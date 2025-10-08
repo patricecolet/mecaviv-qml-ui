@@ -147,13 +147,25 @@ sudo apt-get install cmake ninja-build nodejs npm
 
 ### Installation Qt WebAssembly
 
-```bash
-# Vérifier l'installation Qt
-ls /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
+Télécharger Qt depuis [qt.io/download](https://www.qt.io/download) et installer les modules :
+- Qt 6.10.0 (ou plus récent)
+- Qt for WebAssembly (wasm_singlethread)
 
-# Si Qt n'est pas installé, télécharger depuis qt.io
-# et installer le module "Qt for WebAssembly"
+### Configuration des Chemins Qt
+
+**⚠️ Important** : Le projet utilise des variables d'environnement pour les chemins Qt.
+
+```bash
+# macOS / Linux - Ajouter à ~/.zshrc ou ~/.bashrc
+export QT_DIR="$HOME/Qt/6.10.0/macos"  # ou gcc_64 pour Linux
+export QT_WASM_DIR="$HOME/Qt/6.10.0/wasm_singlethread"
+
+# Windows - PowerShell ou Variables Système
+$env:QT_DIR = "C:\Qt\6.10.0\msvc2019_64"
+$env:QT_WASM_DIR = "C:\Qt\6.10.0\wasm_singlethread"
 ```
+
+**📖 Guide détaillé** : Voir [CONFIG.md](./CONFIG.md) pour la configuration complète.
 
 ### Build de tous les projets
 
@@ -161,7 +173,12 @@ ls /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
 
 ```bash
 # Cloner le dépôt
-cd /Users/patricecolet/repo/mecaviv-qml-ui
+git clone https://github.com/patricecolet/mecaviv-qml-ui.git
+cd mecaviv-qml-ui
+
+# Configurer les variables Qt (voir CONFIG.md)
+export QT_DIR="$HOME/Qt/6.10.0/macos"
+export QT_WASM_DIR="$HOME/Qt/6.10.0/wasm_singlethread"
 
 # Configuration
 cmake --preset=default        # Desktop natif

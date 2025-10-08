@@ -5,6 +5,8 @@ Guide complet pour builder, développer et déployer les applications du monorep
 > 💡 **Recommandé** : Utilisez **CMake** pour un build multiplateforme (Windows, macOS, Linux).  
 > Les scripts bash sont maintenus pour compatibilité mais ne fonctionnent que sur Unix.
 
+> ⚙️ **Configuration Requise** : Avant de commencer, configurez les chemins Qt en suivant le guide [CONFIG.md](../CONFIG.md).
+
 ## 📋 Table des Matières
 
 - [Prérequis](#-prérequis)

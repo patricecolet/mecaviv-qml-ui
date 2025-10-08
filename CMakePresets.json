@@ -19,7 +19,7 @@
         "BUILD_SIRENCONSOLE": true,
         "BUILD_PEDALIER": true,
         "INSTALL_NODE_DEPS": true,
-        "CMAKE_PREFIX_PATH": "/Users/patricecolet/Qt/6.10.0/macos"
+        "CMAKE_PREFIX_PATH": "$env{QT_DIR}"
       }
     },
     {
@@ -44,11 +44,11 @@
         "BUILD_SIRENCONSOLE": true,
         "BUILD_PEDALIER": true,
         "INSTALL_NODE_DEPS": true,
-        "CMAKE_PREFIX_PATH": "/Users/patricecolet/Qt/6.10.0/wasm_singlethread",
-        "CMAKE_TOOLCHAIN_FILE": "/Users/patricecolet/Qt/6.10.0/wasm_singlethread/lib/cmake/Qt6/qt.toolchain.cmake"
+        "CMAKE_PREFIX_PATH": "$env{QT_WASM_DIR}",
+        "CMAKE_TOOLCHAIN_FILE": "$env{QT_WASM_DIR}/lib/cmake/Qt6/qt.toolchain.cmake"
       },
       "environment": {
-        "QT_HOST_PATH": "/Users/patricecolet/Qt/6.10.0/macos"
+        "QT_HOST_PATH": "$env{QT_DIR}"
       }
     },
     {
@@ -63,7 +63,7 @@
       },
       "cacheVariables": {
         "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
-        "CMAKE_PREFIX_PATH": "/Users/patricecolet/Qt/6.10.0/macos"
+        "CMAKE_PREFIX_PATH": "$env{QT_DIR}"
       }
     },
     {
