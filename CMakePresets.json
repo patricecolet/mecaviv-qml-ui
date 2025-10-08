@@ -1,0 +1,140 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 19,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Desktop Build",
+      "description": "Build native desktop applications (Debug)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_FOR_WASM": false,
+        "BUILD_SIRENEPUPITRE": true,
+        "BUILD_SIRENCONSOLE": true,
+        "BUILD_PEDALIER": true,
+        "INSTALL_NODE_DEPS": true
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "default",
+      "displayName": "Release Desktop Build",
+      "description": "Optimized build for production",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "wasm",
+      "displayName": "WebAssembly Build",
+      "description": "Build for WebAssembly (Qt WASM)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-wasm",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_FOR_WASM": true,
+        "BUILD_SIRENEPUPITRE": true,
+        "BUILD_SIRENCONSOLE": true,
+        "BUILD_PEDALIER": true,
+        "INSTALL_NODE_DEPS": true,
+        "CMAKE_PREFIX_PATH": "/Users/patricecolet/Qt/6.10.0/wasm_singlethread",
+        "CMAKE_TOOLCHAIN_FILE": "/Users/patricecolet/Qt/6.10.0/wasm_singlethread/lib/cmake/Qt6/qt.toolchain.cmake"
+      },
+      "environment": {
+        "QT_HOST_PATH": "/Users/patricecolet/Qt/6.10.0/macos"
+      }
+    },
+    {
+      "name": "macos",
+      "inherits": "default",
+      "displayName": "macOS Native",
+      "description": "Native build for macOS",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64"
+      }
+    },
+    {
+      "name": "linux",
+      "inherits": "default",
+      "displayName": "Linux Native",
+      "description": "Native build for Linux",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "windows",
+      "inherits": "default",
+      "displayName": "Windows Native",
+      "description": "Native build for Windows",
+      "generator": "Visual Studio 17 2022",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "raspberry-pi",
+      "inherits": "linux",
+      "displayName": "Raspberry Pi",
+      "description": "Optimized build for Raspberry Pi 4/5",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS": "-march=armv8-a -mtune=cortex-a72"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "displayName": "Build Default",
+      "configurePreset": "default",
+      "jobs": 8
+    },
+    {
+      "name": "release",
+      "displayName": "Build Release",
+      "configurePreset": "release",
+      "jobs": 8
+    },
+    {
+      "name": "wasm",
+      "displayName": "Build WebAssembly",
+      "configurePreset": "wasm",
+      "jobs": 8
+    },
+    {
+      "name": "macos",
+      "displayName": "Build macOS",
+      "configurePreset": "macos",
+      "jobs": 8
+    },
+    {
+      "name": "linux",
+      "displayName": "Build Linux",
+      "configurePreset": "linux",
+      "jobs": 8
+    },
+    {
+      "name": "raspberry-pi",
+      "displayName": "Build Raspberry Pi",
+      "configurePreset": "raspberry-pi",
+      "jobs": 4
+    }
+  ]
+}
+

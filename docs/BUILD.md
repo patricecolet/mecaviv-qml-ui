@@ -2,11 +2,14 @@
 
 Guide complet pour builder, développer et déployer les applications du monorepo.
 
+> 💡 **Recommandé** : Utilisez **CMake** pour un build multiplateforme (Windows, macOS, Linux).  
+> Les scripts bash sont maintenus pour compatibilité mais ne fonctionnent que sur Unix.
+
 ## 📋 Table des Matières
 
 - [Prérequis](#-prérequis)
-- [Installation](#-installation)
-- [Build des Projets](#-build-des-projets)
+- [🏗️ Build avec CMake (Recommandé)](#️-build-avec-cmake-recommandé)
+- [🔧 Build avec Scripts Bash (Legacy)](#-build-avec-scripts-bash-legacy)
 - [Développement](#-développement)
 - [Déploiement](#-déploiement)
 - [Troubleshooting](#-troubleshooting)
@@ -16,12 +19,30 @@ Guide complet pour builder, développer et déployer les applications du monorep
 
 ### Système d'Exploitation
 
-Le système a été testé sur :
-- **macOS** 12.0+ (Monterey ou plus récent)
-- **Linux** (Ubuntu 20.04+, Debian 11+, Raspberry Pi OS)
-- **Windows** 10/11 (avec adaptations des scripts)
+Le système supporte :
+- ✅ **macOS** 12.0+ (Monterey ou plus récent)
+- ✅ **Linux** (Ubuntu 20.04+, Debian 11+, Raspberry Pi OS)
+- ✅ **Windows** 10/11
 
 ### Logiciels Requis
+
+#### CMake 3.19+
+
+**macOS** :
+```bash
+brew install cmake ninja
+cmake --version  # doit afficher 3.19+
+```
+
+**Linux** :
+```bash
+sudo apt-get install cmake ninja-build
+cmake --version
+```
+
+**Windows** :
+- Télécharger depuis [cmake.org/download](https://cmake.org/download/)
+- Installer avec "Add CMake to PATH"
 
 #### Qt 6.10+ avec WebAssembly
 
@@ -37,145 +58,278 @@ Le système a été testé sur :
 
 **Vérification** :
 ```bash
-# Vérifier que qt-cmake est accessible
+# macOS/Linux
 ls /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
 
-# Afficher la version
-/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake --version
-```
-
-**Configuration du chemin** :
-Si Qt est installé ailleurs, modifier `scripts/build-project.sh` :
-```bash
-QT_CMAKE="/votre/chemin/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
+# Windows
+dir C:\Qt\6.10.0\wasm_singlethread\bin\qt-cmake.bat
 ```
 
 #### Node.js 18+
 
-**Installation macOS** :
+**macOS** :
 ```bash
-# Avec Homebrew
 brew install node
-
-# Vérifier
-node --version  # doit afficher v18.x ou plus
-npm --version
+node --version  # doit afficher v18.x+
 ```
 
-**Installation Linux** :
+**Linux** :
 ```bash
-# Ubuntu/Debian
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
-
-# Vérifier
-node --version
-npm --version
 ```
 
-#### CMake 3.16+
+**Windows** :
+- Télécharger depuis [nodejs.org](https://nodejs.org/)
 
-**Installation macOS** :
-```bash
-brew install cmake
-cmake --version
-```
+#### Emscripten SDK (pour WebAssembly)
 
-**Installation Linux** :
-```bash
-sudo apt-get install cmake
-cmake --version
-```
-
-#### Emscripten SDK
-
-Normalement installé avec Qt WebAssembly. Si nécessaire :
+Normalement inclus avec Qt WebAssembly. Si nécessaire :
 
 ```bash
-# Cloner le SDK
 git clone https://github.com/emscripten-core/emsdk.git
 cd emsdk
-
-# Installer et activer
 ./emsdk install latest
 ./emsdk activate latest
 source ./emsdk_env.sh
 ```
 
-#### Google Chrome
+---
 
-Requis pour le développement (DevTools).
+## 🏗️ Build avec CMake (Recommandé)
+
+### Pourquoi CMake ?
+
+- ✅ **Multiplateforme** : Windows, macOS, Linux, WebAssembly
+- ✅ **Intégration IDE** : Qt Creator, CLion, Visual Studio, VS Code
+- ✅ **Build parallèle** optimisé
+- ✅ **Configuration via presets** pour différentes cibles
+- ✅ **Gestion des dépendances** automatique
+
+### 🚀 Quick Start
+
+#### Étape 1 : Configuration
 
 ```bash
-# macOS : Télécharger depuis google.com/chrome
-# Linux : 
-sudo apt-get install google-chrome-stable
+# Desktop natif (Debug)
+cmake --preset=default
+
+# Desktop natif (Release)
+cmake --preset=release
+
+# WebAssembly
+cmake --preset=wasm
+
+# Spécifique plateforme
+cmake --preset=macos       # macOS uniquement
+cmake --preset=linux       # Linux uniquement
+cmake --preset=windows     # Windows uniquement
+cmake --preset=raspberry-pi # Raspberry Pi optimisé
 ```
 
-## 📦 Installation
-
-### Cloner le Dépôt
+**Ou utilisez les scripts helper** :
 
 ```bash
-# Clone le monorepo
-git clone <repository-url> mecaviv-qml-ui
-cd mecaviv-qml-ui
+# Unix (macOS/Linux)
+./scripts/configure.sh default   # ou release, wasm, etc.
 
-# Vérifier la structure
-ls -la
-# Doit afficher : SirenePupitre, SirenConsole, pedalierSirenium, sirenRouter, scripts, docs
+# Windows
+scripts\configure.bat default
 ```
 
-### Installation Rapide (Tous les Projets)
+#### Étape 2 : Build
 
 ```bash
-# Build tous les projets (5-10 minutes)
+# Builder tout
+cmake --build build
+
+# Builder avec le preset
+cmake --build --preset=default
+
+# Build parallèle (utilise tous les cores)
+cmake --build build --parallel
+
+# Builder un projet spécifique
+cmake --build build --target appSirenePupitre
+cmake --build build --target appSirenConsole
+cmake --build build --target qmlwebsocketserver
+cmake --build build --target sirenRouter
+```
+
+#### Étape 3 : Nettoyage
+
+```bash
+# Nettoyer le build
+cmake --build build --target clean
+
+# Nettoyer tout (inclus node_modules)
+cmake --build build --target clean_all
+
+# Ou supprimer le dossier
+rm -rf build
+```
+
+### 📋 Presets Disponibles
+
+| Preset | Description | Utilisation |
+|--------|-------------|-------------|
+| `default` | Build Debug desktop natif | Développement local |
+| `release` | Build Release desktop optimisé | Production desktop |
+| `wasm` | Build WebAssembly (Release) | Déploiement web |
+| `macos` | Build natif macOS (Universal) | Distribution macOS |
+| `linux` | Build natif Linux | Distribution Linux |
+| `windows` | Build natif Windows (Visual Studio) | Distribution Windows |
+| `raspberry-pi` | Build optimisé Raspberry Pi | Déploiement RPi 4/5 |
+
+### 🎯 Workflows Typiques
+
+#### Développement Desktop
+
+```bash
+# Configuration initiale
+cmake --preset=default
+
+# Build
+cmake --build build
+
+# Lancer l'application
+./build/SirenePupitre/appSirenePupitre
+./build/SirenConsole/appSirenConsole
+./build/pedalierSirenium/QtFiles/qmlwebsocketserver
+```
+
+#### Build WebAssembly
+
+```bash
+# Configuration pour WASM
+cmake --preset=wasm
+
+# Build
+cmake --build build-wasm
+
+# Les fichiers WASM sont automatiquement copiés dans webfiles/
+# Lancer le serveur
+cd SirenePupitre/webfiles
+node server.js 8000
+```
+
+#### Build Release Multi-Projets
+
+```bash
+# Configuration Release
+cmake --preset=release
+
+# Build seulement certains projets
+cmake --build build --target appSirenePupitre --target appSirenConsole
+
+# Ou avec options
+cmake -DBUILD_PEDALIER=OFF --preset=release
+cmake --build build
+```
+
+### ⚙️ Options de Configuration
+
+Modifier les options via la ligne de commande :
+
+```bash
+# Désactiver certains projets
+cmake -DBUILD_PEDALIER=OFF --preset=default
+
+# Build sans Node.js
+cmake -DINSTALL_NODE_DEPS=OFF --preset=default
+
+# Ne pas copier vers webfiles
+cmake -DCOPY_TO_WEBFILES=OFF --preset=wasm
+```
+
+### 🔌 Intégration IDE
+
+#### Qt Creator
+
+1. Ouvrir Qt Creator
+2. File → Open File or Project
+3. Sélectionner `CMakeLists.txt` racine
+4. Qt Creator détectera automatiquement les presets
+5. Build → Build All
+
+#### CLion / IntelliJ
+
+1. Open Project → Sélectionner le dossier racine
+2. CLion détecte `CMakeLists.txt`
+3. Settings → Build → CMake → Sélectionner un preset
+4. Build → Build Project
+
+#### Visual Studio Code
+
+1. Installer l'extension "CMake Tools"
+2. Ouvrir le dossier racine
+3. Cmd/Ctrl+Shift+P → "CMake: Select Configure Preset"
+4. Sélectionner un preset
+5. Build via la barre d'état
+
+#### Visual Studio (Windows)
+
+1. File → Open → CMake
+2. Sélectionner `CMakeLists.txt`
+3. Visual Studio détecte automatiquement les presets
+4. Build → Build All
+
+---
+
+## 🔧 Build avec Scripts Bash (Legacy)
+
+> ⚠️ **Attention** : Ces scripts ne fonctionnent que sur **macOS et Linux**.  
+> Pour Windows, utilisez CMake.
+
+### Scripts Disponibles
+
+#### `./scripts/build-all.sh` - Build Complet
+
+Build tous les projets en WebAssembly + installation Node.js.
+
+```bash
 ./scripts/build-all.sh
 ```
 
-**Ce que fait le script** :
-1. Build SirenePupitre en WebAssembly
-2. Build SirenConsole en WebAssembly
-3. Build pedalierSirenium en WebAssembly
-4. Installation Node.js pour sirenRouter
-5. Copie des fichiers dans webfiles/
+**Durée** : 5-10 minutes
 
-## 🔨 Build des Projets
-
-### Build Individuel
-
-Pour builder un seul projet :
+#### `./scripts/build-project.sh <project>` - Build Individuel
 
 ```bash
-# SirenePupitre
 ./scripts/build-project.sh sirenepupitre
-
-# SirenConsole
 ./scripts/build-project.sh sirenconsole
-
-# pedalierSirenium
 ./scripts/build-project.sh pedalier
-
-# sirenRouter (npm install)
 ./scripts/build-project.sh router
 ```
 
-### Build Manuel (Méthode Détaillée)
+#### `./scripts/dev.sh <project>` - Mode Développement
+
+Build + serveur + ouverture Chrome.
+
+```bash
+./scripts/dev.sh sirenepupitre   # Port 8000
+./scripts/dev.sh sirenconsole    # Port 8001
+./scripts/dev.sh pedalier        # Port 8010
+./scripts/dev.sh router          # Ports 8002-8004
+```
+
+#### `./scripts/clean-all.sh` - Nettoyage
+
+Supprime build/, node_modules/, *.wasm, logs.
+
+```bash
+./scripts/clean-all.sh
+```
+
+### Build Manuel (Détaillé)
 
 #### SirenePupitre
 
 ```bash
 cd SirenePupitre
-mkdir -p build
-cd build
-
-# Configuration CMake avec Qt WebAssembly
+mkdir -p build && cd build
 /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
-
-# Compilation (utilise tous les cores)
 make -j$(sysctl -n hw.ncpu)
-
-# Copie vers webfiles
 cp appSirenePupitre.* ../webfiles/
 ```
 
@@ -183,16 +337,9 @@ cp appSirenePupitre.* ../webfiles/
 
 ```bash
 cd SirenConsole
-mkdir -p build
-cd build
-
-# Configuration CMake
+mkdir -p build && cd build
 /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
-
-# Compilation
 make -j$(sysctl -n hw.ncpu)
-
-# Copie vers webfiles
 cp appSirenConsole.* ../webfiles/
 ```
 
@@ -200,16 +347,9 @@ cp appSirenConsole.* ../webfiles/
 
 ```bash
 cd pedalierSirenium/QtFiles
-mkdir -p build
-cd build
-
-# Configuration CMake
+mkdir -p build && cd build
 /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
-
-# Compilation
 make -j$(sysctl -n hw.ncpu)
-
-# Copie vers webfiles
 cp qmlwebsocketserver.* ../../webfiles/
 ```
 
@@ -217,215 +357,169 @@ cp qmlwebsocketserver.* ../../webfiles/
 
 ```bash
 cd sirenRouter
-
-# Installation dépendances Node.js
 npm install
-
-# Optionnel : créer package.json si absent
-cat > package.json << EOF
-{
-  "name": "siren-router",
-  "version": "1.0.0",
-  "description": "Service de monitoring pour sirènes",
-  "main": "src/server.js",
-  "scripts": {
-    "start": "node src/server.js"
-  }
-}
-EOF
-
-npm install express ws
+npm start
 ```
 
-### Nettoyage
-
-Pour nettoyer tous les builds :
-
-```bash
-# Nettoyage complet (build/, node_modules/, *.wasm, logs)
-./scripts/clean-all.sh
-```
-
-Pour nettoyer manuellement :
-
-```bash
-# Supprimer les dossiers build
-rm -rf SirenePupitre/build
-rm -rf SirenConsole/build
-rm -rf pedalierSirenium/QtFiles/build
-
-# Supprimer node_modules
-rm -rf sirenRouter/node_modules
-rm -rf SirenConsole/webfiles/node_modules
-rm -rf pedalierSirenium/webfiles/node_modules
-
-# Supprimer les fichiers wasm
-find . -name "*.wasm" -delete
-```
+---
 
 ## 💻 Développement
 
-### Mode Développement Rapide
+### Mode Développement avec CMake
 
-Le script `dev.sh` automatise : build + serveur + ouverture navigateur.
+#### Workflow Itératif
 
 ```bash
-# SirenePupitre (port 8000)
+# 1. Configuration initiale (une fois)
+cmake --preset=default
+
+# 2. Développement
+# - Modifier le code QML/C++
+# - Rebuild automatique du fichier modifié
+cmake --build build
+
+# 3. Test
+./build/SirenePupitre/appSirenePupitre
+
+# 4. Répéter 2-3
+```
+
+#### Rebuild Incrémental
+
+CMake rebuild uniquement les fichiers modifiés :
+
+```bash
+# Après modification de Main.qml
+cmake --build build
+# → Rebuild uniquement les dépendances nécessaires
+```
+
+#### Watch Mode (Linux/macOS)
+
+Utiliser `fswatch` pour rebuild automatique :
+
+```bash
+# Installer fswatch
+brew install fswatch  # macOS
+sudo apt-get install fswatch  # Linux
+
+# Watch et rebuild
+fswatch -o SirenePupitre/QML | xargs -n1 -I{} cmake --build build --target appSirenePupitre
+```
+
+### Mode Développement avec Scripts Bash
+
+```bash
+# Lancer en mode dev (build + serveur + Chrome)
 ./scripts/dev.sh sirenepupitre
 
-# SirenConsole (port 8001)
-./scripts/dev.sh sirenconsole
+# Modifier le code...
+# Ctrl+C pour arrêter
 
-# pedalierSirenium (port 8010)
-./scripts/dev.sh pedalier
-
-# sirenRouter (ports 8002-8004)
-./scripts/dev.sh router
+# Relancer pour rebuilder
+./scripts/dev.sh sirenepupitre
 ```
-
-**Workflow de développement** :
-1. Lancer `./scripts/dev.sh <project>`
-2. Chrome s'ouvre avec DevTools
-3. Modifier le code QML
-4. Ctrl+C pour arrêter
-5. Relancer pour rebuilder
-
-### Serveur Manuel
-
-Pour lancer uniquement le serveur (sans rebuild) :
-
-```bash
-# SirenePupitre
-cd SirenePupitre/webfiles
-node server.js 8000
-
-# SirenConsole
-cd SirenConsole/webfiles
-node server.js 8001
-
-# pedalierSirenium
-cd pedalierSirenium/webfiles
-node server.js 8010
-```
-
-Ouvrir manuellement : `http://localhost:<port>`
 
 ### Hot Reload
 
-Qt WebAssembly **ne supporte pas** le hot reload natif. Pour tester rapidement :
+⚠️ Qt WebAssembly **ne supporte pas** le hot reload natif.
 
+Workflow recommandé :
 1. Modifier le code QML
 2. Sauvegarder
-3. Rebuilder : `./scripts/build-project.sh <project>`
-4. Recharger la page dans le navigateur (F5)
+3. Rebuilder : `cmake --build build --target <projet>`
+4. Recharger la page (F5)
 
 ### Debug dans le Navigateur
 
 #### Console JavaScript
 
-```bash
-# Ouvrir DevTools : F12 ou Cmd+Opt+I
-
-# Logs QML apparaissent dans la console
-console.log("Message depuis QML")
-```
+- Ouvrir DevTools : **F12** ou **Cmd+Opt+I**
+- Onglet "Console" pour voir les logs QML
+- `console.log()` dans QML apparaît dans la console
 
 #### Network Inspector
 
-Vérifier les communications WebSocket :
+Vérifier les WebSocket :
 1. F12 → Onglet "Network"
 2. Filter "WS" (WebSocket)
 3. Cliquer sur une connexion pour voir les messages
 
 #### Memory Profiling
 
-Pour détecter les fuites mémoire :
 1. F12 → Onglet "Memory"
 2. Take Heap Snapshot
-3. Comparer avant/après actions
+3. Comparer avant/après pour détecter les fuites
 
-### Logs Serveur
-
-Les serveurs Node.js créent des logs :
+### Logs et Debugging
 
 ```bash
-# Voir les logs en temps réel
+# Logs CMake verbeux
+cmake --build build --verbose
+
+# Logs de build détaillés
+cmake --build build -- VERBOSE=1
+
+# Logs du serveur
 tail -f /tmp/sirenepupitre_server.log
 tail -f /tmp/sirenconsole_server.log
-tail -f /tmp/pedalier_server.log
-
-# Logs du build
-tail -f SirenePupitre/build/build.log
 ```
+
+---
 
 ## 🚀 Déploiement
 
 ### Déploiement Local (Tests)
 
 ```bash
-# Build tous les projets
-./scripts/build-all.sh
+# Build tout en Release
+cmake --preset=release
+cmake --build build
 
-# Lancer les applications
-./scripts/dev.sh sirenepupitre &
-./scripts/dev.sh sirenconsole &
-./scripts/dev.sh pedalier &
-./scripts/dev.sh router &
-
-# Accéder aux URLs
-# http://localhost:8000 - SirenePupitre
-# http://localhost:8001 - SirenConsole
-# http://localhost:8010 - pedalierSirenium
-# http://localhost:8002 - sirenRouter API
+# Lancer les applications desktop
+./build/SirenePupitre/appSirenePupitre &
+./build/SirenConsole/appSirenConsole &
 ```
 
-### Déploiement sur Raspberry Pi
-
-#### Préparation
+### Déploiement WebAssembly
 
 ```bash
-# Sur la machine de dev : build
-./scripts/build-all.sh
+# Build WASM Release
+cmake --preset=wasm
+cmake --build build-wasm
 
-# Créer une archive
-tar -czf mecaviv-qml-ui.tar.gz \
-  SirenePupitre/webfiles \
-  SirenConsole/webfiles \
-  pedalierSirenium/webfiles \
-  sirenRouter
+# Les fichiers sont copiés dans webfiles/
+# Lancer les serveurs
+cd SirenePupitre/webfiles && node server.js 8000 &
+cd SirenConsole/webfiles && node server.js 8001 &
+cd pedalierSirenium/webfiles && node server.js 8010 &
 ```
 
-#### Installation sur Raspberry Pi
+### Déploiement Raspberry Pi
+
+#### Méthode 1 : Cross-Compilation (recommandée)
 
 ```bash
-# Copier l'archive
-scp mecaviv-qml-ui.tar.gz pi@192.168.1.20:/home/pi/
+# Sur machine de dev
+cmake --preset=raspberry-pi
+cmake --build build --target package
 
-# Se connecter au Pi
-ssh pi@192.168.1.20
-
-# Extraire
-cd /home/pi
-tar -xzf mecaviv-qml-ui.tar.gz
-
-# Installer Node.js si nécessaire
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo bash -
-sudo apt-get install -y nodejs
-
-# Installer Chromium
-sudo apt-get install -y chromium-browser
-
-# Démarrer les services
-cd SirenePupitre/webfiles
-node server.js 8000 &
-
-cd ../SirenConsole/webfiles
-node server.js 8001 &
-
-# etc...
+# Copier sur le Pi
+scp build/mecaviv-qml-ui.tar.gz pi@192.168.1.20:/home/pi/
 ```
 
-#### Service systemd (Auto-démarrage)
+#### Méthode 2 : Build sur le Pi
+
+```bash
+# Sur le Raspberry Pi
+sudo apt-get install cmake ninja-build qt6-base-dev qt6-quick-dev
+
+# Build
+cmake --preset=raspberry-pi
+cmake --build build -j4
+```
+
+### Service systemd (Auto-démarrage)
 
 Créer `/etc/systemd/system/sirenepupitre.service` :
 
@@ -451,25 +545,16 @@ Activer :
 sudo systemctl daemon-reload
 sudo systemctl enable sirenepupitre
 sudo systemctl start sirenepupitre
-
-# Vérifier
 sudo systemctl status sirenepupitre
 ```
 
-Répéter pour les autres services.
-
-### Déploiement Web (Production)
-
-#### Avec Nginx
+### Déploiement Web (Nginx)
 
 ```nginx
-# /etc/nginx/sites-available/mecaviv
-
 server {
     listen 80;
     server_name mecaviv.local;
 
-    # SirenePupitre
     location /pupitre {
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
@@ -477,56 +562,62 @@ server {
         proxy_set_header Connection "upgrade";
     }
 
-    # SirenConsole
     location /console {
         proxy_pass http://localhost:8001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
     }
-
-    # pedalierSirenium
-    location /pedalier {
-        proxy_pass http://localhost:8010;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-
-    # sirenRouter API
-    location /api {
-        proxy_pass http://localhost:8002;
-    }
 }
 ```
 
-Activer :
-```bash
-sudo ln -s /etc/nginx/sites-available/mecaviv /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-#### Avec Docker (Futur)
-
-Structure des Dockerfiles à venir dans v1.2.
+---
 
 ## 🐛 Troubleshooting
 
-### Erreur "qt-cmake not found"
+### Erreur "CMake not found"
 
-**Cause** : Qt WebAssembly pas installé ou mauvais chemin.
+**Cause** : CMake pas installé ou pas dans le PATH.
 
 **Solution** :
 ```bash
-# Vérifier l'installation Qt
-ls /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
+# macOS
+brew install cmake
 
-# Si absent, réinstaller Qt avec le composant WebAssembly
+# Linux
+sudo apt-get install cmake
 
-# Si différent, modifier scripts/build-project.sh
-nano scripts/build-project.sh
-# Changer QT_CMAKE="/votre/chemin/qt-cmake"
+# Windows
+# Réinstaller CMake avec "Add to PATH"
+```
+
+### Erreur "Qt6 not found"
+
+**Cause** : Qt pas installé ou CMAKE_PREFIX_PATH incorrect.
+
+**Solution** :
+```bash
+# Vérifier installation Qt
+ls /Users/patricecolet/Qt/6.10.0/
+
+# Modifier CMakePresets.json
+# Ajuster CMAKE_PREFIX_PATH vers votre installation Qt
+```
+
+### Erreur "Ninja not found"
+
+**Cause** : Générateur Ninja pas installé.
+
+**Solution** :
+```bash
+# macOS
+brew install ninja
+
+# Linux
+sudo apt-get install ninja-build
+
+# Windows
+# Télécharger depuis github.com/ninja-build/ninja
 ```
 
 ### Erreur "Port already in use"
@@ -535,13 +626,11 @@ nano scripts/build-project.sh
 
 **Solution** :
 ```bash
-# Automatique avec clean-all
-./scripts/clean-all.sh
-
-# Ou manuellement
+# Tuer le processus
 lsof -ti:8000 | xargs kill -9
-lsof -ti:8001 | xargs kill -9
-lsof -ti:8010 | xargs kill -9
+
+# Ou utiliser le script
+./scripts/clean-all.sh
 ```
 
 ### Build échoue avec "emscripten not found"
@@ -557,20 +646,16 @@ source /Users/patricecolet/Qt/6.10.0/wasm_singlethread/emsdk/emsdk_env.sh
 em++ --version
 ```
 
-### Fichiers .wasm très gros (>100MB)
+### Fichiers WASM très gros (>100MB)
 
 **Cause** : Build en mode Debug.
 
 **Solution** :
 ```bash
-# Build en mode Release
-cd build
-/path/to/qt-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(sysctl -n hw.ncpu)
-
-# Tailles attendues :
-# Debug: 80-120 MB
-# Release: 30-40 MB
+# Utiliser le preset Release
+cmake --preset=release
+# ou
+cmake --preset=wasm  # déjà en Release
 ```
 
 ### WebSocket ne se connecte pas
@@ -582,141 +667,108 @@ make -j$(sysctl -n hw.ncpu)
 # Vérifier que PureData tourne (port 10001)
 lsof -i:10001
 
-# Vérifier la config WebSocket
+# Vérifier config
 cat SirenePupitre/config.js | grep serverUrl
-# Doit correspondre au serveur PureData
 ```
 
-### Interface ne charge pas dans Chrome
-
-**Cause** : Fichiers WASM pas copiés ou serveur pas démarré.
-
-**Solution** :
-```bash
-# Vérifier les fichiers webfiles
-ls -lh SirenePupitre/webfiles/*.wasm
-ls -lh SirenePupitre/webfiles/*.js
-ls -lh SirenePupitre/webfiles/*.html
-
-# Si absents, rebuilder
-./scripts/build-project.sh sirenepupitre
-
-# Vérifier le serveur
-curl http://localhost:8000
-# Doit retourner du HTML
-```
-
-### Erreur CMake "Qt6 not found"
-
-**Cause** : Qt pas dans le PATH ou mauvaise version.
-
-**Solution** :
-```bash
-# Utiliser qt-cmake au lieu de cmake
-/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
-
-# Ou ajouter Qt au PATH
-export PATH="/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin:$PATH"
-cmake ..
-```
+---
 
 ## ⚡ Optimisations
 
 ### Build Plus Rapide
 
 ```bash
-# Utiliser tous les cores CPU
-make -j$(sysctl -n hw.ncpu)
+# Utiliser tous les cores
+cmake --build build --parallel
 
-# Ou spécifier le nombre
-make -j8
+# Spécifier le nombre de jobs
+cmake --build build -j8
 
-# Utiliser Ninja au lieu de Make
-/path/to/qt-cmake .. -GNinja
-ninja
+# Utiliser ccache
+sudo apt-get install ccache  # Linux
+brew install ccache          # macOS
+
+cmake -DCMAKE_CXX_COMPILER_LAUNCHER=ccache --preset=default
+```
+
+### Build Incrémental
+
+CMake rebuild automatiquement uniquement les fichiers modifiés :
+
+```bash
+# Première compilation : longue
+cmake --build build
+
+# Modifications mineures : rapide
+cmake --build build
 ```
 
 ### Cache CMake
 
 ```bash
-# Utiliser ccache pour accélérer les recompilations
-brew install ccache  # macOS
-sudo apt-get install ccache  # Linux
+# Utiliser le cache de configuration
+cmake --preset=default  # Première fois
+cmake --build build      # Utilise le cache
 
-# Configurer CMake
-cmake .. -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-```
-
-### Build Incrémental
-
-```bash
-# Ne rebuild que les fichiers modifiés
-cd build
-make
-
-# Si erreur, clean et rebuild
-make clean
-make -j$(sysctl -n hw.ncpu)
+# Nettoyer le cache si problème
+rm -rf build/CMakeCache.txt
+cmake --preset=default
 ```
 
 ### Optimisation Taille WASM
 
 ```bash
-# Build Release avec optimisations
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(sysctl -n hw.ncpu)
+# Build avec optimisations de taille
+cmake -DCMAKE_BUILD_TYPE=MinSizeRel --preset=wasm
 
 # Activer LTO (Link Time Optimization)
-cmake .. -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
-make -j$(sysctl -n hw.ncpu)
+cmake -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON --preset=wasm
 ```
 
 ### Performance Runtime
 
-**Dans main.cpp** :
-```cpp
-// Activer le mode Release
-#define QT_NO_DEBUG_OUTPUT
-#define QT_NO_INFO_OUTPUT
+Dans `CMakeLists.txt` :
+```cmake
+# Mode Release avec optimisations
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+
+# Désactiver les logs de debug
+add_definitions(-DQT_NO_DEBUG_OUTPUT)
 ```
 
-**Dans QML** :
-```qml
-// Désactiver les logs de performance
-Settings {
-    property bool enableDebugLogs: false
-}
-```
+---
 
 ## 📊 Métriques de Build
 
-### Temps de Build (Machine Test : M1 MacBook Pro)
+### Temps de Build (M1 MacBook Pro)
 
-| Projet | Temps (Debug) | Temps (Release) |
-|--------|---------------|-----------------|
-| SirenePupitre | 2m 30s | 3m 15s |
-| SirenConsole | 1m 45s | 2m 20s |
-| pedalierSirenium | 3m 00s | 4m 00s |
-| sirenRouter | 10s | 10s |
-| **Total** | **7m 25s** | **9m 45s** |
+| Projet | Debug | Release | WASM |
+|--------|-------|---------|------|
+| SirenePupitre | 2m 30s | 3m 15s | 3m 45s |
+| SirenConsole | 1m 45s | 2m 20s | 2m 50s |
+| pedalierSirenium | 3m 00s | 4m 00s | 4m 30s |
+| sirenRouter | 10s | 10s | 10s |
+| **Total** | **7m 25s** | **9m 45s** | **11m 15s** |
 
 ### Taille des Fichiers
 
-| Projet | WASM (Debug) | WASM (Release) |
-|--------|--------------|----------------|
+| Projet | WASM Debug | WASM Release |
+|--------|------------|--------------|
 | SirenePupitre | 95 MB | 38 MB |
 | SirenConsole | 82 MB | 34 MB |
 | pedalierSirenium | 108 MB | 42 MB |
 
+---
+
 ## 📚 Références
 
-- [Documentation Qt WebAssembly](https://doc.qt.io/qt-6/wasm.html)
-- [Emscripten Documentation](https://emscripten.org/docs/)
-- [Qt Quick 3D](https://doc.qt.io/qt-6/qtquick3d-index.html)
-- [Qt WebSockets](https://doc.qt.io/qt-6/qtwebsockets-index.html)
+- [CMake Documentation](https://cmake.org/documentation/)
+- [Qt CMake Manual](https://doc.qt.io/qt-6/cmake-manual.html)
+- [Qt WebAssembly](https://doc.qt.io/qt-6/wasm.html)
+- [CMake Presets](https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html)
+- [Ninja Build](https://ninja-build.org/)
 
 ---
 
 Pour l'architecture complète, voir [ARCHITECTURE.md](./ARCHITECTURE.md).  
 Pour les protocoles de communication, voir [COMMUNICATION.md](./COMMUNICATION.md).
-

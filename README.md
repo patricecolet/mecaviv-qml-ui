@@ -127,8 +127,23 @@ Ce monorepo regroupe 4 applications interconnectées pour le contrôle, la visua
 
 - **Qt 6.10+** avec support WebAssembly
 - **Node.js 18+** et npm
-- **CMake 3.16+**
-- **Google Chrome** (pour le développement)
+- **CMake 3.19+** (système de build multiplateforme)
+- **Ninja** (générateur de build recommandé)
+- **Google Chrome** (pour le développement web)
+
+### Installation des Outils
+
+```bash
+# macOS
+brew install cmake ninja node
+
+# Linux
+sudo apt-get install cmake ninja-build nodejs npm
+
+# Windows
+# Installer CMake: https://cmake.org/download/
+# Installer Node.js: https://nodejs.org/
+```
 
 ### Installation Qt WebAssembly
 
@@ -142,11 +157,25 @@ ls /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
 
 ### Build de tous les projets
 
+#### Méthode 1 : CMake (Recommandé - Multiplateforme)
+
 ```bash
 # Cloner le dépôt
 cd /Users/patricecolet/repo/mecaviv-qml-ui
 
-# Build tous les projets (5-10 minutes)
+# Configuration
+cmake --preset=default        # Desktop natif
+# ou
+cmake --preset=wasm          # WebAssembly
+
+# Build (5-10 minutes)
+cmake --build build --parallel
+```
+
+#### Méthode 2 : Scripts Bash (macOS/Linux uniquement)
+
+```bash
+# Build tous les projets
 ./scripts/build-all.sh
 ```
 
@@ -166,22 +195,38 @@ cd /Users/patricecolet/repo/mecaviv-qml-ui
 ./scripts/dev.sh router
 ```
 
-## 📜 Scripts Disponibles
+## 📜 Build System
 
-### `./scripts/build-all.sh`
-Build tous les projets en WebAssembly + installation Node.js.
+### CMake (Recommandé - Multiplateforme)
 
-### `./scripts/build-project.sh <project>`
-Build un projet spécifique :
-- `sirenepupitre`, `sirenconsole`, `pedalier`, `router`
+```bash
+# Configuration
+cmake --preset=default        # Desktop Debug
+cmake --preset=release        # Desktop Release
+cmake --preset=wasm          # WebAssembly
 
-### `./scripts/dev.sh <project>`
-Mode développement : build + serveur + ouverture navigateur.
+# Build
+cmake --build build          # Build tout
+cmake --build build --target appSirenePupitre  # Build un projet
+cmake --build build --parallel  # Build parallèle
 
-### `./scripts/clean-all.sh`
-Nettoyage complet : supprime build/, node_modules/, *.wasm, logs.
+# Helper scripts
+./scripts/configure.sh default   # Unix
+scripts\configure.bat default    # Windows
+```
 
-**Documentation complète** : [scripts/README.md](./scripts/README.md)
+### Scripts Bash (Legacy - Unix uniquement)
+
+```bash
+./scripts/build-all.sh         # Build tous les projets
+./scripts/build-project.sh <project>  # Build un projet spécifique
+./scripts/dev.sh <project>     # Mode développement
+./scripts/clean-all.sh         # Nettoyage complet
+```
+
+**Documentation complète** : 
+- [docs/BUILD.md](./docs/BUILD.md) - Guide de build détaillé
+- [scripts/README.md](./scripts/README.md) - Documentation des scripts
 
 ## 📡 Communication entre Applications
 
