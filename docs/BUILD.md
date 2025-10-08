@@ -136,7 +136,7 @@ cmake --preset=raspberry-pi # Raspberry Pi optimisé
 ./scripts/configure.sh default   # ou release, wasm, etc.
 
 # Windows
-scripts\configure.bat default
+scripts\configure.ps1 default
 ```
 
 #### Étape 2 : Build

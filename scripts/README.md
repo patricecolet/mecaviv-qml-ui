@@ -2,9 +2,17 @@
 
 Scripts pour builder et développer tous les projets du monorepo mecaviv-qml-ui.
 
+> ⚠️ **Note Windows** : Les scripts `.sh` (bash) fonctionnent uniquement sur macOS/Linux.  
+> Pour Windows, utilisez les scripts `.ps1` (PowerShell) ou CMake directement.  
+> Voir [../docs/BUILD.md](../docs/BUILD.md) pour le guide Windows complet.
+
 ## 📋 Scripts Disponibles
 
-### `build-all.sh` - Build de tous les projets
+### Scripts Unix (macOS/Linux)
+
+Les scripts `.sh` ci-dessous ne fonctionnent que sur macOS et Linux.
+
+#### `build-all.sh` - Build de tous les projets
 
 Build tous les projets Qt/QML en WebAssembly + installation de sirenRouter.
 
@@ -74,6 +82,48 @@ Supprime tous les dossiers de build, node_modules et fichiers temporaires.
 - Supprime les fichiers `.wasm`
 - Supprime les logs temporaires
 - Tue tous les serveurs en cours
+
+### Scripts PowerShell (Windows)
+
+Les scripts `.ps1` ci-dessous fonctionnent sur Windows avec PowerShell 5.1+.
+
+#### `setup-env.ps1` - Configuration des Variables Qt
+
+Script interactif pour configurer `QT_DIR` et `QT_WASM_DIR`.
+
+```powershell
+.\scripts\setup-env.ps1
+```
+
+**Ce qu'il fait** :
+- Détecte Qt dans `C:\Qt\`
+- Vous propose de valider ou personnaliser les chemins
+- Optionnellement ajoute aux variables système Windows
+- Configuration permanente pour tous les terminaux
+
+#### `configure.ps1` - Configuration CMake
+
+Configuration rapide du projet avec CMake.
+
+```powershell
+.\scripts\configure.ps1 default   # Desktop Debug
+.\scripts\configure.ps1 release   # Desktop Release
+.\scripts\configure.ps1 wasm      # WebAssembly
+.\scripts\configure.ps1 windows   # Visual Studio
+```
+
+**Prérequis** : Définir `QT_DIR` et `QT_WASM_DIR` avec `setup-env.ps1`.
+
+### Équivalence Scripts
+
+| Unix (macOS/Linux) | Windows (PowerShell) | Description |
+|-------------------|----------------------|-------------|
+| `./scripts/setup-env.sh` | `.\scripts\setup-env.ps1` | Configuration variables Qt |
+| `./scripts/configure.sh` | `.\scripts\configure.ps1` | Configuration CMake |
+| `./scripts/build-all.sh` | ❌ (utiliser CMake) | Build tous les projets |
+| `./scripts/dev.sh` | ❌ (utiliser CMake) | Mode développement |
+
+**Recommandation Windows** : Utiliser CMake directement plutôt que les scripts bash.
 
 ## 🔧 Configuration Requise
 

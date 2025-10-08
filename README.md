@@ -242,8 +242,8 @@ cmake --build build --target appSirenePupitre  # Build un projet
 cmake --build build --parallel  # Build parallèle
 
 # Helper scripts
-./scripts/configure.sh default   # Unix
-scripts\configure.bat default    # Windows
+./scripts/configure.sh default   # macOS/Linux
+.\scripts\configure.ps1 default    # Windows (PowerShell)
 ```
 
 ### Scripts Bash (Legacy - Unix uniquement)
