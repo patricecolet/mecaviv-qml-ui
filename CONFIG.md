@@ -2,6 +2,37 @@
 
 Guide de configuration pour adapter le projet à votre environnement.
 
+## 🚀 Configuration Rapide (Recommandé)
+
+**Scripts interactifs** pour configurer automatiquement vos chemins Qt :
+
+### macOS / Linux
+
+```bash
+# Lancer le script de configuration (bash)
+./scripts/setup-env.sh
+
+# Le script va:
+# 1. Détecter votre système (macOS/Linux)
+# 2. Chercher Qt dans les emplacements standards
+# 3. Vous proposer de valider ou personnaliser les chemins
+# 4. Optionnellement ajouter les variables à votre ~/.zshrc ou ~/.bashrc
+```
+
+### Windows
+
+```powershell
+# Lancer le script de configuration (PowerShell)
+.\scripts\setup-env.ps1
+
+# Le script va:
+# 1. Chercher Qt dans C:\Qt\
+# 2. Vous proposer de valider ou personnaliser les chemins
+# 3. Optionnellement ajouter les variables aux variables système Windows
+```
+
+**Ou configuration manuelle** (voir ci-dessous) :
+
 ## 📋 Prérequis
 
 Avant de configurer, assurez-vous d'avoir installé :

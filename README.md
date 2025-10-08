@@ -155,6 +155,20 @@ Télécharger Qt depuis [qt.io/download](https://www.qt.io/download) et installe
 
 **⚠️ Important** : Le projet utilise des variables d'environnement pour les chemins Qt.
 
+#### Configuration Rapide
+
+```bash
+# macOS / Linux
+./scripts/setup-env.sh
+
+# Windows (PowerShell)
+.\scripts\setup-env.ps1
+```
+
+Le script détecte automatiquement votre système et configure les chemins Qt.
+
+#### Configuration Manuelle
+
 ```bash
 # macOS / Linux - Ajouter à ~/.zshrc ou ~/.bashrc
 export QT_DIR="$HOME/Qt/6.10.0/macos"  # ou gcc_64 pour Linux
