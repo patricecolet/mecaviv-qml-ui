@@ -1,0 +1,110 @@
+<RCC>
+    <qresource prefix="/">
+        <!-- Main files -->
+        <file>qml/qmlwebsocketserver/main.qml</file>
+        <file>qml/qmlwebsocketserver/Settings.qml</file>
+        
+        <!-- Core components -->
+        <file>qml/qmlwebsocketserver/components/core/SirenView.qml</file>
+        <file>qml/qmlwebsocketserver/components/core/SirenColumn.qml</file>
+        <file>qml/qmlwebsocketserver/components/core/CategoryRow.qml</file>
+        
+        <!-- UI components -->
+        <file>qml/qmlwebsocketserver/components/ui/BottomControls.qml</file>
+        <file>qml/qmlwebsocketserver/components/ui/ConnectionStatus.qml</file>
+        <file>qml/qmlwebsocketserver/components/ui/ConfigModeButton.qml</file>
+        <file>qml/qmlwebsocketserver/components/ui/ScenePageIndicator.qml</file>
+        
+        <!-- Control components -->
+        <file>qml/qmlwebsocketserver/components/controls/PedalConfigPanel.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/ControlSection.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/ComboBox3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/TempoControl.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/PedalPresetManager.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/SceneManager.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/SceneNavigation.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/SceneGrid.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/SceneInfo.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/SceneSaveDialog.qml</file>
+        <file>qml/qmlwebsocketserver/components/controls/SceneButton.qml</file>
+        
+        <!-- Monitoring components -->
+        <file>qml/qmlwebsocketserver/components/monitoring/RevolutionCounter3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/PieChartAnimation.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/piechartfinal.frag</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/SireniumMonitor.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/SirenStateMonitor.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/SphereSet.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/SystemInfoReader.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/TemperatureMonitor.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/PerformanceMonitor.qml</file>
+        <!-- Monitoring MIDI Display (3D) -->
+        <file>qml/qmlwebsocketserver/components/monitoring/midi-display/SirenChannelMonitor3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/midi-display/MusicalStaff3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/midi-display/StaffClef3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/midi-display/NoteMarker3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/midi-display/VelocityBar3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/midi-display/BendMeter3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/midi-display/NoteHistoryTrail3D.qml</file>
+        <file>qml/qmlwebsocketserver/components/monitoring/midi-display/SirenSpecProvider.qml</file>
+         <file>qml/qmlwebsocketserver/components/monitoring/midi-display/AccidentalSharp3D.qml</file>
+         <file>qml/qmlwebsocketserver/components/monitoring/midi-display/TrebleClef3D.qml</file>
+        
+        <!-- Debug components -->
+        <file>qml/qmlwebsocketserver/components/debug/DebugPanel.qml</file>
+        
+        
+        <!-- Controllers -->
+        <file>qml/qmlwebsocketserver/controllers/BeatController.qml</file>
+        <file>qml/qmlwebsocketserver/controllers/MessageParser.qml</file>
+        <file>qml/qmlwebsocketserver/controllers/MessageRouter.qml</file>
+        <file>qml/qmlwebsocketserver/controllers/MidiMonitorController.qml</file>
+        <file>qml/qmlwebsocketserver/controllers/PedalConfigController.qml</file>
+        <file>qml/qmlwebsocketserver/controllers/SirenController.qml</file>
+        <file>qml/qmlwebsocketserver/controllers/WebSocketController.qml</file>
+        
+        <!-- Utils -->
+        <file>qml/qmlwebsocketserver/utils/Logger.qml</file>
+        <file>qml/qmlwebsocketserver/config.js</file>
+        <file>qml/qmlwebsocketserver/sirenSpec.json</file>
+        <file>qml/qmlwebsocketserver/sirenSpec.js</file>
+        <file>qml/utils/DigitLED3D.qml</file>
+        <file>qml/utils/Knob.qml</file>
+        <file>qml/utils/Knob3D.qml</file>
+        <file>qml/utils/LEDSegment.qml</file>
+        <file>qml/utils/LEDText3D.qml</file>
+        <file>qml/utils/MusicUtils.qml</file>
+        <file>qml/utils/VirtualKeyboard.qml</file>
+        
+        <!-- Images -->
+        <file>images/grass.jpg</file>
+        <file>images/grass_n.jpg</file>
+        <file>images/qt_logo.png</file>
+        <file>images/sky.jpg</file>
+        <file>images/star.png</file>
+        
+        <!-- Icons -->
+        <file>qml/icons/network.png</file>
+        <file>qml/icons/clock.png</file>
+        <file>qml/icons/mic.png</file>
+        <file>qml/icons/animation.png</file>
+        <file>qml/icons/package.png</file>
+        <file>qml/icons/record.png</file>
+        <file>qml/icons/save.png</file>
+        <file>qml/icons/knob.png</file>
+        <file>qml/icons/switch.png</file>
+        <file>qml/icons/parse.png</file>
+        <file>qml/icons/rocket.png</file>
+        <file>qml/icons/settings.png</file>
+        <file>qml/icons/trash.png</file>
+        <file>qml/icons/play.png</file>
+        <file>qml/icons/pause.png</file>
+        <file>qml/icons/close.png</file>
+        <file>qml/icons/bug.png</file>
+        <file>qml/icons/chart.png</file>
+        <file>qml/icons/lightning.png</file>
+        <file>qml/icons/theater.png</file>
+        <file>qml/icons/music.png</file>
+        <file>qml/icons/circle.png</file>
+    </qresource>
+</RCC>

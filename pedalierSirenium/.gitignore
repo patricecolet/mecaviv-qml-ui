@@ -1,0 +1,58 @@
+# Build files - WebAssembly (trop volumineux pour GitHub)
+*.wasm
+webfiles/*.wasm
+QtFiles/build/
+
+# Fichiers temporaires système
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Qt Creator
+*.user
+*.user.*
+*.pro.user
+*.pro.user.*
+*.autosave
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*build*/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+*.log
+
+# Emscripten
+*.js.mem
+*.bc
+*.a
+*.o
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# Large binary files (stored on Google Drive)
+# - qmlwebsocketserver.wasm (~36MB)
+# - Téléchargeable depuis Google Drive partagé 

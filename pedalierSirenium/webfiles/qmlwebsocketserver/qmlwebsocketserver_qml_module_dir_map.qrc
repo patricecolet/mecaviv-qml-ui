@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/">/Users/patricecolet/repo/mecaviv/patko-scratchpad/qtQmlSockets/pedalierSirenium/QtFiles/build/qmlwebsocketserver</file>
+
+  </qresource>
+</RCC>

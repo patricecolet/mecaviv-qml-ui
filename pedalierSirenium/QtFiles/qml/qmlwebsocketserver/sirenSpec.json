@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "bendBits": 13,
+    "bendCenter": 4096
+  },
+  "siren1": {
+    "label": "S1",
+    "channel": 0,
+    "clef": "bass",
+    "ambitus": { "min": 43, "max": 86 },
+    "transpose": 0,
+    "color": "#26782A"
+  },
+  "siren2": {
+    "label": "S2",
+    "channel": 1,
+    "clef": "bass",
+    "ambitus": { "min": 43, "max": 86 },
+    "transpose": 0,
+    "color": "#5CF263"
+  },
+  "siren3": {
+    "label": "S3",
+    "channel": 2,
+    "clef": "bass",
+    "ambitus": { "min": 36, "max": 77 },
+    "transpose": 0,
+    "color": "#0C85C2"
+  },
+  "siren4": {
+    "label": "S4",
+    "channel": 3,
+    "clef": "bass",
+    "ambitus": { "min": 30, "max": 79 },
+    "transpose": 0,
+    "color": "#66E4F2"
+  },
+  "siren5": {
+    "label": "S5",
+    "channel": 4,
+    "clef": "treble",
+    "ambitus": { "min": 48, "max": 94 },
+    "transpose": 0,
+    "color": "#F7F177"
+  },
+  "siren6": {
+    "label": "S6",
+    "channel": 5,
+    "clef": "treble",
+    "ambitus": { "min": 48, "max": 94 },
+    "transpose": 0,
+    "color": "#F79043"
+  },
+  "siren7": {
+    "label": "S7",
+    "channel": 6,
+    "clef": "treble",
+    "ambitus": { "min": 48, "max": 94 },
+    "transpose": 12,
+    "color": "#F70505"
+  }
+}
+
+

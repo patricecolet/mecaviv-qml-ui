@@ -1,0 +1,4 @@
+module qmlwebsocketserver
+typeinfo qmlwebsocketserver.qmltypes
+prefer :/
+

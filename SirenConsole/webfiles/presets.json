@@ -1,0 +1,301 @@
+{
+  "presets": [
+    {
+      "id": "preset_001",
+      "name": "Configuration Théâtre",
+      "description": "Setup pour spectacle théâtral",
+      "created": "2025-10-05T03:19:13.387Z",
+      "modified": "2025-10-05T03:19:13.388Z",
+      "version": "1.0",
+      "pupitres": [
+        {
+          "id": "P1",
+          "assignedSirenes": [
+            1,
+            2,
+            3
+          ],
+          "vstEnabled": true,
+          "udpEnabled": true,
+          "rtpMidiEnabled": true,
+          "controllerMapping": {
+            "joystickX": {
+              "cc": 1,
+              "curve": "linear"
+            },
+            "joystickY": {
+              "cc": 2,
+              "curve": "parabolic"
+            },
+            "fader": {
+              "cc": 3,
+              "curve": "hyperbolic"
+            },
+            "selector": {
+              "cc": 4,
+              "curve": "s curve"
+            },
+            "pedalId": {
+              "cc": 5,
+              "curve": "linear"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "test",
+      "description": "",
+      "config": {
+        "pupitres": [
+          {
+            "id": "P1",
+            "ambitus": {
+              "min": 48,
+              "max": 72
+            },
+            "frettedMode": false,
+            "assignedSirenes": [
+              1,
+              2,
+              3
+            ],
+            "vstEnabled": true,
+            "udpEnabled": true,
+            "rtpMidiEnabled": true,
+            "controllerMapping": {
+              "joystickX": {
+                "cc": 1,
+                "curve": "linear"
+              },
+              "joystickY": {
+                "cc": 2,
+                "curve": "parabolic"
+              },
+              "fader": {
+                "cc": 3,
+                "curve": "hyperbolic"
+              },
+              "selector": {
+                "cc": 4,
+                "curve": "s curve"
+              },
+              "pedalId": {
+                "cc": 5,
+                "curve": "linear"
+              }
+            }
+          },
+          {
+            "id": "P2",
+            "ambitus": {
+              "min": 48,
+              "max": 72
+            },
+            "frettedMode": false,
+            "assignedSirenes": [],
+            "vstEnabled": false,
+            "udpEnabled": true,
+            "rtpMidiEnabled": false,
+            "controllerMapping": {
+              "joystickX": {
+                "cc": 1,
+                "curve": "linear"
+              },
+              "joystickY": {
+                "cc": 2,
+                "curve": "parabolic"
+              },
+              "fader": {
+                "cc": 3,
+                "curve": "hyperbolic"
+              },
+              "selector": {
+                "cc": 4,
+                "curve": "s curve"
+              },
+              "pedalId": {
+                "cc": 5,
+                "curve": "linear"
+              }
+            }
+          },
+          {
+            "id": "P3",
+            "ambitus": {
+              "min": 48,
+              "max": 72
+            },
+            "frettedMode": false,
+            "assignedSirenes": [],
+            "vstEnabled": false,
+            "udpEnabled": true,
+            "rtpMidiEnabled": false,
+            "controllerMapping": {
+              "joystickX": {
+                "cc": 1,
+                "curve": "linear"
+              },
+              "joystickY": {
+                "cc": 2,
+                "curve": "parabolic"
+              },
+              "fader": {
+                "cc": 3,
+                "curve": "hyperbolic"
+              },
+              "selector": {
+                "cc": 4,
+                "curve": "s curve"
+              },
+              "pedalId": {
+                "cc": 5,
+                "curve": "linear"
+              }
+            }
+          },
+          {
+            "id": "P4",
+            "ambitus": {
+              "min": 48,
+              "max": 72
+            },
+            "frettedMode": false,
+            "assignedSirenes": [],
+            "vstEnabled": false,
+            "udpEnabled": true,
+            "rtpMidiEnabled": false,
+            "controllerMapping": {
+              "joystickX": {
+                "cc": 1,
+                "curve": "linear"
+              },
+              "joystickY": {
+                "cc": 2,
+                "curve": "parabolic"
+              },
+              "fader": {
+                "cc": 3,
+                "curve": "hyperbolic"
+              },
+              "selector": {
+                "cc": 4,
+                "curve": "s curve"
+              },
+              "pedalId": {
+                "cc": 5,
+                "curve": "linear"
+              }
+            }
+          },
+          {
+            "id": "P5",
+            "ambitus": {
+              "min": 48,
+              "max": 72
+            },
+            "frettedMode": false,
+            "assignedSirenes": [],
+            "vstEnabled": false,
+            "udpEnabled": true,
+            "rtpMidiEnabled": false,
+            "controllerMapping": {
+              "joystickX": {
+                "cc": 1,
+                "curve": "linear"
+              },
+              "joystickY": {
+                "cc": 2,
+                "curve": "parabolic"
+              },
+              "fader": {
+                "cc": 3,
+                "curve": "hyperbolic"
+              },
+              "selector": {
+                "cc": 4,
+                "curve": "s curve"
+              },
+              "pedalId": {
+                "cc": 5,
+                "curve": "linear"
+              }
+            }
+          },
+          {
+            "id": "P6",
+            "ambitus": {
+              "min": 48,
+              "max": 72
+            },
+            "frettedMode": false,
+            "assignedSirenes": [],
+            "vstEnabled": false,
+            "udpEnabled": true,
+            "rtpMidiEnabled": false,
+            "controllerMapping": {
+              "joystickX": {
+                "cc": 1,
+                "curve": "linear"
+              },
+              "joystickY": {
+                "cc": 2,
+                "curve": "parabolic"
+              },
+              "fader": {
+                "cc": 3,
+                "curve": "hyperbolic"
+              },
+              "selector": {
+                "cc": 4,
+                "curve": "s curve"
+              },
+              "pedalId": {
+                "cc": 5,
+                "curve": "linear"
+              }
+            }
+          },
+          {
+            "id": "P7",
+            "ambitus": {
+              "min": 48,
+              "max": 72
+            },
+            "frettedMode": false,
+            "assignedSirenes": [],
+            "vstEnabled": false,
+            "udpEnabled": true,
+            "rtpMidiEnabled": false,
+            "controllerMapping": {
+              "joystickX": {
+                "cc": 1,
+                "curve": "linear"
+              },
+              "joystickY": {
+                "cc": 2,
+                "curve": "parabolic"
+              },
+              "fader": {
+                "cc": 3,
+                "curve": "hyperbolic"
+              },
+              "selector": {
+                "cc": 4,
+                "curve": "s curve"
+              },
+              "pedalId": {
+                "cc": 5,
+                "curve": "linear"
+              }
+            }
+          }
+        ]
+      },
+      "created": "2025-10-05T03:58:05.258Z",
+      "modified": "2025-10-05T03:58:05.258Z",
+      "version": "1.0",
+      "id": "preset_1759636685258_9zdcw4wvv"
+    }
+  ]
+}

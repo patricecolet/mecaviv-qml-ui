@@ -1,0 +1,58 @@
+# Build directories
+**/build/
+**/build-*/
+**/node_modules/
+**/.qtc_clangd/
+
+# Qt user files
+*.user
+*.user.*
+.qmlls.ini
+*.autosave
+
+# WebAssembly artifacts
+*.wasm
+qtloader.js
+qtlogo.svg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+
+# Compiled files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Generated files
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+*_qmltyperegistrations.cpp
+compile_commands.json
+
+# Package files
+*.tar.gz
+*.zip
+*.dmg
+*.pkg
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+

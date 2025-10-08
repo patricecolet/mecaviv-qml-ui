@@ -1,0 +1,49 @@
+<RCC>
+    <qresource prefix="/SirenConsole">
+        <file>QML/Main.qml</file>
+        
+        <!-- Components - Overview -->
+        <file>QML/components/overview/AmbitusBar.qml</file>
+        <file>QML/components/overview/OverviewRow.qml</file>
+        <file>QML/components/overview/PupitreCard.qml</file>
+        <file>QML/components/overview/PupitreViewer.qml</file>
+        
+        <!-- Components - Config -->
+        <file>QML/components/config/ConfigNavigationPanel.qml</file>
+        <file>QML/components/config/PresetManager.qml</file>
+        <file>QML/components/config/PresetSelector.qml</file>
+        <file>QML/components/config/PupitreSelector.qml</file>
+        <file>QML/components/config/StatusIndicator.qml</file>
+        
+        <!-- Components - Config Tabs -->
+        <file>QML/components/config/tabs/ConfigurationTab.qml</file>
+        <file>QML/components/config/tabs/SirensTab.qml</file>
+        <file>QML/components/config/tabs/OutputsTab.qml</file>
+        <file>QML/components/config/tabs/ControllersTab.qml</file>
+        
+        <!-- Components - Logs -->
+        <file>QML/components/logs/LogViewer.qml</file>
+        
+    <!-- Controllers -->
+    <file>QML/controllers/ConsoleController.qml</file>
+    <file>QML/controllers/WebSocketManager.qml</file>
+    <file>QML/controllers/ConfigController.qml</file>
+    <file>QML/controllers/ConfigManager.qml</file>
+    <file>QML/controllers/PresetManager.qml</file>
+    <file>QML/controllers/PupitreManager.qml</file>
+    <file>QML/controllers/CommandManager.qml</file>
+    <file>QML/controllers/SireneManager.qml</file>
+        
+        <!-- Pages -->
+        <file>QML/pages/OverviewPage.qml</file>
+        <file>QML/pages/LogsPage.qml</file>
+        <file>QML/pages/ConfigPage.qml</file>
+        
+        <!-- Utils -->
+        <file>QML/utils/NetworkUtils.qml</file>
+        <file>QML/utils/DataModels.qml</file>
+        
+        <!-- Config -->
+        <file>config.js</file>
+    </qresource>
+</RCC>

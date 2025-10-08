@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../volant"
+		},
+		{
+			"path": "../SirenConsole"
+		},
+		{
+			"path": "../../sirenRouter"
+		},
+		{
+			"path": "../pedalierSirenium"
+		}
+	],
+	"settings": {}
+}
