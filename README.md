@@ -345,7 +345,7 @@ lsof -ti:8000 | xargs kill -9
 
 Vérifier le chemin dans `scripts/build-project.sh` :
 ```bash
-QT_CMAKE="/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
+QT_CMAKE="$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
 ```
 
 ### Plus de dépannage

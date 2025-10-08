@@ -56,7 +56,7 @@ check_dependencies() {
     fi
     
     # Vérifier Qt6 (WebAssembly)
-    QT6_WASM_PATH="/Users/patricecolet/Qt/6.10.0/wasm_singlethread"
+    QT6_WASM_PATH="$HOME/Qt/6.10.0/wasm_singlethread"
     if [ -d "$QT6_WASM_PATH" ]; then
         print_success "Qt6 WebAssembly trouvé: $QT6_WASM_PATH"
     else
@@ -92,7 +92,7 @@ build_web() {
     print_info "Build pour WebAssembly..."
     
     # Vérifier Qt6 pour WebAssembly
-    QT6_WASM_PATH="/Users/patricecolet/Qt/6.10.0/wasm_singlethread"
+    QT6_WASM_PATH="$HOME/Qt/6.10.0/wasm_singlethread"
     if [ ! -d "$QT6_WASM_PATH" ]; then
         print_error "Qt6 pour WebAssembly non trouvé dans $QT6_WASM_PATH"
         print_info "Installez Qt6 pour WebAssembly depuis Qt Installer"

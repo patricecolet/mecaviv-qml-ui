@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Configuration Qt WebAssembly
-QT_CMAKE="/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
+QT_CMAKE="$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
 
 # Vérifier l'argument
 if [ $# -eq 0 ]; then

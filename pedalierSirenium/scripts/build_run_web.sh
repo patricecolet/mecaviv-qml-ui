@@ -24,7 +24,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 QTFILES="$ROOT_DIR/QtFiles"
 BUILD_DIR="$QTFILES/build"
 WEBFILES="$ROOT_DIR/webfiles"
-QMAKE="/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
+QMAKE="$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
 
 # 1. Nettoyage et compilation
 cd "$QTFILES"

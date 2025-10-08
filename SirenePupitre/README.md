@@ -627,7 +627,7 @@ make
 ### WebAssembly (méthode manuelle)
 ```bash
 cd build
-/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
+$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
 make
 cp appSirenePupitre.* ../webfiles/
 cd ../webfiles

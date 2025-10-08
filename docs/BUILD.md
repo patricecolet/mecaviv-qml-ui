@@ -61,7 +61,7 @@ cmake --version
 **Vérification** :
 ```bash
 # macOS/Linux
-ls /Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
+ls $HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
 
 # Windows
 dir C:\Qt\6.10.0\wasm_singlethread\bin\qt-cmake.bat
@@ -330,7 +330,7 @@ Supprime build/, node_modules/, *.wasm, logs.
 ```bash
 cd SirenePupitre
 mkdir -p build && cd build
-/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
+$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
 make -j$(sysctl -n hw.ncpu)
 cp appSirenePupitre.* ../webfiles/
 ```
@@ -340,7 +340,7 @@ cp appSirenePupitre.* ../webfiles/
 ```bash
 cd SirenConsole
 mkdir -p build && cd build
-/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
+$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
 make -j$(sysctl -n hw.ncpu)
 cp appSirenConsole.* ../webfiles/
 ```
@@ -350,7 +350,7 @@ cp appSirenConsole.* ../webfiles/
 ```bash
 cd pedalierSirenium/QtFiles
 mkdir -p build && cd build
-/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
+$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake ..
 make -j$(sysctl -n hw.ncpu)
 cp qmlwebsocketserver.* ../../webfiles/
 ```
@@ -600,7 +600,7 @@ sudo apt-get install cmake
 **Solution** :
 ```bash
 # Vérifier installation Qt
-ls /Users/patricecolet/Qt/6.10.0/
+ls $HOME/Qt/6.10.0/
 
 # Modifier CMakePresets.json
 # Ajuster CMAKE_PREFIX_PATH vers votre installation Qt
@@ -642,7 +642,7 @@ lsof -ti:8000 | xargs kill -9
 **Solution** :
 ```bash
 # Activer Emscripten (inclus avec Qt WebAssembly)
-source /Users/patricecolet/Qt/6.10.0/wasm_singlethread/emsdk/emsdk_env.sh
+source $HOME/Qt/6.10.0/wasm_singlethread/emsdk/emsdk_env.sh
 
 # Vérifier
 em++ --version

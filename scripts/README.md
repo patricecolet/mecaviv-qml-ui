@@ -132,7 +132,7 @@ Configuration rapide du projet avec CMake.
 Les scripts utilisent Qt 6.10.0 avec le toolchain WebAssembly :
 
 ```bash
-/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
+$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake
 ```
 
 **Installation Qt pour WebAssembly** :
@@ -235,7 +235,7 @@ sirenRouter/
 Vérifier le chemin dans `build-project.sh` :
 
 ```bash
-QT_CMAKE="/Users/patricecolet/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
+QT_CMAKE="$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake"
 ```
 
 Ajuster selon votre installation Qt.
