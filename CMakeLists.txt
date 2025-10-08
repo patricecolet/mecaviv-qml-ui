@@ -54,46 +54,16 @@ find_package(Qt6 REQUIRED COMPONENTS
 if(BUILD_SIRENEPUPITRE)
     message(STATUS "Configuring SirenePupitre...")
     add_subdirectory(SirenePupitre)
-    
-    # Copie vers webfiles après le build
-    if(COPY_TO_WEBFILES AND BUILD_FOR_WASM)
-        add_custom_command(TARGET appSirenePupitre POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:appSirenePupitre>
-                ${CMAKE_SOURCE_DIR}/SirenePupitre/webfiles/
-            COMMAND ${CMAKE_COMMAND} -E echo "Copied SirenePupitre to webfiles/"
-        )
-    endif()
 endif()
 
 if(BUILD_SIRENCONSOLE)
     message(STATUS "Configuring SirenConsole...")
     add_subdirectory(SirenConsole)
-    
-    # Copie vers webfiles après le build
-    if(COPY_TO_WEBFILES AND BUILD_FOR_WASM)
-        add_custom_command(TARGET appSirenConsole POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:appSirenConsole>
-                ${CMAKE_SOURCE_DIR}/SirenConsole/webfiles/
-            COMMAND ${CMAKE_COMMAND} -E echo "Copied SirenConsole to webfiles/"
-        )
-    endif()
 endif()
 
 if(BUILD_PEDALIER)
     message(STATUS "Configuring pedalierSirenium...")
     add_subdirectory(pedalierSirenium/QtFiles)
-    
-    # Copie vers webfiles après le build
-    if(COPY_TO_WEBFILES AND BUILD_FOR_WASM)
-        add_custom_command(TARGET qmlwebsocketserver POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:qmlwebsocketserver>
-                ${CMAKE_SOURCE_DIR}/pedalierSirenium/webfiles/
-            COMMAND ${CMAKE_COMMAND} -E echo "Copied pedalierSirenium to webfiles/"
-        )
-    endif()
 endif()
 
 # ============================================================================
