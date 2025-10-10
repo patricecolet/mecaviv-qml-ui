@@ -7,8 +7,12 @@ export HOME=/home/sirenateur
 export USER=sirenateur
 export DISPLAY=:0
 
+# Déterminer automatiquement le répertoire du projet
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
 # Aller dans le répertoire du projet
-cd /home/sirenateur/dev/src/mecaviv/patko-scratchpad/qtQmlSockets/SirenePupitre
+cd "$PROJECT_DIR"
 
 # Logs
 LOG_FILE="/home/sirenateur/sirene-boot.log"
@@ -124,17 +128,21 @@ configure_routing() {
         sudo ip route del default via 192.168.1.1 dev eth0 2>/dev/null || true
     fi
     
-    # Recréer la route avec métrique 700 (priorité basse)
-    echo "$(date): ➕ Ajout route eth0 avec métrique 700 (priorité basse)"
+    # Ajouter une route SPÉCIFIQUE pour le réseau local via eth0
+    echo "$(date): ➕ Ajout route locale 192.168.1.0/24 via eth0"
+    sudo ip route add 192.168.1.0/24 dev eth0 metric 100 2>/dev/null || true
+    
+    # Recréer la route par défaut avec métrique 700 (priorité basse)
+    echo "$(date): ➕ Ajout route par défaut eth0 avec métrique 700 (priorité basse)"
     sudo ip route add default via 192.168.1.1 dev eth0 metric 700 2>/dev/null || true
     
     # Vérifier le résultat
     echo "$(date): 📋 Routes actuelles:"
-    ip route show | grep default | while read line; do
+    ip route show | grep -E "(default|192.168.1)" | while read line; do
         echo "$(date):   - $line"
     done
     
-    echo "$(date): ✅ Routage configuré (WiFi prioritaire, Ethernet secondaire)"
+    echo "$(date): ✅ Routage configuré (WiFi prioritaire pour Internet, Ethernet pour réseau local)"
 }
 
 # Fonction pour arrêter les processus
