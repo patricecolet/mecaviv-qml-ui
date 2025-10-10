@@ -612,6 +612,86 @@ Script optimisé pour Raspberry Pi 5 avec Chrome et PureData.
 Voir `scripts/README.md` pour la documentation détaillée de tous les scripts.
 
 
+## Installation sur Raspberry Pi
+
+### Configuration du démarrage automatique (crontab)
+
+Pour lancer automatiquement SirenePupitre au démarrage du Raspberry Pi, utilisez crontab avec la tâche `@reboot`.
+
+#### Étapes d'installation
+
+1. **Cloner le repository sur le Raspberry Pi**
+```bash
+cd /home/sirenateur/dev/src/mecaviv
+git clone https://github.com/patricecolet/mecaviv-qml-ui.git
+cd mecaviv-qml-ui/SirenePupitre
+```
+
+2. **Configurer le démarrage automatique**
+```bash
+# Éditer le crontab
+crontab -e
+
+# Ajouter cette ligne à la fin du fichier :
+@reboot /home/sirenateur/dev/src/mecaviv/mecaviv-qml-ui/SirenePupitre/scripts/start-raspberry.sh
+```
+
+3. **Sauvegarder et quitter** (généralement Ctrl+O puis Ctrl+X pour nano)
+
+#### Ce que fait le script au démarrage
+
+Le script `start-raspberry.sh` effectue automatiquement :
+1. ✅ **Configuration IP statique** (si nécessaire)
+2. ✅ **Configuration du routage réseau** (WiFi prioritaire, Ethernet secondaire avec métrique 700)
+3. ✅ **Démarrage du serveur Node.js** (port 8000)
+4. ✅ **Lancement de PureData** (patch M645.pd)
+5. ✅ **Ouverture de Chromium** en mode kiosk
+
+#### Vérifier le démarrage automatique
+
+```bash
+# Lister les tâches cron configurées
+crontab -l
+
+# Voir les logs de démarrage en temps réel
+tail -f /home/sirenateur/sirene-boot.log
+
+# Vérifier les processus actifs
+ps aux | grep node
+ps aux | grep pd
+ps aux | grep chromium
+```
+
+#### Configuration réseau
+
+Le script configure automatiquement le routage pour :
+- **WiFi** : Prioritaire pour l'accès Internet
+- **Ethernet** : Secondaire (métrique 700) pour SSH depuis votre Mac
+
+Cette configuration permet :
+- ✅ Accès SSH via Ethernet depuis le Mac
+- ✅ Accès Internet via WiFi
+- ✅ Pas de conflit entre les interfaces
+
+#### Désactiver le démarrage automatique
+
+Si vous souhaitez désactiver le démarrage automatique :
+```bash
+crontab -e
+# Commenter la ligne avec # ou la supprimer
+# @reboot /home/sirenateur/dev/src/mecaviv/mecaviv-qml-ui/SirenePupitre/scripts/start-raspberry.sh
+```
+
+#### Arrêter manuellement les services
+
+```bash
+# Arrêter tous les processus
+pkill -f "node server.js"
+pkill -f "pd -nogui"
+pkill -f "chromium-browser"
+```
+
+
 ## Compilation et déploiement
 
 > **💡 Recommandé :** Utilisez les scripts automatiques dans `scripts/` pour simplifier le processus.
