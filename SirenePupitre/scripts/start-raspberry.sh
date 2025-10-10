@@ -114,6 +114,29 @@ EOF
     fi
 }
 
+# Fonction pour configurer le routage réseau
+configure_routing() {
+    echo "$(date): 🔧 Configuration du routage réseau..."
+    
+    # Supprimer la route par défaut sur eth0 (si elle existe)
+    if ip route show | grep -q "default via 192.168.1.1 dev eth0"; then
+        echo "$(date): 🔄 Suppression de la route par défaut eth0"
+        sudo ip route del default via 192.168.1.1 dev eth0 2>/dev/null || true
+    fi
+    
+    # Recréer la route avec métrique 700 (priorité basse)
+    echo "$(date): ➕ Ajout route eth0 avec métrique 700 (priorité basse)"
+    sudo ip route add default via 192.168.1.1 dev eth0 metric 700 2>/dev/null || true
+    
+    # Vérifier le résultat
+    echo "$(date): 📋 Routes actuelles:"
+    ip route show | grep default | while read line; do
+        echo "$(date):   - $line"
+    done
+    
+    echo "$(date): ✅ Routage configuré (WiFi prioritaire, Ethernet secondaire)"
+}
+
 # Fonction pour arrêter les processus
 stop_processes() {
     echo "$(date): Arrêt des processus..."
@@ -196,23 +219,26 @@ main() {
     # 1. Configurer l'IP
     configure_ip
     
-    # 2. Arrêter les processus existants
+    # 2. Configurer le routage (WiFi prioritaire, Ethernet secondaire)
+    configure_routing
+    
+    # 3. Arrêter les processus existants
     stop_processes
     
-    # 3. Démarrer les services
+    # 4. Démarrer les services
     start_server
     start_puredata
     
-    # 4. Démarrer le navigateur
+    # 5. Démarrer le navigateur
     start_browser
     
-    # 5. Afficher les informations
+    # 6. Afficher les informations
     local ip=$(get_configured_ip)
     echo "$(date): ✅ Application démarrée!"
     echo "$(date): 🌐 IP: $ip"
     echo "$(date): 🌐 Serveur: http://$ip:8000"
     
-    # 6. Garder le script en vie
+    # 7. Garder le script en vie
     while true; do
         sleep 60
     done
