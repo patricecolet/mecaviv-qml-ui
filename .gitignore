@@ -27,6 +27,10 @@ _deps/
 qtloader.js
 qtlogo.svg
 
+# Exception: inclure les petits fichiers essentiels dans webfiles/
+!**/webfiles/qtloader.js
+!**/webfiles/qtlogo.svg
+
 # IDE
 .vscode/
 .idea/
