@@ -217,14 +217,12 @@ start_composesiren() {
     # Attendre que le navigateur soit lancé
     sleep 5
     
-    COMPOSESIREN_PATH="/home/sirenateur/dev/src/mecaviv/ComposeSiren/ComposeSiren"
-    
-    if [ -f "$COMPOSESIREN_PATH" ]; then
+    if command -v ComposeSiren >/dev/null 2>&1; then
         export DISPLAY=:0
-        "$COMPOSESIREN_PATH" &
+        ComposeSiren &
         echo "$(date): ✅ ComposeSiren démarré"
     else
-        echo "$(date): ❌ ComposeSiren non trouvé: $COMPOSESIREN_PATH"
+        echo "$(date): ❌ ComposeSiren non trouvé dans le PATH"
     fi
 }
 
