@@ -142,8 +142,9 @@ stop_processes() {
     echo "$(date): Arrêt des processus..."
     
     pkill -f "node server.js" 2>/dev/null || true
-    pkill -f "pd -nogui" 2>/dev/null || true
+    pkill -f "pd -alsamidi" 2>/dev/null || true
     pkill -f "chromium-browser" 2>/dev/null || true
+    pkill -f "ComposeSiren" 2>/dev/null || true
     
     sleep 2
     echo "$(date): Tous les processus arrêtés"
@@ -180,18 +181,15 @@ start_server() {
 
 # Fonction pour démarrer PureData
 start_puredata() {
-    echo "$(date): Démarrage de PureData..."
+    echo "$(date): Démarrage de PureData avec ALSA MIDI..."
     
-    PURE_DATA_DIR="/home/sirenateur/dev/src/mecaviv/patko-scratchpad/volant"
-    PURE_DATA_PATCH="M645.pd"
+    PURE_DATA_PATCH="/home/sirenateur/dev/src/mecaviv/puredata-abstractions/application.layer/M645.pd"
     
-    if [ -d "$PURE_DATA_DIR" ] && [ -f "$PURE_DATA_DIR/$PURE_DATA_PATCH" ]; then
-        cd "$PURE_DATA_DIR"
-        pd -nogui "$PURE_DATA_PATCH" &
-        cd - > /dev/null
-        echo "$(date): ✅ PureData démarré"
+    if [ -f "$PURE_DATA_PATCH" ]; then
+        pd -alsamidi -mididev 1 "$PURE_DATA_PATCH" &
+        echo "$(date): ✅ PureData démarré avec ALSA MIDI (device 1)"
     else
-        echo "$(date): ❌ PureData non trouvé"
+        echo "$(date): ❌ PureData patch non trouvé: $PURE_DATA_PATCH"
     fi
 }
 
@@ -212,6 +210,36 @@ start_browser() {
     fi
 }
 
+# Fonction pour démarrer ComposeSiren
+start_composesiren() {
+    echo "$(date): Démarrage de ComposeSiren..."
+    
+    # Attendre que le navigateur soit lancé
+    sleep 5
+    
+    COMPOSESIREN_PATH="/home/sirenateur/dev/src/mecaviv/ComposeSiren/ComposeSiren"
+    
+    if [ -f "$COMPOSESIREN_PATH" ]; then
+        export DISPLAY=:0
+        "$COMPOSESIREN_PATH" &
+        echo "$(date): ✅ ComposeSiren démarré"
+    else
+        echo "$(date): ❌ ComposeSiren non trouvé: $COMPOSESIREN_PATH"
+    fi
+}
+
+# Fonction pour configurer le volume
+set_volume() {
+    echo "$(date): Configuration du volume..."
+    
+    if command -v amixer >/dev/null 2>&1; then
+        amixer set Master 60% > /dev/null 2>&1
+        echo "$(date): ✅ Volume configuré à 60%"
+    else
+        echo "$(date): ⚠️ amixer non disponible"
+    fi
+}
+
 # Fonction principale
 main() {
     echo "$(date): === Démarrage SirenePupitre ==="
@@ -222,23 +250,32 @@ main() {
     # 2. Configurer le routage (WiFi prioritaire, Ethernet secondaire)
     configure_routing
     
-    # 3. Arrêter les processus existants
+    # 3. Configurer le volume
+    set_volume
+    
+    # 4. Arrêter les processus existants
     stop_processes
     
-    # 4. Démarrer les services
+    # 5. Démarrer les services
     start_server
     start_puredata
     
-    # 5. Démarrer le navigateur
+    # 6. Démarrer le navigateur
     start_browser
     
-    # 6. Afficher les informations
+    # 7. Démarrer ComposeSiren
+    start_composesiren
+    
+    # 8. Afficher les informations
     local ip=$(get_configured_ip)
     echo "$(date): ✅ Application démarrée!"
     echo "$(date): 🌐 IP: $ip"
     echo "$(date): 🌐 Serveur: http://$ip:8000"
+    echo "$(date): 🎵 PureData: ALSA MIDI device 1"
+    echo "$(date): 🎹 ComposeSiren: actif"
+    echo "$(date): 🔊 Volume: 60%"
     
-    # 7. Garder le script en vie
+    # 9. Garder le script en vie
     while true; do
         sleep 60
     done
