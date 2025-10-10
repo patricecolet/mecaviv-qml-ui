@@ -747,3 +747,4 @@ Voir les fichiers de documentation spécifiques :
 Pour l'architecture globale, voir [ARCHITECTURE.md](./ARCHITECTURE.md).  
 Pour le guide de build, voir [BUILD.md](./BUILD.md).
 
+

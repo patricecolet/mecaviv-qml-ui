@@ -478,3 +478,4 @@ Le système est conçu pour supporter :
 Pour plus de détails sur les protocoles, voir [COMMUNICATION.md](./COMMUNICATION.md).  
 Pour le guide de build, voir [BUILD.md](./BUILD.md).
 
+

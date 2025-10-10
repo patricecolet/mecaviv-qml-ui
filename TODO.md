@@ -239,3 +239,4 @@ Tâches et améliorations futures pour l'ensemble du système mecaviv-qml-ui.
 
 **Note** : Cette roadmap est évolutive. Les priorités peuvent changer selon les besoins des performances et les retours utilisateurs.
 
+
