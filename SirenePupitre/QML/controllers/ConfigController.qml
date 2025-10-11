@@ -97,6 +97,14 @@ QtObject {
         current[key] = finalValue
         console.log("Config mise à jour:", path.join("."), ":", oldValue, "->", finalValue)
         
+        // Si on modifie un élément d'un tableau (sirens), forcer une copie pour déclencher les bindings
+        if (path[0] === "sirenConfig" && path[1] === "sirens" && typeof path[2] === "number") {
+            console.log("🔄 Modification dans tableau sirens détectée, forçage mise à jour...")
+            var sirensCopy = JSON.parse(JSON.stringify(config.sirenConfig.sirens))
+            config.sirenConfig.sirens = sirensCopy
+            console.log("✅ Tableau sirens copié pour forcer la détection de changement")
+        }
+        
         // Mise à jour des propriétés locales si nécessaire
         updateLocalState(path, finalValue)
         

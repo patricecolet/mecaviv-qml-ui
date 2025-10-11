@@ -377,8 +377,16 @@ Item {
                                 })
                                 
                                 if (sirenIndex >= 0) {
-                                    configController.setValueAtPath(["sirenConfig", "sirens", sirenIndex, "frettedMode", "enabled"], !currentValue)
-                                    console.log("✅ Mode fretté basculé pour sirène", currentSirenId, ":", !currentValue)
+                                    var newValue = !currentValue
+                                    console.log("🔄 Tentative de basculement:", currentValue, "->", newValue)
+                                    var success = configController.setValueAtPath(["sirenConfig", "sirens", sirenIndex, "frettedMode", "enabled"], newValue)
+                                    console.log("✅ setValueAtPath retourné:", success)
+                                    
+                                    // Vérifier immédiatement si la valeur a changé
+                                    var updatedSirens = configController.getValueAtPath(["sirenConfig", "sirens"], [])
+                                    var updatedSiren = updatedSirens[sirenIndex]
+                                    console.log("🔍 Vérification après modification:", updatedSiren.frettedMode?.enabled)
+                                    console.log("📊 UpdateCounter:", configController.updateCounter)
                                 }
                             } else {
                                 console.error("❌ Sirène actuelle non trouvée:", currentSirenId)
