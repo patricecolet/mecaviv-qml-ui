@@ -244,7 +244,7 @@ Rectangle {
     
     // Fonction pour mettre à jour toutes les données
     function updateControllers(controllersData) {
-        console.log("[5] ControllersPanel.updateControllers début:", Date.now(), "ms");
+        // console.log("[5] ControllersPanel.updateControllers début:", Date.now(), "ms");
         
         if (controllersData.wheel) {
             wheelPosition = controllersData.wheel.position || 0
@@ -280,6 +280,6 @@ Rectangle {
             padActive = controllersData.pad.active || false
         }
         
-        console.log("[8] ControllersPanel.updateControllers fin:", Date.now(), "ms");
+        // console.log("[8] ControllersPanel.updateControllers fin:", Date.now(), "ms");
     }
 }

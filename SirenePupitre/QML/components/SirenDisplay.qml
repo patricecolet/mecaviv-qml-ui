@@ -128,7 +128,7 @@ Item {
                 
                 NumberDisplay3D {
                     x: -250
-                    y: 0
+                    y: 20
                     visible: configController ? configController.isComponentVisible("rpm") : true
                     scaleX: 2 * root.uiScale
                     scaleY: 0.8 * root.uiScale
@@ -141,7 +141,7 @@ Item {
                 
                 NumberDisplay3D {
                     x: 250
-                    y: -5
+                    y: 20
                     visible: configController ? configController.isComponentVisible("frequency") : true
                     scaleX: 1.8 * root.uiScale
                     scaleY: 0.7 * root.uiScale
@@ -170,6 +170,16 @@ Item {
                         configController.updateCounter
                         return configController.isComponentVisible("musicalStaff")
                     }
+                }
+                
+                // Compteur de notes type speedometer vintage
+                NoteSpeedometer3D {
+                    currentNoteMidi: root.clampedNote
+                    ambitusMin: root.sirenInfo ? root.sirenInfo.ambitus.min : 43
+                    ambitusMax: root.sirenInfo ? root.sirenInfo.ambitus.max : 86
+                    
+                    // Position TOUT EN HAUT
+                    position: Qt.vector3d(0, 400, 100)
                 }
             }
         }
@@ -409,11 +419,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
                 anchors.topMargin: 50  // Tout en haut
-                visible: {
-                    if (!configController) return true
-                    var dummy = configController.updateCounter
-                    return configController.isComponentVisible("noteDetails")
-                }
+                visible: false  // TEST: Caché pour tester le nouveau speedometer 3D
                 
                 Column {
                     anchors.centerIn: parent

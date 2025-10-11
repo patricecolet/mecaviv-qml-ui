@@ -6,23 +6,12 @@ Node {
     id: root
     property var configController: null
     
-    onConfigControllerChanged: {
-        console.log("MusicalStaff3D - configController changed to:", configController)
-    }
-    
     property int localUpdateCounter: configController ? configController.updateCounter : 0
-    onLocalUpdateCounterChanged: {
-        console.log("MusicalStaff3D - updateCounter changed to:", localUpdateCounter)
-    }
     
     // Propriété pour recevoir sirenInfo
     property var sirenInfo: null
     // Propriétés de base (avec valeurs par défaut ou depuis sirenInfo)
     property real lineSpacing: 20
-    
-    onLineSpacingChanged: {
-        console.log("📏 MusicalStaff3D - lineSpacing changed to:", lineSpacing)
-    }
     property real lineThickness: 1
     property real staffWidth: 1800
     property real staffPosX: 0
@@ -41,10 +30,6 @@ Node {
     // Propriétés musicales avec gestion du mode restricted
     required property real currentNoteMidi
     
-    onCurrentNoteMidiChanged: {
-        console.log("🎵 MusicalStaff3D - currentNoteMidi changed to:", currentNoteMidi)
-    }
-    
     property real ambitusMin: sirenInfo ? sirenInfo.ambitus.min : 48.0
     property real ambitusMax: {
         if (!sirenInfo) return 84.0
@@ -55,11 +40,7 @@ Node {
         // Sinon utiliser la valeur max normale
         return sirenInfo.ambitus.max
     }
-    property int octaveOffset: sirenInfo ? sirenInfo.displayOctaveOffset : 0
-    
-    onOctaveOffsetChanged: {
-        console.log("🎹 MusicalStaff3D - octaveOffset changed to:", octaveOffset)
-    }
+    property int octaveOffset: sirenInfo && sirenInfo.displayOctaveOffset !== undefined ? sirenInfo.displayOctaveOffset : 0
     
     // Options d'affichage par défaut (peuvent être surchargées par config)
     property bool showCursor: true
@@ -73,20 +54,7 @@ Node {
         var dummy = configController.updateCounter  // Force la mise à jour
         return configController.getConfigValue("displayConfig.components.musicalStaff", {})
     }
-    onStaffConfigChanged: {
-        console.log("📍 MusicalStaff3D - staffConfig changed!");
-        console.log("  - ambitus:", JSON.stringify(staffConfig.ambitus));
-        console.log("  - noteSize:", staffConfig.ambitus ? staffConfig.ambitus.noteSize : "undefined");
-    }
-    property var ambitusConfig: {
-        var config = staffConfig.ambitus || {}
-        console.log("MusicalStaff3D - ambitusConfig.noteSize:", config.noteSize);
-        return config;
-    }
-    onAmbitusConfigChanged: {
-        console.log("📍 MusicalStaff3D - ambitusConfig changed!");
-        console.log("  - noteSize:", ambitusConfig.noteSize);
-    }
+    property var ambitusConfig: staffConfig.ambitus || {}
     property var cursorConfig: staffConfig.cursor || {}
     property var progressConfig: staffConfig.progressBar || {}
     property var clefConfig: staffConfig.clef || {}
@@ -103,10 +71,7 @@ Node {
         if (!configController) return ambitusConfig.showNoteNames === true || showNoteNames
         var dummy = configController.updateCounter
         var noteNameVis = configController.getConfigValue("displayConfig.components.musicalStaff.noteName.visible", undefined)
-        if (noteNameVis !== undefined) {
-            console.log("noteNameVisible from noteName.visible:", noteNameVis)
-            return noteNameVis
-        }
+        if (noteNameVis !== undefined) return noteNameVis
         return ambitusConfig.showNoteNames === true || showNoteNames
     }
     
@@ -155,13 +120,10 @@ Node {
         
         showOnlyNaturals: ambitusConfig.noteFilter === "natural" || ambitusConfig.noteFilter === undefined
         
-        // REMPLACER la ligne noteScale par :
         noteScale: {
             if (configController) {
                 var dummy = configController.updateCounter;
-                var size = configController.getValueAtPath(["displayConfig", "components", "musicalStaff", "ambitus", "noteSize"], 0.15);
-                console.log("🎯 AmbitusDisplay3D noteScale binding - size:", size, "updateCounter:", configController.updateCounter);
-                return size;
+                return configController.getValueAtPath(["displayConfig", "components", "musicalStaff", "ambitus", "noteSize"], 0.15);
             }
             return 0.15;
         }

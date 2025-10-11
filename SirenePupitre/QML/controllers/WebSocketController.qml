@@ -98,8 +98,8 @@ Item {
         // Alternative plus simple si PureData envoie en texte les métadonnées
         onTextMessageReceived: function(message) {
             try {
-                console.log("📥 WebSocket reçu - Message brut:", message);
-                console.log("📥 Longueur du message:", message.length);
+                // Logs désactivés pour performance
+                // console.log("📥 WebSocket reçu - Message brut:", message);
                 
                 // Gérer les messages de contrôle binaire
                 if (message === "BINARY_END") {
@@ -138,19 +138,16 @@ Item {
                 }
                 
                 var data = JSON.parse(message);
-                console.log(" Données parsées:", JSON.stringify(data, null, 2));
-                
-                var t1 = Date.now();
-                console.log("[1] WebSocket reçu:", t1, "ms");
+                // Logs désactivés pour performance
+                // console.log(" Données parsées:", JSON.stringify(data, null, 2));
                 
                 // Mettre à jour les statistiques
                 controller.messageCount++
                 var now = new Date()
                 controller.lastMessageTime = now.toLocaleTimeString()
                 
-                // Vérifier le type de message
-                console.log("🏷️ Type de message:", data.type || "AUCUN");
-                console.log(" Device:", data.device || "AUCUN");
+                // Logs désactivés pour performance
+                // console.log("🏷️ Type de message:", data.type || "AUCUN");
                 
                 // Gestion de la présence de la console
                 if (data.type === "CONSOLE_CONNECT") {
@@ -227,22 +224,16 @@ Item {
                 
                 // Code existant pour MUSIC_VISUALIZER
                 if (data.device === "MUSIC_VISUALIZER") {
-                    console.log("=== MUSIC_VISUALIZER REÇU ===");
+                    // Logs désactivés pour performance
                     if (data.config) {
-                        console.log("📋 Configuration reçue");
                         controller.configReceived(data.config);
                     } else {
-                        console.log("🎵 Données musicales reçues");
-                        console.log("🎵 MIDI Note:", data.midiNote);
-                        console.log("🎵 Contrôleurs:", data.controllers);
-                        console.log("[2] Avant dataReceived signal:", Date.now(), "ms, delta:", Date.now() - t1);
                         controller.dataReceived(data);
                     }
                 } else {
-                    console.log("❓ Message non reconnu - Type:", data.type, "Device:", data.device);
+                    // Logs désactivés pour performance
                     // Essayer de traiter comme données musicales par défaut
                     if (data.midiNote !== undefined || data.controllers) {
-                        console.log("🎵 Traitement comme données musicales");
                         controller.dataReceived(data);
                     }
                 }

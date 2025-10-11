@@ -214,7 +214,8 @@ Node {
                     segmentLength: currentSegmentData.l
                     segmentWidth: root.segmentWidth
                     segmentDepth: root.segmentDepth
-                    segmentColor: isActive ? root.textColor : root.offColor
+                    segmentColor: root.textColor     // Toujours la couleur du texte
+                    segmentActive: isActive          // Contrôle la visibilité
                 }
             }
         }

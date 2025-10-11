@@ -21,19 +21,11 @@ Node {
     property bool showDebugLabels: false  // Corrigé pour éviter l'erreur de propriété manquante
     required property int octaveOffset
     
-    onOctaveOffsetChanged: {
-        console.log("🔄 AmbitusDisplay3D - octaveOffset changed to:", octaveOffset)
-    }
     property color ledgerLineColor: Qt.rgba(0.8, 0.8, 0.8, 1.0)  // Couleur par défaut au lieu de parent.lineColor
     property bool forceRefresh: false
     
     onNoteScaleChanged: {
-        console.log("🔄 AmbitusDisplay3D - Forcing refresh due to noteScale change:", noteScale);
         forceRefresh = !forceRefresh;
-    }
-    
-    onShowDebugLabelsChanged: {
-        console.log("AmbitusDisplay3D - showDebugLabels changed to:", showDebugLabels)
     }
     
     // Instances
@@ -53,35 +45,13 @@ Node {
             property int noteMidi: root.ambitusMin + index
             property real noteY: {
                 var offsetNote = noteMidi + (root.octaveOffset * 12)
-                var y = noteCalc.calculateNoteYPosition(offsetNote, root.lineSpacing, root.clef)
-                
-                // Log pour Do (C) de chaque octave
-                if (noteMidi % 12 === 0) {
-                    console.log("🎵 Note Do:",
-                        "MIDI base:", noteMidi, "(" + musicUtils.midiToNoteName(noteMidi) + ")",
-                        "Offset octaves:", root.octaveOffset,
-                        "MIDI final:", offsetNote, "(" + musicUtils.midiToNoteName(offsetNote) + ")",
-                        "Position Y:", y,
-                        "LineSpacing:", root.lineSpacing)
-                }
-                return y
+                return noteCalc.calculateNoteYPosition(offsetNote, root.lineSpacing, root.clef)
             }
             property real noteX: noteCalc.calculateNoteXPosition(noteMidi, root.ambitusMin, root.ambitusMax, root.staffPosX, root.staffWidth)
             property bool isNatural: noteCalc.isNaturalNote(noteMidi)
             property string noteName: musicUtils.noteNames[noteMidi % 12]
             
             visible: !root.showOnlyNaturals || isNatural
-            
-            Component.onCompleted: {
-                if (index % 12 === 0) { // Log seulement les Do
-                    console.log("🎹 Ambitus note:", 
-                        "Index:", index,
-                        "MIDI original:", noteMidi,
-                        "Offset:", root.octaveOffset, 
-                        "MIDI avec offset:", noteMidi + (root.octaveOffset * 12),
-                        "Position Y:", noteY)
-                }
-            }
             
             // La note
             Model {
@@ -119,22 +89,4 @@ Node {
         }
     }
     
-    // Afficher des infos de débogage
-    Component.onCompleted: {
-        console.log("AmbitusDisplay3D Debug Info:")
-        console.log("- clef:", clef)
-        console.log("- ambitusMin:", ambitusMin, "(", musicUtils.midiToNoteName(ambitusMin), ")")
-        console.log("- ambitusMax:", ambitusMax, "(", musicUtils.midiToNoteName(ambitusMax), ")")
-        console.log("- staffWidth:", staffWidth)
-        console.log("- staffPosX:", staffPosX)
-        console.log("- Calculated X range:", staffPosX - staffWidth/2, "to", staffPosX + staffWidth/2)
-        
-        console.log("\nTest de positions Y pour quelques notes:")
-        var testNotes = [60, 64, 67, 72]
-        for (var i = 0; i < testNotes.length; i++) {
-            var note = testNotes[i]
-            var y = noteCalc.calculateNoteYPosition(note, lineSpacing, clef)
-            console.log(" -", musicUtils.midiToNoteName(note), "(MIDI", note, ") -> Y:", y)
-        }
-    }
 }

@@ -64,13 +64,12 @@ Window {
         configController: configController  // AJOUTER CETTE LIGNE
         
         onDataReceived: function(data) {
-            console.log("[3] Main.qml onDataReceived:", Date.now(), "ms");
+            // Logs désactivés pour performance
             
             if (data.midiNote !== undefined) {
                 sirenController.midiNote = data.midiNote
             }
             if (data.controllers) {
-                console.log("[4] Avant display.updateControllers:", Date.now(), "ms");
                 display.updateControllers(data.controllers)
             }
         }

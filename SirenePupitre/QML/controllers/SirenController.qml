@@ -60,17 +60,11 @@ QtObject {
         
         if (frettedModeEnabled) {
             var frettedNote = Math.round(clampedNote)
-            if (frettedNote !== clampedNote) {
-                console.log("Mode fretté activé pour sirène", currentSirenId, "- Note arrondie:", clampedNote, "->", frettedNote)
-            }
+            // Log désactivé pour performance
             clampedNote = frettedNote
         }
         
-        // Debug si la note est limitée
-        if (clampedNote !== midiNote) {
-            console.log("Note limitée:", midiNote, "->", clampedNote, 
-                       "(min:", minNote, "max:", maxNote, ")")
-        }
+        // Logs désactivés pour performance
         
         // Calculer les vraies valeurs (non limitées)
         var trueFreq = musicUtils.midiToFrequency(midiNote, siren.transposition)
@@ -86,12 +80,8 @@ QtObject {
         rpm = musicUtils.formatRPM(calculatedRpm)
         noteName = musicUtils.midiToNoteName(clampedNote)
         
-        console.log("Calcul -", 
-                   "Sirène:", sirenName,
-                   "Note:", clampedNote, "(" + noteName + ")",
-                   "Freq:", frequency, "Hz",
-                   "RPM:", rpm,
-                   "Outputs:", siren.outputs)
+        // Log désactivé pour performance
+        // console.log("Calcul - Sirène:", sirenName, "Note:", clampedNote, "(" + noteName + ")", "Freq:", frequency, "Hz", "RPM:", rpm, "Outputs:", siren.outputs)
     }
     
     // Méthode pour obtenir les infos actuelles (debug)

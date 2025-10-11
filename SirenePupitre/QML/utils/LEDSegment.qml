@@ -8,6 +8,9 @@ Node {
     property real segmentLength: 30
     property real segmentDepth: 3
     property color segmentColor: "#ff0000"
+    property bool segmentActive: true  // Nouvelle propriété
+    
+    visible: segmentActive  // Le segment n'est visible que s'il est actif
     
     Model {
         source: "#Cube"
