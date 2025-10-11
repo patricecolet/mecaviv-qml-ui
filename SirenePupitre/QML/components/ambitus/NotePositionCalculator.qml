@@ -45,7 +45,12 @@ QtObject {
     // Fonction pour calculer la position Y d'une note sur la portée
     // Basée sur la position diatonique pour un espacement correct
     function calculateNoteYPosition(midiNote, lineSpacing, clef) {
-        var diatonicPos = getDiatonicPosition(midiNote)
+        // Séparer partie entière et décimale pour interpolation
+        var baseNote = Math.floor(midiNote)
+        var fraction = midiNote - baseNote
+        
+        // Position diatonique de la note de base
+        var diatonicPos = getDiatonicPosition(baseNote)
         
         // Notes de référence et leurs positions diatoniques
         var referenceMidi, referenceDiatonic, referenceY
@@ -65,8 +70,20 @@ QtObject {
         // Différence de positions diatoniques
         var diatonicDiff = diatonicPos - referenceDiatonic
         
-        // Chaque position diatonique = 0.5 * lineSpacing (une ligne ou un interligne)
-        return (referenceY + diatonicDiff * 0.5) * lineSpacing
+        // Position Y de base
+        var baseY = (referenceY + diatonicDiff * 0.5) * lineSpacing
+        
+        // Si fraction > 0, interpoler vers la note suivante
+        if (fraction > 0) {
+            var nextDiatonicPos = getDiatonicPosition(baseNote + 1)
+            var nextDiatonicDiff = nextDiatonicPos - referenceDiatonic
+            var nextY = (referenceY + nextDiatonicDiff * 0.5) * lineSpacing
+            
+            // Interpolation linéaire
+            return baseY + fraction * (nextY - baseY)
+        }
+        
+        return baseY
     }
     
     // Fonction pour vérifier si une note est naturelle
