@@ -132,7 +132,7 @@ Node {
                     eulerRotation: Qt.vector3d(0, 0, 270)
                     letterHeight: 12
                     letterSpacing: 25
-                    segmentWidth: 4
+                    segmentWidth: 3
                     segmentDepth: 1.5
                     textColor: "#000000"
                     offColor: "white"
@@ -208,7 +208,7 @@ Node {
                         eulerRotation: Qt.vector3d(0, 0, 270)
                         letterHeight: 12
                         letterSpacing: 25
-                        segmentWidth: 4
+                        segmentWidth: 3
                         segmentDepth: 1.5
                         textColor: "#000000"
                     }

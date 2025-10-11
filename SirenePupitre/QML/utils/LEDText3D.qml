@@ -18,24 +18,73 @@ Node {
     // Définition des 14 segments selon le standard
     property var segmentDefinitions: {
         // Segments horizontaux
-        "a": {x: 0, y: 28, r: 90, l: 16},      // haut
-        "d": {x: 0, y: 0, r: 90, l: 16},       // bas
+        "a": {x: 0, y: 28, r: 90, l: 16},      // haut (complet)
+        "d": {x: 0, y: 0, r: 90, l: 16},       // bas (complet)
         "g1": {x: -4, y: 14, r: 90, l: 8},     // milieu gauche
         "g2": {x: 4, y: 14, r: 90, l: 8},      // milieu droite
         
+        // Segments horizontaux divisés en deux
+        "a1": {x: -4, y: 28, r: 90, l: 8},     // haut gauche
+        "a2": {x: 4, y: 28, r: 90, l: 8},      // haut droite
+        "d1": {x: -4, y: 0, r: 90, l: 8},      // bas gauche
+        "d2": {x: 4, y: 0, r: 90, l: 8},       // bas droite
+        
         // Segments verticaux
-        "b": {x: 8, y: 21, r: 0, l: 14},       // droite haut
-        "c": {x: 8, y: 7, r: 0, l: 14},        // droite bas
-        "e": {x: -8, y: 7, r: 0, l: 14},       // gauche bas
-        "f": {x: -8, y: 21, r: 0, l: 14},      // gauche haut
-        "i": {x: 0, y: 21, r: 0, l: 14},       // centre haut
-        "l": {x: 0, y: 7, r: 0, l: 14},        // centre bas
+        "b": {x: 8, y: 21, r: 0, l: 14},       // droite haut (complet)
+        "c": {x: 8, y: 7, r: 0, l: 14},        // droite bas (complet)
+        "e": {x: -8, y: 7, r: 0, l: 14},       // gauche bas (complet)
+        "f": {x: -8, y: 21, r: 0, l: 14},      // gauche haut (complet)
+        "i": {x: 0, y: 21, r: 0, l: 14},       // centre haut (complet)
+        "l": {x: 0, y: 7, r: 0, l: 14},        // centre bas (complet)
+        
+        // Segments verticaux divisés en deux (pour "e" minuscule, etc.)
+        "b1": {x: 8, y: 24.5, r: 0, l: 7},     // droite haut-supérieur
+        "b2": {x: 8, y: 17.5, r: 0, l: 7},     // droite haut-inférieur
+        "c1": {x: 8, y: 10.5, r: 0, l: 7},     // droite bas-supérieur
+        "c2": {x: 8, y: 3.5, r: 0, l: 7},      // droite bas-inférieur
+        "e1": {x: -8, y: 10.5, r: 0, l: 7},    // gauche bas-supérieur
+        "e2": {x: -8, y: 3.5, r: 0, l: 7},     // gauche bas-inférieur
+        "f1": {x: -8, y: 24.5, r: 0, l: 7},    // gauche haut-supérieur
+        "f2": {x: -8, y: 17.5, r: 0, l: 7},    // gauche haut-inférieur
+        "i1": {x: 0, y: 24.5, r: 0, l: 7},     // centre haut-supérieur
+        "i2": {x: 0, y: 17.5, r: 0, l: 7},     // centre haut-inférieur
+        "l1": {x: 0, y: 10.5, r: 0, l: 7},     // centre bas-supérieur
+        "l2": {x: 0, y: 3.5, r: 0, l: 7},      // centre bas-inférieur
         
         // Segments diagonaux
         "h": {x: -4, y: 21, r: 35, l: 14},     // diagonale haut gauche
         "j": {x: 4, y: 21, r: -35, l: 14},     // diagonale haut droite
         "k": {x: -4, y: 8, r: -35, l: 14},     // diagonale bas gauche
-        "m": {x: 4, y: 8, r: 35, l: 14}        // diagonale bas droite
+        "m": {x: 4, y: 8, r: 35, l: 14},       // diagonale bas droite
+        
+        // === Segments additionnels pour grille 4x4 (16 segments) ===
+        // Chaque case contient un "+" formé de 4 segments :
+        // - 2 horizontaux (gauche/droite) : __ __
+        // - 2 verticaux (haut/bas) : | au-dessus et en-dessous
+        
+        // Case 1 (Haut-Gauche) - Centre (-4, 21)
+        "n1": {x: -6, y: 21, r: 90, l: 4},     // horizontal gauche
+        "n2": {x: -2, y: 21, r: 90, l: 4},     // horizontal droite
+        "n3": {x: -4, y: 25, r: 0, l: 7},      // vertical haut (allongé)
+        "n4": {x: -4, y: 17, r: 0, l: 7},      // vertical bas (allongé)
+        
+        // Case 2 (Haut-Droite) - Centre (4, 21)
+        "n5": {x: 2, y: 21, r: 90, l: 4},      // horizontal gauche
+        "n6": {x: 6, y: 21, r: 90, l: 4},      // horizontal droite
+        "n7": {x: 4, y: 25, r: 0, l: 7},       // vertical haut (allongé)
+        "n8": {x: 4, y: 17, r: 0, l: 7},       // vertical bas (allongé)
+        
+        // Case 3 (Bas-Gauche) - Centre (-4, 7)
+        "n9": {x: -6, y: 7, r: 90, l: 4},      // horizontal gauche
+        "n10": {x: -2, y: 7, r: 90, l: 4},     // horizontal droite
+        "n11": {x: -4, y: 11, r: 0, l: 7},     // vertical haut (allongé)
+        "n12": {x: -4, y: 3, r: 0, l: 7},      // vertical bas (allongé)
+        
+        // Case 4 (Bas-Droite) - Centre (4, 7)
+        "n13": {x: 2, y: 7, r: 90, l: 4},      // horizontal gauche
+        "n14": {x: 6, y: 7, r: 90, l: 4},      // horizontal droite
+        "n15": {x: 4, y: 11, r: 0, l: 7},      // vertical haut (allongé)
+        "n16": {x: 4, y: 3, r: 0, l: 7}        // vertical bas (allongé)
     }
     
     // Définition des lettres selon le standard 14 segments
@@ -69,11 +118,11 @@ Node {
         'Z': ["a", "d", "j", "k"],
         
         // Minuscules
-        'a': ["d", "e", "g1", "l"],
+        'a': ["g1", "l", "d1", "e2", "n9", "n10"],  // a minuscule : barre milieu + vertical central bas + bas gauche + vertical gauche inférieur + barre interne
         'b': ["c", "d", "e", "f", "g1", "g2", "l"],
         'c': ["d", "e", "g1", "g2"],
         'd': ["b", "c", "d", "e", "g1", "g2"],
-        'e': ["a", "d", "e", "f", "g1", "g2"],
+        'e': ["g1", "l1", "n9", "n10", "e", "d1"],  // e minuscule : barre milieu gauche + centre bas-sup + barre interne + vertical gauche + bas gauche
         'f': ["a", "f", "g1", "i", "l"],
         'g': ["a", "b", "c", "d", "f", "g1", "g2"],
         'h': ["c", "e", "f", "g1", "g2", "l"],
@@ -132,7 +181,13 @@ Node {
         ']': ["a", "b", "c", "d"],
         
         // Symboles spéciaux
-        '#': ["b", "c", "e", "f", "g1", "g2"],
+        '#': [
+            // Même définition que ♯ : 2 colonnes verticales + 2 lignes horizontales
+            "n3", "n4", "n11", "n12",    // colonne gauche (x=-4)
+            "n7", "n8", "n15", "n16",    // colonne droite (x=4)
+            "n1", "n2", "n5", "n6",      // ligne haute (y=21)
+            "n9", "n10", "n13", "n14"    // ligne basse (y=7)
+        ],
         '@': ["a", "b", "c", "d", "e", "g1", "g2", "i"],
         '&': ["a", "c", "d", "e", "f", "g1", "h", "m"],
         '$': ["a", "c", "d", "f", "g1", "g2", "i", "l"],
@@ -141,7 +196,14 @@ Node {
         '°': ["a", "b", "f", "g1"],
         
         // Symboles musicaux
-        '♯': ["b", "c", "e", "f", "g1", "g2"],  // dièse
+        '♯': [
+            // 2 colonnes verticales (gauche et droite)
+            "n3", "n4", "n11", "n12",    // colonne gauche (x=-4)
+            "n7", "n8", "n15", "n16",    // colonne droite (x=4)
+            // 2 lignes horizontales (haute et basse)
+            "n1", "n2", "n5", "n6",      // ligne haute (y=21)
+            "n9", "n10", "n13", "n14"    // ligne basse (y=7)
+        ],  // dièse
         '♭': ["c", "d", "e", "f", "g1", "g2", "l"],  // bémol
         '♮': ["e", "f", "g1", "g2", "i", "l"],  // bécarre
         
