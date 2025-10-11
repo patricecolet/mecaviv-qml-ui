@@ -450,6 +450,59 @@ RPM = (fréquence × 60) / nombreDeSorties
 - **Mode restricted** : min ≤ note ≤ restrictedMax
 - **Mode admin** : min ≤ note ≤ max
 
+## Théorie musicale - Positionnement sur la portée
+
+### Système diatonique (7 notes)
+
+Le calcul des positions Y utilise la **gamme diatonique** (Do, Ré, Mi, Fa, Sol, La, Si) plutôt que chromatique (12 demi-tons). Chaque position diatonique = une ligne ou un interligne.
+
+#### Position diatonique
+```javascript
+// Note naturelle de la classe (0-11 MIDI → 0-6 diatonique)
+positionDiatonique = octave × 7 + noteDiatonique
+
+// Espacement vertical
+positionY = différenceDiatonique × 0.5 × lineSpacing
+```
+
+### Clé de Sol (treble) 🎼
+
+**Note de référence** : Sol4 (MIDI 67)  
+**Position** : 2ème ligne (Y = -1 × lineSpacing)
+
+**Les 5 lignes** (de bas en haut) :
+| Ligne | Note | MIDI | Position Y |
+|-------|------|------|------------|
+| 1 | Mi4 | 64 | -2 × lineSpacing |
+| 2 | Sol4 | 67 | -1 × lineSpacing (référence) |
+| 3 | Si4 | 71 | 0 (ligne du milieu) |
+| 4 | Ré5 | 74 | +1 × lineSpacing |
+| 5 | Fa5 | 77 | +2 × lineSpacing |
+
+**Position du modèle 3D** : Origine (0,0,0) sur la boucle qui entoure Sol4
+
+### Clé de Fa (bass) 🎵
+
+**Note de référence** : Fa3 (MIDI 53)  
+**Position** : 4ème ligne (Y = +1 × lineSpacing)
+
+**Les 5 lignes** (de bas en haut) :
+| Ligne | Note | MIDI | Position Y |
+|-------|------|------|------------|
+| 1 | Sol2 | 43 | -2 × lineSpacing |
+| 2 | Si2 | 47 | -1 × lineSpacing |
+| 3 | Ré3 | 50 | 0 (ligne du milieu) |
+| 4 | Fa3 | 53 | +1 × lineSpacing (référence) |
+| 5 | La3 | 57 | +2 × lineSpacing |
+
+**Position du modèle 3D** : Origine (0,0,0) entre les deux points, sur la ligne Fa3
+
+### Notes altérées (dièses/bémols)
+
+Les notes altérées **partagent la même position Y** que leur note naturelle voisine :
+- Do# / Réb → position de Do ou Ré (selon contexte)
+- Les altérations sont représentées visuellement par des symboles ♯ ou ♭ (non implémenté actuellement)
+
 ## État actuel du développement
 
 ### Phase 1 - Infrastructure de base ✅
@@ -531,6 +584,127 @@ RPM = (fréquence × 60) / nombreDeSorties
 - [X] Finaliser le dessin des clefs musicales (Clef3D avec modèle 3D)
 - [ ] Implémenter zoom sur ambitus selon levier de vitesse (octave=>tout l'ambitus, sixte, tierce, demi-ton => 2 tours de volant)
 
+
+## Modèles 3D - Conversion .obj vers .mesh
+
+### Outil balsam de Qt Quick 3D
+
+Qt Quick 3D utilise des fichiers `.mesh` optimisés pour la performance. L'outil `balsam` convertit les modèles 3D depuis divers formats (.obj, .fbx, .gltf) vers le format `.mesh`.
+
+#### Localisation de l'outil
+
+```bash
+# macOS
+$HOME/Qt/6.10.0/macos/bin/balsam
+
+# Linux
+$HOME/Qt/6.10.0/gcc_64/bin/balsam
+
+# Windows
+C:\Qt\6.10.0\msvc2019_64\bin\balsam.exe
+
+# Rechercher balsam automatiquement
+find $HOME/Qt -name balsam
+```
+
+#### Commandes de conversion
+
+```bash
+# Conversion de base
+balsam source.obj destination.mesh
+
+# Avec optimisation (recommandé pour la production)
+balsam --optimize source.obj destination.mesh
+
+# Avec génération de normales et tangentes
+balsam --optimize --generateNormals --generateTangents source.obj destination.mesh
+
+# Afficher l'aide complète
+balsam --help
+```
+
+#### Workflow réel pour les clés musicales
+
+⚠️ **Note importante** : `balsam` crée un sous-dossier `meshes/` contenant le fichier `.mesh` avec un nom basé sur l'objet 3D interne. Il faut récupérer et renommer ce fichier.
+
+```bash
+# Se placer dans le dossier des meshes
+cd SirenePupitre/QML/utils/meshes
+
+# 1. Convertir la clé de Sol
+$HOME/Qt/6.10.0/macos/bin/balsam TrebleKey.obj TrebleKey.mesh
+
+# 2. Récupérer le fichier généré (chercher dans meshes/)
+cp ./meshes/*.mesh ./TrebleKey.mesh
+
+# 3. Nettoyer les fichiers temporaires
+rm -f TrebleKey.qml
+rm -rf ./meshes/
+
+# 4. Répéter pour la clé de Fa
+$HOME/Qt/6.10.0/macos/bin/balsam BassKey.obj BassKey.mesh
+cp ./meshes/*.mesh ./BassKey.mesh
+rm -f BassKey.qml
+rm -rf ./meshes/
+
+# 5. Les fichiers sont prêts avec leurs noms finaux
+ls -lh *.mesh
+```
+
+**Résultat attendu** :
+- `TrebleKey.mesh` (~200KB) - Clé de Sol
+- `BassKey.mesh` (~95KB) - Clé de Fa
+
+#### Script automatisé (recommandé)
+
+Pour simplifier, utilisez les scripts fournis :
+
+```bash
+# Convertir un seul fichier
+./scripts/convert-mesh.sh TrebleKey.obj TrebleKey.mesh
+
+# Convertir les deux clés musicales automatiquement
+./scripts/convert-clefs.sh
+```
+
+Les scripts gèrent automatiquement :
+- ✅ Détection de l'outil balsam
+- ✅ Récupération du fichier dans le sous-dossier meshes/
+- ✅ Nettoyage des fichiers temporaires
+- ✅ Affichage du résultat
+
+#### ⚠️ Important : Placement du point d'origine dans le modèle 3D
+
+Lors de la création du modèle 3D dans Blender ou autre logiciel :
+
+**Clé de Sol (treble)** :
+- Placer l'origine (0,0,0) sur la **boucle centrale** qui entoure la ligne Sol4
+- Cette boucle doit croiser exactement la 2ème ligne de la portée
+
+**Clé de Fa (bass)** :
+- Placer l'origine (0,0,0) **entre les deux points**, sur la ligne Fa3
+- Les deux points doivent encadrer la 4ème ligne de la portée
+
+Cette approche simplifie grandement le positionnement dans le code QML, car la position Y du Node correspond directement à la ligne de référence de la clé.
+
+#### Intégration dans le projet
+
+Après conversion, ajouter les fichiers dans `data.qrc` :
+
+```xml
+<file>QML/utils/meshes/TrebleKey.mesh</file>
+<file>QML/utils/meshes/BassKey.mesh</file>
+```
+
+Et référencer dans le code QML :
+
+```qml
+Model {
+    source: clefType === "treble" 
+        ? "qrc:/QML/utils/meshes/TrebleKey.mesh"
+        : "qrc:/QML/utils/meshes/BassKey.mesh"
+}
+```
 
 ## Scripts de développement et déploiement
 
@@ -767,7 +941,7 @@ Loader {
 - ✅ XMLHttpRequest bloqué en local → Utilisation de config.js
 - ✅ Warning WebGL DEPTH_STENCIL_ATTACHMENT → SSAA au lieu de MSAA
 - ✅ Structure des messages WebSocket adaptée
-- ✅ Calcul des positions des notes selon la clé (sol/fa)
+- ✅ Calcul des positions des notes selon la clé (sol/fa) → Système diatonique avec Sol4 (treble) et Fa3 (bass) comme références
 - ✅ Curseur dynamique qui suit la hauteur de la note
 - ✅ Lignes supplémentaires n'apparaissant que sur les positions de lignes
 - ✅ Gestion du mode restricted dans MusicalStaff3D
@@ -779,6 +953,7 @@ Loader {
 - ✅ Changements de visibilité non appliqués → Ajouter bindings visible dans les composants
 - ✅ Chargement des modèles 3D (.obj/.mesh) → Intégration dans data.qrc et CMakeLists.txt
 - ✅ Antialiasing configuré → SSAA/MSAA activé dans les vues principales
+- ✅ Positionnement des clés 3D → Origine (0,0,0) placée sur la ligne de référence (Sol4/Fa3)
 
 
 ## TODO

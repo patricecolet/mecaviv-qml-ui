@@ -82,6 +82,43 @@ Script de développement qui combine build, serveur et ouverture de Chrome.
 ./scripts/dev.sh server
 ```
 
+### 🎨 `convert-mesh.sh` - Conversion de modèles 3D
+Convertit un fichier .obj en .mesh pour Qt Quick 3D en gérant automatiquement les fichiers temporaires.
+
+**Usage:**
+```bash
+./scripts/convert-mesh.sh <fichier.obj> <nom_final.mesh>
+```
+
+**Arguments:**
+- `fichier.obj` - Fichier source au format Wavefront OBJ
+- `nom_final.mesh` - Nom du fichier .mesh de sortie
+
+**Exemples:**
+```bash
+./scripts/convert-mesh.sh TrebleKey.obj TrebleKey.mesh
+./scripts/convert-mesh.sh BassKey.obj BassKey.mesh
+```
+
+**Fonctionnalités:**
+- Détecte automatiquement l'outil balsam de Qt
+- Gère le sous-dossier meshes/ créé par balsam
+- Nettoie automatiquement les fichiers temporaires (.qml)
+- Affiche la taille du fichier généré
+
+### 🎼 `convert-clefs.sh` - Conversion des clés musicales
+Convertit automatiquement les deux clés musicales (Sol et Fa) en une seule commande.
+
+**Usage:**
+```bash
+./scripts/convert-clefs.sh
+```
+
+**Actions:**
+- Convertit `TrebleKey.obj` → `TrebleKey.mesh`
+- Convertit `BassKey.obj` → `BassKey.mesh`
+- Affiche un résumé des fichiers générés
+
 ## Workflow de développement
 
 ### Développement Web (WebAssembly)

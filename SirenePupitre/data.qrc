@@ -48,6 +48,7 @@
         <file>QML/admin/advanced/AdvancedColors.qml</file>
         <file>QML/admin/advanced/AdvancedSizes.qml</file>
         <file>QML/utils/ColorPicker.qml</file>
-        <file>QML/utils/meshes/Clef3D.mesh</file>
+        <file>QML/utils/meshes/TrebleKey.mesh</file>
+        <file>QML/utils/meshes/BassKey.mesh</file>
     </qresource>
 </RCC>

@@ -137,12 +137,18 @@ build_web() {
     fi
     
     # Copier les fichiers .mesh pour les modèles 3D
-    mkdir -p webfiles/QML/obj/meshes || true
-    if compgen -G "QML/obj/meshes/*.mesh" > /dev/null; then
-        cp QML/obj/meshes/*.mesh webfiles/QML/obj/meshes/ || true
-        print_success "Fichiers .mesh copiés dans webfiles/QML/obj/meshes/"
+    mkdir -p webfiles/QML/utils/meshes || true
+    if compgen -G "QML/utils/meshes/*.mesh" > /dev/null; then
+        cp QML/utils/meshes/*.mesh webfiles/QML/utils/meshes/ || true
+        print_success "Fichiers .mesh copiés dans webfiles/QML/utils/meshes/"
     else
-        print_warning "Aucun fichier .mesh trouvé dans QML/obj/meshes/"
+        print_warning "Aucun fichier .mesh trouvé dans QML/utils/meshes/"
+    fi
+    
+    # Copier le sous-dossier meshes/ si il existe (pour fichiers .qml générés par balsam)
+    if [ -d "QML/utils/meshes/meshes" ]; then
+        cp -r QML/utils/meshes/meshes webfiles/QML/utils/meshes/ || true
+        print_success "Sous-dossier meshes/ copié"
     fi
     
     print_success "Build WebAssembly terminé"
