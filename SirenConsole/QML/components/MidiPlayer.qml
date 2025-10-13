@@ -423,6 +423,8 @@ Rectangle {
                 implicitWidth: 60
                 
                 onClicked: {
+                    console.log("🎵 Bouton Play/Pause cliqué - État:", playing ? "PLAY→PAUSE" : "STOP→PLAY")
+                    console.log("🎵 CommandManager:", commandManager ? "OK" : "NULL")
                     if (playing) {
                         pause()
                     } else {

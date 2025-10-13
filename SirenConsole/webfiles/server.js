@@ -44,7 +44,10 @@ function setSecurityHeaders(response) {
 
 // Gestion des requêtes
 const server = http.createServer(function (request, response) {
-    console.log('📥 Requête:', request.method, request.url);
+    // Logs uniquement pour les requêtes intéressantes (pas les GET polling)
+    if (request.method !== 'GET' || !request.url.includes('/api/puredata/playback')) {
+        console.log('📥 Requête:', request.method, request.url);
+    }
     
     // Appliquer les headers de sécurité
     setSecurityHeaders(response);

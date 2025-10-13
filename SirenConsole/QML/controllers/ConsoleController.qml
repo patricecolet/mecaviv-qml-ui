@@ -5,6 +5,12 @@ Item {
     
     // === PROPRIÉTÉS PUBLIQUES ===
     
+    // Exposer les managers pour accès externe
+    property alias commandManager: commandManager
+    property alias configManager: configManager
+    property alias pupitreManager: pupitreManager
+    property alias webSocketManager: webSocketManager
+    
     // Managers - Utilisation directe des composants
     ConfigManager {
         id: configManager
