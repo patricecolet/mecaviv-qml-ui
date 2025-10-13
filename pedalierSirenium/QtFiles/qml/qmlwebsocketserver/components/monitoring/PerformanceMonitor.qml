@@ -22,6 +22,7 @@ Rectangle {
         
         Text {
             text: "📊 Performances Système"
+            font.family: window.globalEmojiFont
             color: "#00aaff"
             font.pixelSize: 12
             font.bold: true

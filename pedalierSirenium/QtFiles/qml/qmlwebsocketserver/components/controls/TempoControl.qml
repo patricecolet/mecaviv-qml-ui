@@ -135,6 +135,7 @@ Item {
         Text {
             anchors.centerIn: parent
             text: "▶"
+            font.family: window.globalEmojiFont
             color: "white"
             font.pixelSize: 20
         }

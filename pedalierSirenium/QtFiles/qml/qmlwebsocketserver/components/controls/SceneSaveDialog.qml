@@ -38,6 +38,7 @@ Rectangle {
         // En-tête
         Text {
             text: "💾 Sauvegarder la scène"
+            font.family: window.globalEmojiFont
             color: "white"
             font.pixelSize: 20
             font.bold: true
@@ -129,6 +130,7 @@ Rectangle {
                 
                 contentItem: Text {
                     text: parent.text
+                    font.family: window.globalEmojiFont
                     color: parent.enabled ? "white" : "#888"
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
@@ -153,6 +155,7 @@ Rectangle {
                 
                 contentItem: Text {
                     text: parent.text
+                    font.family: window.globalEmojiFont
                     color: "white"
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter

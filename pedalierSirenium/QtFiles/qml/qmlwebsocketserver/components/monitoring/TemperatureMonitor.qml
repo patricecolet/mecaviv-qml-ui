@@ -26,6 +26,7 @@ Rectangle {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: "🌡️ CPU"
+            font.family: window.globalEmojiFont
             color: "white"
             font.pixelSize: 12
             font.bold: true

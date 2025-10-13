@@ -107,4 +107,10 @@
         <file>qml/icons/music.png</file>
         <file>qml/icons/circle.png</file>
     </qresource>
+    
+    <!-- Polices partagées -->
+    <qresource prefix="/">
+        <file>../../fonts/EmojiFont.qml</file>
+        <file>../../fonts/NotoEmoji-VariableFont_wght.ttf</file>
+    </qresource>
 </RCC>

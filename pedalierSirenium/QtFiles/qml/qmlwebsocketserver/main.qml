@@ -19,6 +19,20 @@ Window {
     height: 600
     visible: true
     color: "black"
+    
+    // Police Emoji globale
+    FontLoader {
+        id: emojiFont
+        source: "qrc:/fonts/NotoEmoji-VariableFont_wght.ttf"
+        onStatusChanged: {
+            if (status === FontLoader.Ready) {
+                console.log("✅ [Global] Police Emoji chargée:", name)
+            }
+        }
+    }
+    
+    // Rendre la police accessible globalement
+    readonly property string globalEmojiFont: emojiFont.name
 
     // Settings
     Settings {

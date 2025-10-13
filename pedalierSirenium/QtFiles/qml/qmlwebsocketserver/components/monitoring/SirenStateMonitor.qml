@@ -28,6 +28,7 @@ Rectangle {
             spacing: 10
             Text {
                 text: "🎵 État des Sirènes"
+                font.family: window.globalEmojiFont
                 color: "#00aaff"
                 font.pixelSize: 12
                 font.bold: true

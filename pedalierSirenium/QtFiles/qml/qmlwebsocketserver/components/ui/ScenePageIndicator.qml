@@ -86,6 +86,7 @@ Item {
 
                 Text {
                     text: "▶"
+                    font.family: window.globalEmojiFont
                     color: "white"
                     font.pixelSize: 12
                     anchors.centerIn: parent
