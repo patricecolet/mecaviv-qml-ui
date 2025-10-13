@@ -105,6 +105,13 @@ const server = http.createServer(function (request, response) {
         return;
     }
     
+    if (request.url === '/api/puredata/playback') {
+        const playbackState = pureDataProxy.getPlaybackState();
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(playbackState));
+        return;
+    }
+    
     // Route principale
     if (request.url === '/' || request.url === '') {
         filePath = './appSirenConsole.html';

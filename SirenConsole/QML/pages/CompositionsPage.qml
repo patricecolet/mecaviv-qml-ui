@@ -41,10 +41,28 @@ Rectangle {
         anchors.margins: 20
         spacing: 15
         
+        // Lecteur MIDI avec contrôles de transport
+        MidiPlayer {
+            id: midiPlayer
+            Layout.fillWidth: true
+            Layout.preferredHeight: 280
+            
+            midiFileManager: midiFileManager
+            commandManager: consoleController ? consoleController.commandManager : null
+        }
+        
+        // Séparateur
+        Rectangle {
+            Layout.fillWidth: true
+            height: 2
+            color: "#00ff00"
+            opacity: 0.3
+        }
+        
         // En-tête
         Rectangle {
             Layout.fillWidth: true
-            height: 80
+            height: 60
             color: "#2a2a2a"
             radius: 8
             border.color: "#555555"
@@ -56,9 +74,9 @@ Rectangle {
                 spacing: 20
                 
                 Text {
-                    text: "🎵 Compositions MIDI"
+                    text: "🎵 Bibliothèque MIDI"
                     color: "#ffffff"
-                    font.pixelSize: 24
+                    font.pixelSize: 18
                     font.bold: true
                 }
                 

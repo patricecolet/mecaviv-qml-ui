@@ -170,6 +170,26 @@
 }
 ```
 
+**État de lecture (PureData → Interfaces, périodique)** :
+```json
+{
+    "type": "MIDI_PLAYBACK_STATE",
+    "playing": true,              // État lecture
+    "position": 5234,             // Position en ms
+    "beat": 8.5,                  // Beat actuel (décimal)
+    "tempo": 120,                 // BPM actuel
+    "timeSignature": {            // Signature temporelle
+        "numerator": 4,           // Battements par mesure
+        "denominator": 4          // Type de note (4 = noire)
+    },
+    "duration": 180000,           // Durée totale en ms
+    "totalBeats": 240,            // Nombre total de beats
+    "file": "louette/AnxioGapT.midi"
+}
+```
+
+**Note** : PureData extrait le tempo et la signature depuis le fichier MIDI (méta-événements) et les broadcast en temps réel.
+
 ---
 
 ## 🎮 MCU Contrôleurs - Communication UDP

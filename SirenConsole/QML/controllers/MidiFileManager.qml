@@ -15,7 +15,7 @@ QtObject {
     property var websocketManager: null
     
     // Signals
-    signal filesLoaded()
+    signal filesLoaded(var files)
     signal fileSelected(string filePath)
     signal loadError(string errorMessage)
     
@@ -49,7 +49,7 @@ QtObject {
                     try {
                         var response = JSON.parse(xhr.responseText)
                         processFiles(response)
-                        filesLoaded()
+                        filesLoaded(files)
                     } catch (e) {
                         error = "Erreur de parsing: " + e.message
                         loadError(error)
@@ -102,6 +102,13 @@ QtObject {
         
         categories = cats
         files = allFiles
+        
+        console.log("📁 Fichiers MIDI traités:", allFiles.length, "fichiers,", cats.length, "catégories")
+    }
+    
+    // Demander le chargement des fichiers (alias pour loadMidiFiles)
+    function requestFiles() {
+        loadMidiFiles()
     }
     
     // Obtenir le nom d'affichage d'une catégorie

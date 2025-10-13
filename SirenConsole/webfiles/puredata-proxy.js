@@ -14,6 +14,7 @@ class PureDataProxy {
         this.reconnectTimer = null;
         this.eventBuffer = []; // Buffer pour événements temps réel
         this.maxBufferSize = 100;
+        this.playbackState = null; // État de lecture MIDI
         
         console.log('🎛️ PureDataProxy initialisé, URL:', this.pureDataUrl);
         
@@ -73,6 +74,12 @@ class PureDataProxy {
         try {
             const data = JSON.parse(message);
             
+            // Traiter les messages d'état de lecture MIDI
+            if (data.type === 'MIDI_PLAYBACK_STATE') {
+                this.playbackState = data;
+                console.log('🎵 État lecture MIDI mis à jour:', data.playing ? 'PLAY' : 'STOP', '- Position:', data.position, 'ms');
+            }
+            
             // Ajouter au buffer pour polling
             this.eventBuffer.push({
                 timestamp: Date.now(),
@@ -128,6 +135,20 @@ class PureDataProxy {
             connected: this.connected,
             url: this.pureDataUrl,
             bufferSize: this.eventBuffer.length
+        };
+    }
+    
+    // Obtenir l'état de lecture MIDI
+    getPlaybackState() {
+        return this.playbackState || {
+            playing: false,
+            position: 0,
+            beat: 0,
+            tempo: 120,
+            timeSignature: { numerator: 4, denominator: 4 },
+            duration: 0,
+            totalBeats: 0,
+            file: ""
         };
     }
     

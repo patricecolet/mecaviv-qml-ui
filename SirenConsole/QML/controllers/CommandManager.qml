@@ -19,6 +19,84 @@ QtObject {
         console.log("🎮 CommandManager initialisé")
     }
     
+    // ==========================================
+    // Commandes MIDI (PureData via proxy HTTP)
+    // ==========================================
+    
+    function sendMidiCommand(command) {
+        console.log("🎵 Envoi commande MIDI à PureData:", JSON.stringify(command))
+        
+        var xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText)
+                        if (response.success) {
+                            commandExecuted("midi_" + command.type, response)
+                            console.log("✅ Commande MIDI envoyée:", command.type)
+                        } else {
+                            commandError("midi_" + command.type, response.message || "Erreur inconnue")
+                        }
+                    } catch (e) {
+                        commandError("midi_" + command.type, "Erreur parsing réponse: " + e)
+                    }
+                } else {
+                    commandError("midi_" + command.type, "Erreur HTTP: " + xhr.status)
+                }
+            }
+        }
+        
+        xhr.open("POST", "http://localhost:8001/api/puredata/command")
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.send(JSON.stringify(command))
+        
+        return true
+    }
+    
+    function loadMidiFile(path) {
+        return sendMidiCommand({
+            "type": "MIDI_FILE_LOAD",
+            "path": path
+        })
+    }
+    
+    function playMidi() {
+        return sendMidiCommand({
+            "type": "MIDI_TRANSPORT",
+            "action": "play"
+        })
+    }
+    
+    function pauseMidi() {
+        return sendMidiCommand({
+            "type": "MIDI_TRANSPORT",
+            "action": "pause"
+        })
+    }
+    
+    function stopMidi() {
+        return sendMidiCommand({
+            "type": "MIDI_TRANSPORT",
+            "action": "stop"
+        })
+    }
+    
+    function seekMidi(position) {
+        return sendMidiCommand({
+            "type": "MIDI_SEEK",
+            "position": position
+        })
+    }
+    
+    function setMidiTempo(tempo) {
+        return sendMidiCommand({
+            "type": "TEMPO_CHANGE",
+            "tempo": tempo,
+            "smooth": true
+        })
+    }
+    
     // Exécuter une commande sur un pupitre
     function executeCommand(pupitreId, command, parameters) {
         if (!pupitreManager) {
