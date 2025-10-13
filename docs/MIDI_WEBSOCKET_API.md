@@ -397,16 +397,34 @@ ws.send(jsonString)  // → "Not a JSON object." dans PureData
 
 ### Architecture Multi-Joueurs
 
+**Rôles** :
+- **PureData** (chaque Raspberry) : Moteur du jeu (lit MIDI + calcule score)
+- **Node.js** (SirenConsole) : Coordinateur (synchro + leaderboard)
+- **QML** (SirenePupitre) : Interface visuelle (partition + feedback)
+
 ```
-SirenConsole (Node.js) → broadcast GAME_START
+SirenConsole (Node.js - Coordinateur)
+    │
+    ├─→ broadcast GAME_START (synchro)
+    │
     ↓
-7× SirenePupitre (Raspberry Pi)
-    ├─ PureData: Calcul score local
-    └─ QML: Affichage partition + feedback
+7× Raspberry Pi (autonomes)
+    ├─ PureData:
+    │  ├─ Lit fichier MIDI localement
+    │  ├─ Reçoit contrôleurs UDP (MCU)
+    │  ├─ Compare contrôleurs vs séquence MIDI
+    │  └─ Calcule score (Perfect/Good/Miss)
+    │
+    ├─ SirenePupitre (QML):
+    │  ├─ Affiche partition défilante
+    │  └─ Feedback visuel temps réel
+    │
+    └─→ GAME_SCORE_UPDATE 0x11 (PureData → Console via WebSocket)
     ↓
-7× GAME_SCORE_UPDATE → SirenConsole
-    ↓
-SirenConsole → broadcast GAME_LEADERBOARD
+SirenConsole (Node.js)
+    ├─ Collecte scores des 7 pupitres
+    ├─ Trie par score (leaderboard)
+    └─→ broadcast GAME_LEADERBOARD 0x12
 ```
 
 ### 1. GAME_START (Console → Pupitres)
@@ -633,15 +651,20 @@ Exemple partie 3 minutes, 150 notes, 7 joueurs :
 
 ## 📋 Tableau Récapitulatif des Messages Binaires
 
-| Type | ID   | Nom                  | Taille   | Fréquence            | Direction          |
-|------|------|----------------------|----------|----------------------|--------------------|
-| 0x01 | MIDI | POSITION             | 10 bytes | 50ms (lecture)       | Node.js → Clients  |
-| 0x02 | MIDI | FILE_INFO            | 10 bytes | 1× (chargement)      | Node.js → Clients  |
-| 0x03 | MIDI | TEMPO                | 3 bytes  | Changement           | Node.js → Clients  |
-| 0x04 | MIDI | TIMESIG              | 3 bytes  | Changement           | Node.js → Clients  |
-| 0x10 | GAME | NOTE_HIT             | 9 bytes  | Chaque note          | Pupitre → Console  |
-| 0x11 | GAME | SCORE_UPDATE         | 14 bytes | 1 sec (partie)       | Pupitre → Console  |
-| 0x12 | GAME | LEADERBOARD          | 1+N×9    | 2 sec (partie)       | Console → Pupitres |
+| Type | ID   | Nom                  | Taille   | Fréquence            | Direction            | Contexte        |
+|------|------|----------------------|----------|----------------------|----------------------|-----------------|
+| 0x01 | MIDI | POSITION             | 10 bytes | 50ms (lecture)       | Node.js → Clients    | Séquenceur MIDI |
+| 0x02 | MIDI | FILE_INFO            | 10 bytes | 1× (chargement)      | Node.js → Clients    | Séquenceur MIDI |
+| 0x03 | MIDI | TEMPO                | 3 bytes  | Changement           | Node.js → Clients    | Séquenceur MIDI |
+| 0x04 | MIDI | TIMESIG              | 3 bytes  | Changement           | Node.js → Clients    | Séquenceur MIDI |
+| 0x10 | GAME | NOTE_HIT             | 9 bytes  | Chaque note          | PureData → Console   | Mode Jeu        |
+| 0x11 | GAME | SCORE_UPDATE         | 14 bytes | 1 sec (partie)       | PureData → Console   | Mode Jeu        |
+| 0x12 | GAME | LEADERBOARD          | 1+N×9    | 2 sec (partie)       | Console → PureData   | Mode Jeu        |
+
+**Clarification** :
+- **Messages 0x01-0x04** : Séquenceur MIDI (Node.js lit MIDI, broadcast position/tempo)
+- **Messages 0x10-0x11** : Mode Jeu (PureData lit MIDI, calcule score, envoie à Console)
+- **Message 0x12** : Mode Jeu (Console collecte scores, broadcast leaderboard)
 
 **Bande passante totale** :
 - **Séquenceur MIDI** : ~200 bytes/sec pendant lecture
