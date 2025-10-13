@@ -1227,6 +1227,40 @@ Jeu de type Guitar Hero adapté aux sirènes mécaniques :
 
 ---
 
+## ✅ Accompli Récemment (Octobre 2025)
+
+### Configuration Centralisée
+- ✅ **config.json unique** à la racine du projet (chemins relatifs portables)
+- ✅ **config-loader.js** : Chargement avec expansion de chemins (Node.js)
+- ✅ **pdjson external** : Lecture et broadcast depuis PureData
+- ✅ **Migration complète** : SirenConsole et SirenePupitre utilisent config.json
+- ✅ **Un seul fichier** pour toute la configuration système
+
+### Infrastructure WebSocket
+- ✅ **Port 10002** : Migration depuis 10001 (évite conflit avec Cursor)
+- ✅ **Mode binaire** : Messages Buffer UTF-8 (compatibilité PureData)
+- ✅ **Proxy Node.js** : puredata-proxy.js pour SirenConsole WASM
+- ✅ **WebSocket direct QML** : SirenePupitre natif → PureData
+- ✅ **Reconnexion automatique** : Gestion robuste des déconnexions
+- ✅ **Communication bidirectionnelle** testée et fonctionnelle
+
+### Paramètres Configurables
+- ✅ **Caméra 3D** : Position et fieldOfView dans config.json
+- ✅ **Affichage notes** : showNoteNames, noteNameSettings (couleur, taille, position)
+- ✅ **Contrôleurs** : Scale, couleurs, visibilité
+- ✅ **Mise à jour dynamique** : Modifier config.json → PureData recharge → Interfaces refresh
+
+### Workflow Opérationnel
+```
+config.json (mecaviv-qml-ui)
+    ↓
+├─→ config-loader.js → SirenConsole (Node.js)
+├─→ pdjson → PureData → WebSocket binaire (3672 bytes)
+└─→ ConfigController.qml → SirenePupitre
+```
+
+---
+
 ## 🎯 Prochaines Étapes
 
 ### Phase 1 : Analyse du Code
@@ -1247,22 +1281,33 @@ Jeu de type Guitar Hero adapté aux sirènes mécaniques :
   - UDP → UDP sirènes (via sirenMidi2Udp)
 - [ ] Documenter le routage MIDI multi-destination
 - [ ] Expliquer les courbes de transformation
-- [ ] Documenter la communication WebSocket bidirectionnelle
-- [ ] Documenter config.json (structure, chargement, sync)
+- [X] Documenter la communication WebSocket bidirectionnelle
+- [X] **Documenter config.json** :
+  - [X] Structure centralisée (chemins relatifs portables)
+  - [X] Chargement avec config-loader.js (Node.js)
+  - [X] Lecture avec pdjson (PureData)
+  - [X] Broadcast binaire via WebSocket
+  - [X] Mise à jour dynamique dans SirenePupitre/SirenConsole
 
 ### Phase 3 : Intégration Console et Lecture MIDI
 - [ ] **Lancement ComposeSiren** :
   - Script de démarrage headless (Raspberry Pi)
   - Configuration via arguments CLI
   - Pas d'interface graphique en production
-- [X] **API REST** `/api/midi/files` - Liste des compositions disponibles
+- [X] **API REST** `/api/midi/files` - Liste des compositions disponibles (46 fichiers)
+- [X] **Infrastructure WebSocket opérationnelle** :
+  - [X] Proxy Node.js → PureData (puredata-proxy.js)
+  - [X] Mode binaire (Buffer UTF-8)
+  - [X] Port 10002 (évite conflit Cursor sur 10001)
+  - [X] Reconnexion automatique
 - [ ] Créer l'interface de sélection de fichiers MIDI dans SirenConsole
 - [ ] **Messages WebSocket** pour contrôle lecture (Console/Pupitre → PureData) :
-  - `MIDI_FILE_LOAD` : Charger un fichier
-  - `MIDI_FILE_PLAY` : Démarrer lecture
-  - `MIDI_FILE_STOP` : Arrêter lecture
-  - `MIDI_FILE_PAUSE` : Mettre en pause
-  - `MIDI_FILE_SEEK` : Se déplacer dans le fichier
+  - [X] Infrastructure prête (messages reçus par PureData)
+  - [ ] `MIDI_FILE_LOAD` : Charger un fichier (à implémenter dans PureData)
+  - [ ] `MIDI_FILE_PLAY` : Démarrer lecture
+  - [ ] `MIDI_FILE_STOP` : Arrêter lecture
+  - [ ] `MIDI_FILE_PAUSE` : Mettre en pause
+  - [ ] `MIDI_FILE_SEEK` : Se déplacer dans le fichier
 - [ ] **Configuration reverb** :
   - Interface dans SirenConsole (onglet Audio/Effects)
   - Panneau admin SirenePupitre (section Advanced)
