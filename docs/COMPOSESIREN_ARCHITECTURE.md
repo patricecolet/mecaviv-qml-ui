@@ -973,8 +973,84 @@ Le preset **training** adapte automatiquement le volume selon la sirène jouée 
 
 **API REST** :
 - GET `/api/midi/files` - Liste compositions
+- GET `/api/midi/categories` - Catégories MIDI
 - GET `/api/presets` - Liste presets
 - POST `/api/presets` - Sauvegarder preset
+
+#### **API MIDI - Gestion des Fichiers**
+
+**Fichier** : `SirenConsole/webfiles/api-midi.js`  
+**Intégration** : `server.js` (port 8001)
+
+**Configuration** :
+```javascript
+// Chemin vers le repository MIDI
+const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH 
+    || path.resolve(__dirname, '../../../mecaviv/compositions');
+```
+
+**Route GET `/api/midi/files`** :
+```json
+{
+    "success": true,
+    "count": 45,
+    "files": [
+        {
+            "name": "AnxioGapT.midi",
+            "path": "louette/AnxioGapT.midi",
+            "category": "louette",
+            "fullPath": "/Users/.../mecaviv/compositions/louette/AnxioGapT.midi"
+        }
+    ],
+    "repositoryPath": "/Users/.../mecaviv/compositions"
+}
+```
+
+**Route GET `/api/midi/categories`** :
+```json
+{
+    "success": true,
+    "categories": [
+        {
+            "name": "louette",
+            "count": 40,
+            "files": [...]
+        },
+        {
+            "name": "patwave",
+            "count": 4,
+            "files": [...]
+        }
+    ]
+}
+```
+
+**Fonctionnalités** :
+- ✅ Scan récursif du dépôt `mecaviv/compositions`
+- ✅ Groupement automatique par catégories
+- ✅ Filtrage fichiers `.midi` et `.mid`
+- ✅ Chemins relatifs pour portabilité
+- ✅ Variable d'environnement `MECAVIV_COMPOSITIONS_PATH` pour override
+
+**Configuration locale (test)** :
+```bash
+# Répertoires côte-à-côte
+~/repo/mecaviv-qml-ui/     # Ce projet
+~/repo/mecaviv/            # Dépôt parent avec compositions/
+
+# Chemin automatique : ../../../mecaviv/compositions
+# Fonctionne depuis SirenConsole/webfiles/api-midi.js
+```
+
+**Configuration production (Raspberry Pi)** :
+```bash
+# Avec variable d'environnement
+export MECAVIV_COMPOSITIONS_PATH=/home/pi/mecaviv/compositions
+
+# Ou structure identique à dev
+~/dev/src/mecaviv-qml-ui/
+~/dev/src/mecaviv/
+```
 
 ---
 

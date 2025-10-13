@@ -179,3 +179,4 @@ echo ""
 print_info "Vous pouvez maintenant utiliser ce fichier dans QML:"
 echo "   Model { source: \"qrc:/chemin/vers/$OUTPUT_MESH\" }"
 
+

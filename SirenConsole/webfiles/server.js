@@ -5,6 +5,9 @@ const path = require('path');
 // Importer l'API des presets
 const presetAPI = require('./api-presets.js');
 
+// Importer l'API MIDI
+const midiAPI = require('./api-midi.js');
+
 // Configuration du serveur
 const PORT = 8001; // Port différent de SirenePupitre (8000)
 const HOST = '0.0.0.0';
@@ -44,6 +47,17 @@ const server = http.createServer(function (request, response) {
     if (request.url.startsWith('/api/presets')) {
         // Rediriger vers l'API des presets
         presetAPI.app(request, response);
+        return;
+    }
+    
+    // Routes API MIDI
+    if (request.url === '/api/midi/files') {
+        midiAPI.getMidiFiles(request, response);
+        return;
+    }
+    
+    if (request.url === '/api/midi/categories') {
+        midiAPI.getMidiCategories(request, response);
         return;
     }
     

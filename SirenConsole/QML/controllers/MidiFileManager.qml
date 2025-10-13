@@ -44,7 +44,7 @@ QtObject {
             }
         }
         
-        xhr.open("GET", "http://localhost:3000/api/midi/files")
+        xhr.open("GET", "http://localhost:8001/api/midi/files")
         xhr.send()
     }
     
