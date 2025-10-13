@@ -12,7 +12,6 @@
         <file>QML/controllers/SirenController.qml</file>
         <file>QML/utils/MusicUtils.qml</file>
         <file>QML/controllers/ConfigController.qml</file>
-        <file>QML/utils/ConfigLoader.qml</file>
         <file>config.js</file>
         <file>QML/utils/Clef3D.qml</file>
         <file>QML/utils/Clef2D.qml</file>

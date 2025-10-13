@@ -59,9 +59,9 @@ Window {
     
     WebSocketController {
         id: webSocketController
-        serverUrl: configController.config ? configController.config.serverUrl : "ws://localhost:10001"
+        serverUrl: (configController.config && configController.config.serverUrl) ? configController.config.serverUrl : "ws://127.0.0.1:10002"
         debugMode: mainWindow.debugMode
-        configController: configController  // AJOUTER CETTE LIGNE
+        configController: configController
         
         onDataReceived: function(data) {
             // Logs désactivés pour performance

@@ -139,16 +139,17 @@ Node {
                 }
                 return Qt.rgba(0.9, 0.6, 0.6, 0.9)
             }
-            showDebugLabels: {
-                if (configController) {
-                    var dummy = configController.updateCounter
-                    // Vérifier d'abord noteName.visible
-                    var noteNameVisible = configController.getConfigValue("displayConfig.components.musicalStaff.noteName.visible", undefined)
-                    if (noteNameVisible !== undefined) return noteNameVisible
-                }
-                // Sinon utiliser la logique existante
-                return ambitusConfig.showNoteNames === true || root.showNoteNames
+        
+        showDebugLabels: {
+            if (configController) {
+                var dummy = configController.updateCounter
+                // Vérifier d'abord noteName.visible
+                var noteNameVisible = configController.getConfigValue("displayConfig.components.musicalStaff.noteName.visible", undefined)
+                if (noteNameVisible !== undefined) return noteNameVisible
             }
+            // Sinon utiliser la logique existante
+            return ambitusConfig.showNoteNames === true || root.showNoteNames
+        }
     }
     
     // Le curseur

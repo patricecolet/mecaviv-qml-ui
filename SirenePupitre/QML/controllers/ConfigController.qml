@@ -1,13 +1,59 @@
 import QtQuick 2.15
-import "../utils/ConfigLoader.qml" as ConfigLoaderModule
 
 QtObject {
     id: root
     
-    // Loader de configuration depuis config.json
-    property ConfigLoaderModule.ConfigLoader configLoader: ConfigLoaderModule.ConfigLoader {}
-    
-    property var config: configLoader.configData
+    // Configuration chargée depuis config.json (initialisée par défaut)
+    // Note: En WASM, la vraie config arrive via WebSocket depuis PureData
+    property var config: ({
+        "serverUrl": "ws://127.0.0.1:10002",
+        "admin": { "enabled": true },
+        "controllersPanel": { "visible": false },
+        "ui": { "scale": 0.65 },
+        "midiFiles": { "repositoryPath": "../mecaviv/compositions" },
+        "sirenConfig": { 
+            "mode": "restricted", 
+            "currentSiren": "1",
+            "sirens": [
+                {
+                    "id": "1",
+                    "name": "S1",
+                    "outputs": 12,
+                    "ambitus": { "min": 43, "max": 86 },
+                    "clef": "bass",
+                    "restrictedMax": 72,
+                    "transposition": 1,
+                    "displayOctaveOffset": -1,
+                    "frettedMode": { "enabled": false }
+                }
+            ]
+        },
+        "displayConfig": {
+            "camera": {
+                "position": [0, 0, 1500],
+                "fieldOfView": 27
+            },
+            "components": {
+                "musicalStaff": {
+                    "visible": true,
+                    "ambitus": {
+                        "showNoteNames": true,
+                        "noteNameSettings": {
+                            "position": "below",
+                            "offsetY": 30,
+                            "letterHeight": 15,
+                            "letterSpacing": 20,
+                            "color": "#FFFF99",
+                            "segmentWidth": 3,
+                            "segmentDepth": 0.5
+                        }
+                    }
+                }
+            },
+            "controllers": { "visible": true, "scale": 0.8 }
+        },
+        "reverbConfig": { "enabled": true }
+    })
     property var currentSiren: null
     property string mode: "restricted"
     property var webSocketController: null
@@ -41,14 +87,22 @@ QtObject {
     signal settingsUpdated()
     
     Component.onCompleted: {
+        // En WASM, la vraie config arrive via WebSocket depuis PureData
         console.log("=== ConfigController initialisé ===");
-        console.log("Config disponible:", config ? "OUI" : "NON");
+        console.log("⏳ Config par défaut chargée, attente de PureData pour la vraie config...");
         
-        // Valeur par défaut si absente dans la config racine
+        // Valeur par défaut
         mode = (config && config.mode) ? config.mode : "restricted"
-        selectSiren(config.sirenConfig.currentSiren)
+        
+        // Sélectionner la sirène par défaut
+        if (config.sirenConfig && config.sirenConfig.sirens && config.sirenConfig.sirens.length > 0) {
+            var selected = selectSiren(config.sirenConfig.currentSiren)
+            if (selected) {
+                console.log("✅ Config par défaut OK - Sirène:", currentSiren.name, "- Mode:", mode)
+            }
+        }
+        
         ready()
-        console.log("Configuration chargée - Mode:", mode, "- Sirène:", currentSiren.name)
     }
     
     // FONCTION GÉNÉRIQUE PRINCIPALE
@@ -299,6 +353,9 @@ QtObject {
     }
     function updateFullConfig(newConfig) {
         console.log("Mise à jour complète de la configuration depuis PureData");
+        console.log("📦 Config reçue de PureData:");
+        console.log("  - displayConfig.components.musicalStaff:", JSON.stringify(newConfig.displayConfig?.components?.musicalStaff || "MANQUANT"));
+        console.log("  - displayConfig.controllers.scale:", newConfig.displayConfig?.controllers?.scale || "MANQUANT");
         
         // Remplacer toute la configuration
         config = newConfig;

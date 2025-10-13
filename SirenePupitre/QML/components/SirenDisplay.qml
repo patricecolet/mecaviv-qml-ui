@@ -90,9 +90,28 @@ Item {
             }
             
             PerspectiveCamera {
-                position: Qt.vector3d(0, 0, 1500)
+                position: {
+                    // Forcer la mise à jour avec updateCounter
+                    if (configController) {
+                        var dummy = configController.updateCounter
+                    }
+                    if (configController && configController.config && configController.config.displayConfig && configController.config.displayConfig.camera) {
+                        var cam = configController.config.displayConfig.camera.position
+                        return Qt.vector3d(cam[0], cam[1], cam[2])
+                    }
+                    return Qt.vector3d(0, 0, 1500)  // Valeur par défaut
+                }
                 eulerRotation.x: 0
-                fieldOfView: 27
+                fieldOfView: {
+                    // Forcer la mise à jour avec updateCounter
+                    if (configController) {
+                        var dummy = configController.updateCounter
+                    }
+                    if (configController && configController.config && configController.config.displayConfig && configController.config.displayConfig.camera) {
+                        return configController.config.displayConfig.camera.fieldOfView
+                    }
+                    return 27  // Valeur par défaut
+                }
                 clipFar: 5000
                 clipNear: 1
             }

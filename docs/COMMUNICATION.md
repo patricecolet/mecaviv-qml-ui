@@ -19,7 +19,7 @@ Le système utilise **3 protocoles principaux** pour la communication entre appl
 | Source | Destination | Port | Format |
 |--------|-------------|------|--------|
 | SirenConsole | SirenePupitre | 8000 + WS | JSON |
-| SirenePupitre | PureData | 10001 | JSON + Binaire |
+| SirenePupitre | PureData | 10002 | JSON + Binaire |
 | pedalierSirenium | PureData | 10000 | JSON + Binaire |
 | sirenRouter | SirenConsole | 8003 | JSON |
 
