@@ -1,10 +1,13 @@
 import QtQuick 2.15
-import "qrc:/config.js" as Config
+import "../utils/ConfigLoader.qml" as ConfigLoaderModule
 
 QtObject {
     id: root
     
-    property var config: Config.configData
+    // Loader de configuration depuis config.json
+    property ConfigLoaderModule.ConfigLoader configLoader: ConfigLoaderModule.ConfigLoader {}
+    
+    property var config: configLoader.configData
     property var currentSiren: null
     property string mode: "restricted"
     property var webSocketController: null

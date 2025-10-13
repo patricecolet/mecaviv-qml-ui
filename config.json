@@ -31,7 +31,8 @@
         "clef": "bass",
         "restrictedMax": 72,
         "transposition": 1,
-        "displayOctaveOffset": -1
+        "displayOctaveOffset": -1,
+        "frettedMode": { "enabled": false }
       },
       {
         "id": "2",
@@ -41,7 +42,8 @@
         "clef": "bass",
         "restrictedMax": 72,
         "transposition": 1,
-        "displayOctaveOffset": -1
+        "displayOctaveOffset": -1,
+        "frettedMode": { "enabled": false }
       },
       {
         "id": "3",
@@ -51,7 +53,8 @@
         "clef": "bass",
         "restrictedMax": 60,
         "transposition": 1,
-        "displayOctaveOffset": 0
+        "displayOctaveOffset": 0,
+        "frettedMode": { "enabled": false }
       },
       {
         "id": "4",
@@ -61,7 +64,8 @@
         "clef": "bass",
         "restrictedMax": 60,
         "transposition": 1,
-        "displayOctaveOffset": 0
+        "displayOctaveOffset": 0,
+        "frettedMode": { "enabled": false }
       },
       {
         "id": "5",
@@ -71,7 +75,8 @@
         "clef": "treble",
         "restrictedMax": 84,
         "transposition": 1,
-        "displayOctaveOffset": 0
+        "displayOctaveOffset": 0,
+        "frettedMode": { "enabled": false }
       },
       {
         "id": "6",
@@ -81,7 +86,8 @@
         "clef": "treble",
         "restrictedMax": 84,
         "transposition": 1,
-        "displayOctaveOffset": 0
+        "displayOctaveOffset": 0,
+        "frettedMode": { "enabled": false }
       },
       {
         "id": "7",
@@ -91,7 +97,8 @@
         "clef": "treble",
         "restrictedMax": 84,
         "transposition": 0,
-        "displayOctaveOffset": 0
+        "displayOctaveOffset": 0,
+        "frettedMode": { "enabled": false }
       }
     ]
   },
