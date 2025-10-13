@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import QtWebSockets 1.15
 
 QtObject {
     id: webSocketManager
@@ -9,11 +10,114 @@ QtObject {
     property bool autoReconnect: true
     property int reconnectDelay: 3000
     
+    // WebSocket vers PureData (central)
+    property string pureDataUrl: "ws://localhost:10001"
+    property var pureDataSocket: null
+    property bool pureDataConnected: false
+    
     // Signaux
     signal connectionOpened(string url)
     signal connectionClosed(string url)
     signal messageReceived(string url, string message)
     signal errorOccurred(string url, string error)
+    signal pureDataConnected()
+    signal pureDataDisconnected()
+    
+    // Initialisation : Connexion automatique à PureData
+    Component.onCompleted: {
+        connectToPureData()
+    }
+    
+    // Connexion à PureData (WebSocket central)
+    function connectToPureData() {
+        console.log("🔌 Connexion à PureData:", pureDataUrl)
+        
+        if (pureDataSocket) {
+            pureDataSocket.active = false
+            pureDataSocket.destroy()
+        }
+        
+        pureDataSocket = pureDataSocketComponent.createObject(webSocketManager)
+    }
+    
+    // Composant WebSocket pour PureData
+    Component {
+        id: pureDataSocketComponent
+        
+        WebSocket {
+            id: socket
+            url: pureDataUrl
+            active: true
+            
+            onStatusChanged: {
+                console.log("📡 PureData WebSocket status:", status)
+                
+                if (status === WebSocket.Open) {
+                    pureDataConnected = true
+                    console.log("✅ Connecté à PureData:", url)
+                    connectionOpened(url)
+                    webSocketManager.pureDataConnected()
+                } else if (status === WebSocket.Closed || status === WebSocket.Error) {
+                    pureDataConnected = false
+                    console.log("❌ Déconnecté de PureData")
+                    connectionClosed(url)
+                    webSocketManager.pureDataDisconnected()
+                    
+                    // Reconnexion automatique
+                    if (autoReconnect) {
+                        console.log("🔄 Reconnexion dans", reconnectDelay, "ms")
+                        reconnectTimer.start()
+                    }
+                }
+            }
+            
+            onTextMessageReceived: function(message) {
+                console.log("📥 Message de PureData:", message)
+                messageReceived(url, message)
+                
+                // Parser et dispatcher
+                try {
+                    var data = JSON.parse(message)
+                    handlePureDataMessage(data)
+                } catch (e) {
+                    console.error("❌ Erreur parsing message:", e)
+                }
+            }
+            
+            onErrorStringChanged: {
+                console.error("❌ Erreur WebSocket:", errorString)
+                errorOccurred(url, errorString)
+            }
+        }
+    }
+    
+    // Timer de reconnexion
+    Timer {
+        id: reconnectTimer
+        interval: reconnectDelay
+        repeat: false
+        onTriggered: connectToPureData()
+    }
+    
+    // Gérer les messages de PureData
+    function handlePureDataMessage(data) {
+        console.log("📨 Type de message:", data.type)
+        
+        // TODO: Dispatcher selon le type de message
+        // CONFIG_FULL, MIDI_NOTE, CONTROLLERS, etc.
+    }
+    
+    // Envoyer un message à PureData
+    function sendMessage(message) {
+        if (pureDataSocket && pureDataConnected) {
+            console.log("📤 Envoi à PureData:", message)
+            pureDataSocket.sendTextMessage(message)
+            return true
+        } else {
+            console.error("❌ PureData non connecté")
+            return false
+        }
+    }
     
     // Fonction pour créer une connexion WebSocket (simulation)
     function connectToPupitre(url, pupitreId) {
