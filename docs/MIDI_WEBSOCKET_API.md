@@ -393,6 +393,263 @@ ws.send(jsonString)  // → "Not a JSON object." dans PureData
 
 ---
 
-**Dernière mise à jour** : Octobre 2025  
-**Status** : ✅ Séquenceur MIDI Node.js complet et fonctionnel - Architecture centralisée opérationnelle
+## 🎮 Messages Mode Jeu "Siren Hero"
+
+### Architecture Multi-Joueurs
+
+```
+SirenConsole (Node.js) → broadcast GAME_START
+    ↓
+7× SirenePupitre (Raspberry Pi)
+    ├─ PureData: Calcul score local
+    └─ QML: Affichage partition + feedback
+    ↓
+7× GAME_SCORE_UPDATE → SirenConsole
+    ↓
+SirenConsole → broadcast GAME_LEADERBOARD
+```
+
+### 1. GAME_START (Console → Pupitres)
+
+**Lancement d'une partie multi-joueurs synchronisée**
+
+```json
+{
+  "type": "GAME_START",
+  "midiFile": "louette/bach_partita.mid",
+  "mode": "challenge",
+  "difficulty": "medium",
+  "syncTimestamp": 1697212800000,
+  "countdown": 3,
+  "options": {
+    "lookaheadMs": 2000,
+    "toleranceMs": 150,
+    "showNotes": true,
+    "practiceMode": false
+  }
+}
+```
+
+**Champs** :
+- `midiFile` : Chemin relatif depuis midiRepository
+- `mode` : `"practice"`, `"challenge"`, `"performance"`, `"training"`
+- `difficulty` : `"easy"`, `"medium"`, `"hard"`, `"expert"`
+- `syncTimestamp` : Timestamp Unix (ms) de démarrage synchronisé
+- `countdown` : Décompte en secondes avant le début
+- `options.lookaheadMs` : Avance d'affichage des notes (ms)
+- `options.toleranceMs` : Fenêtre de tolérance pour Perfect/Good/Miss
+- `options.showNotes` : Afficher les notes à l'avance
+- `options.practiceMode` : Mode entraînement (pas de score)
+
+### 2. GAME_SCORE_UPDATE (Pupitre → Console) - FORMAT BINAIRE
+
+**Mise à jour du score en temps réel (toutes les secondes)**
+
+**Format** : `0x11 - GAME_SCORE_UPDATE` (14 bytes)
+
+```
+Offset | Type    | Champ           | Description
+-------|---------|-----------------|----------------------------------
+0      | uint8   | messageType     | 0x11 (GAME_SCORE_UPDATE)
+1      | uint8   | pupitreId       | ID pupitre (1-7)
+2      | uint32  | score           | Score total (0 à 4 294 967 295)
+6      | uint16  | combo           | Combo actuel (0-65535)
+8      | uint16  | maxCombo        | Meilleur combo (0-65535)
+10     | uint8   | accuracy        | Précision * 100 (0-100%)
+11     | uint8   | perfect         | Nombre Perfect (0-255)
+12     | uint8   | good            | Nombre Good (0-255)
+13     | uint8   | miss            | Nombre Miss (0-255)
+```
+
+**Total** : 14 bytes (vs ~180 bytes JSON)
+
+**Exemple** :
+```javascript
+// Score 8750, combo 42, maxCombo 67, accuracy 87%, 45 perfect, 23 good, 12 miss
+Buffer: [0x11, 0x03, 0x2E, 0x22, 0x00, 0x00, 0x2A, 0x00, 0x43, 0x00, 0x57, 0x2D, 0x17, 0x0C]
+//       type  pup   score (LE)          combo maxC  acc   perf good miss
+```
+
+### 3. GAME_NOTE_HIT (Pupitre → Console) - FORMAT BINAIRE
+
+**Feedback d'une note jouée (temps réel, envoi à chaque note)**
+
+**Format** : `0x10 - GAME_NOTE_HIT` (9 bytes)
+
+```
+Offset | Type    | Champ           | Description
+-------|---------|-----------------|----------------------------------
+0      | uint8   | messageType     | 0x10 (GAME_NOTE_HIT)
+1      | uint8   | pupitreId       | ID pupitre (1-7)
+2      | uint8   | noteNumber      | Note MIDI (0-127)
+3      | uint8   | expectedValue   | Contrôleur attendu (0-127)
+4      | uint8   | actualValue     | Contrôleur joué (0-127)
+5      | int16   | timingMs        | Timing signé (-500 à +500 ms)
+7      | uint8   | rating          | 0=miss, 1=good, 2=perfect
+8      | uint8   | scoreGained     | Points gagnés / 10 (0-255 → 0-2550)
+```
+
+**Total** : 9 bytes (vs ~150 bytes JSON)
+
+**Exemple** :
+```javascript
+// Perfect hit: Note 60, attendu 64, joué 67, timing +23ms, 250 points
+Buffer: [0x10, 0x03, 0x3C, 0x40, 0x43, 0x00, 0x17, 0x02, 0x19]
+//       type  pup   note  exp   act   timing   rat   score
+```
+
+### 4. GAME_END (Pupitre → Console)
+
+**Signal de fin de partie**
+
+```json
+{
+  "type": "GAME_END",
+  "pupitreId": "pupitre_3",
+  "finalScore": 12450,
+  "accuracy": 0.89,
+  "rank": "A",
+  "stats": {
+    "perfect": 67,
+    "good": 28,
+    "miss": 5,
+    "totalNotes": 100,
+    "maxCombo": 73,
+    "duration": 185000
+  }
+}
+```
+
+**Champs** :
+- `finalScore` : Score final de la partie
+- `rank` : `"S"` (perfect), `"A"` (>90%), `"B"` (>75%), `"C"` (>60%), `"D"` (<60%)
+- `stats.duration` : Durée de la partie en ms
+
+### 5. GAME_LEADERBOARD (Console → Pupitres) - FORMAT BINAIRE
+
+**Classement temps réel (broadcast toutes les 2 secondes)**
+
+**Format** : `0x12 - GAME_LEADERBOARD` (1 + N×9 bytes, N = nombre de joueurs)
+
+**En-tête** (1 byte) :
+```
+Offset | Type    | Champ           | Description
+-------|---------|-----------------|----------------------------------
+0      | uint8   | messageType     | 0x12 (GAME_LEADERBOARD)
+```
+
+**Par joueur** (9 bytes, répété N fois) :
+```
+Offset | Type    | Champ           | Description
+-------|---------|-----------------|----------------------------------
+0      | uint8   | rank            | Position classement (1-7)
+1      | uint8   | pupitreId       | ID pupitre (1-7)
+2      | uint32  | score           | Score total (little-endian)
+6      | uint16  | combo           | Meilleur combo (little-endian)
+8      | uint8   | accuracy        | Précision * 100 (0-100%)
+```
+
+**Total** : 1 + (9 × 7) = **64 bytes max** (vs ~400 bytes JSON pour 7 joueurs)
+
+**Exemple (3 joueurs)** :
+```javascript
+// Top 3: P5 (14200pts, 89combo, 94%), P3 (12450pts, 73combo, 89%), P1 (10000pts, 60combo, 82%)
+Buffer: [0x12, 
+         0x01, 0x05, 0x78, 0x37, 0x00, 0x00, 0x59, 0x00, 0x5E,  // Rank 1: P5
+         0x02, 0x03, 0xA2, 0x30, 0x00, 0x00, 0x49, 0x00, 0x59,  // Rank 2: P3
+         0x03, 0x01, 0x10, 0x27, 0x00, 0x00, 0x3C, 0x00, 0x52]  // Rank 3: P1
+```
+
+**Note** : Les noms de joueurs ne sont pas transmis en binaire (économie de bande passante). Chaque pupitre connaît son propre nom localement.
+
+### 6. GAME_PAUSE (Console → Pupitres)
+
+**Mise en pause synchronisée**
+
+```json
+{
+  "type": "GAME_PAUSE",
+  "paused": true
+}
+```
+
+### 7. GAME_ABORT (Console → Pupitres)
+
+**Annulation de la partie**
+
+```json
+{
+  "type": "GAME_ABORT",
+  "reason": "Network error"
+}
+```
+
+---
+
+## 📊 Flux Complet Mode Jeu
+
+```
+1. SirenConsole → broadcast GAME_START (JSON, 1 fois)
+   ↓
+2. Pupitres démarrent countdown (3...2...1...GO!)
+   ↓
+3. PureData lit MIDI + calcule score
+   ↓
+4. Pupitres → GAME_NOTE_HIT 0x10 (chaque note, 9 bytes)
+   ↓
+5. Pupitres → GAME_SCORE_UPDATE 0x11 (toutes les secondes, 14 bytes)
+   ↓
+6. Console → broadcast GAME_LEADERBOARD 0x12 (toutes les 2s, 64 bytes max)
+   ↓
+7. Fin du morceau → Pupitres → GAME_END (JSON, 1 fois)
+   ↓
+8. Console → broadcast GAME_LEADERBOARD 0x12 (final)
+```
+
+### 🚀 Optimisation Binaire
+
+**Bande passante économisée** :
+
+Exemple partie 3 minutes, 150 notes, 7 joueurs :
+- **JSON** :
+  - GAME_NOTE_HIT: 150 notes × 150 bytes × 7 = **157 KB**
+  - GAME_SCORE_UPDATE: 180 sec × 180 bytes × 7 = **221 KB**
+  - GAME_LEADERBOARD: 90 broadcasts × 400 bytes = **36 KB**
+  - **Total** : ~414 KB
+
+- **Binaire** :
+  - GAME_NOTE_HIT: 150 × 9 bytes × 7 = **9.4 KB**
+  - GAME_SCORE_UPDATE: 180 × 14 bytes × 7 = **17.6 KB**
+  - GAME_LEADERBOARD: 90 × 64 bytes = **5.8 KB**
+  - **Total** : ~33 KB
+
+**Économie** : **92%** (414 KB → 33 KB) ⚡
+
+**Avantages** :
+- Latence minimale sur WiFi Raspberry Pi
+- Peut gérer 30+ joueurs simultanés
+- Pas de lag même avec beaucoup de notes rapides
+- Parfait pour morceaux virtuoses (Paganini, Flight of the Bumblebee)
+
+## 📋 Tableau Récapitulatif des Messages Binaires
+
+| Type | ID   | Nom                  | Taille   | Fréquence            | Direction          |
+|------|------|----------------------|----------|----------------------|--------------------|
+| 0x01 | MIDI | POSITION             | 10 bytes | 50ms (lecture)       | Node.js → Clients  |
+| 0x02 | MIDI | FILE_INFO            | 10 bytes | 1× (chargement)      | Node.js → Clients  |
+| 0x03 | MIDI | TEMPO                | 3 bytes  | Changement           | Node.js → Clients  |
+| 0x04 | MIDI | TIMESIG              | 3 bytes  | Changement           | Node.js → Clients  |
+| 0x10 | GAME | NOTE_HIT             | 9 bytes  | Chaque note          | Pupitre → Console  |
+| 0x11 | GAME | SCORE_UPDATE         | 14 bytes | 1 sec (partie)       | Pupitre → Console  |
+| 0x12 | GAME | LEADERBOARD          | 1+N×9    | 2 sec (partie)       | Console → Pupitres |
+
+**Bande passante totale** :
+- **Séquenceur MIDI** : ~200 bytes/sec pendant lecture
+- **Mode Jeu (7 joueurs)** : ~300 bytes/sec pendant partie
+- **Total** : ~500 bytes/sec (vs ~6500 JSON) = **92% économie**
+
+---
+
+**Dernière mise à jour** : 13 Octobre 2025  
+**Status** : ✅ Séquenceur MIDI Node.js complet - 🎮 Protocole Mode Jeu binaire défini (92% économie)
 
