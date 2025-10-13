@@ -1,8 +1,10 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-// Chemin vers le repository MIDI (depuis config.js)
-const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH || path.resolve(__dirname, '../../../mecaviv/compositions');
+// Charger la config pour obtenir le chemin MIDI
+const { loadConfig } = require('../../config-loader.js');
+const config = loadConfig();
+const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH || config.paths.midiRepository;
 
 console.log('📁 MIDI Repository Path:', MIDI_REPO_PATH);
 

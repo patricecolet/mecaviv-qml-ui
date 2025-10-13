@@ -4,7 +4,10 @@ const WebSocket = require('ws');
 class PureDataProxy {
     constructor(config) {
         this.config = config;
-        this.pureDataUrl = config.servers.websocketUrl || 'ws://localhost:10001';
+        // Construire l'URL depuis la nouvelle structure config.json
+        const host = config.servers?.websocket?.host || 'localhost';
+        const port = config.servers?.websocket?.port || 10002;
+        this.pureDataUrl = `ws://${host}:${port}`;
         this.ws = null;
         this.connected = false;
         this.reconnectInterval = 3000;

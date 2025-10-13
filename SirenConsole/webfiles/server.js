@@ -11,8 +11,9 @@ const midiAPI = require('./api-midi.js');
 // Importer le proxy PureData
 const PureDataProxy = require('./puredata-proxy.js');
 
-// Charger la configuration
-const config = require('./config.js');
+// Charger la configuration depuis config.json
+const { loadConfig } = require('../../config-loader.js');
+const config = loadConfig();
 
 // Configuration du serveur
 const PORT = 8001; // Port différent de SirenePupitre (8000)
