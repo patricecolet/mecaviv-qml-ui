@@ -22,7 +22,15 @@ class PureDataProxy {
         console.log('🔌 Connexion à PureData:', this.pureDataUrl);
         
         try {
-            this.ws = new WebSocket(this.pureDataUrl);
+            // Options pour compatibilité avec PureData
+            const options = {
+                perMessageDeflate: false,
+                handshakeTimeout: 5000,
+                protocolVersion: 13,
+                origin: 'http://localhost:8001'
+            };
+            
+            this.ws = new WebSocket(this.pureDataUrl, options);
             
             this.ws.on('open', () => {
                 this.connected = true;
