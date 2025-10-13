@@ -1,11 +1,10 @@
 /**
  * Configuration Loader
- * Charge config.json avec détection OS et expansion du ~
+ * Charge config.json et résout les chemins relatifs
  */
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 
 /**
  * Déterminer le chemin vers config.json
@@ -17,43 +16,48 @@ function getConfigPath() {
 }
 
 /**
- * Expansion du ~ dans un chemin
+ * Résoudre un chemin relatif depuis la racine du projet
  */
-function expandTilde(str) {
-    if (typeof str !== 'string') return str;
-    if (str.startsWith('~/') || str === '~') {
-        return str.replace('~', os.homedir());
+function resolvePath(relativePath) {
+    if (typeof relativePath !== 'string') return relativePath;
+    
+    // Si c'est déjà un chemin absolu, le retourner tel quel
+    if (path.isAbsolute(relativePath)) {
+        return relativePath;
     }
-    return str;
+    
+    // Résoudre depuis la racine du projet (où se trouve config.json)
+    return path.resolve(__dirname, relativePath);
 }
 
 /**
- * Résoudre les chemins selon l'OS
+ * Résoudre récursivement tous les chemins dans un objet
  */
-function resolvePaths(obj, platform) {
+function resolveAllPaths(obj) {
+    // Si c'est une string, résoudre le chemin
+    if (typeof obj === 'string') {
+        return resolvePath(obj);
+    }
+    
+    // Si ce n'est pas un objet, retourner tel quel
     if (typeof obj !== 'object' || obj === null) {
         return obj;
     }
     
-    // Si c'est un objet avec des clés par OS (darwin, linux)
-    if (obj.darwin || obj.linux) {
-        const value = obj[platform] || obj.linux || obj.darwin;
-        return expandTilde(value);
-    }
-    
-    // Sinon, expansion simple du ~
-    if (typeof obj === 'string') {
-        return expandTilde(obj);
-    }
-    
-    // Récursion pour les objets/arrays
+    // Si c'est un array, résoudre chaque élément
     if (Array.isArray(obj)) {
-        return obj.map(item => resolvePaths(item, platform));
+        return obj.map(item => resolveAllPaths(item));
     }
     
+    // Si c'est un objet, résoudre chaque propriété
     const resolved = {};
     for (const [key, value] of Object.entries(obj)) {
-        resolved[key] = resolvePaths(value, platform);
+        // Ne pas résoudre les champs "description"
+        if (key === 'description') {
+            resolved[key] = value;
+        } else {
+            resolved[key] = resolveAllPaths(value);
+        }
     }
     return resolved;
 }
@@ -73,27 +77,17 @@ function loadConfig(configPath = null) {
     
     // Lire le JSON
     const rawConfig = JSON.parse(fs.readFileSync(finalPath, 'utf8'));
-    const platform = os.platform();
     
-    console.log('🖥️  Plateforme détectée:', platform);
-    
-    // Résoudre les chemins selon l'OS
+    // Résoudre tous les chemins relatifs
     const config = {
         ...rawConfig,
-        paths: resolvePaths(rawConfig.paths, platform),
-        servers: {
-            ...rawConfig.servers,
-            websocket: {
-                ...rawConfig.servers.websocket,
-                host: resolvePaths(rawConfig.servers.websocket.host, platform)
-            }
-        }
+        paths: resolveAllPaths(rawConfig.paths),
+        servers: rawConfig.servers  // Pas de résolution pour les serveurs
     };
     
     // Afficher les chemins résolus
     console.log('📂 MIDI Repository:', config.paths.midiRepository);
-    console.log('🔌 WebSocket Host:', config.servers.websocket.host);
-    console.log('🔌 WebSocket Port:', config.servers.websocket.port);
+    console.log('🔌 WebSocket:', `${config.servers.websocket.host}:${config.servers.websocket.port}`);
     
     return config;
 }

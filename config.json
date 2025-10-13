@@ -3,21 +3,14 @@
   "description": "Configuration centralisée pour le système Mecaviv (PureData, SirenConsole, SirenePupitre)",
   
   "paths": {
-    "midiRepository": {
-      "darwin": "~/repo/mecaviv/compositions",
-      "linux": "~/mecaviv/compositions",
-      "description": "Chemin vers le dépôt MIDI. ~ sera expansé automatiquement. PureData détecte l'OS et choisit le bon chemin."
-    }
+    "midiRepository": "../mecaviv/compositions",
+    "description": "Chemins relatifs depuis mecaviv-qml-ui/. Structure fixe des repos."
   },
   
   "servers": {
     "websocket": {
       "port": 10002,
-      "host": {
-        "darwin": "127.0.0.1",
-        "linux": "0.0.0.0",
-        "description": "macOS = localhost uniquement, Linux/RPi = toutes interfaces"
-      }
+      "host": "127.0.0.1"
     },
     "api": {
       "port": 8001,
