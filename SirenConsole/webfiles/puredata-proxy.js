@@ -96,7 +96,12 @@ class PureDataProxy {
         try {
             const message = JSON.stringify(command);
             console.log('📤 Envoi à PureData:', message.substring(0, 100));
-            this.ws.send(message);
+            
+            // Envoyer en mode binaire comme SirenePupitre
+            // Convertir la string JSON en Buffer
+            const buffer = Buffer.from(message, 'utf8');
+            this.ws.send(buffer);
+            
             return true;
         } catch (error) {
             console.error('❌ Erreur envoi PureData:', error);

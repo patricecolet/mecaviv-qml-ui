@@ -159,7 +159,7 @@ const config = {
         apiUrl: "http://localhost:8001",
         
         // WebSocket PureData (localhost en dev, IP fixe en prod)
-        websocketUrl: "ws://localhost:10001",
+        websocketUrl: "ws://localhost:10002",
         
         // Production (Raspberry Pi)
         // apiUrl: "http://192.168.1.100:8001",

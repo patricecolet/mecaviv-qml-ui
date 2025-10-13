@@ -1,5 +1,5 @@
 var configData = {
-  "serverUrl": "ws://localhost:10001",
+  "serverUrl": "ws://localhost:10002",
   "admin": {
     "enabled": true
   },

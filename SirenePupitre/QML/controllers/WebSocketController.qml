@@ -8,7 +8,7 @@ Item {
     property bool debugMode: false
     
     // WebSocket
-    property string serverUrl: "ws://127.0.0.1:10001"
+    property string serverUrl: "ws://127.0.0.1:10002"
     property alias active: socket.active
     property alias status: socket.status
     property bool connected: socket.status === WebSocket.Open
