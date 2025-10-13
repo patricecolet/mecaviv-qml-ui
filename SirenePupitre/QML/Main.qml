@@ -14,6 +14,20 @@ Window {
     title: qsTr("Sirène Pupitre")
     color: "#6f6a6a"
     
+    // Police Emoji globale
+    FontLoader {
+        id: emojiFont
+        source: "qrc:/fonts/NotoEmoji-VariableFont_wght.ttf"
+        onStatusChanged: {
+            if (status === FontLoader.Ready) {
+                console.log("✅ [Global] Police Emoji chargée:", name)
+            }
+        }
+    }
+    
+    // Rendre la police accessible globalement
+    readonly property string globalEmojiFont: emojiFont.name
+    
     // Propriété pour le mode studio
     property bool studioMode: false
     property bool debugMode: true  // Mettre à true pour activer les logs

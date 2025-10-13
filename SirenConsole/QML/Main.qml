@@ -12,6 +12,20 @@ ApplicationWindow {
     visible: true
     title: "SirenConsole - Console de Contrôle des Pupitres"
     
+    // Police Emoji globale
+    FontLoader {
+        id: emojiFont
+        source: "qrc:/fonts/NotoEmoji-VariableFont_wght.ttf"
+        onStatusChanged: {
+            if (status === FontLoader.Ready) {
+                console.log("✅ [Global] Police Emoji chargée:", name)
+            }
+        }
+    }
+    
+    // Rendre la police accessible globalement
+    readonly property string globalEmojiFont: emojiFont.name
+    
     // Contrôleur principal
     ConsoleController {
         id: consoleController

@@ -50,6 +50,7 @@ Item {
                             
                             Text {
                                 text: modelData.icon
+                                font.family: mainWindow.globalEmojiFont
                                 color: "#FFD700"
                                 font.pixelSize: 16
                             }
