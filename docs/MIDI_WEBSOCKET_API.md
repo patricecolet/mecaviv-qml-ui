@@ -122,6 +122,110 @@ server.js → SirenConsole
 - Immédiatement après un changement (load, seek, tempo, transport)
 - En réponse à toute commande
 
+**Format recommandé** : **BINAIRE multi-types** pour économiser bande passante
+
+#### 0x01 - POSITION (6 bytes, haute fréquence 50ms)
+
+État de lecture en temps réel, envoyé toutes les 50ms pendant lecture :
+
+```
+Offset  Size  Type      Field                    
+------  ----  --------  -----------------------
+0       1     uint8     messageType (0x01)
+1       1     uint8     flags (bit0=playing)
+2       4     float32   beat (décimal, ex: 8.5)
+------  ----  --------  -----------------------
+Total: 6 bytes → 120 bytes/sec à 50ms
+```
+
+**Construction** :
+```
+bytes[0] = 0x01
+bytes[1] = playing ? 0x01 : 0x00
+writeFloat32LE(beat, 2)
+```
+
+---
+
+#### 0x02 - FILE_INFO (10 bytes, au load)
+
+Informations fichier, envoyé une fois au chargement :
+
+```
+Offset  Size  Type      Field                    
+------  ----  --------  -----------------------
+0       1     uint8     messageType (0x02)
+1       1     uint8     reserved (0x00)
+2       4     uint32    duration (ms total)
+6       4     uint32    totalBeats
+------  ----  --------  -----------------------
+Total: 10 bytes
+```
+
+**Construction** :
+```
+bytes[0] = 0x02
+bytes[1] = 0x00
+writeUInt32LE(duration, 2)
+writeUInt32LE(totalBeats, 6)
+```
+
+---
+
+#### 0x03 - TEMPO (3 bytes, quand change)
+
+Changement de tempo, envoyé seulement si tempo change :
+
+```
+Offset  Size  Type      Field                    
+------  ----  --------  -----------------------
+0       1     uint8     messageType (0x03)
+1       2     uint16    tempo (BPM)
+------  ----  --------  -----------------------
+Total: 3 bytes
+```
+
+**Construction** :
+```
+bytes[0] = 0x03
+writeUInt16LE(tempo, 1)
+```
+
+---
+
+#### 0x04 - TIMESIG (3 bytes, quand change)
+
+Changement de signature temporelle, envoyé seulement si signature change :
+
+```
+Offset  Size  Type      Field                    
+------  ----  --------  -----------------------
+0       1     uint8     messageType (0x04)
+1       1     uint8     numerator (ex: 4)
+2       1     uint8     denominator (ex: 4)
+------  ----  --------  -----------------------
+Total: 3 bytes
+```
+
+**Construction** :
+```
+bytes[0] = 0x04
+bytes[1] = numerator
+bytes[2] = denominator
+```
+
+---
+
+**Avantages** :
+- **6 bytes** à 50ms = **120 bytes/sec** vs 6000 bytes/sec JSON (98% économie !)
+- Tempo/Signature : uniquement quand change (économie maximale)
+- Parsing ultra-rapide
+- Node.js décodage automatique via `puredata-proxy.js`
+
+---
+
+#### Format JSON (alternatif, pour debug)
+
 **Format JSON** :
 ```json
 {
@@ -135,8 +239,7 @@ server.js → SirenConsole
         "denominator": 4
     },
     "duration": 180000,
-    "totalBeats": 240,
-    "file": "louette/AnxioGapT.midi"
+    "totalBeats": 240
 }
 ```
 
@@ -153,7 +256,6 @@ server.js → SirenConsole
 | `timeSignature.denominator` | int | Type de note (4=noire, 8=croche) | `4` |
 | `duration` | int | Durée totale en **millisecondes** | `180000` |
 | `totalBeats` | int | Nombre total de beats dans le fichier | `240` |
-| `file` | string | Chemin du fichier chargé | `"louette/AnxioGapT.midi"` |
 
 **Calculs UI** (côté SirenConsole, pour info) :
 ```javascript
