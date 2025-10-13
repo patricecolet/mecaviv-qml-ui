@@ -970,12 +970,83 @@ Le preset **training** adapte automatiquement le volume selon la sirène jouée 
 - Chargement presets
 - Monitoring global
 - **Lancement de ComposeSiren** (via installeur)
+- **Sélection et chargement de compositions MIDI**
+
+#### **Architecture de Communication**
+
+**Problème WebAssembly** :
+- SirenConsole tourne en **WebAssembly** (navigateur)
+- Les WebSockets natifs QML ne sont **pas disponibles en WASM**
+- Communication directe QML → PureData impossible
+
+**Solution : Proxy via server.js** :
+
+```
+┌─────────────────────────────────────────────────────┐
+│         SirenConsole (WebAssembly Qt)               │
+│         http://localhost:8001                       │
+├─────────────────────────────────────────────────────┤
+│  • Interface QML dans le navigateur                 │
+│  • Envoie requêtes HTTP POST à server.js           │
+│  • Pas d'accès WebSocket direct                    │
+└──────────┬──────────────────────────────────────────┘
+           │
+           │ HTTP POST /api/puredata/command
+           │ { "type": "MIDI_FILE_LOAD", "path": "..." }
+           ▼
+┌─────────────────────────────────────────────────────┐
+│         server.js (Node.js Proxy)                   │
+│         Port 8001                                   │
+├─────────────────────────────────────────────────────┤
+│  • Serveur HTTP (fichiers WASM + API REST)         │
+│  • Client WebSocket vers PureData                  │
+│  • Proxy bidirectionnel                            │
+│  • Convertit HTTP ↔ WebSocket                      │
+└──────────┬──────────────────────────────────────────┘
+           │
+           │ WebSocket ws://localhost:10001
+           │ Messages JSON bidirectionnels
+           ▼
+┌─────────────────────────────────────────────────────┐
+│         PureData (Hub Central)                      │
+│         WebSocket Server Port 10001                 │
+├─────────────────────────────────────────────────────┤
+│  • Reçoit commandes (MIDI_FILE_LOAD, etc.)         │
+│  • Envoie état temps réel                          │
+│  • Broadcast à tous les clients                    │
+└─────────────────────────────────────────────────────┘
+```
+
+**Flux de données** :
+
+**1. Commande (SirenConsole → PureData)** :
+```
+SirenConsole (QML)
+    ↓ HTTP POST /api/puredata/command
+    ↓ { "type": "MIDI_FILE_LOAD", "path": "louette/file.midi" }
+server.js (proxy)
+    ↓ WebSocket.send(JSON)
+PureData
+```
+
+**2. État temps réel (PureData → SirenConsole)** :
+```
+PureData
+    ↓ WebSocket.send({ "type": "MIDI_NOTE", ... })
+server.js (proxy)
+    ↓ Stocke dans buffer
+    ↓ Polling HTTP ou Server-Sent Events
+SirenConsole (QML)
+```
 
 **API REST** :
-- GET `/api/midi/files` - Liste compositions
-- GET `/api/midi/categories` - Catégories MIDI
-- GET `/api/presets` - Liste presets
-- POST `/api/presets` - Sauvegarder preset
+- GET `/api/midi/files` - Liste compositions ✅
+- GET `/api/midi/categories` - Catégories MIDI ✅
+- GET `/api/presets` - Liste presets ✅
+- POST `/api/presets` - Sauvegarder preset ✅
+- **POST `/api/puredata/command`** - Envoyer commande à PureData (nouveau)
+- **GET `/api/puredata/status`** - État de la connexion PureData (nouveau)
+- **GET `/api/puredata/events`** - Polling événements temps réel (nouveau)
 
 #### **API MIDI - Gestion des Fichiers**
 

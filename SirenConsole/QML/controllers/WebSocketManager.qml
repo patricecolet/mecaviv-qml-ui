@@ -1,103 +1,61 @@
 import QtQuick 2.15
-import "../utils/WebSocketHelper.js" as WS
 
+// WebSocketManager simplifié pour SirenConsole
+// La connexion à PureData se fait via proxy HTTP dans server.js
 Item {
     id: webSocketManager
     
     // Propriétés
     property var connections: ({})
     property var consoleController: null
-    property bool autoReconnect: true
-    property int reconnectDelay: 3000
-    
-    // WebSocket vers PureData (central)
-    property string pureDataUrl: "ws://localhost:10001"
     property bool pureDataConnected: false
     
-    // Signaux
+    // Signaux (pour compatibilité)
     signal connectionOpened(string url)
     signal connectionClosed(string url)
     signal messageReceived(string url, string message)
     signal errorOccurred(string url, string error)
-    signal pureDataConnectedSignal()
-    signal pureDataDisconnectedSignal()
     
-    // Initialisation
-    Component.onCompleted: {
-        connectToPureData()
-    }
-    
-    // Connexion à PureData
-    function connectToPureData() {
-        console.log("🔌 Connexion à PureData:", pureDataUrl)
-        
-        WS.connect(
-            pureDataUrl,
-            function() {
-                // onOpen
-                pureDataConnected = true
-                connectionOpened(pureDataUrl)
-                pureDataConnectedSignal()
-            },
-            function() {
-                // onClose
-                pureDataConnected = false
-                connectionClosed(pureDataUrl)
-                pureDataDisconnectedSignal()
-                
-                if (autoReconnect) {
-                    console.log("🔄 Reconnexion dans", reconnectDelay, "ms")
-                    reconnectTimer.start()
-                }
-            },
-            function(message) {
-                // onMessage
-                messageReceived(pureDataUrl, message)
-                handlePureDataMessage(message)
-            },
-            function(error) {
-                // onError
-                errorOccurred(pureDataUrl, error)
-            }
-        )
-    }
-    
-    // Timer de reconnexion
+    // Timer pour vérifier le statut PureData
     Timer {
-        id: reconnectTimer
-        interval: reconnectDelay
-        repeat: false
-        onTriggered: connectToPureData()
+        interval: 2000 // Vérifier toutes les 2 secondes
+        running: true
+        repeat: true
+        onTriggered: checkPureDataStatus()
     }
     
-    // Gérer les messages de PureData
-    function handlePureDataMessage(messageText) {
-        try {
-            var data = JSON.parse(messageText)
-            console.log("📨 Type de message:", data.type)
-            
-            // TODO: Dispatcher selon le type de message
-            // CONFIG_FULL, MIDI_NOTE, CONTROLLERS, etc.
-        } catch (e) {
-            console.error("❌ Erreur parsing message:", e)
+    // Vérifier le statut de la connexion PureData (via HTTP)
+    function checkPureDataStatus() {
+        var xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var status = JSON.parse(xhr.responseText)
+                    pureDataConnected = status.connected
+                } catch (e) {
+                    // Ignorer erreur silencieusement
+                }
+            }
         }
+        xhr.open("GET", "http://localhost:8001/api/puredata/status")
+        xhr.send()
     }
     
-    // Envoyer un message à PureData
+    // Envoyer une commande à PureData (via HTTP POST au proxy)
     function sendMessage(message) {
-        if (pureDataConnected) {
-            console.log("📤 Envoi à PureData:", message)
-            return WS.send(message)
-        } else {
-            console.error("❌ PureData non connecté")
-            return false
-        }
+        console.log("📤 Envoi commande via proxy:", message)
+        
+        var xhr = new XMLHttpRequest()
+        xhr.open("POST", "http://localhost:8001/api/puredata/command")
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.send(message)
+        
+        return true // Toujours retourner true (async)
     }
     
-    // Fonction pour connecter aux pupitres (simulation pour compatibilité)
+    // Fonctions pour compatibilité avec le code existant
     function connectToPupitre(url, pupitreId) {
-        console.log("🔌 Connexion pupitre simulée:", url)
-        console.log("⚠️ Les pupitres utilisent PureData central")
+        console.log("🔌 Connexion pupitre (simulé):", url)
         
         connections[url] = {
             pupitreId: pupitreId,
@@ -116,42 +74,27 @@ Item {
         }, 1000)
     }
     
-    // Fonction pour fermer une connexion
     function disconnectFromPupitre(url) {
         if (connections[url]) {
-            console.log("🔌 Fermeture connexion:", url)
             connections[url].connected = false
             connectionClosed(url)
-            
             if (consoleController && consoleController.onPupitreDisconnected) {
-                var pupitreId = connections[url].pupitreId
-                consoleController.onPupitreDisconnected(pupitreId, url)
+                consoleController.onPupitreDisconnected(connections[url].pupitreId, url)
             }
-            
             delete connections[url]
         }
     }
     
-    // Fonction pour fermer toutes les connexions
     function disconnectAll() {
-        console.log("🔌 Fermeture de toutes les connexions")
-        
-        WS.close()
-        
         for (var url in connections) {
             disconnectFromPupitre(url)
         }
     }
     
-    // Fonction pour obtenir le statut d'une connexion
     function isConnected(url) {
-        if (url === pureDataUrl) {
-            return pureDataConnected
-        }
         return connections[url] && connections[url].connected
     }
     
-    // Fonction pour obtenir la liste des connexions actives
     function getActiveConnections() {
         var active = []
         for (var url in connections) {

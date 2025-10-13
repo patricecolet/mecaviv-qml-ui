@@ -114,25 +114,35 @@ QtObject {
         }
     }
     
-    // Charger un fichier MIDI (envoie message WebSocket à PureData)
+    // Charger un fichier MIDI (envoie via HTTP POST au proxy)
     function loadMidiFile(filePath) {
-        if (!websocketManager) {
-            error = "WebSocket non connecté"
-            loadError(error)
-            return
-        }
-        
         selectedFile = filePath
         fileSelected(filePath)
         
-        // Envoi du message WebSocket MIDI_FILE_LOAD
-        var message = {
+        // Commande à envoyer à PureData
+        var command = {
             "type": "MIDI_FILE_LOAD",
             "path": filePath
         }
         
-        websocketManager.sendMessage(JSON.stringify(message))
-        console.log("MIDI file load requested:", filePath)
+        // Envoyer via HTTP POST au proxy server.js
+        var apiUrl = getApiUrl()
+        var xhr = new XMLHttpRequest()
+        
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    console.log("✅ MIDI file load requested:", filePath)
+                } else {
+                    error = "Erreur envoi commande: HTTP " + xhr.status
+                    loadError(error)
+                }
+            }
+        }
+        
+        xhr.open("POST", apiUrl + "/api/puredata/command")
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.send(JSON.stringify(command))
     }
     
     // Obtenir les fichiers d'une catégorie

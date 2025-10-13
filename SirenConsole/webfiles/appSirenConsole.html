@@ -33,68 +33,6 @@ SPDX-License-Identifier: LicenseRef-Qt-Commercial OR GPL-3.0-only
     <div id="screen"></div>
 
     <script type="text/javascript">
-        // WebSocket Bridge pour QML
-        window.QmlWebSocket = {
-            socket: null,
-            callbacks: {},
-            
-            connect: function(url, onOpen, onClose, onMessage, onError) {
-                console.log("🔌 [QmlWebSocket] Connexion à:", url);
-                this.callbacks = { onOpen, onClose, onMessage, onError };
-                
-                try {
-                    this.socket = new WebSocket(url);
-                    var self = this;
-                    
-                    this.socket.onopen = function() {
-                        console.log("✅ [QmlWebSocket] Connecté");
-                        if (self.callbacks.onOpen) self.callbacks.onOpen();
-                    };
-                    
-                    this.socket.onclose = function() {
-                        console.log("❌ [QmlWebSocket] Déconnecté");
-                        if (self.callbacks.onClose) self.callbacks.onClose();
-                    };
-                    
-                    this.socket.onmessage = function(event) {
-                        console.log("📥 [QmlWebSocket] Message:", event.data.substring(0, 50));
-                        if (self.callbacks.onMessage) self.callbacks.onMessage(event.data);
-                    };
-                    
-                    this.socket.onerror = function(error) {
-                        console.error("❌ [QmlWebSocket] Erreur");
-                        if (self.callbacks.onError) self.callbacks.onError("WebSocket error");
-                    };
-                    
-                    return true;
-                } catch (e) {
-                    console.error("❌ [QmlWebSocket] Exception:", e);
-                    return false;
-                }
-            },
-            
-            send: function(message) {
-                if (this.socket && this.socket.readyState === 1) {
-                    console.log("📤 [QmlWebSocket] Envoi:", message.substring(0, 50));
-                    this.socket.send(message);
-                    return true;
-                }
-                console.error("❌ [QmlWebSocket] Pas connecté");
-                return false;
-            },
-            
-            close: function() {
-                if (this.socket) {
-                    this.socket.close();
-                    this.socket = null;
-                }
-            },
-            
-            isConnected: function() {
-                return this.socket && this.socket.readyState === 1;
-            }
-        };
-        
         async function init()
         {
             const spinner = document.querySelector('#qtspinner');

@@ -8,9 +8,18 @@ const presetAPI = require('./api-presets.js');
 // Importer l'API MIDI
 const midiAPI = require('./api-midi.js');
 
+// Importer le proxy PureData
+const PureDataProxy = require('./puredata-proxy.js');
+
+// Charger la configuration
+const config = require('./config.js');
+
 // Configuration du serveur
 const PORT = 8001; // Port différent de SirenePupitre (8000)
 const HOST = '0.0.0.0';
+
+// Initialiser le proxy PureData
+let pureDataProxy = null;
 
 // Middleware pour les headers CORS et sécurité
 function setSecurityHeaders(response) {
@@ -58,6 +67,40 @@ const server = http.createServer(function (request, response) {
     
     if (request.url === '/api/midi/categories') {
         midiAPI.getMidiCategories(request, response);
+        return;
+    }
+    
+    // Routes API PureData Proxy
+    if (request.url === '/api/puredata/command' && request.method === 'POST') {
+        let body = '';
+        request.on('data', chunk => { body += chunk; });
+        request.on('end', () => {
+            try {
+                const command = JSON.parse(body);
+                const success = pureDataProxy.sendCommand(command);
+                response.writeHead(success ? 200 : 503, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success, message: success ? 'Commande envoyée' : 'PureData non connecté' }));
+            } catch (e) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+    
+    if (request.url === '/api/puredata/status') {
+        const status = pureDataProxy.getStatus();
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(status));
+        return;
+    }
+    
+    if (request.url.startsWith('/api/puredata/events')) {
+        const url = new URL(request.url, `http://${request.headers.host}`);
+        const since = parseInt(url.searchParams.get('since') || '0');
+        const events = pureDataProxy.getEvents(since);
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ events }));
         return;
     }
     
@@ -119,14 +162,19 @@ const server = http.createServer(function (request, response) {
 
 // Initialiser l'API des presets et démarrer le serveur
 presetAPI.initializePresetAPI().then(() => {
+    // Initialiser le proxy PureData
+    pureDataProxy = new PureDataProxy(config);
+    
     server.listen(PORT, HOST, () => {
         console.log(`🚀 Serveur SirenConsole démarré sur http://${HOST}:${PORT}`);
         console.log(`🌐 Application principale sur http://localhost:${PORT}/appSirenConsole.html`);
-        console.log(`🔌 WebSocket compatible avec Qt WebAssembly`);
+        console.log(`🔌 Proxy WebSocket PureData: ${config.servers.websocketUrl}`);
         console.log(`📊 Console de contrôle des pupitres`);
         console.log(`💾 API Presets disponible sur http://localhost:${PORT}/api/presets`);
+        console.log(`🎵 API MIDI disponible sur http://localhost:${PORT}/api/midi/files`);
+        console.log(`🔀 API PureData Proxy sur http://localhost:${PORT}/api/puredata/*`);
     });
 }).catch((error) => {
-    console.error('❌ Erreur initialisation API Presets:', error);
+    console.error('❌ Erreur initialisation:', error);
     process.exit(1);
 });
