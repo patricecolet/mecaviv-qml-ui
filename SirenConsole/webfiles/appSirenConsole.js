@@ -12535,14 +12535,14 @@ function checkIncomingModuleAPI() {
 }
 
 var ASM_CONSTS = {
-  13207988: () => {
+  13217524: () => {
     Module.qtSuspendResumeControl = ({
       resume: null,
       eventHandlers: {},
       pendingEvents: []
     });
   },
-  13208083: $0 => {
+  13217619: $0 => {
     let index = $0;
     let control = Module.qtSuspendResumeControl;
     let handler = arg => {

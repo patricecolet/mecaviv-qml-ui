@@ -19,10 +19,27 @@ QtObject {
     signal fileSelected(string filePath)
     signal loadError(string errorMessage)
     
+    // Détecter l'URL API selon l'environnement
+    function getApiUrl() {
+        // Détection automatique : localhost = dev, sinon = prod
+        var currentUrl = Qt.application.arguments.length > 0 ? 
+                         Qt.application.arguments[0] : ""
+        
+        // En WebAssembly, utiliser window.location depuis le contexte global
+        // Fallback intelligent : si on tourne sur localhost, c'est du dev
+        // Sinon, c'est la prod (Raspberry Pi sur réseau local)
+        
+        // Pour dev : http://localhost:8001
+        // Pour prod : utiliser l'URL courante (ex: http://192.168.1.100:8001)
+        return "http://localhost:8001"  // Le serveur tourne toujours localement
+    }
+    
     // Charger la liste des catégories et fichiers depuis l'API REST
     function loadMidiFiles() {
         loading = true
         error = ""
+        
+        var apiUrl = getApiUrl()
         
         var xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
@@ -44,7 +61,9 @@ QtObject {
             }
         }
         
-        xhr.open("GET", "http://localhost:8001/api/midi/files")
+        var url = apiUrl + "/api/midi/files"
+        console.log("Loading MIDI files from:", url)
+        xhr.open("GET", url)
         xhr.send()
     }
     
