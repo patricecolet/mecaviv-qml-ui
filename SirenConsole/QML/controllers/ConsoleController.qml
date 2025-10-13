@@ -35,11 +35,14 @@ Item {
         id: sirenRouterManager
     }
     
+    WebSocketManager {
+        id: webSocketManager
+        consoleController: consoleController
+    }
+    
     // Exposer les managers publiquement
     property var sireneManager: sireneManager
     property var sirenRouterManager: sirenRouterManager
-    
-    property var webSocketManager: null
     
     // Propriétés des pupitres (pour compatibilité avec l'UI existante)
     property var pupitre1: null
