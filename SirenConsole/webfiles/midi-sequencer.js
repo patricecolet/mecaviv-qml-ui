@@ -218,10 +218,15 @@ class MidiSequencer {
             return false;
         }
         
-        console.log('▶️ Play - Position:', this.currentBeat.toFixed(1));
+        console.log('▶️ Play - Position beat:', this.currentBeat.toFixed(1), 'tick:', this.currentTick);
         this.playing = true;
-        this.startTime = Date.now() - (this.currentTick / this.ppq / (60000000 / this.tempo)) * 1000;
-        this.lastTickTime = Date.now();
+        
+        // Calculer le temps écoulé depuis le début (même formule que tick())
+        const bpm = 60000000 / this.tempo;
+        const elapsedMs = (this.currentBeat / bpm) * 60000;
+        this.startTime = Date.now() - elapsedMs;
+        
+        console.log('   Elapsed:', elapsedMs.toFixed(0), 'ms - StartTime:', this.startTime);
         
         // Démarrer le timer
         this.timer = setInterval(() => this.tick(), this.timerInterval);
