@@ -33,11 +33,14 @@
     <file>QML/controllers/PupitreManager.qml</file>
     <file>QML/controllers/CommandManager.qml</file>
     <file>QML/controllers/SireneManager.qml</file>
+    <file>QML/controllers/SirenRouterManager.qml</file>
+    <file>QML/controllers/MidiFileManager.qml</file>
         
         <!-- Pages -->
         <file>QML/pages/OverviewPage.qml</file>
-        <file>QML/pages/LogsPage.qml</file>
+        <file>QML/pages/CompositionsPage.qml</file>
         <file>QML/pages/ConfigPage.qml</file>
+        <file>QML/pages/LogsPage.qml</file>
         
         <!-- Utils -->
         <file>QML/utils/NetworkUtils.qml</file>
