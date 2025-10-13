@@ -1,5 +1,4 @@
 import QtQuick 2.15
-import QtWebSockets 1.15
 
 QtObject {
     id: webSocketManager
@@ -20,73 +19,82 @@ QtObject {
     signal connectionClosed(string url)
     signal messageReceived(string url, string message)
     signal errorOccurred(string url, string error)
-    signal pureDataConnected()
-    signal pureDataDisconnected()
+    signal pureDataConnectedSignal()
+    signal pureDataDisconnectedSignal()
     
     // Initialisation : Connexion automatique à PureData
     Component.onCompleted: {
         connectToPureData()
     }
     
-    // Connexion à PureData (WebSocket central)
+    // Connexion à PureData via JavaScript WebSocket natif
     function connectToPureData() {
         console.log("🔌 Connexion à PureData:", pureDataUrl)
         
-        if (pureDataSocket) {
-            pureDataSocket.active = false
-            pureDataSocket.destroy()
-        }
-        
-        pureDataSocket = pureDataSocketComponent.createObject(webSocketManager)
-    }
-    
-    // Composant WebSocket pour PureData
-    Component {
-        id: pureDataSocketComponent
-        
-        WebSocket {
-            id: socket
-            url: pureDataUrl
-            active: true
-            
-            onStatusChanged: {
-                console.log("📡 PureData WebSocket status:", status)
-                
-                if (status === WebSocket.Open) {
-                    pureDataConnected = true
-                    console.log("✅ Connecté à PureData:", url)
-                    connectionOpened(url)
-                    webSocketManager.pureDataConnected()
-                } else if (status === WebSocket.Closed || status === WebSocket.Error) {
-                    pureDataConnected = false
-                    console.log("❌ Déconnecté de PureData")
-                    connectionClosed(url)
-                    webSocketManager.pureDataDisconnected()
+        try {
+            // Créer WebSocket natif JavaScript
+            pureDataSocket = Qt.createQmlObject('
+                import QtQuick 2.15
+                QtObject {
+                    id: wsWrapper
+                    property var socket: null
                     
-                    // Reconnexion automatique
-                    if (autoReconnect) {
-                        console.log("🔄 Reconnexion dans", reconnectDelay, "ms")
-                        reconnectTimer.start()
+                    Component.onCompleted: {
+                        socket = new WebSocket("' + pureDataUrl + '")
+                        
+                        socket.onopen = function() {
+                            console.log("✅ Connecté à PureData:", "' + pureDataUrl + '")
+                            pureDataConnected = true
+                            connectionOpened("' + pureDataUrl + '")
+                            pureDataConnectedSignal()
+                        }
+                        
+                        socket.onclose = function() {
+                            console.log("❌ Déconnecté de PureData")
+                            pureDataConnected = false
+                            connectionClosed("' + pureDataUrl + '")
+                            pureDataDisconnectedSignal()
+                            
+                            if (autoReconnect) {
+                                console.log("🔄 Reconnexion dans", reconnectDelay, "ms")
+                                reconnectTimer.start()
+                            }
+                        }
+                        
+                        socket.onerror = function(error) {
+                            console.error("❌ Erreur WebSocket:", error)
+                            errorOccurred("' + pureDataUrl + '", error.toString())
+                        }
+                        
+                        socket.onmessage = function(event) {
+                            console.log("📥 Message de PureData:", event.data)
+                            messageReceived("' + pureDataUrl + '", event.data)
+                            handlePureDataMessage(event.data)
+                        }
+                    }
+                    
+                    function send(message) {
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(message)
+                            return true
+                        }
+                        return false
+                    }
+                    
+                    function close() {
+                        if (socket) {
+                            socket.close()
+                        }
                     }
                 }
-            }
+            ', webSocketManager)
             
-            onTextMessageReceived: function(message) {
-                console.log("📥 Message de PureData:", message)
-                messageReceived(url, message)
-                
-                // Parser et dispatcher
-                try {
-                    var data = JSON.parse(message)
-                    handlePureDataMessage(data)
-                } catch (e) {
-                    console.error("❌ Erreur parsing message:", e)
-                }
-            }
+        } catch (e) {
+            console.error("❌ Erreur création WebSocket:", e)
+            errorOccurred(pureDataUrl, e.toString())
             
-            onErrorStringChanged: {
-                console.error("❌ Erreur WebSocket:", errorString)
-                errorOccurred(url, errorString)
+            if (autoReconnect) {
+                reconnectTimer.start()
             }
         }
     }
@@ -100,19 +108,24 @@ QtObject {
     }
     
     // Gérer les messages de PureData
-    function handlePureDataMessage(data) {
-        console.log("📨 Type de message:", data.type)
-        
-        // TODO: Dispatcher selon le type de message
-        // CONFIG_FULL, MIDI_NOTE, CONTROLLERS, etc.
+    function handlePureDataMessage(messageText) {
+        try {
+            var data = JSON.parse(messageText)
+            console.log("📨 Type de message:", data.type)
+            
+            // TODO: Dispatcher selon le type de message
+            // CONFIG_FULL, MIDI_NOTE, CONTROLLERS, etc.
+        } catch (e) {
+            console.error("❌ Erreur parsing message:", e)
+        }
     }
     
     // Envoyer un message à PureData
     function sendMessage(message) {
         if (pureDataSocket && pureDataConnected) {
             console.log("📤 Envoi à PureData:", message)
-            pureDataSocket.sendTextMessage(message)
-            return true
+            var success = pureDataSocket.send(message)
+            return success
         } else {
             console.error("❌ PureData non connecté")
             return false
@@ -162,6 +175,13 @@ QtObject {
     // Fonction pour fermer toutes les connexions
     function disconnectAll() {
         console.log("🔌 Fermeture de toutes les connexions")
+        
+        // Fermer PureData
+        if (pureDataSocket) {
+            pureDataSocket.close()
+        }
+        
+        // Fermer pupitres
         for (var url in connections) {
             disconnectFromPupitre(url)
         }
@@ -169,6 +189,9 @@ QtObject {
     
     // Fonction pour obtenir le statut d'une connexion
     function isConnected(url) {
+        if (url === pureDataUrl) {
+            return pureDataConnected
+        }
         return connections[url] && connections[url].connected
     }
     

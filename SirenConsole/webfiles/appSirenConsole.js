@@ -12048,178 +12048,6 @@ function _emscripten_webgl_make_context_current(contextHandle) {
   return success ? 0 : -5;
 }
 
-var webSockets = new HandleAllocator;
-
-var WS = {
-  socketEvent: null,
-  getSocket(socketId) {
-    if (!webSockets.has(socketId)) {
-      return 0;
-    }
-    return webSockets.get(socketId);
-  },
-  getSocketEvent(socketId) {
-    // Singleton event pointer.  Use EmscriptenWebSocketCloseEvent, which is
-    // the largest event struct
-    this.socketEvent ||= _malloc(520);
-    HEAPU32[((this.socketEvent) >>> 2) >>> 0] = socketId;
-    return this.socketEvent;
-  }
-};
-
-function _emscripten_websocket_close(socketId, code, reason) {
-  reason >>>= 0;
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  var reasonStr = reason ? UTF8ToString(reason) : undefined;
-  // According to WebSocket specification, only close codes that are recognized have integer values
-  // 1000-4999, with 3000-3999 and 4000-4999 denoting user-specified close codes:
-  // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#Status_codes
-  // Therefore be careful to call the .close() function with exact number and types of parameters.
-  // Coerce code==0 to undefined, since Wasm->JS call can only marshal integers, and 0 is not allowed.
-  if (reason) socket.close(code || undefined, UTF8ToString(reason)); else if (code) socket.close(code); else socket.close();
-  return 0;
-}
-
-var _emscripten_websocket_delete = socketId => {
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  socket.onopen = socket.onerror = socket.onclose = socket.onmessage = null;
-  webSockets.free(socketId);
-  return 0;
-};
-
-function _emscripten_websocket_get_ready_state(socketId, readyState) {
-  readyState >>>= 0;
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  HEAP16[((readyState) >>> 1) >>> 0] = socket.readyState;
-  return 0;
-}
-
-function _emscripten_websocket_new(createAttributes) {
-  createAttributes >>>= 0;
-  if (typeof WebSocket == "undefined") {
-    return -1;
-  }
-  if (!createAttributes) {
-    return -5;
-  }
-  var url = UTF8ToString(HEAPU32[((createAttributes) >>> 2) >>> 0]);
-  var protocols = HEAPU32[(((createAttributes) + (4)) >>> 2) >>> 0];
-  // TODO: Add support for createOnMainThread==false; currently all WebSocket connections are created on the main thread.
-  // var createOnMainThread = HEAP8[createAttributes+2];
-  var socket = protocols ? new WebSocket(url, UTF8ToString(protocols).split(",")) : new WebSocket(url);
-  // We always marshal received WebSocket data back to Wasm, so enable receiving the data as arraybuffers for easy marshalling.
-  socket.binaryType = "arraybuffer";
-  // TODO: While strictly not necessary, this ID would be good to be unique across all threads to avoid confusion.
-  var socketId = webSockets.allocate(socket);
-  return socketId;
-}
-
-function _emscripten_websocket_send_binary(socketId, binaryData, dataLength) {
-  binaryData >>>= 0;
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  socket.send(HEAPU8.subarray((binaryData) >>> 0, binaryData + dataLength >>> 0));
-  return 0;
-}
-
-function _emscripten_websocket_send_utf8_text(socketId, textData) {
-  textData >>>= 0;
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  var str = UTF8ToString(textData);
-  socket.send(str);
-  return 0;
-}
-
-function _emscripten_websocket_set_onclose_callback_on_thread(socketId, userData, callbackFunc, thread) {
-  userData >>>= 0;
-  callbackFunc >>>= 0;
-  thread >>>= 0;
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  socket.onclose = function(e) {
-    var eventPtr = WS.getSocketEvent(socketId);
-    HEAP8[(eventPtr) + (4) >>> 0] = e.wasClean, HEAP16[(((eventPtr) + (6)) >>> 1) >>> 0] = e.code, 
-    stringToUTF8(e.reason, eventPtr + 8, 512);
-    getWasmTableEntry(callbackFunc)(0, eventPtr, userData);
-  };
-  return 0;
-}
-
-function _emscripten_websocket_set_onerror_callback_on_thread(socketId, userData, callbackFunc, thread) {
-  userData >>>= 0;
-  callbackFunc >>>= 0;
-  thread >>>= 0;
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  socket.onerror = function(e) {
-    var eventPtr = WS.getSocketEvent(socketId);
-    getWasmTableEntry(callbackFunc)(0, eventPtr, userData);
-  };
-  return 0;
-}
-
-function _emscripten_websocket_set_onmessage_callback_on_thread(socketId, userData, callbackFunc, thread) {
-  userData >>>= 0;
-  callbackFunc >>>= 0;
-  thread >>>= 0;
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  socket.onmessage = function(e) {
-    var isText = typeof e.data == "string";
-    if (isText) {
-      var buf = stringToNewUTF8(e.data);
-      var len = lengthBytesUTF8(e.data) + 1;
-    } else {
-      var len = e.data.byteLength;
-      var buf = _malloc(len);
-      HEAP8.set(new Uint8Array(e.data), buf >>> 0);
-    }
-    var eventPtr = WS.getSocketEvent(socketId);
-    HEAPU32[(((eventPtr) + (4)) >>> 2) >>> 0] = buf, HEAP32[(((eventPtr) + (8)) >>> 2) >>> 0] = len, 
-    HEAP8[(eventPtr) + (12) >>> 0] = isText, getWasmTableEntry(callbackFunc)(0, eventPtr, userData);
-    _free(buf);
-  };
-  return 0;
-}
-
-function _emscripten_websocket_set_onopen_callback_on_thread(socketId, userData, callbackFunc, thread) {
-  userData >>>= 0;
-  callbackFunc >>>= 0;
-  thread >>>= 0;
-  // TODO:
-  //    if (thread == 2 ||
-  //      (thread == _pthread_self()) return emscripten_websocket_set_onopen_callback_on_calling_thread(socketId, userData, callbackFunc);
-  var socket = WS.getSocket(socketId);
-  if (!socket) {
-    return -3;
-  }
-  socket.onopen = function(e) {
-    var eventPtr = WS.getSocketEvent(socketId);
-    getWasmTableEntry(callbackFunc)(0, eventPtr, userData);
-  };
-  return 0;
-}
-
 var ENV = {};
 
 var getExecutableName = () => thisProgram || "./this.program";
@@ -12707,14 +12535,14 @@ function checkIncomingModuleAPI() {
 }
 
 var ASM_CONSTS = {
-  13235060: () => {
+  13218340: () => {
     Module.qtSuspendResumeControl = ({
       resume: null,
       eventHandlers: {},
       pendingEvents: []
     });
   },
-  13235155: $0 => {
+  13218435: $0 => {
     let index = $0;
     let control = Module.qtSuspendResumeControl;
     let handler = arg => {
@@ -13140,16 +12968,6 @@ var wasmImports = {
   /** @export */ emscripten_webgl_destroy_context: _emscripten_webgl_destroy_context,
   /** @export */ emscripten_webgl_get_context_attributes: _emscripten_webgl_get_context_attributes,
   /** @export */ emscripten_webgl_make_context_current: _emscripten_webgl_make_context_current,
-  /** @export */ emscripten_websocket_close: _emscripten_websocket_close,
-  /** @export */ emscripten_websocket_delete: _emscripten_websocket_delete,
-  /** @export */ emscripten_websocket_get_ready_state: _emscripten_websocket_get_ready_state,
-  /** @export */ emscripten_websocket_new: _emscripten_websocket_new,
-  /** @export */ emscripten_websocket_send_binary: _emscripten_websocket_send_binary,
-  /** @export */ emscripten_websocket_send_utf8_text: _emscripten_websocket_send_utf8_text,
-  /** @export */ emscripten_websocket_set_onclose_callback_on_thread: _emscripten_websocket_set_onclose_callback_on_thread,
-  /** @export */ emscripten_websocket_set_onerror_callback_on_thread: _emscripten_websocket_set_onerror_callback_on_thread,
-  /** @export */ emscripten_websocket_set_onmessage_callback_on_thread: _emscripten_websocket_set_onmessage_callback_on_thread,
-  /** @export */ emscripten_websocket_set_onopen_callback_on_thread: _emscripten_websocket_set_onopen_callback_on_thread,
   /** @export */ environ_get: _environ_get,
   /** @export */ environ_sizes_get: _environ_sizes_get,
   /** @export */ exit: _exit,
