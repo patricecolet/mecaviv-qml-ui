@@ -287,6 +287,7 @@ Voir la documentation détaillée : [docs/COMMUNICATION.md](./docs/COMMUNICATION
 - **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** : Architecture détaillée du système
 - **[BUILD.md](./docs/BUILD.md)** : Guide de build complet et troubleshooting
 - **[COMMUNICATION.md](./docs/COMMUNICATION.md)** : Protocoles de communication
+- **[COMPOSESIREN_ARCHITECTURE.md](./docs/COMPOSESIREN_ARCHITECTURE.md)** : Architecture ComposeSiren et flux MIDI
 - **[TODO.md](./TODO.md)** : Roadmap et tâches à venir
 
 ### Documentation par Projet
@@ -414,6 +415,106 @@ Pour toute question :
 1. Consulter la [documentation](./docs/)
 2. Vérifier les [README des projets](#-projets-inclus)
 3. Consulter le [TODO.md](./TODO.md) pour les fonctionnalités en cours
+
+## 🔄 TODO - Restructuration Planifiée
+
+### Dossier partagé `shared/` (En cours)
+
+Pour éviter la duplication de code entre projets, création d'un dossier `shared/` à la racine du monorepo.
+
+#### Structure prévue
+
+```
+mecaviv-qml-ui/
+├── shared/
+│   └── qml/
+│       ├── common/              # Composants QML partagés
+│       │   ├── DigitLED3D.qml
+│       │   ├── LEDText3D.qml
+│       │   ├── LEDSegment.qml
+│       │   ├── Knob.qml
+│       │   ├── Knob3D.qml
+│       │   └── MusicUtils.qml
+│       └── fonts/                # Polices musicales partagées
+│           ├── MusiSync.ttf
+│           └── NotoMusic-Regular.ttf
+├── SirenePupitre/
+│   └── QML/
+│       └── utils/               # Composants spécifiques au pupitre
+│           ├── meshes/          # Modèles 3D (reste local)
+│           ├── Clef3D.qml
+│           ├── Clef2D.qml
+│           ├── Ring3D.qml
+│           └── ColorPicker.qml
+└── pedalierSirenium/
+    └── QtFiles/qml/
+        └── utils/               # Composants spécifiques pédalier
+            └── VirtualKeyboard.qml
+```
+
+#### Composants à déplacer vers `shared/qml/common/`
+
+**Actuellement dupliqués** entre SirenePupitre et pedalierSirenium :
+- [X] `DigitLED3D.qml` - Afficheur 7 segments 3D
+- [X] `LEDText3D.qml` - Texte LED 3D
+- [X] `LEDSegment.qml` - Segment LED individuel
+- [X] `Knob.qml` - Bouton rotatif 2D
+- [X] `Knob3D.qml` - Bouton rotatif 3D
+- [X] `MusicUtils.qml` - Utilitaires de calculs musicaux
+
+#### Ressources à déplacer vers `shared/qml/fonts/`
+
+**Polices musicales** utilisées par plusieurs projets :
+- [X] `MusiSync.ttf` - Symboles musicaux de base
+- [X] `NotoMusic-Regular.ttf` - Police Noto Music (SMuFL)
+
+#### Composants à garder locaux
+
+**Spécifiques à chaque projet** :
+- `meshes/` - Modèles 3D (spécifiques par projet, build complexe)
+- `Clef3D.qml`, `Clef2D.qml` - Clés musicales (SirenePupitre)
+- `Ring3D.qml`, `ColorPicker.qml` - Utilitaires UI (SirenePupitre)
+- `VirtualKeyboard.qml` - Clavier virtuel (pedalierSirenium)
+
+#### Modifications nécessaires
+
+**Scripts à adapter** :
+- [ ] `SirenePupitre/scripts/build.sh` - Copier fonts depuis shared/
+- [ ] `pedalierSirenium/scripts/build.sh` - Copier fonts depuis shared/
+- [ ] `scripts/convert-clefs.sh` - Chemins meshes/ (reste local)
+
+**Fichiers de ressources** :
+- [ ] `data.qrc` - Références vers `../shared/qml/`
+- [ ] `CMakeLists.txt` - Inclusion des chemins shared/
+
+**Imports QML** (environ 20+ fichiers) :
+- [ ] Mettre à jour les imports `import "../utils"` → `import "../../../shared/qml/common"`
+- [ ] Mettre à jour les imports fonts `qrc:/QML/fonts/` → `qrc:/shared/qml/fonts/`
+
+### Bibliothèque MIDI externe (À faire)
+
+#### Déplacer `midifiles/` vers un repository séparé
+
+**Raison** : La bibliothèque MIDI (40+ fichiers, compositions musicales) mérite son propre repository pour :
+- Gestion de versions indépendante
+- Partage avec d'autres projets
+- Historique Git dédié aux compositions
+
+**Structure prévue** :
+```
+mecaviv-midi-library/           # Nouveau repository
+├── README.md
+├── louette/                    # Compositions de Louette (40+ fichiers)
+├── patwave/                    # Compositions de Patwave (4 fichiers)
+├── covers/                     # Adaptations et reprises
+└── presets/                    # Configurations de presets
+```
+
+**Intégration** :
+- [ ] Créer repository `mecaviv-midi-library`
+- [ ] Déplacer `SirenePupitre/midifiles/` vers le nouveau repo
+- [ ] Ajouter en submodule Git : `git submodule add <url> shared/midi`
+- [ ] Mettre à jour les scripts pour référencer `shared/midi/`
 
 ---
 

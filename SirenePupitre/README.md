@@ -26,16 +26,32 @@ SirenePupitre/
 ├── main.cpp                        # Point d'entrée C++
 ├── data.qrc                        # Ressources Qt
 ├── CMakeLists.txt                  # Configuration de build
-├── config.js                       # Configuration unique (sirènes + affichage + serveur)
+├── config.js                       # Configuration fallback (si PureData ne transmet pas config.json)
 ├── build/                          # Dossier de compilation
 ├── webFiles/                       # Fichiers pour WebAssembly
 │   ├── server.js                   # Serveur Node.js pour tests
 │   └── [fichiers compilés]
+├── midifiles/                      # Bibliothèque de fichiers MIDI
+│   ├── louette/                    # Compositions de Louette
+│   ├── patwave/                    # Compositions de Patwave
+│   └── covers/                     # Adaptations et reprises
+├── scripts/                        # Scripts de développement et déploiement
+│   ├── build.sh                    # Build WebAssembly
+│   ├── dev.sh                      # Développement web (build + serveur + Chrome)
+│   ├── dev-with-logs.sh            # Développement avec logs navigateur
+│   ├── start-server.sh             # Serveur Node.js standalone
+│   ├── start-raspberry.sh          # Script Raspberry Pi 5
+│   ├── restart-servers.sh          # Redémarrage serveurs sur Raspberry Pi
+│   ├── sync-to-server.sh           # Synchronisation vers serveur distant
+│   ├── convert-mesh.sh             # Conversion .obj vers .mesh
+│   ├── convert-clefs.sh            # Conversion automatique des clés musicales
+│   └── README.md                   # Documentation des scripts
 └── QML/                            # Tous les fichiers QML
     ├── Main.qml                    # Fenêtre principale
     ├── components/                 # Composants visuels
     │   ├── SirenDisplay.qml        ✅ 
     │   ├── NumberDisplay3D.qml     ✅ 
+    │   ├── NoteSpeedometer3D.qml   ✅ (Tachymètre rotatif 3D)
     │   ├── ControllersPanel.qml    ✅ 
     │   ├── StudioView.qml          ✅ (Visualiseur 3D)
     │   ├── ambitus/                # Composants musicaux
@@ -44,7 +60,8 @@ SirenePupitre/
     │   │   ├── NoteCursor3D.qml         ✅
     │   │   ├── NoteProgressBar3D.qml    ✅
     │   │   ├── LedgerLines3D.qml        ✅
-    │   │   └── NotePositionCalculator.qml ✅
+    │   │   ├── NotePositionCalculator.qml ✅
+    │   │   └── GearShiftPositionIndicator.qml ✅ (Overlay 2D)
     │   └── indicators/             # Composants indicateurs
     │       ├── GearShiftIndicator.qml   ✅
     │       ├── FaderIndicator.qml       ✅
@@ -56,8 +73,13 @@ SirenePupitre/
     │   ├── ConfigController.qml    ✅
     │   ├── SirenController.qml     ✅
     │   └── WebSocketController.qml ✅
+    ├── fonts/                      # Polices musicales
+    │   ├── MusiSync.ttf            # Symboles musicaux
+    │   └── NotoMusic-Regular.ttf   # Police Noto Music
     ├── utils/                      # Utilitaires réutilisables
-    │   ├── Clef3D.qml              ✅
+    │   ├── Clef3D.qml              ✅ (Modèles 3D)
+    │   ├── Clef2D.qml              ✅ (Police musicale)
+    │   ├── Clef2DPath.qml          ✅ (Variante 2D)
     │   ├── MusicUtils.qml          ✅ 
     │   ├── LEDText3D.qml           ✅
     │   ├── DigitLED3D.qml          ✅ 
@@ -65,10 +87,13 @@ SirenePupitre/
     │   ├── LEDSegment.qml          ✅ 
     │   ├── Knob.qml                ✅ 
     │   ├── Knob3D.qml              ✅
-    │   └── ColorPicker.qml         ✅
+    │   ├── ColorPicker.qml         ✅
+    │   └── meshes/                 # Modèles 3D convertis
+    │       ├── TrebleKey.mesh      # Clé de Sol
+    │       ├── BassKey.mesh        # Clé de Fa
+    │       └── [fichiers sources .obj/.mtl]
     └── admin/                      # Interface d'administration ✅
         ├── AdminPanel.qml          ✅
-        ├── PasswordDialog.qml      ✅
         ├── SirenSelectionSection.qml    ✅
         ├── VisibilitySection.qml        ✅
         ├── AdvancedSection.qml          ✅
@@ -81,15 +106,104 @@ SirenePupitre/
             ├── AdvancedConfig.qml       ✅
             ├── AdvancedWebSocket.qml    ✅
             ├── AdvancedColors.qml       ✅
-            └── AdvancedSizes.qml        ✅
+            ├── AdvancedSizes.qml        ✅
+            └── AdvancedAnimations.qml   🚧 (À implémenter)
 ```
 
 ### Organisation des imports
 Les composants dans les sous-dossiers (visibility/, advanced/) nécessitent des imports relatifs dans leurs sections parentes.
 
+### Nouveaux composants visuels
+
+#### NoteSpeedometer3D
+Tachymètre rotatif 3D qui affiche les notes MIDI comme un compteur de vitesse automobile. Le cylindre tourne en continu pour suivre les changements de notes, avec gestion intelligente des transitions d'octaves (Si → Do).
+
+**Propriétés principales** :
+- `currentNoteMidi` : Note MIDI actuelle (avec fractions de demi-tons)
+- `ambitusMin`/`ambitusMax` : Limites de l'ambitus
+- `degreesPerSemitone` : Rotation par demi-ton (défaut : 30°)
+- `visibleNotesCount` : Nombre de notes visibles à travers la fenêtre
+
+#### GearShiftPositionIndicator
+Indicateur visuel 2D en overlay qui affiche la position actuelle du levier de vitesse et les valeurs configurées pour chaque position (en demi-tons). S'affiche en bas à gauche de l'écran.
+
+**Propriétés** :
+- `currentPosition` : Position actuelle du levier (0-3)
+- `configController` : Accès à la configuration des positions
+- `positions` : Tableau des valeurs en demi-tons pour chaque position
+
+#### Clef2D et Clef2DPath
+Variantes 2D des clés musicales utilisant des polices musicales (MusiSync, Noto Music) au lieu de modèles 3D. Plus légères et plus rapides pour l'affichage en overlay ou dans des interfaces 2D classiques.
+
+**Propriétés communes** :
+- `clefType` : "treble" (Sol) ou "bass" (Fa)
+- `clefColor` : Couleur de la clé
+- `lineSpacing` : Espacement des lignes de la portée
+- `clefFontFamily` : Police utilisée (avec fallback automatique)
+
+**Différence** :
+- `Clef2D` : Utilise Text avec polices musicales Unicode
+- `Clef2DPath` : Implémentation expérimentale avec paths SVG
+
+## Bibliothèque MIDI
+
+### Organisation des fichiers MIDI
+
+Le dossier `midifiles/` contient une bibliothèque de fichiers MIDI organisée par compositeur et usage :
+
+```
+midifiles/
+├── louette/          # Compositions de Louette
+│   ├── AnxioGapT.midi, HallucinogeneGapT.midi
+│   ├── SoleilGapT.midi, SuspenduGapT.midi
+│   ├── carillon.midi, Groove.midi
+│   └── [40+ fichiers]
+├── patwave/          # Compositions de Patwave
+│   ├── ambiant.midi
+│   ├── appelDesSirenes.midi
+│   ├── daphne.midi
+│   └── sparseSpace.midi
+└── covers/           # Adaptations et reprises (vide)
+```
+
+**Usage** : Ces fichiers MIDI servent de :
+- Bibliothèque de tests pour le développement
+- Répertoire de performances pour les concerts
+- Base de données pour l'analyse musicale des capacités des sirènes
+
+**Format** : Fichiers MIDI standard (.midi, .mid) compatibles avec PureData et les séquenceurs MIDI classiques.
+
+## Polices musicales
+
+Le dossier `fonts/` contient les polices nécessaires pour l'affichage des symboles musicaux :
+
+### MusiSync.ttf
+Police de symboles musicaux de base incluant :
+- Clés de Sol (𝄞) et Fa (𝄢)
+- Altérations (♯, ♭, ♮)
+- Figures de notes et silences
+- Signes d'expression et dynamiques
+
+**Usage** : Police de fallback pour `Clef2D` et affichages musicaux simples.
+
+### NotoMusic-Regular.ttf
+Police Noto Music (Google Fonts) offrant une couverture complète de la notation musicale selon le standard SMuFL (Standard Music Font Layout).
+
+**Avantages** :
+- Glyphes haute qualité avec antialiasing optimal
+- Couverture complète des symboles musicaux
+- Compatibilité multi-plateforme
+- Open source (SIL Open Font License)
+
+**Usage** : Police principale pour `Clef2D`, utilisée prioritairement avec `MusiSync` en fallback.
+
+**Chargement** : Les polices sont chargées via `FontLoader` dans les composants QML qui en ont besoin.
+
 ## Fichier de configuration
 
-### config.js - Configuration unique (format JavaScript pour WebAssembly)
+### config.js - Configuration fallback (format JavaScript pour WebAssembly)
+
+Ce fichier sert de **configuration par défaut** si PureData ne transmet pas de configuration via WebSocket. En production, la configuration principale provient de `config.json` dans PureData et est transmise via le message `CONFIG_FULL`.
 ```javascript
 var configData = {
     "serverUrl": "ws://localhost:10001",  // URL du serveur WebSocket
@@ -189,14 +303,59 @@ var configData = {
 ### Architecture de configuration
 
 #### Gestion hybride config.js / PureData
-- **config.js** : Configuration par défaut chargée au démarrage
-- **PureData** : Peut remplacer ou modifier la configuration via WebSocket
+- **config.js** : Configuration **fallback** chargée au démarrage si PureData ne transmet pas de config
+- **config.json (PureData)** : Configuration principale transmise via WebSocket au démarrage
+- **Priorité** : PureData (config.json) > config.js (fallback local)
 - **Synchronisation bidirectionnelle** : Les changements dans l'interface sont envoyés à PureData
+
+**Workflow au démarrage** :
+1. ConfigController charge config.js comme configuration par défaut
+2. WebSocketController se connecte au serveur PureData
+3. Le pupitre envoie `REQUEST_CONFIG` via WebSocket
+4. Si PureData répond avec `CONFIG_FULL`, la config reçue remplace config.js
+5. Si PureData ne répond pas, config.js reste la configuration active (mode fallback)
 
 #### Format de transmission WebSocket
 - **Format** : Les messages sont envoyés en **binaire** (pas en texte)
 - **Encodage** : JSON converti en ArrayBuffer/bytes avant envoi
 - **Reception** : Les messages binaires sont décodés en JSON côté récepteur
+
+#### Protocole binaire - Types de messages
+
+Le **premier byte** de chaque message binaire identifie son type :
+
+| Type | Hex | Usage | Taille |
+|------|-----|-------|--------|
+| CONFIG | 0x00 | Configuration complète (JSON) | Variable (8 bytes header + données) |
+| MIDI_NOTE | 0x01 | Note MIDI + Pitch Bend combinés | 5 bytes |
+| CONTROLLERS | 0x02 | États contrôleurs | 15 bytes |
+
+**Note MIDI avec micro-tonalité (type 0x01)** :
+```
+[0x01, note, velocity, bend_lsb, bend_msb]
+   │     │       │         │         │
+   │     │       │         │         └─ Pitch Bend MSB (valeur haute)
+   │     │       │         └─────────── Pitch Bend LSB (valeur basse)
+   │     │       └─────────────────────  Vélocité (0-127)
+   │     └─────────────────────────────  Note MIDI (0-127)
+   └───────────────────────────────────  Type: MIDI_NOTE
+```
+
+**Calcul de la note fractionnelle** :
+- Note entière : byte 1 (0-127)
+- Fraction : calculée depuis Pitch Bend (14 bits = bytes 3-4)
+- Formule QML : `midiNote = note + (pitchBend / 8192) * 2` (range ±2 demi-tons)
+
+**Exemple** : Note 69.5 (La4 + 50 centièmes)
+```
+[0x01, 0x45, 0x64, 0x00, 0x10]
+   │     │     │     │     │
+   │     │     │     │     └─ Bend MSB: 0x10 (= +0.5 demi-ton)
+   │     │     │     └─────── Bend LSB: 0x00
+   │     │     └───────────── Vélocité: 100
+   │     └─────────────────── Note: 69 (La4)
+   └───────────────────────── Type: MIDI_NOTE
+```
 
 **3. Dans ConfigController**, la méthode d'envoi devra être adaptée** :
 
@@ -364,15 +523,16 @@ webSocketController.sendBinaryMessage({
 ## Flux de données
 
 ### Phase 1 - Infrastructure de base
-1. **ConfigController** charge config.js au démarrage
+1. **ConfigController** charge config.js comme configuration fallback au démarrage
 2. **WebSocketController** se connecte au serveur défini dans la config
-3. **WebSocketController** reçoit les messages avec la note MIDI
-4. **SirenController** :
+3. Le pupitre envoie `REQUEST_CONFIG` et reçoit `CONFIG_FULL` de PureData (remplace config.js)
+4. **WebSocketController** reçoit les messages avec la note MIDI
+5. **SirenController** :
    - Récupère la configuration de la sirène active
    - Limite la note selon le mode et l'ambitus
    - Calcule la fréquence avec transposition
    - Calcule les RPM selon le nombre de sorties
-5. **SirenDisplay** affiche Hz et RPM avec des afficheurs LED 3D
+6. **SirenDisplay** affiche Hz et RPM avec des afficheurs LED 3D
 
 ### Phase 2 - Visualisation musicale
 1. **MusicalStaff3D** affiche une portée musicale en 3D
@@ -730,6 +890,22 @@ Script de développement qui combine build, serveur et ouverture de Chrome.
 ./scripts/dev.sh help           # Afficher l'aide
 ```
 
+#### 🔍 `dev-with-logs.sh` - Développement avec logs
+Script de développement avancé avec capture des logs du navigateur pour le debugging. Utile pour diagnostiquer les erreurs WebAssembly et JavaScript.
+
+```bash
+./scripts/dev-with-logs.sh both     # Build + serveur + navigateur avec logs (défaut)
+./scripts/dev-with-logs.sh build   # Build WebAssembly uniquement
+./scripts/dev-with-logs.sh serve   # Serveur + navigateur avec logs
+./scripts/dev-with-logs.sh kill    # Arrêter tous les serveurs
+```
+
+**Fonctionnalités** :
+- Capture des erreurs console du navigateur
+- Logs des requêtes WebSocket en temps réel
+- Détection automatique des crashs
+- Nettoyage propre des processus
+
 #### 🌐 `start-server.sh` - Serveur Node.js
 Démarre le serveur Node.js pour le développement WebAssembly.
 
@@ -745,6 +921,51 @@ Script optimisé pour Raspberry Pi 5 avec Chrome et PureData.
 ./scripts/start-raspberry.sh start    # Application complète
 ./scripts/start-raspberry.sh server   # Serveur seulement
 ./scripts/start-raspberry.sh stop     # Arrêt de tous les processus
+```
+
+#### 🔄 `restart-servers.sh` - Redémarrage serveurs Raspberry Pi
+Script de redémarrage des serveurs sur Raspberry Pi, déployé et exécuté via SSH. Arrête tous les processus (Node.js, serveur web, navigateur) et les relance proprement.
+
+**Usage** : Copié sur le Raspberry Pi et exécuté automatiquement par `sync-to-server.sh --restart-client`
+
+**Actions** :
+- Arrêt des processus existants (pkill safe)
+- Lancement du serveur Node.js (port 10001)
+- Lancement du serveur web Python (port 8080)
+- Lancement de Chromium en mode kiosk
+- Logs dans `server.log` et `web.log`
+
+#### 📡 `sync-to-server.sh` - Synchronisation vers serveur distant
+Script de synchronisation automatique du projet vers un Raspberry Pi ou serveur distant via rsync.
+
+```bash
+./scripts/sync-to-server.sh                           # Sync basique
+./scripts/sync-to-server.sh --build                   # Build avant sync
+./scripts/sync-to-server.sh --restart-client          # Relance client après sync
+./scripts/sync-to-server.sh --build --restart-client  # Build + sync + relance
+./scripts/sync-to-server.sh --ip 192.168.1.100        # IP personnalisée
+./scripts/sync-to-server.sh --password MYPASS         # Mot de passe SSH personnalisé
+```
+
+**Configuration par défaut** :
+- Serveur : `192.168.1.46` (modifiable avec `--ip`)
+- Utilisateur : `sirenateur`
+- Mot de passe : `SIRENS` (modifiable avec `--password`)
+- Chemin distant : `/home/sirenateur/dev/src/mecaviv/patko-scratchpad/qtQmlSockets/SirenePupitre`
+
+**Fonctionnalités** :
+- Build automatique avec `scripts/build.sh` (option `--build`)
+- Synchronisation rsync des fichiers compilés
+- Redémarrage automatique du client sur le Raspberry Pi (option `--restart-client`)
+- Gestion de l'interruption (Ctrl-C)
+- Logs colorés avec progression
+
+#### 🎼 `convert-mesh.sh` et `convert-clefs.sh`
+Scripts de conversion des modèles 3D (.obj) vers le format Qt Quick 3D (.mesh).
+
+```bash
+./scripts/convert-mesh.sh input.obj output.mesh    # Conversion unique
+./scripts/convert-clefs.sh                         # Convertir toutes les clés musicales
 ```
 
 ### 🎯 Workflow de développement
@@ -938,7 +1159,7 @@ Loader {
 ```
 
 ## Problèmes résolus
-- ✅ XMLHttpRequest bloqué en local → Utilisation de config.js
+- ✅ XMLHttpRequest bloqué en local → Utilisation de config.js (fallback) et config.json via WebSocket (production)
 - ✅ Warning WebGL DEPTH_STENCIL_ATTACHMENT → SSAA au lieu de MSAA
 - ✅ Structure des messages WebSocket adaptée
 - ✅ Calcul des positions des notes selon la clé (sol/fa) → Système diatonique avec Sol4 (treble) et Fa3 (bass) comme références
@@ -956,5 +1177,35 @@ Loader {
 - ✅ Positionnement des clés 3D → Origine (0,0,0) placée sur la ligne de référence (Sol4/Fa3)
 
 
-## TODO
-- Selection Sirene au démarrage via config
+## TODO - Prochaines améliorations
+
+### Interface utilisateur
+- [X] Améliorer le support des minuscules dans LEDText3D ✅
+- [ ] Améliorer le support des caractères accentués dans LEDText3D
+- [ ] Valider et finaliser l'esthétique des indicateurs de contrôleurs
+- [ ] Implémenter AdvancedAnimations (transitions et effets visuels)
+
+### Fonctionnalités musicales
+- [ ] Implémenter zoom sur ambitus selon levier de vitesse :
+  - Octave → tout l'ambitus
+  - Sixte → portion réduite
+  - Tierce → encore plus réduit
+  - Demi-ton → 2 tours de volant pour un demi-ton
+- [X] Sélection de la sirène au démarrage via config.js ✅ (implémenté ligne 46 ConfigController.qml)
+
+### Tests et optimisation
+- [ ] Tests complets avec toutes les sirènes configurées
+- [ ] Optimisations de performance pour WebAssembly
+- [ ] Tests de charge avec multiples pupitres connectés
+
+### Documentation
+- [ ] Documentation utilisateur finale
+- [ ] Guide de configuration des sirènes
+- [ ] Documentation des messages WebSocket pour PureData
+
+### Nettoyage du code (après commit + push)
+- [ ] Nettoyer les fichiers temporaires dans `utils/meshes/` :
+  - `TrebleKey.qml` (généré par balsam)
+  - `OldClef3D.mesh`, `TrebleKeyNew.mesh` (anciennes versions)
+  - Sous-dossier `meshes/meshes/` (temporaire)
+- [ ] Supprimer les composants expérimentaux non utilisés (Clef2DPath si obsolète)
