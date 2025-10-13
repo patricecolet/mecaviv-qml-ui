@@ -1,7 +1,7 @@
 import QtQuick 2.15
 import "../utils/WebSocketHelper.js" as WS
 
-QtObject {
+Item {
     id: webSocketManager
     
     // Propriétés
