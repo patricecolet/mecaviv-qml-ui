@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import "/fonts" as Fonts
 
 /**
  * MidiPlayer - Lecteur MIDI avec contrôles complets
@@ -13,6 +14,9 @@ Rectangle {
     radius: 8
     border.color: "#00ff00"
     border.width: 2
+    
+    // Police Emoji partagée
+    Fonts.EmojiFont { id: emoji }
     
     // Propriétés
     property var commandManager: null
@@ -51,7 +55,8 @@ Rectangle {
             spacing: 10
             
             Label {
-                text: "♪ Lecteur MIDI"
+                text: "🎵 Lecteur MIDI"
+                font.family: emoji.name
                 font.pixelSize: 18
                 font.bold: true
                 color: "#00ff00"
@@ -419,7 +424,7 @@ Rectangle {
             
             // Bouton Play/Pause
             Button {
-                text: playing ? "||" : "▶"
+                text: playing ? "⏸" : "▶"
                 enabled: currentFile !== ""
                 implicitWidth: 60
                 
@@ -442,6 +447,7 @@ Rectangle {
                 
                 contentItem: Label {
                     text: parent.text
+                    font.family: emoji.name
                     color: parent.enabled ? "#000000" : "#666666"
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -452,7 +458,7 @@ Rectangle {
             
             // Bouton Stop
             Button {
-                text: "■"
+                text: "⏹"
                 enabled: currentFile !== ""
                 implicitWidth: 50
                 
@@ -470,6 +476,7 @@ Rectangle {
                 
                 contentItem: Label {
                     text: parent.text
+                    font.family: emoji.name
                     color: parent.enabled ? "#000000" : "#666666"
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter

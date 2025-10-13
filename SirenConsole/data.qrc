@@ -54,4 +54,10 @@
         <!-- Config -->
         <file>config.js</file>
     </qresource>
+    
+    <!-- Polices partagées -->
+    <qresource prefix="/">
+        <file>../fonts/EmojiFont.qml</file>
+        <file>../fonts/NotoEmoji-VariableFont_wght.ttf</file>
+    </qresource>
 </RCC>

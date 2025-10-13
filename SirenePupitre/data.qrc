@@ -52,4 +52,10 @@
         <file>QML/utils/meshes/TrebleKey.mesh</file>
         <file>QML/utils/meshes/BassKey.mesh</file>
     </qresource>
+    
+    <!-- Polices partagées -->
+    <qresource prefix="/">
+        <file>../fonts/EmojiFont.qml</file>
+        <file>../fonts/NotoEmoji-VariableFont_wght.ttf</file>
+    </qresource>
 </RCC>
