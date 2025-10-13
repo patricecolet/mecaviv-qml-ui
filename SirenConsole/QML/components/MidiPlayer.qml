@@ -143,7 +143,8 @@ Rectangle {
                                     var newBar = parseInt(text)
                                     if (newBar > 0) {
                                         var newBeat = (newBar - 1) * timeSignatureNum
-                                        var newPos = (newBeat / tempo) * 60000
+                                        var newPos = (newBeat * 60000) / tempo
+                                        console.log("⏩ Seek mesure", newBar, "→", Math.floor(newPos), "ms")
                                         seek(Math.floor(newPos))
                                         focus = false
                                     }
@@ -456,19 +457,20 @@ Rectangle {
                 implicitWidth: 50
                 
                 onClicked: {
+                    console.log("⏹ Bouton Stop cliqué")
                     stop()
                 }
                 
                 background: Rectangle {
-                    color: parent.enabled ? (parent.pressed ? "#cc0000" : "#ff0000") : "#1a1a1a"
-                    border.color: parent.enabled ? "#ff0000" : "#444444"
+                    color: parent.enabled ? (parent.pressed ? "#cc8800" : "#ffaa00") : "#1a1a1a"
+                    border.color: parent.enabled ? "#ffaa00" : "#444444"
                     border.width: 1
                     radius: 4
                 }
                 
                 contentItem: Label {
                     text: parent.text
-                    color: parent.enabled ? "#ffffff" : "#666666"
+                    color: parent.enabled ? "#000000" : "#666666"
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     font.bold: true

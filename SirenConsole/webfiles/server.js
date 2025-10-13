@@ -148,14 +148,32 @@ const server = http.createServer(function (request, response) {
                             message = 'Action inconnue: ' + command.action;
                     }
                     
+                    // Envoyer aussi à PureData pour synchronisation
+                    if (success) {
+                        pureDataProxy.sendCommand(command);
+                        console.log('📤 Transport envoyé à PureData:', command.action);
+                    }
+                    
                 } else if (command.type === 'MIDI_SEEK' && command.position !== undefined) {
                     console.log('⏩ MIDI_SEEK:', command.position, 'ms');
                     success = midiSequencer.seek(command.position);
+                    
+                    // Envoyer aussi à PureData
+                    if (success) {
+                        pureDataProxy.sendCommand(command);
+                        console.log('📤 Seek envoyé à PureData:', command.position, 'ms');
+                    }
+                    
                     message = 'Position mise à jour';
                     
                 } else if (command.type === 'TEMPO_CHANGE' && command.tempo) {
                     console.log('🎼 TEMPO_CHANGE:', command.tempo, 'BPM');
                     success = midiSequencer.setTempo(command.tempo);
+                    
+                    // Envoyer aussi à PureData pour qu'il soit au courant
+                    pureDataProxy.sendCommand(command);
+                    console.log('📤 Tempo envoyé à PureData:', command.tempo, 'BPM');
+                    
                     message = 'Tempo changé';
                     
                 } else {
