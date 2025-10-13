@@ -14,6 +14,9 @@ const PureDataProxy = require('./puredata-proxy.js');
 // Importer l'analyseur MIDI
 const { analyzeMidiFile, createFileInfoBuffer, createTempoBuffer, createTimeSigBuffer } = require('./midi-analyzer.js');
 
+// Importer le séquenceur MIDI
+const MidiSequencer = require('./midi-sequencer.js');
+
 // Charger la configuration depuis config.json
 const { loadConfig } = require('../../config-loader.js');
 const config = loadConfig();
@@ -25,8 +28,9 @@ const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH || config.paths.mid
 const PORT = 8001; // Port différent de SirenePupitre (8000)
 const HOST = '0.0.0.0';
 
-// Initialiser le proxy PureData
+// Initialiser le proxy PureData et le séquenceur
 let pureDataProxy = null;
+let midiSequencer = null;
 
 // Middleware pour les headers CORS et sécurité
 function setSecurityHeaders(response) {
@@ -88,40 +92,80 @@ const server = http.createServer(function (request, response) {
             try {
                 const command = JSON.parse(body);
                 
-                // Intercepter MIDI_FILE_LOAD pour analyser le fichier
+                // Traiter les commandes MIDI
+                let success = false;
+                let message = '';
+                
                 if (command.type === 'MIDI_FILE_LOAD' && command.path) {
-                    console.log('📁 MIDI_FILE_LOAD détecté:', command.path);
+                    console.log('📁 MIDI_FILE_LOAD:', command.path);
                     
                     // Construire le chemin complet
                     const fullPath = path.resolve(MIDI_REPO_PATH, command.path);
-                    console.log('📁 Chemin complet:', fullPath);
                     
                     // Analyser le fichier MIDI
                     const midiInfo = analyzeMidiFile(fullPath);
                     
-                    // Mettre à jour le playbackState du proxy avec le nom du fichier
-                    pureDataProxy.updatePlaybackFile(command.path);
+                    // Charger dans le séquenceur
+                    success = midiSequencer.loadFile(fullPath);
                     
-                    // Envoyer les infos binaires au proxy pour broadcast
-                    // Type 0x02 - FILE_INFO
-                    const fileInfoBuffer = createFileInfoBuffer(midiInfo.duration, midiInfo.totalBeats);
-                    pureDataProxy.broadcastBinaryToClients(fileInfoBuffer);
+                    if (success) {
+                        // Mettre à jour le playbackState
+                        pureDataProxy.updatePlaybackFile(command.path);
+                        
+                        // Envoyer les infos binaires
+                        const fileInfoBuffer = createFileInfoBuffer(midiInfo.duration, midiInfo.totalBeats);
+                        pureDataProxy.broadcastBinaryToClients(fileInfoBuffer);
+                        
+                        const tempoBuffer = createTempoBuffer(midiInfo.tempo);
+                        pureDataProxy.broadcastBinaryToClients(tempoBuffer);
+                        
+                        const timeSigBuffer = createTimeSigBuffer(midiInfo.timeSignature.numerator, midiInfo.timeSignature.denominator);
+                        pureDataProxy.broadcastBinaryToClients(timeSigBuffer);
+                        
+                        console.log('✅ Fichier MIDI chargé et métadonnées envoyées');
+                        message = 'Fichier chargé';
+                    } else {
+                        message = 'Erreur chargement fichier';
+                    }
                     
-                    // Type 0x03 - TEMPO
-                    const tempoBuffer = createTempoBuffer(midiInfo.tempo);
-                    pureDataProxy.broadcastBinaryToClients(tempoBuffer);
+                } else if (command.type === 'MIDI_TRANSPORT') {
+                    console.log('🎵 MIDI_TRANSPORT:', command.action);
                     
-                    // Type 0x04 - TIMESIG
-                    const timeSigBuffer = createTimeSigBuffer(midiInfo.timeSignature.numerator, midiInfo.timeSignature.denominator);
-                    pureDataProxy.broadcastBinaryToClients(timeSigBuffer);
+                    switch (command.action) {
+                        case 'play':
+                            success = midiSequencer.play();
+                            message = success ? 'Lecture démarrée' : 'Impossible de démarrer';
+                            break;
+                        case 'pause':
+                            success = midiSequencer.pause();
+                            message = 'Pause';
+                            break;
+                        case 'stop':
+                            success = midiSequencer.stop();
+                            message = 'Stop';
+                            break;
+                        default:
+                            message = 'Action inconnue: ' + command.action;
+                    }
                     
-                    console.log('✅ Métadonnées MIDI envoyées aux clients');
+                } else if (command.type === 'MIDI_SEEK' && command.position !== undefined) {
+                    console.log('⏩ MIDI_SEEK:', command.position, 'ms');
+                    success = midiSequencer.seek(command.position);
+                    message = 'Position mise à jour';
+                    
+                } else if (command.type === 'TEMPO_CHANGE' && command.tempo) {
+                    console.log('🎼 TEMPO_CHANGE:', command.tempo, 'BPM');
+                    success = midiSequencer.setTempo(command.tempo);
+                    message = 'Tempo changé';
+                    
+                } else {
+                    // Commande inconnue, envoyer à PureData
+                    success = pureDataProxy.sendCommand(command);
+                    message = success ? 'Commande envoyée à PureData' : 'PureData non connecté';
                 }
                 
-                // Envoyer la commande à PureData
-                const success = pureDataProxy.sendCommand(command);
-                response.writeHead(success ? 200 : 503, { 'Content-Type': 'application/json' });
-                response.end(JSON.stringify({ success, message: success ? 'Commande envoyée' : 'PureData non connecté' }));
+                response.writeHead(success ? 200 : 400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success, message }));
             } catch (e) {
                 console.error('❌ Erreur traitement commande:', e);
                 response.writeHead(400, { 'Content-Type': 'application/json' });
@@ -214,6 +258,9 @@ const server = http.createServer(function (request, response) {
 presetAPI.initializePresetAPI().then(() => {
     // Initialiser le proxy PureData
     pureDataProxy = new PureDataProxy(config);
+    
+    // Initialiser le séquenceur MIDI
+    midiSequencer = new MidiSequencer(pureDataProxy);
     
     server.listen(PORT, HOST, () => {
         console.log(`🚀 Serveur SirenConsole démarré sur http://${HOST}:${PORT}`);

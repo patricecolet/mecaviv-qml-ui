@@ -28,9 +28,9 @@ Rectangle {
     property int totalBeats: 0         // Nombre total de beats
     property string currentFile: ""    // Fichier en cours
     
-    // Calculs pour affichage transport
-    property int currentBar: Math.floor(beat / timeSignatureNum) + 1
-    property int currentBeat: Math.floor(beat % timeSignatureNum) + 1
+    // Valeurs transport (reçues du serveur via /api/puredata/playback)
+    property int currentBar: 1             // Numéro de mesure (reçu ou calculé)
+    property int currentBeat: 1            // Beat dans la mesure (reçu ou calculé)
     property int currentFrame: Math.floor((beat % 1) * 960)  // 960 frames par beat (MIDI ticks)
     
     // Signaux
@@ -623,6 +623,19 @@ Rectangle {
         tempo = state.tempo || 120
         duration = state.duration || 0
         totalBeats = state.totalBeats || 0
+        
+        // Utiliser bar/beat du serveur si disponibles (sinon calcul fallback)
+        if (state.bar !== undefined) {
+            currentBar = state.bar
+        } else if (timeSignatureNum > 0) {
+            currentBar = Math.floor(beat / timeSignatureNum) + 1
+        }
+        
+        if (state.beatInBar !== undefined) {
+            currentBeat = state.beatInBar
+        } else if (timeSignatureNum > 0) {
+            currentBeat = Math.floor(beat % timeSignatureNum) + 1
+        }
         
         if (state.timeSignature) {
             timeSignatureNum = state.timeSignature.numerator || 4

@@ -121,22 +121,30 @@ class PureDataProxy {
         }
         
         switch (messageType) {
-            case 0x01: // POSITION (6 bytes, 50ms)
-                if (buffer.length < 6) {
-                    console.error('❌ POSITION trop court:', buffer.length, 'bytes (attendu 6)');
+            case 0x01: // POSITION (10 bytes, 50ms)
+                if (buffer.length < 10) {
+                    console.error('❌ POSITION trop court:', buffer.length, 'bytes (attendu 10)');
                     return;
                 }
                 const flags = buffer.readUInt8(1);
                 this.playbackState.playing = (flags & 0x01) !== 0;
-                this.playbackState.beat = buffer.readFloatLE(2);
+                const barNumber = buffer.readUInt16LE(2);
+                const beatInBar = buffer.readUInt16LE(4);
+                this.playbackState.beat = buffer.readFloatLE(6);
                 
-                // Calculer position approximative (beat * 60000 / tempo)
-                this.playbackState.position = Math.floor((this.playbackState.beat / this.playbackState.tempo) * 60000);
+                // Calculer position en ms (beat * 60000 / tempo)
+                const bpm = this.playbackState.tempo || 120;
+                this.playbackState.position = Math.floor((this.playbackState.beat / bpm) * 60000);
+                
+                // Stocker bar/beat pour l'API
+                this.playbackState.bar = barNumber;
+                this.playbackState.beatInBar = beatInBar;
                 
                 // Log compact (max 1/sec)
                 if (!this.lastPosLogTime || Date.now() - this.lastPosLogTime > 1000) {
-                    console.log('🎵 POSITION (6B):', this.playbackState.playing ? 'PLAY' : 'STOP', 
-                               '- Beat:', this.playbackState.beat.toFixed(1));
+                    console.log('🎵 POSITION (10B):', this.playbackState.playing ? 'PLAY' : 'STOP', 
+                               '- Bar:', barNumber, 'Beat:', beatInBar, '/', this.playbackState.timeSignature?.numerator || 4,
+                               '- Total:', this.playbackState.beat.toFixed(1));
                     this.lastPosLogTime = Date.now();
                 }
                 break;

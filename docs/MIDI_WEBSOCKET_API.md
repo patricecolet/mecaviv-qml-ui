@@ -2,18 +2,27 @@
 
 ## 📋 Vue d'ensemble
 
-Communication bidirectionnelle entre **SirenConsole** (client) et **PureData** (serveur) pour le contrôle et le monitoring de la lecture MIDI.
+Système de contrôle et monitoring MIDI avec **Node.js comme séquenceur central**.
 
 **Architecture** :
 ```
-SirenConsole (WASM)
-    ↓ HTTP POST
-server.js (Node.js proxy)
-    ↓ WebSocket (binaire UTF-8)
-PureData (port 10002)
-    ↓ WebSocket (binaire UTF-8)
-server.js → SirenConsole
+SirenConsole (WASM - machine de contrôle)
+    ↓ HTTP POST (commandes)
+Node.js server.js
+    ├─ MidiSequencer : Lecture MIDI, transport, calcul bar/beat
+    ├─ Timer 50ms → Broadcast 0x01 POSITION (binaire 10 bytes)
+    ├─ Envoi notes MIDI → PureData (WebSocket)
+    └─ HTTP GET (polling état)
+    ↓
+SirenePupitre (Raspberry - pupitres)
+    └─ PureData : Reçoit notes + position, synthèse audio
 ```
+
+**Avantages** :
+- ✅ Pas de PureData sur machine SirenConsole (plus portable)
+- ✅ Synchro centralisée depuis Node.js
+- ✅ PureData focus sur audio uniquement
+- ✅ Format binaire ultra-compact (10 bytes @ 50ms = 200 bytes/sec)
 
 ---
 
@@ -124,26 +133,37 @@ server.js → SirenConsole
 
 **Format recommandé** : **BINAIRE multi-types** pour économiser bande passante
 
-#### 0x01 - POSITION (6 bytes, haute fréquence 50ms)
+#### 0x01 - POSITION (10 bytes, haute fréquence 50ms)
 
 État de lecture en temps réel, envoyé toutes les 50ms pendant lecture :
 
 ```
-Offset  Size  Type      Field                    
-------  ----  --------  -----------------------
-0       1     uint8     messageType (0x01)
-1       1     uint8     flags (bit0=playing)
-2       4     float32   beat (décimal, ex: 8.5)
-------  ----  --------  -----------------------
-Total: 6 bytes → 120 bytes/sec à 50ms
+Offset  Size  Type      Field                    Exemple
+------  ----  --------  -------------------      -------
+0       1     uint8     messageType              0x01
+1       1     uint8     flags (bit0=playing)     0x01
+2       2     uint16    barNumber                13
+4       2     uint16    beatInBar                2
+6       4     float32   beat (total décimal)     50.5
+------  ----  --------  -------------------      -------
+Total: 10 bytes → 200 bytes/sec à 50ms
 ```
+
+**Champs** :
+- `barNumber` : Numéro de mesure (calculé avec changements de signature)
+- `beatInBar` : Beat dans la mesure actuelle (1-n selon signature)
+- `beat` : Beat total depuis le début (décimal pour précision)
 
 **Construction** :
 ```
 bytes[0] = 0x01
 bytes[1] = playing ? 0x01 : 0x00
-writeFloat32LE(beat, 2)
+writeUInt16LE(barNumber, 2)
+writeUInt16LE(beatInBar, 4)
+writeFloat32LE(beat, 6)
 ```
+
+**Note** : `barNumber` et `beatInBar` doivent être calculés en tenant compte des changements de signature temporelle dans le fichier MIDI.
 
 ---
 
@@ -343,6 +363,36 @@ ws.send(jsonString)  // → "Not a JSON object." dans PureData
 
 ---
 
+---
+
+## 🎛️ Séquenceur MIDI Node.js
+
+**Fichier** : `SirenConsole/webfiles/midi-sequencer.js`
+
+**Fonctionnalités** :
+- ✅ Lecture fichiers MIDI (via `midi-file`)
+- ✅ Transport : play/pause/stop/seek
+- ✅ Calcul bar/beat avec changements de signature
+- ✅ Timer haute résolution 50ms
+- ✅ Broadcast position binaire (0x01)
+- ✅ Envoi notes MIDI à PureData
+- ✅ Gestion tempo dynamique
+- ✅ Map des changements de signature temporelle
+
+**Commandes gérées** :
+- `MIDI_FILE_LOAD` → Charge fichier, parse événements, build signature map
+- `MIDI_TRANSPORT` → play/pause/stop avec timer
+- `MIDI_SEEK` → Navigation précise (ms → tick → bar/beat)
+- `TEMPO_CHANGE` → Ajuste tempo et broadcast 0x03
+
+**Broadcast automatique** :
+- 0x01 POSITION toutes les 50ms pendant lecture
+- 0x03 TEMPO si changement dans fichier MIDI
+- 0x04 TIMESIG si changement dans fichier MIDI
+- Notes MIDI vers PureData via WebSocket
+
+---
+
 **Dernière mise à jour** : Octobre 2025  
-**Status** : ✅ Interface SirenConsole complète - Spec WebSocket documentée
+**Status** : ✅ Séquenceur MIDI Node.js complet et fonctionnel - Architecture centralisée opérationnelle
 
