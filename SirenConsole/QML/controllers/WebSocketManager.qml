@@ -119,14 +119,12 @@ QtObject {
         }
     }
     
-    // Fonction pour créer une connexion WebSocket (simulation)
+    // Fonction pour connecter aux pupitres (simulation pour compatibilité)
     function connectToPupitre(url, pupitreId) {
-        console.log("🔌 Tentative de connexion à:", url)
+        console.log("🔌 Tentative de connexion pupitre:", url)
+        console.log("⚠️ Mode simulation - les pupitres utilisent PureData central")
         
-        // Mode simulation puisque les pupitres ne sont pas sur le réseau
-        console.log("⚠️ Mode simulation - les pupitres ne sont pas sur le réseau")
-        
-        // Stocker la connexion simulée
+        // Simuler connexion réussie (pour compatibilité avec le code existant)
         connections[url] = {
             socket: null,
             pupitreId: pupitreId,
@@ -134,29 +132,15 @@ QtObject {
             connected: false
         }
         
-        // Simuler une connexion réussie après un délai
         Qt.callLater(function() {
             if (connections[url]) {
-                console.log("🎭 Simulation: Connexion simulée ouverte:", url)
                 connections[url].connected = true
                 connectionOpened(url)
-                
                 if (consoleController) {
                     consoleController.onPupitreConnected(pupitreId, url)
                 }
             }
         }, 1000)
-    }
-    
-    // Fonction pour envoyer un message (simulation)
-    function sendMessage(url, message) {
-        if (connections[url] && connections[url].connected) {
-            console.log("🎭 Simulation: Message simulé envoyé à", url, ":", message)
-            return true
-        } else {
-            console.log("❌ Connexion non disponible:", url)
-            return false
-        }
     }
     
     // Fonction pour fermer une connexion
