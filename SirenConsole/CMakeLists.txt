@@ -18,7 +18,7 @@ if(EMSCRIPTEN)
 endif()
 
 # Trouver Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Quick QuickControls2 Quick3D WebSockets)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick QuickControls2 Quick3D)
 
 # Configuration Qt6
 set(CMAKE_AUTOMOC ON)
@@ -44,7 +44,6 @@ target_link_libraries(appSirenConsole PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Quick3D
-    Qt6::WebSockets
 )
 
 # Configuration pour macOS (si nécessaire)

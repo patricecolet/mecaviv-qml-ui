@@ -45,6 +45,7 @@
         <!-- Utils -->
         <file>QML/utils/NetworkUtils.qml</file>
         <file>QML/utils/DataModels.qml</file>
+        <file>QML/utils/WebSocketHelper.js</file>
         
         <!-- Config -->
         <file>config.js</file>

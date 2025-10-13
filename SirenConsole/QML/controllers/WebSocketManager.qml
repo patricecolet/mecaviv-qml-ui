@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import "../utils/WebSocketHelper.js" as WS
 
 QtObject {
     id: webSocketManager
@@ -11,7 +12,6 @@ QtObject {
     
     // WebSocket vers PureData (central)
     property string pureDataUrl: "ws://localhost:10001"
-    property var pureDataSocket: null
     property bool pureDataConnected: false
     
     // Signaux
@@ -22,81 +22,44 @@ QtObject {
     signal pureDataConnectedSignal()
     signal pureDataDisconnectedSignal()
     
-    // Initialisation : Connexion automatique à PureData
+    // Initialisation
     Component.onCompleted: {
         connectToPureData()
     }
     
-    // Connexion à PureData via JavaScript WebSocket natif
+    // Connexion à PureData
     function connectToPureData() {
         console.log("🔌 Connexion à PureData:", pureDataUrl)
         
-        try {
-            // Créer WebSocket natif JavaScript
-            pureDataSocket = Qt.createQmlObject('
-                import QtQuick 2.15
-                QtObject {
-                    id: wsWrapper
-                    property var socket: null
-                    
-                    Component.onCompleted: {
-                        socket = new WebSocket("' + pureDataUrl + '")
-                        
-                        socket.onopen = function() {
-                            console.log("✅ Connecté à PureData:", "' + pureDataUrl + '")
-                            pureDataConnected = true
-                            connectionOpened("' + pureDataUrl + '")
-                            pureDataConnectedSignal()
-                        }
-                        
-                        socket.onclose = function() {
-                            console.log("❌ Déconnecté de PureData")
-                            pureDataConnected = false
-                            connectionClosed("' + pureDataUrl + '")
-                            pureDataDisconnectedSignal()
-                            
-                            if (autoReconnect) {
-                                console.log("🔄 Reconnexion dans", reconnectDelay, "ms")
-                                reconnectTimer.start()
-                            }
-                        }
-                        
-                        socket.onerror = function(error) {
-                            console.error("❌ Erreur WebSocket:", error)
-                            errorOccurred("' + pureDataUrl + '", error.toString())
-                        }
-                        
-                        socket.onmessage = function(event) {
-                            console.log("📥 Message de PureData:", event.data)
-                            messageReceived("' + pureDataUrl + '", event.data)
-                            handlePureDataMessage(event.data)
-                        }
-                    }
-                    
-                    function send(message) {
-                        if (socket && socket.readyState === WebSocket.OPEN) {
-                            socket.send(message)
-                            return true
-                        }
-                        return false
-                    }
-                    
-                    function close() {
-                        if (socket) {
-                            socket.close()
-                        }
-                    }
+        WS.connect(
+            pureDataUrl,
+            function() {
+                // onOpen
+                pureDataConnected = true
+                connectionOpened(pureDataUrl)
+                pureDataConnectedSignal()
+            },
+            function() {
+                // onClose
+                pureDataConnected = false
+                connectionClosed(pureDataUrl)
+                pureDataDisconnectedSignal()
+                
+                if (autoReconnect) {
+                    console.log("🔄 Reconnexion dans", reconnectDelay, "ms")
+                    reconnectTimer.start()
                 }
-            ', webSocketManager)
-            
-        } catch (e) {
-            console.error("❌ Erreur création WebSocket:", e)
-            errorOccurred(pureDataUrl, e.toString())
-            
-            if (autoReconnect) {
-                reconnectTimer.start()
+            },
+            function(message) {
+                // onMessage
+                messageReceived(pureDataUrl, message)
+                handlePureDataMessage(message)
+            },
+            function(error) {
+                // onError
+                errorOccurred(pureDataUrl, error)
             }
-        }
+        )
     }
     
     // Timer de reconnexion
@@ -122,10 +85,9 @@ QtObject {
     
     // Envoyer un message à PureData
     function sendMessage(message) {
-        if (pureDataSocket && pureDataConnected) {
+        if (pureDataConnected) {
             console.log("📤 Envoi à PureData:", message)
-            var success = pureDataSocket.send(message)
-            return success
+            return WS.send(message)
         } else {
             console.error("❌ PureData non connecté")
             return false
@@ -134,12 +96,10 @@ QtObject {
     
     // Fonction pour connecter aux pupitres (simulation pour compatibilité)
     function connectToPupitre(url, pupitreId) {
-        console.log("🔌 Tentative de connexion pupitre:", url)
-        console.log("⚠️ Mode simulation - les pupitres utilisent PureData central")
+        console.log("🔌 Connexion pupitre simulée:", url)
+        console.log("⚠️ Les pupitres utilisent PureData central")
         
-        // Simuler connexion réussie (pour compatibilité avec le code existant)
         connections[url] = {
-            socket: null,
             pupitreId: pupitreId,
             url: url,
             connected: false
@@ -176,12 +136,8 @@ QtObject {
     function disconnectAll() {
         console.log("🔌 Fermeture de toutes les connexions")
         
-        // Fermer PureData
-        if (pureDataSocket) {
-            pureDataSocket.close()
-        }
+        WS.close()
         
-        // Fermer pupitres
         for (var url in connections) {
             disconnectFromPupitre(url)
         }
