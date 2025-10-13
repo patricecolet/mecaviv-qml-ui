@@ -51,7 +51,7 @@ Rectangle {
             spacing: 10
             
             Label {
-                text: "🎵 Lecteur MIDI"
+                text: "♪ Lecteur MIDI"
                 font.pixelSize: 18
                 font.bold: true
                 color: "#00ff00"
@@ -419,7 +419,7 @@ Rectangle {
             
             // Bouton Play/Pause
             Button {
-                text: playing ? "⏸" : "▶"
+                text: playing ? "||" : "▶"
                 enabled: currentFile !== ""
                 implicitWidth: 60
                 
@@ -452,7 +452,7 @@ Rectangle {
             
             // Bouton Stop
             Button {
-                text: "⏹"
+                text: "■"
                 enabled: currentFile !== ""
                 implicitWidth: 50
                 
