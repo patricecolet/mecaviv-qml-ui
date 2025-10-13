@@ -1279,6 +1279,57 @@ config.json (mecaviv-qml-ui)
 └─→ ConfigController.qml → SirenePupitre
 ```
 
+### Séquenceur MIDI Node.js (Octobre 2025)
+- ✅ **Architecture centralisée** : Node.js agit comme séquenceur principal (pas PureData)
+- ✅ **midi-file library** : Analyse complète des fichiers MIDI
+- ✅ **Transport complet** : play/pause/stop/seek avec timer 50ms
+- ✅ **Calcul bar/beat/frame** : Gestion des changements de signature temporelle
+- ✅ **Envoi notes MIDI** : WebSocket → PureData → ComposeSiren
+- ✅ **Broadcast position** : Format binaire optimisé vers tous les clients
+
+### Interface Transport DAW (SirenConsole)
+- ✅ **Barre transport professionnelle** : MESURE | BEAT | FRAME | TEMPO | SIGNATURE
+- ✅ **Champs éditables** : Navigation directe (mesure/beat), tempo dynamique
+- ✅ **Boutons transport** : Play ▶, Pause ⏸, Stop ⏹ (couleur orange)
+- ✅ **Synchronisation temps réel** : Polling 100ms du state de lecture
+- ✅ **Gestion fichiers MIDI** : API REST + sélection depuis bibliothèque
+- ✅ **Documentation complète** : [MIDI_WEBSOCKET_API.md](./MIDI_WEBSOCKET_API.md)
+
+### Protocole Binaire WebSocket Optimisé
+- ✅ **Format 0x01 - POSITION** : 10 bytes (barNumber, beatInBar, beat) - 50ms
+- ✅ **Format 0x02 - FILE_INFO** : 10 bytes (duration, totalBeats) - au chargement
+- ✅ **Format 0x03 - TEMPO** : 3 bytes - à chaque changement
+- ✅ **Format 0x04 - TIMESIG** : 3 bytes - à chaque changement
+- ✅ **Optimisation** : 200 bytes/sec vs 6000 bytes/sec JSON (97% économie)
+- ✅ **Décodage** : puredata-proxy.js → clients WebSocket
+
+### Police Emoji Universelle (Noto Emoji 1.9 MB)
+- ✅ **Intégration globale** : SirenConsole, SirenePupitre, pedalierSirenium
+- ✅ **FontLoader dans Main.qml** : `globalEmojiFont` accessible partout
+- ✅ **Version monochrome** : 12× plus légère que version couleur (24 MB)
+- ✅ **Affichage parfait** : Plus de rectangles □ pour les emojis
+- ✅ **Usage uniforme** : `font.family: window.globalEmojiFont`
+
+### Architecture MIDI Finale
+```
+SirenConsole (localhost:8001)
+    ↓ HTTP REST API + WebSocket client
+    ↓
+Node.js server.js (séquenceur MIDI)
+    ├─→ midi-sequencer.js (lecture, transport, timing)
+    ├─→ midi-analyzer.js (analyse fichiers)
+    └─→ puredata-proxy.js (WebSocket → PureData)
+        ↓ WebSocket binaire (port 10002)
+        ↓
+PureData (Raspberry Pi)
+    ├─→ Reçoit notes MIDI + transport
+    ├─→ Génère audio + contrôle sirènes
+    └─→ Broadcast position binaire (0x01)
+        ↓
+SirenePupitre (×7 instances)
+    └─→ Affichage temps réel (portée 3D, Hz, RPM)
+```
+
 ---
 
 ## 🎯 Prochaines Étapes
@@ -1320,14 +1371,13 @@ config.json (mecaviv-qml-ui)
   - [X] Mode binaire (Buffer UTF-8)
   - [X] Port 10002 (évite conflit Cursor sur 10001)
   - [X] Reconnexion automatique
-- [ ] Créer l'interface de sélection de fichiers MIDI dans SirenConsole
-- [ ] **Messages WebSocket** pour contrôle lecture (Console/Pupitre → PureData) :
-  - [X] Infrastructure prête (messages reçus par PureData)
-  - [ ] `MIDI_FILE_LOAD` : Charger un fichier (à implémenter dans PureData)
-  - [ ] `MIDI_FILE_PLAY` : Démarrer lecture
-  - [ ] `MIDI_FILE_STOP` : Arrêter lecture
-  - [ ] `MIDI_FILE_PAUSE` : Mettre en pause
-  - [ ] `MIDI_FILE_SEEK` : Se déplacer dans le fichier
+- [X] **Interface de sélection MIDI** : CompositionsPage + MidiPlayer intégré
+- [X] **Messages WebSocket** pour contrôle lecture (Node.js → PureData) :
+  - [X] `MIDI_FILE_LOAD` : Charger fichier (Node.js analyse + broadcast infos)
+  - [X] `MIDI_TRANSPORT` (play/pause/stop) : Contrôle séquenceur Node.js
+  - [X] `MIDI_SEEK` : Navigation précise (ms → tick → bar/beat)
+  - [X] `TEMPO_CHANGE` : Modification tempo dynamique
+  - [X] Broadcast binaire optimisé (0x01/0x02/0x03/0x04)
 - [ ] **Configuration reverb** :
   - Interface dans SirenConsole (onglet Audio/Effects)
   - Panneau admin SirenePupitre (section Advanced)
@@ -1370,5 +1420,5 @@ config.json (mecaviv-qml-ui)
 ---
 
 **Document de travail** - À compléter au fur et à mesure de l'analyse  
-**Dernière mise à jour** : Octobre 2025
+**Dernière mise à jour** : 13 Octobre 2025 - Séquenceur MIDI Node.js + Interface Transport DAW + Police Emoji
 
