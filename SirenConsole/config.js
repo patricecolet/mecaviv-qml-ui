@@ -153,6 +153,12 @@ const config = {
         reconnectInterval: 5000 // ms
     },
     
+    // Configuration des fichiers MIDI
+    midiFiles: {
+        repositoryPath: "../../mecaviv/compositions",
+        description: "Chemin relatif vers le dépôt mecaviv/compositions contenant les fichiers MIDI"
+    },
+    
     // Configuration des couleurs
     colors: {
         background: "#1a1a1a",

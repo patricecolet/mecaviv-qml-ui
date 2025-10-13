@@ -9,6 +9,10 @@ var configData = {
   "ui": {
     "scale": 0.65
   },
+  "midiFiles": {
+    "repositoryPath": "../../mecaviv/compositions",
+    "description": "Chemin relatif vers le dépôt mecaviv/compositions contenant les fichiers MIDI"
+  },
   "sirenConfig": {
     "mode": "restricted",
     "currentSiren": "1",
