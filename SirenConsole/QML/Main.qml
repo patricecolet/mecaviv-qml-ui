@@ -62,15 +62,21 @@ ApplicationWindow {
                         }
                         
                         Button {
-                            text: "Configuration"
+                            text: "Compositions"
                             highlighted: swipeView.currentIndex === 1
                             onClicked: swipeView.currentIndex = 1
                         }
                         
                         Button {
-                            text: "Logs"
+                            text: "Configuration"
                             highlighted: swipeView.currentIndex === 2
                             onClicked: swipeView.currentIndex = 2
+                        }
+                        
+                        Button {
+                            text: "Logs"
+                            highlighted: swipeView.currentIndex === 3
+                            onClicked: swipeView.currentIndex = 3
                         }
                     }
                 }
@@ -86,6 +92,14 @@ ApplicationWindow {
                 // Page Vue d'ensemble
                 Loader {
                     source: "pages/OverviewPage.qml"
+                    onLoaded: {
+                        item.consoleController = consoleController
+                    }
+                }
+                
+                // Page Compositions
+                Loader {
+                    source: "pages/CompositionsPage.qml"
                     onLoaded: {
                         item.consoleController = consoleController
                     }
