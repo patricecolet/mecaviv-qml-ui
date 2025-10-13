@@ -233,6 +233,25 @@ class PureDataProxy {
         };
     }
     
+    // Mettre à jour le nom du fichier dans playbackState
+    updatePlaybackFile(filePath) {
+        if (!this.playbackState) {
+            this.playbackState = this.getPlaybackState();
+        }
+        this.playbackState.file = filePath;
+        console.log('📁 Fichier MIDI mis à jour:', filePath);
+    }
+    
+    // Broadcaster un buffer binaire directement (utilisé pour FILE_INFO, TEMPO, TIMESIG depuis server.js)
+    broadcastBinaryToClients(buffer) {
+        // Pour l'instant, on stocke juste dans playbackState
+        // Le broadcast réel se fera via le polling HTTP des clients
+        // (car on n'a pas de connexion WebSocket directe clients ↔ server.js)
+        
+        // Décoder le buffer pour mettre à jour playbackState
+        this.handleBinaryMessage(buffer);
+    }
+    
     // Planifier une reconnexion
     scheduleReconnect() {
         if (this.reconnectTimer) return;

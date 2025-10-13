@@ -11,9 +11,15 @@ const midiAPI = require('./api-midi.js');
 // Importer le proxy PureData
 const PureDataProxy = require('./puredata-proxy.js');
 
+// Importer l'analyseur MIDI
+const { analyzeMidiFile, createFileInfoBuffer, createTempoBuffer, createTimeSigBuffer } = require('./midi-analyzer.js');
+
 // Charger la configuration depuis config.json
 const { loadConfig } = require('../../config-loader.js');
 const config = loadConfig();
+
+// Chemin du répertoire MIDI
+const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH || config.paths.midiRepository;
 
 // Configuration du serveur
 const PORT = 8001; // Port différent de SirenePupitre (8000)
@@ -78,10 +84,43 @@ const server = http.createServer(function (request, response) {
         request.on('end', () => {
             try {
                 const command = JSON.parse(body);
+                
+                // Intercepter MIDI_FILE_LOAD pour analyser le fichier
+                if (command.type === 'MIDI_FILE_LOAD' && command.path) {
+                    console.log('📁 MIDI_FILE_LOAD détecté:', command.path);
+                    
+                    // Construire le chemin complet
+                    const fullPath = path.resolve(MIDI_REPO_PATH, command.path);
+                    console.log('📁 Chemin complet:', fullPath);
+                    
+                    // Analyser le fichier MIDI
+                    const midiInfo = analyzeMidiFile(fullPath);
+                    
+                    // Mettre à jour le playbackState du proxy avec le nom du fichier
+                    pureDataProxy.updatePlaybackFile(command.path);
+                    
+                    // Envoyer les infos binaires au proxy pour broadcast
+                    // Type 0x02 - FILE_INFO
+                    const fileInfoBuffer = createFileInfoBuffer(midiInfo.duration, midiInfo.totalBeats);
+                    pureDataProxy.broadcastBinaryToClients(fileInfoBuffer);
+                    
+                    // Type 0x03 - TEMPO
+                    const tempoBuffer = createTempoBuffer(midiInfo.tempo);
+                    pureDataProxy.broadcastBinaryToClients(tempoBuffer);
+                    
+                    // Type 0x04 - TIMESIG
+                    const timeSigBuffer = createTimeSigBuffer(midiInfo.timeSignature.numerator, midiInfo.timeSignature.denominator);
+                    pureDataProxy.broadcastBinaryToClients(timeSigBuffer);
+                    
+                    console.log('✅ Métadonnées MIDI envoyées aux clients');
+                }
+                
+                // Envoyer la commande à PureData
                 const success = pureDataProxy.sendCommand(command);
                 response.writeHead(success ? 200 : 503, { 'Content-Type': 'application/json' });
                 response.end(JSON.stringify({ success, message: success ? 'Commande envoyée' : 'PureData non connecté' }));
             } catch (e) {
+                console.error('❌ Erreur traitement commande:', e);
                 response.writeHead(400, { 'Content-Type': 'application/json' });
                 response.end(JSON.stringify({ success: false, error: e.message }));
             }
