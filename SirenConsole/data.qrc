@@ -24,6 +24,9 @@
         <!-- Components - Logs -->
         <file>QML/components/logs/LogViewer.qml</file>
         
+        <!-- Components - MIDI -->
+        <file>QML/components/MidiPlayer.qml</file>
+        
     <!-- Controllers -->
     <file>QML/controllers/ConsoleController.qml</file>
     <file>QML/controllers/WebSocketManager.qml</file>
@@ -39,6 +42,7 @@
         <!-- Pages -->
         <file>QML/pages/OverviewPage.qml</file>
         <file>QML/pages/CompositionsPage.qml</file>
+        <file>QML/pages/MidiPage.qml</file>
         <file>QML/pages/ConfigPage.qml</file>
         <file>QML/pages/LogsPage.qml</file>
         

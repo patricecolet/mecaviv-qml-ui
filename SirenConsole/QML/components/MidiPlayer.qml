@@ -15,7 +15,6 @@ Rectangle {
     border.width: 2
     
     // Propriétés
-    property var midiFileManager: null
     property var commandManager: null
     
     // État de lecture
@@ -29,144 +28,359 @@ Rectangle {
     property int totalBeats: 0         // Nombre total de beats
     property string currentFile: ""    // Fichier en cours
     
-    // Fichiers disponibles
-    property var midiFiles: []
-    property int selectedFileIndex: -1
+    // Calculs pour affichage transport
+    property int currentBar: Math.floor(beat / timeSignatureNum) + 1
+    property int currentBeat: Math.floor(beat % timeSignatureNum) + 1
+    property int currentFrame: Math.floor((beat % 1) * 960)  // 960 frames par beat (MIDI ticks)
     
     // Signaux
-    signal loadFile(string path)
     signal play()
     signal pause()
     signal stop()
     signal seek(int position)
-    signal tempoChanged(int tempo)
+    signal tempoChangeRequested(int tempo)
     
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 15
         spacing: 10
         
-        // Titre
-        Label {
-            text: "🎵 Lecteur MIDI"
-            font.pixelSize: 18
-            font.bold: true
-            color: "#00ff00"
-        }
-        
-        // Sélection de fichier
+        // En-tête avec titre et fichier en cours
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
             
             Label {
-                text: "Fichier :"
-                color: "#ffffff"
-                font.pixelSize: 14
+                text: "🎵 Lecteur MIDI"
+                font.pixelSize: 18
+                font.bold: true
+                color: "#00ff00"
             }
             
-            ComboBox {
-                id: fileSelector
+            Rectangle {
                 Layout.fillWidth: true
-                model: midiFiles
-                textRole: "name"
-                currentIndex: selectedFileIndex
+                height: 1
+                color: "#444444"
+            }
+        }
+        
+        // Fichier en cours (plus visible)
+        Rectangle {
+            Layout.fillWidth: true
+            height: 40
+            color: "#1a1a1a"
+            radius: 4
+            border.color: currentFile ? "#00ff00" : "#444444"
+            border.width: 1
+            
+            Label {
+                anchors.fill: parent
+                anchors.margins: 10
+                text: currentFile ? "▶ " + currentFile : "⏹ Aucun fichier chargé"
+                color: currentFile ? "#00ff00" : "#666666"
+                font.pixelSize: 13
+                font.bold: currentFile !== ""
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideMiddle
+            }
+        }
+        
+        // Affichage position avec champs éditables (style DAW)
+        Rectangle {
+            Layout.fillWidth: true
+            height: 70
+            color: "#0a0a0a"
+            radius: 4
+            border.color: "#00ff00"
+            border.width: 1
+            
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 15
                 
-                delegate: ItemDelegate {
-                    width: fileSelector.width
-                    contentItem: RowLayout {
-                        spacing: 8
+                // Position: Mesure | Beat | Frame
+                RowLayout {
+                    spacing: 3
+                    
+                    // Mesure
+                    Rectangle {
+                        width: 60
+                        height: 50
+                        color: "#1a1a1a"
+                        radius: 3
+                        border.color: barInput.activeFocus ? "#00ff00" : "#333333"
+                        border.width: 1
                         
-                        Label {
-                            text: modelData.category || "?"
-                            color: "#ffaa00"
-                            font.pixelSize: 10
-                            font.bold: true
-                            Layout.preferredWidth: 60
-                        }
-                        
-                        Label {
-                            text: modelData.name || "?"
-                            color: "#ffffff"
-                            font.pixelSize: 12
-                            Layout.fillWidth: true
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 0
+                            
+                            Label {
+                                text: "MESURE"
+                                color: "#666666"
+                                font.pixelSize: 8
+                                horizontalAlignment: Text.AlignHCenter
+                                Layout.fillWidth: true
+                                Layout.topMargin: 3
+                            }
+                            
+                            TextInput {
+                                id: barInput
+                                text: currentBar.toString().padStart(3, '0')
+                                color: "#00ff00"
+                                font.pixelSize: 18
+                                font.bold: true
+                                font.family: "monospace"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                
+                                validator: IntValidator { bottom: 1; top: 9999 }
+                                
+                                onAccepted: {
+                                    var newBar = parseInt(text)
+                                    if (newBar > 0) {
+                                        var newBeat = (newBar - 1) * timeSignatureNum
+                                        var newPos = (newBeat / tempo) * 60000
+                                        seek(Math.floor(newPos))
+                                        focus = false
+                                    }
+                                }
+                            }
                         }
                     }
                     
-                    background: Rectangle {
-                        color: parent.hovered ? "#3a3a3a" : "transparent"
+                    Label {
+                        text: "|"
+                        color: "#666666"
+                        font.pixelSize: 24
+                        font.bold: true
                     }
-                }
-                
-                background: Rectangle {
-                    color: "#1a1a1a"
-                    border.color: fileSelector.activeFocus ? "#00ff00" : "#444444"
-                    border.width: 1
-                    radius: 4
-                }
-                
-                contentItem: Label {
-                    text: {
-                        if (fileSelector.currentIndex >= 0 && midiFiles[fileSelector.currentIndex]) {
-                            var file = midiFiles[fileSelector.currentIndex]
-                            return file.category + "/" + file.name
+                    
+                    // Beat
+                    Rectangle {
+                        width: 50
+                        height: 50
+                        color: "#1a1a1a"
+                        radius: 3
+                        border.color: beatInput.activeFocus ? "#00ff00" : "#333333"
+                        border.width: 1
+                        
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 0
+                            
+                            Label {
+                                text: "BEAT"
+                                color: "#666666"
+                                font.pixelSize: 8
+                                horizontalAlignment: Text.AlignHCenter
+                                Layout.fillWidth: true
+                                Layout.topMargin: 3
+                            }
+                            
+                            TextInput {
+                                id: beatInput
+                                text: currentBeat.toString()
+                                color: "#00ff00"
+                                font.pixelSize: 18
+                                font.bold: true
+                                font.family: "monospace"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                
+                                validator: IntValidator { bottom: 1; top: timeSignatureNum }
+                                
+                                onAccepted: {
+                                    var newBeat = parseInt(text)
+                                    if (newBeat > 0 && newBeat <= timeSignatureNum) {
+                                        var totalBeat = (currentBar - 1) * timeSignatureNum + (newBeat - 1)
+                                        var newPos = (totalBeat / tempo) * 60000
+                                        seek(Math.floor(newPos))
+                                        focus = false
+                                    }
+                                }
+                            }
                         }
-                        return "Sélectionner un fichier..."
                     }
-                    color: "#ffffff"
-                    verticalAlignment: Text.AlignVCenter
-                    leftPadding: 10
+                    
+                    Label {
+                        text: "|"
+                        color: "#666666"
+                        font.pixelSize: 24
+                        font.bold: true
+                    }
+                    
+                    // Frame (ticks MIDI)
+                    Rectangle {
+                        width: 60
+                        height: 50
+                        color: "#1a1a1a"
+                        radius: 3
+                        border.color: frameInput.activeFocus ? "#00ff00" : "#333333"
+                        border.width: 1
+                        
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 0
+                            
+                            Label {
+                                text: "FRAME"
+                                color: "#666666"
+                                font.pixelSize: 8
+                                horizontalAlignment: Text.AlignHCenter
+                                Layout.fillWidth: true
+                                Layout.topMargin: 3
+                            }
+                            
+                            TextInput {
+                                id: frameInput
+                                text: currentFrame.toString().padStart(3, '0')
+                                color: "#00ff00"
+                                font.pixelSize: 18
+                                font.bold: true
+                                font.family: "monospace"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                
+                                validator: IntValidator { bottom: 0; top: 959 }
+                                
+                                onAccepted: {
+                                    // Les frames sont difficiles à convertir précisément
+                                    // On ignore pour l'instant, focus sur bar/beat
+                                    focus = false
+                                }
+                            }
+                        }
+                    }
                 }
                 
-                onCurrentIndexChanged: {
-                    if (currentIndex >= 0 && midiFiles[currentIndex]) {
-                        selectedFileIndex = currentIndex
+                // Séparateur vertical
+                Rectangle {
+                    width: 1
+                    height: 50
+                    color: "#444444"
+                }
+                
+                // Signature temporelle (éditable)
+                Rectangle {
+                    width: 80
+                    height: 50
+                    color: "#1a1a1a"
+                    radius: 3
+                    border.color: "#ffaa00"
+                    border.width: 1
+                    
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 0
+                        
+                        Label {
+                            text: "SIGNATURE"
+                            color: "#666666"
+                            font.pixelSize: 8
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.fillWidth: true
+                            Layout.topMargin: 3
+                        }
+                        
+                        Label {
+                            text: timeSignatureNum + "/" + timeSignatureDen
+                            color: "#ffaa00"
+                            font.pixelSize: 18
+                            font.bold: true
+                            font.family: "monospace"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                        }
                     }
                 }
+                
+                // Tempo (éditable)
+                Rectangle {
+                    width: 90
+                    height: 50
+                    color: "#1a1a1a"
+                    radius: 3
+                    border.color: tempoInput.activeFocus ? "#ffaa00" : "#333333"
+                    border.width: 1
+                    
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 0
+                        
+                        Label {
+                            text: "TEMPO"
+                            color: "#666666"
+                            font.pixelSize: 8
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.fillWidth: true
+                            Layout.topMargin: 3
+                        }
+                        
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 2
+                            
+                            Item { width: 5 }
+                            
+                            TextInput {
+                                id: tempoInput
+                                text: tempo.toString()
+                                color: "#ffaa00"
+                                font.pixelSize: 18
+                                font.bold: true
+                                font.family: "monospace"
+                                horizontalAlignment: Text.AlignRight
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.fillHeight: true
+                                Layout.preferredWidth: 45
+                                
+                                validator: IntValidator { bottom: 20; top: 300 }
+                                
+                                onAccepted: {
+                                    var newTempo = parseInt(text)
+                                    if (newTempo >= 20 && newTempo <= 300) {
+                                        tempoChangeRequested(newTempo)
+                                        focus = false
+                                    }
+                                }
+                                
+                                Keys.onUpPressed: {
+                                    var newTempo = Math.min(300, tempo + 1)
+                                    tempoChangeRequested(newTempo)
+                                }
+                                
+                                Keys.onDownPressed: {
+                                    var newTempo = Math.max(20, tempo - 1)
+                                    tempoChangeRequested(newTempo)
+                                }
+                            }
+                            
+                            Label {
+                                text: "BPM"
+                                color: "#888888"
+                                font.pixelSize: 10
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.fillHeight: true
+                            }
+                            
+                            Item { width: 3 }
+                        }
+                    }
+                }
+                
+                Item { Layout.fillWidth: true }
             }
-            
-            Button {
-                text: "📂 Charger"
-                enabled: selectedFileIndex >= 0
-                
-                onClicked: {
-                    if (selectedFileIndex >= 0 && midiFiles[selectedFileIndex]) {
-                        var file = midiFiles[selectedFileIndex]
-                        currentFile = file.path
-                        loadFile(file.path)
-                        console.log("📂 Chargement fichier:", file.path)
-                    }
-                }
-                
-                background: Rectangle {
-                    color: parent.enabled ? (parent.pressed ? "#00aa00" : "#00ff00") : "#444444"
-                    radius: 4
-                }
-                
-                contentItem: Label {
-                    text: parent.text
-                    color: parent.enabled ? "#000000" : "#888888"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    font.bold: true
-                }
-            }
-        }
-        
-        // Fichier en cours
-        Label {
-            text: currentFile ? "▶ " + currentFile : "Aucun fichier chargé"
-            color: currentFile ? "#00ff00" : "#888888"
-            font.pixelSize: 12
-            font.italic: true
-            Layout.fillWidth: true
-        }
-        
-        // Séparateur
-        Rectangle {
-            Layout.fillWidth: true
-            height: 1
-            color: "#444444"
         }
         
         // Contrôles de transport
@@ -289,24 +503,6 @@ Rectangle {
             }
             
             Item { Layout.fillWidth: true }
-            
-            // Affichage signature temporelle
-            Rectangle {
-                Layout.preferredWidth: 70
-                Layout.preferredHeight: 40
-                color: "#1a1a1a"
-                border.color: "#00ff00"
-                border.width: 1
-                radius: 4
-                
-                Label {
-                    anchors.centerIn: parent
-                    text: timeSignatureNum + "/" + timeSignatureDen
-                    color: "#00ff00"
-                    font.pixelSize: 18
-                    font.bold: true
-                }
-            }
         }
         
         // Barre de progression
@@ -405,99 +601,7 @@ Rectangle {
                 }
                 
                 Item { Layout.fillWidth: true }
-                
-                Label {
-                    text: "Beat: " + beat.toFixed(1) + " / " + totalBeats
-                    color: "#ffaa00"
-                    font.pixelSize: 12
-                }
             }
-        }
-        
-        // Séparateur
-        Rectangle {
-            Layout.fillWidth: true
-            height: 1
-            color: "#444444"
-        }
-        
-        // Contrôle du tempo
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 10
-            
-            Label {
-                text: "Tempo :"
-                color: "#ffffff"
-                font.pixelSize: 14
-            }
-            
-            Button {
-                text: "-10"
-                implicitWidth: 50
-                
-                onClicked: {
-                    var newTempo = Math.max(40, tempo - 10)
-                    tempoChanged(newTempo)
-                }
-                
-                background: Rectangle {
-                    color: parent.pressed ? "#444444" : "#2a2a2a"
-                    border.color: "#ffaa00"
-                    border.width: 1
-                    radius: 4
-                }
-                
-                contentItem: Label {
-                    text: parent.text
-                    color: "#ffaa00"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
-            
-            Rectangle {
-                Layout.preferredWidth: 80
-                Layout.preferredHeight: 35
-                color: "#1a1a1a"
-                border.color: "#ffaa00"
-                border.width: 2
-                radius: 4
-                
-                Label {
-                    anchors.centerIn: parent
-                    text: tempo + " BPM"
-                    color: "#ffaa00"
-                    font.pixelSize: 16
-                    font.bold: true
-                }
-            }
-            
-            Button {
-                text: "+10"
-                implicitWidth: 50
-                
-                onClicked: {
-                    var newTempo = Math.min(240, tempo + 10)
-                    tempoChanged(newTempo)
-                }
-                
-                background: Rectangle {
-                    color: parent.pressed ? "#444444" : "#2a2a2a"
-                    border.color: "#ffaa00"
-                    border.width: 1
-                    radius: 4
-                }
-                
-                contentItem: Label {
-                    text: parent.text
-                    color: "#ffaa00"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
-            
-            Item { Layout.fillWidth: true }
         }
     }
     
@@ -528,10 +632,10 @@ Rectangle {
         }
     }
     
-    // Charger la liste des fichiers MIDI
-    function loadMidiFilesList(files) {
-        midiFiles = files
-        console.log("📁 Liste MIDI chargée:", files.length, "fichiers")
+    // Fonction appelée quand un fichier est chargé depuis la bibliothèque
+    function onFileLoaded(path) {
+        currentFile = path
+        console.log("📁 Fichier chargé dans le lecteur:", path)
     }
     
     // Timer pour récupérer l'état de lecture depuis PureData
@@ -558,23 +662,8 @@ Rectangle {
         }
     }
     
-    // Connexion aux signaux
-    Component.onCompleted: {
-        // Demander la liste des fichiers MIDI au démarrage
-        if (midiFileManager) {
-            midiFileManager.requestFiles()
-        }
-    }
-    
-    // Gestion des signaux
-    onLoadFile: function(path) {
-        if (commandManager) {
-            commandManager.sendMidiCommand({
-                "type": "MIDI_FILE_LOAD",
-                "path": path
-            })
-        }
-    }
+    // Gestion des signaux de transport uniquement
+    // Le chargement de fichier est géré par CompositionsPage
     
     onPlay: function() {
         if (commandManager) {
@@ -612,7 +701,7 @@ Rectangle {
         }
     }
     
-    onTempoChanged: function(newTempo) {
+    onTempoChangeRequested: function(newTempo) {
         if (commandManager) {
             commandManager.sendMidiCommand({
                 "type": "TEMPO_CHANGE",

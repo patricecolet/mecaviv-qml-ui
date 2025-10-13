@@ -29,6 +29,8 @@ Rectangle {
         onFileSelected: function(filePath) {
             statusText.text = "📁 Chargement: " + filePath
             statusText.color = "#00ff00"
+            // Mettre à jour le lecteur MIDI
+            midiPlayer.currentFile = filePath
         }
     }
     
@@ -45,9 +47,8 @@ Rectangle {
         MidiPlayer {
             id: midiPlayer
             Layout.fillWidth: true
-            Layout.preferredHeight: 280
+            Layout.preferredHeight: 200
             
-            midiFileManager: midiFileManager
             commandManager: consoleController ? consoleController.commandManager : null
         }
         
