@@ -1,0 +1,124 @@
+{
+  "version": "1.0",
+  "description": "Configuration centralisée pour le système Mecaviv (PureData, SirenConsole, SirenePupitre)",
+  
+  "paths": {
+    "midiRepository": {
+      "darwin": "~/repo/mecaviv/compositions",
+      "linux": "~/mecaviv/compositions",
+      "description": "Chemin vers le dépôt MIDI. ~ sera expansé automatiquement. PureData détecte l'OS et choisit le bon chemin."
+    }
+  },
+  
+  "servers": {
+    "websocket": {
+      "port": 10002,
+      "host": {
+        "darwin": "127.0.0.1",
+        "linux": "0.0.0.0",
+        "description": "macOS = localhost uniquement, Linux/RPi = toutes interfaces"
+      }
+    },
+    "api": {
+      "port": 8001,
+      "host": "0.0.0.0",
+      "description": "API REST pour SirenConsole"
+    }
+  },
+  
+  "sirenConfig": {
+    "mode": "restricted",
+    "currentSiren": "1",
+    "sirens": [
+      {
+        "id": "1",
+        "name": "S1",
+        "outputs": 12,
+        "ambitus": { "min": 43, "max": 86 },
+        "clef": "bass",
+        "restrictedMax": 72,
+        "transposition": 1,
+        "displayOctaveOffset": -1
+      },
+      {
+        "id": "2",
+        "name": "S2",
+        "outputs": 12,
+        "ambitus": { "min": 43, "max": 86 },
+        "clef": "bass",
+        "restrictedMax": 72,
+        "transposition": 1,
+        "displayOctaveOffset": -1
+      },
+      {
+        "id": "3",
+        "name": "S3",
+        "outputs": 8,
+        "ambitus": { "min": 36, "max": 77 },
+        "clef": "bass",
+        "restrictedMax": 60,
+        "transposition": 1,
+        "displayOctaveOffset": 0
+      },
+      {
+        "id": "4",
+        "name": "S4",
+        "outputs": 9,
+        "ambitus": { "min": 36, "max": 79 },
+        "clef": "bass",
+        "restrictedMax": 60,
+        "transposition": 1,
+        "displayOctaveOffset": 0
+      },
+      {
+        "id": "5",
+        "name": "S5",
+        "outputs": 8,
+        "ambitus": { "min": 48, "max": 94 },
+        "clef": "treble",
+        "restrictedMax": 84,
+        "transposition": 1,
+        "displayOctaveOffset": 0
+      },
+      {
+        "id": "6",
+        "name": "S6",
+        "outputs": 8,
+        "ambitus": { "min": 48, "max": 94 },
+        "clef": "treble",
+        "restrictedMax": 84,
+        "transposition": 1,
+        "displayOctaveOffset": 0
+      },
+      {
+        "id": "7",
+        "name": "S7",
+        "outputs": 8,
+        "ambitus": { "min": 48, "max": 94 },
+        "clef": "treble",
+        "restrictedMax": 84,
+        "transposition": 0,
+        "displayOctaveOffset": 0
+      }
+    ]
+  },
+  
+  "displayConfig": {
+    "components": {
+      "musicalStaff": {
+        "visible": true
+      },
+      "controllers": {
+        "visible": true
+      }
+    }
+  },
+  
+  "reverbConfig": {
+    "enabled": true,
+    "roomSize": 0.5,
+    "dryWet": 0.3,
+    "damp": 0.5
+  }
+}
+

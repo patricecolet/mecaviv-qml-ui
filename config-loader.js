@@ -8,19 +8,12 @@ const path = require('path');
 const os = require('os');
 
 /**
- * Déterminer le chemin vers config.json selon l'OS
+ * Déterminer le chemin vers config.json
+ * Cherche à la racine du projet mecaviv-qml-ui
  */
 function getConfigPath() {
-    const platform = os.platform();
-    const home = os.homedir();
-    
-    if (platform === 'darwin') {
-        // macOS - Dev
-        return path.join(home, 'repo/mecaviv/config.json');
-    } else {
-        // Linux (Raspberry Pi) - Prod
-        return path.join(home, 'mecaviv/config.json');
-    }
+    // Chemin relatif depuis ce fichier (config-loader.js est à la racine de mecaviv-qml-ui)
+    return path.join(__dirname, 'config.json');
 }
 
 /**
