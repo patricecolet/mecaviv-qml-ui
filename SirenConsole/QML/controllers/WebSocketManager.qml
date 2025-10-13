@@ -109,7 +109,7 @@ Item {
             if (connections[url]) {
                 connections[url].connected = true
                 connectionOpened(url)
-                if (consoleController) {
+                if (consoleController && consoleController.onPupitreConnected) {
                     consoleController.onPupitreConnected(pupitreId, url)
                 }
             }
@@ -123,7 +123,7 @@ Item {
             connections[url].connected = false
             connectionClosed(url)
             
-            if (consoleController) {
+            if (consoleController && consoleController.onPupitreDisconnected) {
                 var pupitreId = connections[url].pupitreId
                 consoleController.onPupitreDisconnected(pupitreId, url)
             }
