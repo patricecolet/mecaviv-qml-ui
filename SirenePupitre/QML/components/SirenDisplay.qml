@@ -189,7 +189,16 @@ Item {
                         return configController.isComponentVisible("musicalStaff")
                     }
                 }
-                
+            
+            // Mode Jeu (à l'intérieur du View3D)
+                GameMode {
+                    id: gameModeComponent
+                    configController: root.configController
+                    sirenInfo: root.sirenInfo
+                    currentNoteMidi: root.clampedNote
+                    isGameModeActive: root.gameMode  // Lier au mode jeu
+                    staffWidth: 1600
+                }                
                 // Compteur de notes type speedometer vintage
                 NoteSpeedometer3D {
                     currentNoteMidi: root.clampedNote
@@ -199,16 +208,6 @@ Item {
                     // Position TOUT EN HAUT
                     position: Qt.vector3d(0, 400, 100)
                 }
-            }
-            
-            // Mode Jeu (à l'intérieur du View3D)
-            GameMode {
-                id: gameModeComponent
-                configController: root.configController
-                sirenInfo: root.sirenInfo
-                currentNoteMidi: root.clampedNote
-                isGameModeActive: root.gameMode  // Lier au mode jeu
-                
             }
         }
         

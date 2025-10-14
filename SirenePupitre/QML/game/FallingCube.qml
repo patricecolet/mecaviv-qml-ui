@@ -16,10 +16,9 @@ Model {
     property real currentY: spawnHeight
     property real currentX: targetX
     property real cubeZ: -50
-    property real cubeSize: velocity / 127.0 * 40  // Taille proportionnelle à la vélocité
     
     position: Qt.vector3d(currentX, currentY, cubeZ)
-    scale: Qt.vector3d(cubeSize / 100, cubeSize / 100, cubeSize / 100)
+    scale: Qt.vector3d(velocity / 127.0 * 0.8 + 0.2, 1, 1)  // 20% à 100% uniquement sur X
     
     source: "#Cube"
     

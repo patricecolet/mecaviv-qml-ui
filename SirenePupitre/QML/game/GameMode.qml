@@ -29,9 +29,47 @@ Node {
     // Propriétés de la portée
     property real staffWidth: 1800
     property real lineSpacing: 20
-    property real ambitusMin: sirenInfo ? sirenInfo.ambitus.min : 48.0
-    property real ambitusMax: sirenInfo ? sirenInfo.ambitus.max : 84.0
-    property string clef: sirenInfo ? sirenInfo.clef : "treble"
+    
+    // Propriétés calculées avec réévaluation forcée
+    property real ambitusMin: {
+        if (!sirenInfo) return 48.0
+        // Forcer la réévaluation avec updateCounter
+        if (configController) {
+            var dummy = configController.updateCounter
+        }
+        return sirenInfo.ambitus.min
+    }
+    
+    property real ambitusMax: {
+        if (!sirenInfo) return 84.0
+        // Forcer la réévaluation avec updateCounter
+        if (configController) {
+            var dummy = configController.updateCounter
+        }
+        return sirenInfo.mode === "restricted" && sirenInfo.restrictedMax !== undefined ? sirenInfo.restrictedMax : sirenInfo.ambitus.max
+    }
+    
+    property string clef: {
+        if (!sirenInfo) return "treble"
+        // Forcer la réévaluation avec updateCounter
+        if (configController) {
+            var dummy = configController.updateCounter
+        }
+        return sirenInfo.clef
+    }
+    
+    property int octaveOffset: {
+        if (!sirenInfo) return 0
+        // Forcer la réévaluation avec updateCounter
+        if (configController) {
+            var dummy = configController.updateCounter
+        }
+        return sirenInfo.displayOctaveOffset || 0
+    }
+    
+    // Calcul de l'offset pour la clé (comme dans MusicalStaff3D)
+    property real clefWidth: 100  // Largeur de la clé
+    property real ambitusOffset: clefWidth  // Offset pour l'ambitus
     
     // Portée musicale (cachée en mode normal)
     MusicalStaff3D {
@@ -58,10 +96,16 @@ Node {
         lineSpacing: root.lineSpacing
         ambitusMin: root.ambitusMin
         ambitusMax: root.ambitusMax
+        staffWidth: root.staffWidth
+        ambitusOffset: root.ambitusOffset
+        octaveOffset: sirenInfo ? sirenInfo.displayOctaveOffset : 0 
+        clef: root.clef
     }
     
     // Fonction pour traiter les événements MIDI
     function processMidiEvents() {
+    console.log("🎵 processMidiEvents - sirenInfo:", sirenInfo, "ambitusMin:", ambitusMin, "ambitusMax:", ambitusMax)
+    
         var segments = []
         
         for (var i = 0; i < midiEvents.length; i++) {
@@ -119,7 +163,7 @@ Node {
         addMidiEvent({
             timestamp: event.timestamp || Date.now(),
             note: event.note || event.midiNote || 60,
-            velocity: event.velocity || 100,
+            velocity: event.velocity ?? 100,
             controllers: event.controllers || {}
         })
     }

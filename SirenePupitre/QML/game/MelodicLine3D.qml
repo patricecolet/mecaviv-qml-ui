@@ -1,17 +1,23 @@
 import QtQuick
 import QtQuick3D
-
+import "../components/ambitus"
 Node {
     id: root
-    
+        // Instances
+    NotePositionCalculator {
+        id: noteCalc
+    }
     // Propriétés
     property var lineSegments: []
     property real lineSpacing: 20
     property real ambitusMin: 48.0
     property real ambitusMax: 84.0
+    property real staffWidth: 1800
+    property real ambitusOffset: 0
     property real fallSpeed: 150  // Vitesse de chute
     property real spawnHeight: 500  // Hauteur de départ
-    
+    property int octaveOffset: 0 
+    property string clef: "treble"
     // Propriétés calculées
     readonly property real ambitusRange: ambitusMax - ambitusMin
     readonly property real staffHeight: ambitusRange * lineSpacing
@@ -23,17 +29,25 @@ Node {
         }
     }
     
-    // Fonction pour convertir une note MIDI en position Y sur la portée
-    function noteToY(note) {
-        var normalized = (note - ambitusMin) / ambitusRange
-        return staffHeight * (1 - normalized) - staffHeight / 2
-    }
+// Fonction pour convertir une note MIDI en position Y sur la portée
+function noteToY(note) {
+    // Ne pas appliquer octaveOffset car les notes envoyées sont déjà dans le bon registre
+    var y = noteCalc.calculateNoteYPosition(note, lineSpacing, clef)
+    console.log("🎵 noteToY - note:", note, "Y:", y)
+    return y
+}
+function noteToX(note) {
+    // Utiliser la même fonction que AmbitusDisplay3D pour la cohérence
+    // staffPosX = 0 + ambitusOffset/2 (comme dans AmbitusDisplay3D)
+    // staffWidth = staffWidth - ambitusOffset (comme dans AmbitusDisplay3D)
+    var staffPosX = ambitusOffset / 2
+    var effectiveStaffWidth = staffWidth - ambitusOffset
+    var x = noteCalc.calculateNoteXPosition(note, ambitusMin, ambitusMax, staffPosX, effectiveStaffWidth)
     
-    // Fonction pour calculer la position X de la note sur la portée
-    function noteToX(note) {
-        var normalized = (note - ambitusMin) / ambitusRange
-        return (normalized - 0.5) * 1600
-    }
+    console.log("🎵 noteToX - note:", note, "ambitusMin:", ambitusMin, "ambitusMax:", ambitusMax, "staffPosX:", staffPosX, "effectiveStaffWidth:", effectiveStaffWidth, "X:", x.toFixed(1))
+    return x
+}
+
     
     // Fonction pour obtenir une couleur selon la hauteur de la note
     function noteToColor(note) {
