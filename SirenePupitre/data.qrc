@@ -51,6 +51,11 @@
         <file>QML/components/NoteSpeedometer3D.qml</file>
         <file>QML/utils/meshes/TrebleKey.mesh</file>
         <file>QML/utils/meshes/BassKey.mesh</file>
+        <file>QML/game/GameMode.qml</file>
+        <file>QML/game/GameHUD.qml</file>
+        <file>QML/game/MelodicLine.qml</file>
+        <file>QML/game/GameFeedback.qml</file>
+        <file>QML/game/ControllerTargetBar.qml</file>
     </qresource>
     
     <!-- Polices partagées -->

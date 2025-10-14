@@ -5,6 +5,7 @@ import QtQuick3D
 import "components"
 import "controllers"
 import "admin"
+import "game"
 
 Window {
     id: mainWindow
@@ -30,6 +31,7 @@ Window {
     
     // Propriété pour le mode studio
     property bool studioMode: false
+    property bool gameMode: false  // Mode jeu "Siren Hero"
     property bool debugMode: true  // Mettre à true pour activer les logs
     property bool isAdminMode: false  // État admin persistant
     
@@ -98,9 +100,19 @@ Window {
     SirenDisplay {
         id: display
         anchors.fill: parent
-        visible: !studioMode && !adminPanel.visible
+        visible: !studioMode && !gameMode && !adminPanel.visible
         sirenController: sirenController
         sirenInfo: configController.currentSirenInfo
+        configController: configController
+    }
+    
+    // Mode Jeu "Siren Hero"
+    GameMode {
+        id: gameModeView
+        anchors.fill: parent
+        visible: gameMode && !adminPanel.visible
+        webSocketController: webSocketController
+        sirenController: sirenController
         configController: configController
     }
     
@@ -108,7 +120,7 @@ Window {
     StudioView {
         id: studioView
         anchors.fill: parent
-        visible: studioMode && !isAdminMode
+        visible: studioMode && !gameMode && !isAdminMode
         //debugMode: mainWindow.debugMode  // Passer le flag
     }
     
@@ -134,33 +146,62 @@ Window {
         }
     }
     
-    // Bouton pour basculer entre les modes
-    Rectangle {
+    // Boutons pour basculer entre les modes
+    Column {
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: 20
-        width: 120
-        height: 40
-        color: "#2a2a2a"
-        border.color: studioMode ? "#00ff00" : "#FFD700"
-        radius: 5
-        visible: {
-            if (isAdminMode) return false
-            if (!configController) return true
-            var dummy = configController.updateCounter
-            return configController.isComponentVisible("studioButton")
+        spacing: 10
+        visible: !isAdminMode
+        
+        // Bouton Mode Studio
+        Rectangle {
+            width: 140
+            height: 40
+            color: "#2a2a2a"
+            border.color: studioMode ? "#00ff00" : "#FFD700"
+            radius: 5
+            
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    studioMode = !studioMode
+                    gameMode = false  // Désactiver le mode jeu
+                }
+            }
+            
+            Text {
+                text: studioMode ? "🎬 Mode Normal" : "🎬 Mode Studio"
+                color: "white"
+                font.pixelSize: 14
+                anchors.centerIn: parent
+            }
         }
         
-        MouseArea {
-            anchors.fill: parent
-            onClicked: studioMode = !studioMode
-        }
-        
-        Text {
-            text: studioMode ? "Mode Normal" : "Mode Studio"
-            color: "white"
-            font.pixelSize: 14
-            anchors.centerIn: parent
+        // Bouton Mode Jeu
+        Rectangle {
+            width: 140
+            height: 40
+            color: "#2a2a2a"
+            border.color: gameMode ? "#FF0000" : "#00CED1"
+            border.width: 2
+            radius: 5
+            
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    gameMode = !gameMode
+                    studioMode = false  // Désactiver le mode studio
+                }
+            }
+            
+            Text {
+                text: gameMode ? "🎮 Mode Normal" : "🎮 Mode Jeu"
+                color: gameMode ? "#FF0000" : "#00CED1"
+                font.pixelSize: 14
+                font.bold: gameMode
+                anchors.centerIn: parent
+            }
         }
     }
     

@@ -17,6 +17,9 @@ const { analyzeMidiFile, createFileInfoBuffer, createTempoBuffer, createTimeSigB
 // Importer le séquenceur MIDI
 const MidiSequencer = require('./midi-sequencer.js');
 
+// Importer le moteur de jeu
+const GameEngine = require('./game-engine.js');
+
 // Charger la configuration depuis config.json
 const { loadConfig } = require('../../config-loader.js');
 const config = loadConfig();
@@ -28,9 +31,10 @@ const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH || config.paths.mid
 const PORT = 8001; // Port différent de SirenePupitre (8000)
 const HOST = '0.0.0.0';
 
-// Initialiser le proxy PureData et le séquenceur
+// Initialiser le proxy PureData, le séquenceur, et le moteur de jeu
 let pureDataProxy = null;
 let midiSequencer = null;
+let gameEngine = null;
 
 // Middleware pour les headers CORS et sécurité
 function setSecurityHeaders(response) {
@@ -216,6 +220,77 @@ const server = http.createServer(function (request, response) {
         return;
     }
     
+    // Routes API Mode Jeu
+    if (request.url === '/api/game/start' && request.method === 'POST') {
+        let body = '';
+        request.on('data', chunk => { body += chunk; });
+        request.on('end', () => {
+            try {
+                const options = JSON.parse(body);
+                const result = gameEngine.startGame(options);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify(result));
+            } catch (error) {
+                console.error('❌ Erreur GAME_START:', error);
+                response.writeHead(500, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: error.message }));
+            }
+        });
+        return;
+    }
+    
+    if (request.url === '/api/game/state' && request.method === 'GET') {
+        const state = gameEngine.getGameState();
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(state));
+        return;
+    }
+    
+    if (request.url === '/api/game/pause' && request.method === 'POST') {
+        let body = '';
+        request.on('data', chunk => { body += chunk; });
+        request.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                const paused = data.paused !== undefined ? data.paused : true;
+                const result = gameEngine.pauseGame(paused);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify(result));
+            } catch (error) {
+                console.error('❌ Erreur GAME_PAUSE:', error);
+                response.writeHead(500, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: error.message }));
+            }
+        });
+        return;
+    }
+    
+    if (request.url === '/api/game/abort' && request.method === 'POST') {
+        let body = '';
+        request.on('data', chunk => { body += chunk; });
+        request.on('end', () => {
+            try {
+                const data = body ? JSON.parse(body) : {};
+                const reason = data.reason || 'Aborted by user';
+                const result = gameEngine.abortGame(reason);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify(result));
+            } catch (error) {
+                console.error('❌ Erreur GAME_ABORT:', error);
+                response.writeHead(500, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: error.message }));
+            }
+        });
+        return;
+    }
+    
+    if (request.url === '/api/game/end' && request.method === 'POST') {
+        const result = gameEngine.endGame();
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(result));
+        return;
+    }
+    
     // Route principale
     if (request.url === '/' || request.url === '') {
         filePath = './appSirenConsole.html';
@@ -280,6 +355,12 @@ presetAPI.initializePresetAPI().then(() => {
     // Initialiser le séquenceur MIDI
     midiSequencer = new MidiSequencer(pureDataProxy);
     
+    // Initialiser le moteur de jeu
+    gameEngine = new GameEngine(pureDataProxy);
+    
+    // Injecter GameEngine dans PureDataProxy pour router les messages
+    pureDataProxy.setGameEngine(gameEngine);
+    
     server.listen(PORT, HOST, () => {
         console.log(`🚀 Serveur SirenConsole démarré sur http://${HOST}:${PORT}`);
         console.log(`🌐 Application principale sur http://localhost:${PORT}/appSirenConsole.html`);
@@ -288,6 +369,7 @@ presetAPI.initializePresetAPI().then(() => {
         console.log(`💾 API Presets disponible sur http://localhost:${PORT}/api/presets`);
         console.log(`🎵 API MIDI disponible sur http://localhost:${PORT}/api/midi/files`);
         console.log(`🔀 API PureData Proxy sur http://localhost:${PORT}/api/puredata/*`);
+        console.log(`🎮 API Mode Jeu sur http://localhost:${PORT}/api/game/*`);
     });
 }).catch((error) => {
     console.error('❌ Erreur initialisation:', error);

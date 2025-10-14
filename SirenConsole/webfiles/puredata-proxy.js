@@ -15,10 +15,17 @@ class PureDataProxy {
         this.eventBuffer = []; // Buffer pour événements temps réel
         this.maxBufferSize = 100;
         this.playbackState = null; // État de lecture MIDI
+        this.gameEngine = null; // Moteur de jeu (injecté après construction)
         
         console.log('🎛️ PureDataProxy initialisé, URL:', this.pureDataUrl);
         
         this.connect();
+    }
+    
+    // Injecter le moteur de jeu (appelé après construction depuis server.js)
+    setGameEngine(gameEngine) {
+        this.gameEngine = gameEngine;
+        console.log('🎮 GameEngine injecté dans PureDataProxy');
     }
     
     // Connexion au WebSocket PureData
@@ -78,6 +85,11 @@ class PureDataProxy {
             try {
                 const data = JSON.parse(message);
                 
+                // Router les messages de jeu vers GameEngine
+                if (data.type === 'GAME_END' && this.gameEngine) {
+                    this.gameEngine.handleJsonGameMessage(data);
+                }
+                
                 // Traiter les messages d'état de lecture MIDI
                 if (data.type === 'MIDI_PLAYBACK_STATE') {
                     this.playbackState = data;
@@ -104,6 +116,16 @@ class PureDataProxy {
     // Décoder messages binaires multi-types
     handleBinaryMessage(buffer) {
         const messageType = buffer.readUInt8(0);
+        
+        // Router les messages de jeu (0x10-0x1F) vers GameEngine
+        if (messageType >= 0x10 && messageType <= 0x1F) {
+            if (this.gameEngine) {
+                this.gameEngine.handleBinaryGameMessage(buffer);
+            } else {
+                console.warn('⚠️ Message de jeu reçu mais GameEngine non initialisé:', '0x' + messageType.toString(16).padStart(2, '0'));
+            }
+            return;
+        }
         
         // Initialiser playbackState si nécessaire
         if (!this.playbackState) {
