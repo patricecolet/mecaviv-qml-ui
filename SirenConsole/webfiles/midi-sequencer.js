@@ -400,12 +400,12 @@ class MidiSequencer {
             this.pureDataProxy.broadcastBinaryToClients(buffer);
         }
         
-        // Notes MIDI
-        if (event.type === 'noteOn' && event.velocity > 0) {
-            this.sendNoteToPlayers(event.noteNumber, event.velocity, event.channel);
-        } else if (event.type === 'noteOff' || (event.type === 'noteOn' && event.velocity === 0)) {
-            this.sendNoteToPlayers(event.noteNumber, 0, event.channel); // velocity 0 = noteOff
-        }
+        // Notes MIDI - DÉSACTIVÉ : PureData lit le MIDI localement
+        // if (event.type === 'noteOn' && event.velocity > 0) {
+        //     this.sendNoteToPlayers(event.noteNumber, event.velocity, event.channel);
+        // } else if (event.type === 'noteOff' || (event.type === 'noteOn' && event.velocity === 0)) {
+        //     this.sendNoteToPlayers(event.noteNumber, 0, event.channel); // velocity 0 = noteOff
+        // }
     }
     
     /**

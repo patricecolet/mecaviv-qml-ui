@@ -100,7 +100,6 @@ Item {
                     Layout.preferredWidth: 200
                     
                     onClicked: {
-                        console.log("Rechargement de la configuration...")
                     }
                 }
                 
@@ -110,7 +109,6 @@ Item {
                     enabled: false
                     
                     onClicked: {
-                        console.log("Export de la configuration...")
                     }
                 }
                 
@@ -120,7 +118,6 @@ Item {
                     enabled: false
                     
                     onClicked: {
-                        console.log("Réinitialisation...")
                     }
                 }
             }

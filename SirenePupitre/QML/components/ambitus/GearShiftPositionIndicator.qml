@@ -9,7 +9,6 @@ Item {
     
     // Debug logs
     onCurrentPositionChanged: {
-        console.log("🎛️ GearShiftPositionIndicator - Position changée:", currentPosition)
     }
     
     // Propriétés configurables

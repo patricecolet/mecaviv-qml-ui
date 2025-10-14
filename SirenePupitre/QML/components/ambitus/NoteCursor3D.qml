@@ -28,7 +28,6 @@ Node {
     
     // AJOUTER pour déboguer et forcer la mise à jour
     onCursorWidthChanged: {
-        console.log("🔄 NoteCursor3D - cursorWidth changed to:", cursorWidth);
         // Forcer la mise à jour du scale
         if (cursorModel) {
             cursorModel.scale = Qt.vector3d(cursorWidth / 100, Math.abs(cursorHeight) / 100, 0.02);
@@ -36,7 +35,6 @@ Node {
     }
     
     onCursorColorChanged: {
-        console.log("🔄 NoteCursor3D - cursorColor changed");
         if (cursorModel && cursorModel.materials[0]) {
             cursorModel.materials[0].baseColor = cursorColor;
             cursorModel.materials[0].opacity = cursorColor.a;
@@ -44,14 +42,12 @@ Node {
     }
     
     onHighlightColorChanged: {
-        console.log("🔄 NoteCursor3D - highlightColor changed to:", highlightColor);
         if (highlightModel && highlightModel.materials && highlightModel.materials.length > 0) {
             highlightModel.materials[0].baseColor = highlightColor;
         }
     }
     
     onHighlightSizeChanged: {
-        console.log("🔄 NoteCursor3D - highlightSize changed to:", highlightSize);
         if (highlightModel) {
             highlightModel.scale = Qt.vector3d(highlightSize, highlightSize * 0.8, highlightSize);
         }

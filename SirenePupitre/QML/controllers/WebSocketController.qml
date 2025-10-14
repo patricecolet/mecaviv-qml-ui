@@ -38,8 +38,29 @@ Item {
             try {
                 var bytes = new Uint8Array(message);
                 
+                // Format binaire simple pour les notes MIDI (3 bytes)
+                if (bytes.length === 3 && bytes[0] === 0x03) {
+                    // Format: [0x03, note, velocity] - LE SERVEUR ENVOIE NOTE PUIS VELOCITY !
+                    var note = bytes[1];
+                    var velocity = bytes[2];
+                    
+                    // Créer l'objet événement avec flag "sequence"
+                    var event = {
+                        midiNote: note,
+                        note: note,
+                        velocity: velocity,
+                        timestamp: Date.now(),
+                        controllers: {},
+                        isSequence: true  // Flag pour différencier séquence/contrôleurs
+                    };
+                    
+                    // Transmettre l'événement
+                    controller.dataReceived(event);
+                    return;
+                }
+                
+                // Format binaire config (8+ bytes)
                 if (bytes.length < 8) {
-                    console.error("Message trop court:", bytes.length);
                     return;
                 }
                 
@@ -55,7 +76,6 @@ Item {
                     controller.binaryBuffer = new Array(totalSize);
                     controller.expectedSize = totalSize;
                     controller.receivedBytes = 0;
-                    console.log("📊 Nouvelle réception:", totalSize, "bytes au total");
                 }
                 
                 // Copier les données à la bonne position
@@ -64,14 +84,8 @@ Item {
                 }
                 controller.receivedBytes += dataLength;
                 
-                var progress = Math.round((controller.receivedBytes / totalSize) * 100);
-                console.log("📦 Chunk à position", position + ":", dataLength, 
-                           "bytes | Total:", controller.receivedBytes + "/" + totalSize,
-                           "(" + progress + "%)");
-                
                 // Vérifier si on a tout reçu
                 if (controller.receivedBytes >= totalSize) {
-                    console.log("✅ Réception complète !");
                     
                     // Reconstruire le JSON
                     var jsonString = "";
@@ -82,7 +96,6 @@ Item {
                     var jsonData = JSON.parse(jsonString);
                     if (jsonData.type === "CONFIG_FULL" && controller.configController) {
                         controller.configController.updateFullConfig(jsonData.config);
-                        console.log("✅ Configuration mise à jour !");
                     }
                     
                     // Réinitialiser
@@ -91,7 +104,6 @@ Item {
                     controller.receivedBytes = 0;
                 }
             } catch (e) {
-                console.error("❌ Erreur:", e);
             }
         }
         
@@ -99,7 +111,6 @@ Item {
         onTextMessageReceived: function(message) {
             try {
                 // Logs désactivés pour performance
-                // console.log("📥 WebSocket reçu - Message brut:", message);
                 
                 // Gérer les messages de contrôle binaire
                 if (message === "BINARY_END") {
@@ -112,7 +123,6 @@ Item {
                         
                         var jsonData = JSON.parse(jsonString);
                         if (jsonData.type === "CONFIG_FULL") {
-                            console.log("CONFIG_FULL reçu (BINARY_END)");
                             if (controller.configController && jsonData.config) {
                                 controller.configController.updateFullConfig(jsonData.config);
                             }
@@ -132,14 +142,12 @@ Item {
                         controller.chunkSize = parseInt(parts[2]);
                         controller.binaryBuffer = [];
                         controller.receivingBinary = true;
-                        console.log("Début réception binaire (text):", controller.expectedSize, "octets");
                     }
                     return;
                 }
                 
                 var data = JSON.parse(message);
                 // Logs désactivés pour performance
-                // console.log(" Données parsées:", JSON.stringify(data, null, 2));
                 
                 // Mettre à jour les statistiques
                 controller.messageCount++
@@ -147,75 +155,54 @@ Item {
                 controller.lastMessageTime = now.toLocaleTimeString()
                 
                 // Logs désactivés pour performance
-                // console.log("🏷️ Type de message:", data.type || "AUCUN");
                 
                 // Gestion de la présence de la console
                 if (data.type === "CONSOLE_CONNECT") {
                     consoleConnected = true
                     if (controller.configController) controller.configController.consoleConnected = true
-                    console.log("🎛️ Console connectée - priorité activée")
                     return
                 }
                 if (data.type === "CONSOLE_DISCONNECT") {
                     consoleConnected = false
                     if (controller.configController) controller.configController.consoleConnected = false
-                    console.log("🎛️ Console déconnectée - retour mode autonome")
                     return
                 }
 
                 // AJOUTER : Traiter PARAM_UPDATE
                 if (data.type === "PARAM_UPDATE") {
-                    console.log("=== PARAM_UPDATE REÇU ===");
-                    console.log("configController défini?", controller.configController ? "OUI" : "NON");
-                    
-                    // Tester directement l'appel
-                    if (controller.configController) {
-                        console.log("Test direct getValueAtPath:", 
-                            controller.configController.getValueAtPath(["sirenConfig", "mode"], "default"));
-                    }
                     
                     if (!controller.configController) {
-                        console.error("❌ configController est null !");
                         return;
                     }
                     
                     if (!data.path || !Array.isArray(data.path)) {
-                        console.error("❌ Path invalide ou manquant:", data.path);
                         return;
                     }
                     
                     if (data.value === undefined) {
-                        console.error("❌ Value est undefined !");
                         return;
                     }
                     
                     // Afficher le chemin complet pour debug
-                    console.log("📍 Chemin complet:", data.path.join(" -> "));
                     
                     // Appeler setValueAtPath et logger le résultat
                     try {
                         // Transmettre la source pour éviter les renvois inutiles
                         var result = controller.configController.setValueAtPath(data.path, data.value, data.source || "console");
-                        console.log("✅ setValueAtPath résultat:", result ? "succès" : "échec");
                         
                         // Vérifier la valeur après modification
                         var newValue = controller.configController.getValueAtPath(data.path);
-                        console.log("📊 Nouvelle valeur lue:", newValue, "- Type:", typeof newValue);
                         
                         if (newValue !== data.value && typeof newValue !== typeof data.value) {
-                            console.log("⚠️ Conversion de type détectée:", typeof data.value, "->", typeof newValue);
                         }
                     } catch (e) {
-                        console.error("❌ Erreur dans setValueAtPath:", e);
                     }
                     
-                    console.log("=== FIN PARAM_UPDATE ===\n");
                     return;
                 }
                 
                 // Après le bloc PARAM_UPDATE
                 if (data.type === "CONFIG_FULL") {
-                    console.log("CONFIG_FULL reçu de PureData");
                     if (controller.configController && data.config) {
                         controller.configController.updateFullConfig(data.config);
                     }
@@ -238,7 +225,6 @@ Item {
                     }
                 }
             } catch (e) {
-                console.error("Erreur parsing JSON:", e);
             }
         }
         
@@ -246,18 +232,14 @@ Item {
             if (controller.debugMode || status === WebSocket.Error) { // Toujours logger les erreurs
                 switch(status) {
                     case WebSocket.Error:
-                        console.error("WebSocket error:", socket.errorString);
                         break;
                     case WebSocket.Open:
-                        console.log("WebSocket connected to", controller.serverUrl);
                         // Demander la configuration complète à PureData
                         controller.sendBinaryMessage({
                             type: "REQUEST_CONFIG"
                         });
-                        console.log("REQUEST_CONFIG envoyé à PureData");
                         break;
                     case WebSocket.Closed:
-                        console.log("WebSocket disconnected");
                         break;
                 }
             }
@@ -286,7 +268,6 @@ Item {
     function sendBinaryMessage(message) {
         if (socket.status === WebSocket.Open) {
             if (controller.debugMode) {
-                console.log("Envoi message binaire:", JSON.stringify(message));
             }
             // Convertir le JSON en string puis en binaire
             var jsonString = JSON.stringify(message);

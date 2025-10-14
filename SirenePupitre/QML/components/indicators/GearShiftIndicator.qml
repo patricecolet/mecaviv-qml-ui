@@ -10,11 +10,9 @@ Node {
     property string mode: "SEMITONE" // Mode actuel
     
     onModeChanged: {
-        console.log("🎛️ GearShiftIndicator - mode changed to:", mode)
     }
     
     onPositionChanged: {
-        console.log("🎛️ GearShiftIndicator - position changed to:", position)
     }
     
     // Propriétés visuelles

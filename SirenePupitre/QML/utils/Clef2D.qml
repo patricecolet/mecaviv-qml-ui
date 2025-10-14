@@ -7,7 +7,6 @@ Item {
         id: clefFont
         source: "qrc:/QML/fonts/NotoMusic-Regular.ttf"
         onStatusChanged: {
-            console.log("🎼 Clef2D FontLoader status:", status, "name:", name)
             root.updateTick++
         }
     }
@@ -16,7 +15,6 @@ Item {
         id: clefFallback
         source: "qrc:/QML/fonts/MusiSync.ttf"
         onStatusChanged: {
-            console.log("🎼 Clef2D Fallback FontLoader status:", status, "name:", name)
             root.updateTick++
         }
     }
@@ -58,7 +56,6 @@ Item {
         repeat: true
         running: clefFont.status !== FontLoader.Ready
         onTriggered: {
-            console.log("🎼 Clef2D probe - status:", clefFont.status, "name:", clefFont.name)
             if (clefFont.status === FontLoader.Ready) {
                 root.updateTick++
                 fontProbe.stop()
@@ -67,8 +64,6 @@ Item {
     }
 
     Component.onCompleted: {
-        console.log("🎼 Clef2D init - status:", clefFont.status, "name:", clefFont.name, "family:", clefFontFamily, "fallback:", fallbackAscii)
-        console.log("🎼 Clef2D PROPS:", clefScale, clefOffsetX, clefOffsetY)
     }
 
     // Largeur/hauteur calculées pour la zone du texte
@@ -86,7 +81,6 @@ Item {
             var _ = root.updateTick // force rebind quand la police change d'état
             var useAscii = root.fallbackAscii && !(clefFallback.status === FontLoader.Ready || clefFont.status === FontLoader.Ready)
             var t = useAscii ? (root.clefType === "treble" ? "G" : "F") : (root.clefType === "treble" ? "\uD834\uDD1E" : "\uD834\uDD22")
-            console.log("🎼 Clef2D PROPS:", root.clefScale, root.clefOffsetX, root.clefOffsetY)
             return t
         }
         color: root.clefColor

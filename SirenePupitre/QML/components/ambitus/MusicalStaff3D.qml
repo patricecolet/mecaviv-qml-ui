@@ -220,7 +220,6 @@ Node {
                 var dummy = configController.updateCounter;
                 var colorValue = configController.getValueAtPath(["displayConfig", "components", "musicalStaff", "cursor", "highlightColor"], "#FFFF00");
                 
-                console.log("🎨 Highlight color from config:", colorValue);
                 
                 // Si c'est une string hexadécimale
                 if (typeof colorValue === "string") {

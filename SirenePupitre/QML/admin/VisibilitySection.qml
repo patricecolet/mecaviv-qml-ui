@@ -95,7 +95,6 @@ Item {
                 }
                 
                 onSourceChanged: {
-                    console.log("Loading visibility section:", source)
                 }
             }
         }
@@ -104,7 +103,6 @@ Item {
     // Debug pour vérifier le chargement
     onConfigControllerChanged: {
         if (configController) {
-            console.log("VisibilitySection - configController maintenant disponible:", configController)
             
             // Forcer la mise à jour du Loader si nécessaire
             if (contentLoader.item) {

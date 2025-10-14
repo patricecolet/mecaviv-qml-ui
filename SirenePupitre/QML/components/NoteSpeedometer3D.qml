@@ -46,7 +46,6 @@ Node {
     }
     
     Component.onCompleted: {
-        console.log("🎰 NoteSpeedometer3D créé - Note MIDI:", currentNoteMidi)
         // Initialiser la rotation selon la note actuelle
         var noteInOctave = currentNoteMidi - Math.floor(currentNoteMidi / 12) * 12
         accumulatedRotation = -noteInOctave * degreesPerSemitone
@@ -115,7 +114,6 @@ Node {
                 eulerRotation.y: angle
                 
                 Component.onCompleted: {
-                    console.log("📝 Note", index, ":", noteName, "Angle:", angle, "°")
                 }
                 
                 // Texte de la note en LED 3D

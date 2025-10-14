@@ -8,16 +8,13 @@ Item {
     property var configController: null
     
     onConfigControllerChanged: {
-        console.log("AdminPanel - configController reçu:", configController)
     }
     property var webSocketController: null
     
     Component.onCompleted: {
-        console.log("AdminPanel créé - webSocketController:", webSocketController)
     }
     
     onWebSocketControllerChanged: {
-        console.log("AdminPanel - webSocketController changé:", webSocketController)
     }
         // Test temporaire
         

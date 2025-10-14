@@ -12,15 +12,12 @@ Node {
     
     // Ajoutez ces handlers de changement :
     onXValueChanged: {
-        console.log("[9] JoystickIndicator xValue changed:", Date.now(), "ms, value:", xValue);
     }
     
     onZValueChanged: {
-        console.log("[10] JoystickIndicator zValue changed:", Date.now(), "ms, value:", zValue);
     }
     
     Component.onCompleted: {
-        console.log("[INIT] JoystickIndicator créé");
     }
     // Paramètre de taille globale
     property real globalScale: 1.7  // Facteur d'échelle global de l'objet

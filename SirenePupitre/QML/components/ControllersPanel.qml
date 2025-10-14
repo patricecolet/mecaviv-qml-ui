@@ -244,7 +244,6 @@ Rectangle {
     
     // Fonction pour mettre à jour toutes les données
     function updateControllers(controllersData) {
-        // console.log("[5] ControllersPanel.updateControllers début:", Date.now(), "ms");
         
         if (controllersData.wheel) {
             wheelPosition = controllersData.wheel.position || 0
@@ -252,12 +251,10 @@ Rectangle {
         }
         
         if (controllersData.joystick) {
-            console.log("[6] Avant mise à jour joystick:", Date.now(), "ms");
             joystickX = (controllersData.joystick.x || 0) / 127.0
             joystickY = (controllersData.joystick.y || 0) / 127.0
             joystickZ = (controllersData.joystick.z || 0) / 127.0
             joystickButton = controllersData.joystick.button || false
-            console.log("[7] Après mise à jour joystick:", Date.now(), "ms");
         }
         
         if (controllersData.gearShift) {
@@ -280,6 +277,5 @@ Rectangle {
             padActive = controllersData.pad.active || false
         }
         
-        // console.log("[8] ControllersPanel.updateControllers fin:", Date.now(), "ms");
     }
 }

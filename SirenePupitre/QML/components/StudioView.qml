@@ -352,7 +352,6 @@ Rectangle {
         if (index < 0 || index >= controllers.length) return
         
         var controller = controllers[index]
-        console.log("Chargement de:", controller.file)
         
         // Supprimer l'ancien objet
         if (currentObject) {
@@ -375,51 +374,35 @@ Rectangle {
                 }
                 
                 // Debug
-                console.log("=== PROPRIÉTÉS ===")
-                console.log("position:", currentObject.position)
-                console.log("scale:", currentObject.scale)
-                console.log("eulerRotation:", currentObject.eulerRotation)
                 
                 // Debug spécifique pour WheelIndicator
                 if (controller.name === "Wheel Controller") {
-                    console.log("=== DEBUG WHEEL ===")
-                    console.log("CurrentObject:", currentObject)
-                    console.log("Enfants:", currentObject.children)
                     
                     // Parcourir les enfants
                     for (var i = 0; i < currentObject.children.length; i++) {
                         var child = currentObject.children[i]
-                        console.log("Enfant", i, ":", child, "visible:", child.visible)
                     }
                     
                     // Debug détaillé du premier enfant (Node rotatif)
                     if (currentObject.children.length > 0) {
-                        console.log("=== DEBUG NODE ROTATIF ===")
                         var rotatingNode = currentObject.children[0]
-                        console.log("Node rotatif:", rotatingNode)
-                        console.log("Nombre d'enfants:", rotatingNode.children.length)
                         
                         // Parcourir les enfants du node rotatif
                         for (var j = 0; j < rotatingNode.children.length; j++) {
                             var subChild = rotatingNode.children[j]
-                            console.log("  Sub-enfant", j, ":", subChild)
                             
                             // Vérifier les propriétés si possible
                             if (subChild.hasOwnProperty('radius')) {
-                                console.log("    radius:", subChild.radius)
                             }
                             if (subChild.hasOwnProperty('thickness')) {
-                                console.log("    thickness:", subChild.thickness)
                             }
                             if (subChild.hasOwnProperty('source')) {
-                                console.log("    source:", subChild.source)
                             }
                         }
                     }
                 }
             }
         } else {
-            console.error("Erreur lors du chargement:", component.errorString())
         }
     }
     

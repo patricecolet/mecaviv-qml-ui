@@ -4,6 +4,7 @@ import QtQuick.Controls
 import "../utils"
 import "../components"
 import "./ambitus"
+import "../game"
 
 Item {
     id: root
@@ -12,6 +13,9 @@ Item {
     property var sirenController: null
     property var sirenInfo: null
     property var configController: null
+    
+    // Propriété pour le mode jeu
+    property bool gameMode: false
     
     // Propriétés calculées depuis sirenController
     property real rpm: sirenController ? sirenController.trueRpm : 0  // Vraies valeurs
@@ -25,7 +29,6 @@ Item {
         if (!configController) return 0.8
         var dummy = configController.updateCounter // Force la réévaluation
         var scale = configController.getValueAtPath(["ui", "scale"], 0.8)
-        console.log("🎨 SirenDisplay - uiScale:", scale)
         return scale
     }
     // Approximation de la largeur projetée de la portée en pixels (centrée)
@@ -38,7 +41,6 @@ Item {
         // Mettre à jour la position GearShift pour l'ambitus
         if (controllersData.gearShift) {
             var newPosition = controllersData.gearShift.position || 0
-            console.log("🎛️ SirenDisplay - Mise à jour GearShift position:", newPosition)
             configController.gearShiftPosition = newPosition
         }
     }
@@ -46,12 +48,17 @@ Item {
     // Fonction pour changer de sirène
     function changeSiren(sirenId) {
         if (!configController || !configController.config) {
-            console.error("❌ ConfigController ou config non disponible")
             return
         }
         
-        console.log("🔄 Changement de sirène vers:", sirenId)
         configController.setValueAtPath(["sirenConfig", "currentSiren"], sirenId)
+    }
+    
+    // Fonction pour transmettre les événements MIDI au mode jeu
+    function sendMidiEventToGame(event) {
+        if (gameMode && gameModeComponent) {
+            gameModeComponent.midiEventReceived(event)
+        }
     }
     
     // Instance de MusicUtils
@@ -62,14 +69,6 @@ Item {
     // Propriété calculée pour la fréquence avec transposition (vraie valeur)
     property int frequency: sirenController ? sirenController.trueFrequency : 0
     
-    // Log uniquement quand sirenInfo change (pour debug si nécessaire)
-    onSirenInfoChanged: {
-        if (sirenInfo) {
-            console.log("SirenDisplay: Sirène mise à jour -", sirenInfo.name, 
-                       "| Clef:", sirenInfo.clef,
-                       "| Transposition:", sirenInfo.transposition)
-        }
-    }
     
     Rectangle {
         anchors.fill: parent
@@ -172,7 +171,7 @@ Item {
                 }
             }
             
-            // Zone centrale - Portée musicale
+            // Zone centrale - Portée musicale (toujours visible)
             Node {
                 y: 0 // Position centrale fixe
                 scale: Qt.vector3d(root.uiScale, root.uiScale, root.uiScale)
@@ -200,6 +199,16 @@ Item {
                     // Position TOUT EN HAUT
                     position: Qt.vector3d(0, 400, 100)
                 }
+            }
+            
+            // Mode Jeu (à l'intérieur du View3D)
+            GameMode {
+                id: gameModeComponent
+                configController: root.configController
+                sirenInfo: root.sirenInfo
+                currentNoteMidi: root.clampedNote
+                isGameModeActive: root.gameMode  // Lier au mode jeu
+                
             }
         }
         
@@ -387,8 +396,6 @@ Item {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        console.log("🖱️ Clic sur bouton FRETTÉ détecté")
-                        console.log("🔧 configController disponible:", !!configController)
                         if (configController) {
                             var currentSirenId = configController.getValueAtPath(["sirenConfig", "currentSiren"], "1")
                             var sirens = configController.getValueAtPath(["sirenConfig", "sirens"], [])
@@ -398,7 +405,6 @@ Item {
                             
                             if (currentSiren) {
                                 var currentValue = currentSiren.frettedMode?.enabled || false
-                                console.log("📊 Valeur actuelle frettedMode pour sirène", currentSirenId, ":", currentValue)
                                 
                                 // Trouver l'index de la sirène dans le tableau
                                 var sirenIndex = sirens.findIndex(function(siren) {
@@ -407,21 +413,15 @@ Item {
                                 
                                 if (sirenIndex >= 0) {
                                     var newValue = !currentValue
-                                    console.log("🔄 Tentative de basculement:", currentValue, "->", newValue)
                                     var success = configController.setValueAtPath(["sirenConfig", "sirens", sirenIndex, "frettedMode", "enabled"], newValue)
-                                    console.log("✅ setValueAtPath retourné:", success)
                                     
                                     // Vérifier immédiatement si la valeur a changé
                                     var updatedSirens = configController.getValueAtPath(["sirenConfig", "sirens"], [])
                                     var updatedSiren = updatedSirens[sirenIndex]
-                                    console.log("🔍 Vérification après modification:", updatedSiren.frettedMode?.enabled)
-                                    console.log("📊 UpdateCounter:", configController.updateCounter)
                                 }
                             } else {
-                                console.error("❌ Sirène actuelle non trouvée:", currentSirenId)
                             }
                         } else {
-                            console.error("❌ configController non disponible")
                         }
                     }
                 }
@@ -482,12 +482,7 @@ Item {
                 currentPosition: configController ? (configController.gearShiftPosition || 0) : 0
                 configController: root.configController
                 
-                // Debug
-                onCurrentPositionChanged: {
-                    console.log("🎛️ SirenDisplay - GearShift position transmise:", currentPosition)
-                }
             }
-
         }
 
         // Zone inférieure - Contrôleurs (peut être affiché/masqué)
@@ -501,7 +496,7 @@ Item {
             visible: {
                 if (!configController) return false
                 configController.updateCounter // Force la réévaluation
-                return configController.getValueAtPath(["controllersPanel", "visible"], false)
+                return configController.getValueAtPath(["controllersPanel", "visible"], false) && !root.gameMode
             }
         }
     }

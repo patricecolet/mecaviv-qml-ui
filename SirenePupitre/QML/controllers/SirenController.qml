@@ -32,7 +32,6 @@ QtObject {
     onConfigControllerChanged: {
         if (configController) {
             configController.ready.connect(function() {
-                console.log("Config prête, calcul initial")
                 calculate()
             })
         }
@@ -40,7 +39,6 @@ QtObject {
     
     function calculate() {
         if (!configController || !configController.currentSiren) {
-            console.log("Pas de configuration disponible")
             return
         }
         
@@ -81,7 +79,6 @@ QtObject {
         noteName = musicUtils.midiToNoteName(clampedNote)
         
         // Log désactivé pour performance
-        // console.log("Calcul - Sirène:", sirenName, "Note:", clampedNote, "(" + noteName + ")", "Freq:", frequency, "Hz", "RPM:", rpm, "Outputs:", siren.outputs)
     }
     
     // Méthode pour obtenir les infos actuelles (debug)

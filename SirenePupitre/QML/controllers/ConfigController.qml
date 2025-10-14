@@ -88,8 +88,6 @@ QtObject {
     
     Component.onCompleted: {
         // En WASM, la vraie config arrive via WebSocket depuis PureData
-        console.log("=== ConfigController initialisé ===");
-        console.log("⏳ Config par défaut chargée, attente de PureData pour la vraie config...");
         
         // Valeur par défaut
         mode = (config && config.mode) ? config.mode : "restricted"
@@ -98,7 +96,6 @@ QtObject {
         if (config.sirenConfig && config.sirenConfig.sirens && config.sirenConfig.sirens.length > 0) {
             var selected = selectSiren(config.sirenConfig.currentSiren)
             if (selected) {
-                console.log("✅ Config par défaut OK - Sirène:", currentSiren.name, "- Mode:", mode)
             }
         }
         
@@ -107,9 +104,6 @@ QtObject {
     
     // FONCTION GÉNÉRIQUE PRINCIPALE
     function setValueAtPath(path, value, source) {
-        console.log("\n=== ConfigController.setValueAtPath ===");
-        console.log("Path reçu:", JSON.stringify(path));
-        console.log("Value reçue:", value, "- Type:", typeof value, "- Source:", source || "local");
 
         // Bloquer les écritures locales si la console est connectée
         if (consoleConnected && (source === undefined || source !== "console")) {
@@ -118,7 +112,6 @@ QtObject {
         }
         
         if (!config) {
-            console.error("❌ config est null !");
             return false;  // Important: retourner false
         }
         
@@ -148,18 +141,14 @@ QtObject {
         // Conversion spéciale pour currentSiren
         if (path.join(".") === "sirenConfig.currentSiren" && typeof value === "number") {
             finalValue = value.toString();
-            console.log("🔄 Conversion spéciale currentSiren number->string:", value, "->", finalValue);
         }
         // Définir la valeur
         current[key] = finalValue
-        console.log("Config mise à jour:", path.join("."), ":", oldValue, "->", finalValue)
         
         // Si on modifie un élément d'un tableau (sirens), forcer une copie pour déclencher les bindings
         if (path[0] === "sirenConfig" && path[1] === "sirens" && typeof path[2] === "number") {
-            console.log("🔄 Modification dans tableau sirens détectée, forçage mise à jour...")
             var sirensCopy = JSON.parse(JSON.stringify(config.sirenConfig.sirens))
             config.sirenConfig.sirens = sirensCopy
-            console.log("✅ Tableau sirens copié pour forcer la détection de changement")
         }
         
         // Mise à jour des propriétés locales si nécessaire
@@ -179,7 +168,6 @@ QtObject {
         updateCounter++
         settingsUpdated()
         
-        console.log("=== Fin setValueAtPath ===\n");
         return true;  // IMPORTANT: Ajouter cette ligne
     }
     
@@ -292,7 +280,6 @@ QtObject {
             }
         }
         
-        console.log("🔍 Recherche de sirène - ID reçu:", id, "- Normalisé:", normalizedId)
         
         var sirens = config.sirenConfig.sirens
         for (var i = 0; i < sirens.length; i++) {
@@ -313,19 +300,11 @@ QtObject {
                         sirenId: normalizedId,
                         sirenNumber: parseInt(normalizedId)  // Convertir en nombre
                     })
-                    console.log("📡 WebSocket: Sirène sélectionnée envoyée - ID:", normalizedId, "Numéro:", parseInt(normalizedId))
                 }
                 
-                console.log("✅ Sirène sélectionnée:", currentSiren.name,
-                    "- Outputs:", currentSiren.outputs,
-                    "- Ambitus:", currentSiren.ambitus.min + "-" + currentSiren.ambitus.max,
-                    "- Transposition:", currentSiren.transposition,
-                    "- RestrictedMax:", currentSiren.restrictedMax)
                 return true
             }
         }
-        console.error("❌ Sirène non trouvée:", id, "- Normalisé:", normalizedId)
-        console.error("   Sirènes disponibles:", sirens.map(s => s.id + "(" + s.name + ")").join(", "))
         return false
     }
     
@@ -352,10 +331,6 @@ QtObject {
         return currentSirenInfo
     }
     function updateFullConfig(newConfig) {
-        console.log("Mise à jour complète de la configuration depuis PureData");
-        console.log("📦 Config reçue de PureData:");
-        console.log("  - displayConfig.components.musicalStaff:", JSON.stringify(newConfig.displayConfig?.components?.musicalStaff || "MANQUANT"));
-        console.log("  - displayConfig.controllers.scale:", newConfig.displayConfig?.controllers?.scale || "MANQUANT");
         
         // Remplacer toute la configuration
         config = newConfig;
@@ -370,6 +345,5 @@ QtObject {
         updateCounter++;
         settingsUpdated();
         
-        console.log("Configuration mise à jour avec succès");
     }   
 }

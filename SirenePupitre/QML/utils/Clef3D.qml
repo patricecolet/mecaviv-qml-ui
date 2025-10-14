@@ -32,7 +32,6 @@ Node {
     z: 0.1  // Légèrement devant les lignes de la portée
     
     Component.onCompleted: {
-        console.log("🎼 Clef3D - Type:", clefType, "- Position:", x, y, z, "- Scale:", clefScale)
     }
     
     // Modèle 3D avec origine (0,0) sur la ligne de référence
@@ -52,7 +51,6 @@ Node {
         }
         
         Component.onCompleted: {
-            console.log("🎨 Clef model loaded:", clefType, "from", source)
         }
     }
 }

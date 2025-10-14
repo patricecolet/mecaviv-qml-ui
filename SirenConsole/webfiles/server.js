@@ -112,6 +112,10 @@ const server = http.createServer(function (request, response) {
                         // Mettre à jour le playbackState
                         pureDataProxy.updatePlaybackFile(command.path);
                         
+                        // Envoyer le message MIDI_FILE_LOAD à PureData
+                        pureDataProxy.sendCommand(command);
+                        console.log('📤 MIDI_FILE_LOAD envoyé à PureData:', command.path);
+                        
                         // Envoyer les infos binaires
                         const fileInfoBuffer = createFileInfoBuffer(midiInfo.duration, midiInfo.totalBeats);
                         pureDataProxy.broadcastBinaryToClients(fileInfoBuffer);
@@ -150,8 +154,11 @@ const server = http.createServer(function (request, response) {
                     
                     // Envoyer aussi à PureData pour synchronisation
                     if (success) {
+                        // Ajouter la position en ticks
+                        const state = midiSequencer.getState();
+                        command.position = Math.floor(state.beat * midiSequencer.ppq);
                         pureDataProxy.sendCommand(command);
-                        console.log('📤 Transport envoyé à PureData:', command.action);
+                        console.log('📤 Transport envoyé à PureData:', command.action, '- Position:', command.position, 'ticks');
                     }
                     
                 } else if (command.type === 'MIDI_SEEK' && command.position !== undefined) {

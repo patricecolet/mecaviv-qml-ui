@@ -18,11 +18,6 @@ Window {
     FontLoader {
         id: emojiFont
         source: "qrc:/fonts/NotoEmoji-VariableFont_wght.ttf"
-        onStatusChanged: {
-            if (status === FontLoader.Ready) {
-                console.log("✅ [Global] Police Emoji chargée:", name)
-            }
-        }
     }
     
     // Rendre la police accessible globalement
@@ -51,7 +46,6 @@ Window {
         
         // Utiliser le signal existant pour tout
         onSettingsUpdated: {
-            console.log("Configuration mise à jour")
             // L'interface se met à jour automatiquement grâce aux bindings
         }
         
@@ -80,16 +74,30 @@ Window {
         onDataReceived: function(data) {
             // Logs désactivés pour performance
             
+            // Si c'est une note de séquence (binaire 3 bytes), aller uniquement au mode jeu
+            if (data.isSequence) {
+                if (display.gameMode) {
+                    display.sendMidiEventToGame(data)
+                }
+                return
+            }
+            
+            // Sinon, traiter les contrôleurs et la note actuelle (JSON)
             if (data.midiNote !== undefined) {
                 sirenController.midiNote = data.midiNote
             }
             if (data.controllers) {
                 display.updateControllers(data.controllers)
             }
+            
+            // Si mode jeu actif, transmettre aussi au mode jeu
+            if (display.gameMode) {
+                display.sendMidiEventToGame(data)
+            }
         }
         
         onConfigReceived: function(config) {
-            console.log("Configuration reçue via WebSocket:", JSON.stringify(config))
+            // Configuration reçue
         }
     }
     
@@ -124,28 +132,24 @@ Window {
         configController: configController  // Vérifiez que c'est bien là
         webSocketController: webSocketController  // Vérifiez que c'est bien là
         
-        Component.onCompleted: {
-            console.log("AdminPanel Component.onCompleted - configController:", configController)
-            console.log("AdminPanel Component.onCompleted - webSocketController:", webSocketController)
-        }
         
         onClose: {
             adminPanel.visible = false
         }
     }
     
-    // Bouton pour basculer entre les modes
+    // Bouton pour basculer en mode jeu
     Rectangle {
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: 20
         width: 120
         height: 40
-        color: "#2a2a2a"
-        border.color: studioMode ? "#00ff00" : "#FFD700"
+        color: display.gameMode ? "#00CED1" : "#2a2a2a"
+        border.color: "#00CED1"
+        border.width: 2
         radius: 5
         visible: {
-            if (isAdminMode) return false
             if (!configController) return true
             var dummy = configController.updateCounter
             return configController.isComponentVisible("studioButton")
@@ -153,13 +157,16 @@ Window {
         
         MouseArea {
             anchors.fill: parent
-            onClicked: studioMode = !studioMode
+            onClicked: {
+                display.gameMode = !display.gameMode
+            }
         }
         
         Text {
-            text: studioMode ? "Mode Normal" : "Mode Studio"
-            color: "white"
+            text: display.gameMode ? "Mode Normal" : "Mode Jeu"
+            color: display.gameMode ? "#000" : "#00CED1"
             font.pixelSize: 14
+            font.bold: true
             anchors.centerIn: parent
         }
     }
@@ -188,7 +195,6 @@ Window {
                 if (configController) {
                     var currentValue = configController.getValueAtPath(["controllersPanel", "visible"], false)
                     configController.setValueAtPath(["controllersPanel", "visible"], !currentValue)
-                    console.log("Panneau contrôleurs basculé:", !currentValue)
                 }
             }
         }
@@ -220,12 +226,9 @@ Window {
             cursorShape: Qt.PointingHandCursor
             
             onClicked: {
-                console.log("Bouton admin cliqué")
-                console.log("Ouverture du panneau admin")
                 if (configController.getValueAtPath(["admin", "enabled"], true)) {
                     adminPanel.visible = true
                 } else {
-                    console.log("Accès admin désactivé par configuration")
                 }
             }
         }

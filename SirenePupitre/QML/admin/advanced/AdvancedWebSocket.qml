@@ -10,14 +10,10 @@ GroupBox {
     
     // Ajoutons un debug pour vérifier
     Component.onCompleted: {
-        console.log("AdvancedWebSocket créé")
     }
     
     onWebSocketControllerChanged: {
-        console.log("AdvancedWebSocket - webSocketController changé:", webSocketController)
         if (webSocketController) {
-            console.log("- connected:", webSocketController.connected)
-            console.log("- serverUrl:", webSocketController.serverUrl)
         }
     }
     
