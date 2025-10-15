@@ -17,10 +17,21 @@ Composant qui affiche une ligne mélodique composée de cubes 3D qui tombent.
   - **Couleur** : Dépend de la hauteur de la note (bleu → rouge)
 
 ### `FallingCube.qml`
-Composant pour un cube qui tombe.
+Composant pour un cube qui tombe (version simple avec shader).
 - Animation de chute depuis `spawnHeight` jusqu'à `targetY`
 - Vitesse de chute : `fallSpeed` (150 par défaut)
 - Auto-destruction quand il atteint la cible
+- Modulations tremolo/vibrato via shaders
+
+### `FallingNoteCustomGeo.qml`
+Composant avancé avec géométrie C++ custom pour visualisation ADSR complète.
+- **Géométrie custom** : `TaperedBoxGeometry` (C++)
+- **Enveloppe ADSR** visualisée en 3D :
+  - **Attack** : Pyramide inversée en bas (pointe vers le bas)
+  - **Sustain** : Cube central (hauteur variable)
+  - **Release** : Pyramide effilée en haut (pointe vers le haut)
+- **Modulations** tremolo/vibrato proportionnelles au sustain
+- **Contrôle MIDI CC** pour tous les paramètres
 
 ### `GameMode.qml`
 Vue du mode jeu qui affiche :
@@ -159,12 +170,84 @@ PrincipledMaterial {
 }
 ```
 
+## 🎼 Enveloppe ADSR et Modulations (Custom Geometry)
+
+### Architecture C++/QML
+
+**Classe C++ : `TaperedBoxGeometry`**
+- Hérite de `QQuick3DGeometry`
+- Génère une géométrie custom : Attack (pyramide inversée) + Sustain (cube) + Release (pyramide)
+- 18 vertices, 18 triangles
+- Propriétés exposées : `attackHeight`, `sustainHeight`, `releaseHeight`, `width`, `depth`
+
+**Fichiers C++ :**
+- `taperedboxgeometry.h` : Déclaration de la classe
+- `taperedboxgeometry.cpp` : Génération de la géométrie
+- `main.cpp` : Enregistrement QML avec `qmlRegisterType`
+
+### Visualisation ADSR
+
+```
+      ___           <- Release (pyramide, hauteur variable)
+     /   \
+    /     \
+   |-------|         <- Sustain (cube, hauteur = duration - attack)
+   |       |
+   |       |
+    \     /
+     \___/           <- Attack (pyramide inversée, hauteur variable)
+```
+
+**Logique des hauteurs :**
+- `totalDurationHeight` = durée de la note (MIDI duration) convertie en unités visuelles
+- `attackHeight` = min(`attackTime` converti, 95% de `totalDurationHeight`)
+- `sustainHeight` = `totalDurationHeight - attackHeight`
+- `releaseHeight` = `releaseTime` converti (s'AJOUTE, ne fait pas partie de duration)
+- **Total affiché** = `attackHeight + sustainHeight + releaseHeight`
+
+**Compensation de scale :**
+- Le scale Y = `sustainHeight * cubeSize / 20`
+- Les hauteurs de pyramides sont divisées par ce scale en C++ pour garder une taille absolue constante/proportionnelle
+
+### Contrôle MIDI CC
+
+**Format binaire :** `[0x05, CC_number, value]` (3 bytes)
+
+| CC# | Paramètre | Conversion | Plage |
+|-----|-----------|------------|-------|
+| 1 | Vibrato Amount | `value/127 * 2.0` | 0.0 - 2.0 |
+| 9 | Vibrato Rate | `1.0 + value/127 * 9.0` | 1.0 - 10.0 Hz |
+| 15 | Tremolo Rate | `1.0 + value/127 * 9.0` | 1.0 - 10.0 Hz |
+| 72 | Release Time | `value/127 * 2000` | 0 - 2000 ms |
+| 73 | Attack Time | `value/127 * 500` | 0 - 500 ms |
+| 92 | Tremolo Amount | `value/127 * 0.3` | 0.0 - 0.3 |
+
+**Flux des CC :**
+1. WebSocket reçoit `[0x05, CC#, value]`
+2. `WebSocketController` émet `controlChangeReceived(ccNumber, ccValue)`
+3. `Main.qml` → `GameMode.handleControlChange()`
+4. `GameMode` → `MelodicLine3D` (propriétés)
+5. `MelodicLine3D` → `FallingNoteCustomGeo` (à la création)
+6. `CustomMaterial` utilise les valeurs pour les shaders
+
+### Modulations proportionnelles
+
+**Problème résolu :** Les modulations étaient trop fortes sur les petits cubes (sustain court).
+
+**Solution :** Facteur `sustainHeightNormalized` passé au shader
+```glsl
+float sustainFactor = clamp(sustainHeightNormalized / 75.0, 0.2, 1.0);
+tremoloAmount *= sustainFactor;
+vibratoAmount *= sustainFactor;
+```
+- Sustain petit (15) → modulations à 20%
+- Sustain normal (75) → modulations à 100%
+
 ## 🚀 Prochaines étapes
 
-1. **Améliorer l'encodage visuel**
-   - Ajouter le serpentin pour le vibrato
-   - Ajouter la visibilité alternée pour le tremolo
-   - Ajouter des effets visuels (particules, éclats)
+1. **Améliorer l'éclairage**
+   - Ajouter lumière ambiante pour uniformiser les pyramides attack/release
+   - Ajuster DirectionalLight pour meilleur rendu
 
 2. **Ajouter le scoring**
    - Détecter quand un cube atteint la note
@@ -221,5 +304,5 @@ PrincipledMaterial {
 ---
 
 **Créé le** : 13 janvier 2025  
-**Dernière mise à jour** : 13 janvier 2025 (v2 - Système de durée et alignement)
+**Dernière mise à jour** : 15 octobre 2025 (v3 - Enveloppe ADSR complète avec géométrie C++ custom + contrôle MIDI CC)
 
