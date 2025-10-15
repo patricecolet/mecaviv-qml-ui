@@ -104,23 +104,24 @@ Node {
     
     // Fonction pour traiter les événements MIDI
     function processMidiEvents() {
-    console.log("🎵 processMidiEvents - sirenInfo:", sirenInfo, "ambitusMin:", ambitusMin, "ambitusMax:", ambitusMax)
-    
         var segments = []
         
         for (var i = 0; i < midiEvents.length; i++) {
             var event = midiEvents[i]
             
-            // Créer un segment pour chaque événement
-            segments.push({
-                timestamp: event.timestamp,
-                note: event.note,
-                velocity: event.velocity,
-                x: 0,  // Position X (sera calculée selon le temps)
-                vibrato: event.controllers ? event.controllers.modPedal > 64 : false,
-                tremolo: event.controllers ? event.controllers.pad > 0 : false,
-                volume: event.velocity / 127.0
-            })
+            // Créer un segment UNIQUEMENT au noteOn (velocity > 0)
+            if (event.velocity > 0) {
+                segments.push({
+                    timestamp: event.timestamp,
+                    note: event.note,
+                    velocity: event.velocity,
+                    duration: event.duration ?? 500,  // Utiliser la durée du paquet, ou 500ms par défaut
+                    x: 0,
+                    vibrato: event.controllers ? event.controllers.modPedal > 64 : false,
+                    tremolo: event.controllers ? event.controllers.pad > 0 : false,
+                    volume: event.velocity / 127.0
+                })
+            }
         }
         
         return segments
@@ -161,10 +162,11 @@ Node {
     onMidiEventReceived: function(event) {
         // Ajouter l'événement à la liste
         addMidiEvent({
-            timestamp: event.timestamp || Date.now(),
-            note: event.note || event.midiNote || 60,
+            timestamp: event.timestamp ?? Date.now(),
+            note: event.note ?? event.midiNote ?? 60,
             velocity: event.velocity ?? 100,
-            controllers: event.controllers || {}
+            duration: event.duration ?? 500,  // Durée en ms
+            controllers: event.controllers ?? {}
         })
     }
     

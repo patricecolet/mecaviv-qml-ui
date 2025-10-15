@@ -38,17 +38,19 @@ Item {
             try {
                 var bytes = new Uint8Array(message);
                 
-                // Format binaire simple pour les notes MIDI (3 bytes)
-                if (bytes.length === 3 && bytes[0] === 0x03) {
-                    // Format: [0x03, note, velocity] - LE SERVEUR ENVOIE NOTE PUIS VELOCITY !
+                // Format binaire optimisé pour les notes MIDI avec durée (5 bytes)
+                if (bytes.length === 5 && bytes[0] === 0x04) {
+                    // Format: [0x04, note, velocity, duration_lsb, duration_msb]
                     var note = bytes[1];
                     var velocity = bytes[2];
+                    var duration = bytes[3] + (bytes[4] << 8);  // Durée en ms (16 bits, max 65535ms = 65.5s)
                     
-                    // Créer l'objet événement avec flag "sequence"
+                    // Créer l'objet événement avec durée
                     var event = {
                         midiNote: note,
                         note: note,
                         velocity: velocity,
+                        duration: duration,
                         timestamp: Date.now(),
                         controllers: {},
                         isSequence: true  // Flag pour différencier séquence/contrôleurs

@@ -141,7 +141,7 @@ Item {
             
             // Zone supérieure - Afficheurs numériques
             Node {
-                y: 270 // Position haute fixe
+                y: root.gameMode ? -270 : 270
                 scale: Qt.vector3d(1.5 * root.uiScale, 1.5 * root.uiScale, 1.5 * root.uiScale)
                 
                 NumberDisplay3D {
@@ -206,7 +206,7 @@ Item {
                     ambitusMax: root.sirenInfo ? root.sirenInfo.ambitus.max : 86
                     
                     // Position TOUT EN HAUT
-                    position: Qt.vector3d(0, 400, 100)
+                    position: Qt.vector3d(0, root.gameMode ? -400 : 400, 100)
                 }
             }
         }

@@ -329,6 +329,7 @@ Le **premier byte** de chaque message binaire identifie son type :
 | CONFIG | 0x00 | Configuration complète (JSON) | Variable (8 bytes header + données) |
 | MIDI_NOTE | 0x01 | Note MIDI + Pitch Bend combinés | 5 bytes |
 | CONTROLLERS | 0x02 | États contrôleurs | 15 bytes |
+| MIDI_NOTE_DURATION | 0x04 | Note MIDI avec durée (optimisé mode jeu) | 5 bytes |
 
 **Note MIDI avec micro-tonalité (type 0x01)** :
 ```
@@ -356,6 +357,41 @@ Le **premier byte** de chaque message binaire identifie son type :
    │     └─────────────────── Note: 69 (La4)
    └───────────────────────── Type: MIDI_NOTE
 ```
+
+**Note MIDI avec durée (type 0x04) - OPTIMISÉ POUR LE MODE JEU** :
+```
+[0x04, note, velocity, duration_lsb, duration_msb]
+   │     │       │         │            │
+   │     │       │         │            └─ Durée MSB (valeur haute)
+   │     │       │         └──────────────── Durée LSB (valeur basse)
+   │     │       └────────────────────────── Vélocité (0-127)
+   │     └────────────────────────────────── Note MIDI (0-127)
+   └──────────────────────────────────────── Type: MIDI_NOTE_DURATION
+```
+
+**Calcul de la durée** :
+- Durée LSB : byte 3 (0-255)
+- Durée MSB : byte 4 (0-255)
+- Durée totale : `duration_lsb + (duration_msb << 8)` en millisecondes
+- Range : 0-65535 ms (0-65.5 secondes)
+
+**Exemples** :
+```
+[0x04, 0x45, 0x64, 0x20, 0x03]
+   │     │     │     │     │
+   │     │     │     │     └─ Durée MSB: 0x03
+   │     │     │     └─────── Durée LSB: 0x20
+   │     │     └───────────── Vélocité: 100
+   │     └─────────────────── Note: 69 (La4)
+   └───────────────────────── Type: MIDI_NOTE_DURATION
+   Durée: 0x20 + (0x03 << 8) = 32 + 768 = 800ms
+```
+
+**Avantages du format 0x04** :
+- **20x plus compact** que JSON (~5 bytes vs ~100+ bytes)
+- **Parsing ultra-rapide** (pas de JSON.parse)
+- **Parfait pour le mode jeu** avec beaucoup de notes
+- **Durée précise** pour la hauteur des cubes
 
 **3. Dans ConfigController**, la méthode d'envoi devra être adaptée** :
 

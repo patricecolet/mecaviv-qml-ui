@@ -31,9 +31,9 @@ Node {
     
 // Fonction pour convertir une note MIDI en position Y sur la portée
 function noteToY(note) {
-    // Ne pas appliquer octaveOffset car les notes envoyées sont déjà dans le bon registre
-    var y = noteCalc.calculateNoteYPosition(note, lineSpacing, clef)
-    console.log("🎵 noteToY - note:", note, "Y:", y)
+    // Appliquer octaveOffset comme dans AmbitusDisplay3D pour que les cubes atteignent les notes
+    var offsetNote = note + (octaveOffset * 12)
+    var y = noteCalc.calculateNoteYPosition(offsetNote, lineSpacing, clef)
     return y
 }
 function noteToX(note) {
@@ -44,7 +44,7 @@ function noteToX(note) {
     var effectiveStaffWidth = staffWidth - ambitusOffset
     var x = noteCalc.calculateNoteXPosition(note, ambitusMin, ambitusMax, staffPosX, effectiveStaffWidth)
     
-    console.log("🎵 noteToX - note:", note, "ambitusMin:", ambitusMin, "ambitusMax:", ambitusMax, "staffPosX:", staffPosX, "effectiveStaffWidth:", effectiveStaffWidth, "X:", x.toFixed(1))
+    //console.log("🎵 noteToX - note:", note, "ambitusMin:", ambitusMin, "ambitusMax:", ambitusMax, "staffPosX:", staffPosX, "effectiveStaffWidth:", effectiveStaffWidth, "X:", x.toFixed(1))
     return x
 }
 
@@ -71,7 +71,8 @@ function noteToX(note) {
             "spawnHeight": root.spawnHeight,
             "fallSpeed": root.fallSpeed,
             "cubeColor": noteToColor(segment.note),
-            "velocity": vel
+            "velocity": vel,
+            "duration": segment.duration ?? 1000  // Durée en ms (utiliser ?? au lieu de ||)
         })
     }
     
