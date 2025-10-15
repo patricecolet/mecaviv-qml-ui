@@ -25,7 +25,7 @@ Node {
     // Component pour créer les cubes (créé une seule fois)
     Component {
         id: cubeComponent
-        FallingCube {
+        FallingNote {
         }
     }
     
