@@ -73,6 +73,9 @@ Model {
             property real tremoloSpeed: 4.0  // 4 Hz
             property real vibratoSpeed: 5.0  // 5 Hz
             
+            // Hauteur du sustain pour modulation proportionnelle
+            property real sustainHeightNormalized: noteModel.sustainHeight
+            
             shadingMode: CustomMaterial.Shaded
             
             // Animation continue du temps pour les oscillations
