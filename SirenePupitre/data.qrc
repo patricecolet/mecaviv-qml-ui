@@ -54,6 +54,14 @@
         <file>QML/game/MelodicLine3D.qml</file>
         <file>QML/game/GameMode.qml</file>
         <file>QML/game/FallingCube.qml</file>
+        <file>QML/game/shaders/bend.vert</file>
+        <file>QML/game/shaders/squash.vert</file>
+        <file>QML/game/shaders/bend_uniform.vert</file>
+        <file>QML/game/shaders/tremolo.vert</file>
+        <file>QML/game/shaders/vibrato.vert</file>
+        <file>QML/game/shaders/tremolo_vibrato.vert</file>
+        <file>QML/game/shaders/tremolo_vibrato_release.vert</file>
+        <file>QML/game/shaders/bend.frag</file>
         <file>QML/game/README.md</file>
     </qresource>
     

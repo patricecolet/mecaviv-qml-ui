@@ -14,30 +14,78 @@ Model {
     property real duration: 1000  // Durée en ms
     
     // Position
-    property real currentY: spawnHeight + cubeHeight * 50.0
+    property real currentY: spawnHeight + cubeHeight
     property real currentX: targetX
     property real cubeZ: -50
     property real cubeSize: 0.4  // Taille proportionnelle à la vélocité
     
     // Calculer la hauteur du cube basée sur la durée
-    property real cubeHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed / 100.0)
+    property real cubeHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed / 2.0)
     
     // Position du cube - currentY représente la position du CENTRE du cube
     position: Qt.vector3d(currentX, currentY, cubeZ)
     scale: Qt.vector3d(
         (velocity / 127.0 * 0.8 + 0.2) * cubeSize,  // Largeur selon vélocité
-        cubeHeight,  // Hauteur selon durée
+        cubeHeight*cubeSize/20,  // Hauteur selon durée
         cubeSize     // Profondeur fixe
     )
     
     source: "#Cube"
     
     materials: [
-        PrincipledMaterial {
-            baseColor: cubeColor
-            metalness: 0.7
-            roughness: 0.2
-            emissiveFactor: 0.5
+        CustomMaterial {
+            id: cubeMaterial
+            
+            // ===== CHOIX DU SHADER =====
+            // Décommente celui que tu veux tester :
+            
+            // EFFETS MUSICAUX (recommandés)
+            // ---------------------------
+            // Tremolo seul (pulsation de largeur)
+            //vertexShader: "shaders/tremolo.vert"
+            
+            // Vibrato seul (ondulation latérale)
+            //vertexShader: "shaders/vibrato.vert"
+            
+            // Tremolo + Vibrato combinés (contrôle séparé)
+            vertexShader: "shaders/tremolo_vibrato.vert"
+            
+            // AUTRES EFFETS
+            // -------------
+            // Squash & Stretch (élastique cartoon)
+            //vertexShader: "shaders/squash.vert"
+            
+            // Bend uniforme (courbure douce)
+            //vertexShader: "shaders/bend_uniform.vert"
+            
+            // Balancement simple (oscillation globale)
+            //vertexShader: "shaders/bend.vert"
+            
+            fragmentShader: "shaders/bend.frag"
+            
+            property color baseColor: cubeColor
+            property real metalness: 0.7
+            property real roughness: 0.2
+            property real time: 0  // Temps pour l'animation (en ms)
+            
+            // Intensités des effets musicaux (0.0 = désactivé, 0.15 = standard, 0.3 = fort)
+            property real tremoloIntensity: 0.15  // Variation de largeur
+            property real vibratoIntensity: 1.12  // Ondulation latérale
+            
+            // Fréquences (vitesse) des effets musicaux (Hz)
+            property real tremoloSpeed: 4.0  // 4 Hz = 4 oscillations/seconde (standard)
+            property real vibratoSpeed: 5.0  // 5 Hz = 5 oscillations/seconde (standard)
+            
+            shadingMode: CustomMaterial.Shaded
+            
+            // Animation continue du temps pour les oscillations
+            NumberAnimation on time {
+                from: 0
+                to: 100000  // Grande valeur pour que ça continue longtemps
+                duration: 100000
+                running: true
+                loops: Animation.Infinite
+            }
         }
     ]
     
@@ -51,8 +99,8 @@ Model {
     NumberAnimation on currentY {
         id: fallAnimation
         from: currentY  // Le centre du cube est à spawnHeight au début
-        to: targetY - cubeHeight * 50.0  // Le haut du cube est à targetY à la fin
-        duration: Math.max(200, (spawnHeight - (targetY - cubeHeight / 2)) / fallSpeed * 1000)
+        to: targetY - cubeHeight // Le haut du cube est à targetY à la fin
+        duration: Math.max(100, (spawnHeight - (targetY - cubeHeight*2)) / fallSpeed * 1000)
         running: false  // Ne pas démarrer automatiquement
         
         onFinished: {
