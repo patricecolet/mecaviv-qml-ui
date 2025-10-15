@@ -18,6 +18,14 @@ Node {
     property real spawnHeight: 500  // Hauteur de départ
     property int octaveOffset: 0 
     property string clef: "treble"
+    
+    // Paramètres MIDI CC (reçus depuis GameMode)
+    property real vibratoAmount: 1.12
+    property real vibratoRate: 5.0
+    property real tremoloAmount: 0.15
+    property real tremoloRate: 4.0
+    property real attackTime: 100
+    property real releaseTime: 200
     // Propriétés calculées
     readonly property real ambitusRange: ambitusMax - ambitusMin
     readonly property real staffHeight: ambitusRange * lineSpacing
@@ -72,7 +80,14 @@ function noteToX(note) {
             "fallSpeed": root.fallSpeed,
             "cubeColor": noteToColor(segment.note),
             "velocity": vel,
-            "duration": segment.duration ?? 1000  // Durée en ms (utiliser ?? au lieu de ||)
+            "duration": segment.duration ?? 1000,  // Durée en ms
+            // Paramètres MIDI CC
+            "attackTime": root.attackTime,
+            "releaseTime": root.releaseTime,
+            "vibratoAmount": root.vibratoAmount,
+            "vibratoRate": root.vibratoRate,
+            "tremoloAmount": root.tremoloAmount,
+            "tremoloRate": root.tremoloRate
         })
     }
     

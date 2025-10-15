@@ -14,8 +14,14 @@ Model {
     property color cubeColor: "#00CED1"
     property real velocity: 127  // Vélocité de la note (0-127)
     property real duration: 1000  // Durée en ms
-    property real attackTime: 500  // Durée de l'attaque en ms
-    property real releaseTime: 1000  // Durée du release en ms
+    property real attackTime: 100  // Durée de l'attaque en ms (contrôlée par CC73)
+    property real releaseTime: 200  // Durée du release en ms (contrôlée par CC72)
+    
+    // Paramètres de modulation (contrôlés par MIDI CC)
+    property real vibratoAmount: 1.12  // CC1
+    property real vibratoRate: 5.0     // CC9
+    property real tremoloAmount: 0.15  // CC92
+    property real tremoloRate: 4.0     // CC15
     
     // Propriétés calculées
     property real cubeZ: -50
@@ -61,17 +67,17 @@ Model {
             fragmentShader: "shaders/bend.frag"
             
             property color baseColor: cubeColor
-            property real metalness: 0.7
-            property real roughness: 0.2
+            property real metalness: 1.0
+            property real roughness: 0.5
             property real time: 0  // Temps pour l'animation (en ms)
             
-            // Intensités des effets musicaux
-            property real tremoloIntensity: 0.15  // Variation de largeur
-            property real vibratoIntensity: 1.12  // Ondulation latérale
+            // Intensités des effets musicaux (contrôlées par MIDI CC)
+            property real tremoloIntensity: noteModel.tremoloAmount  // CC92
+            property real vibratoIntensity: noteModel.vibratoAmount  // CC1
             
-            // Fréquences (vitesse) des effets musicaux (Hz)
-            property real tremoloSpeed: 4.0  // 4 Hz
-            property real vibratoSpeed: 5.0  // 5 Hz
+            // Fréquences (vitesse) des effets musicaux (contrôlées par MIDI CC)
+            property real tremoloSpeed: noteModel.tremoloRate  // CC15
+            property real vibratoSpeed: noteModel.vibratoRate  // CC9
             
             // Hauteur du sustain pour modulation proportionnelle
             property real sustainHeightNormalized: noteModel.sustainHeight

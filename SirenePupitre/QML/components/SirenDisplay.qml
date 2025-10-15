@@ -16,6 +16,7 @@ Item {
     
     // Propriété pour le mode jeu
     property bool gameMode: false
+    property alias gameModeComponent: gameModeComponent  // Exposer le GameMode pour les connexions externes
     
     // Propriétés calculées depuis sirenController
     property real rpm: sirenController ? sirenController.trueRpm : 0  // Vraies valeurs
@@ -86,6 +87,14 @@ Item {
                 backgroundMode: SceneEnvironment.Color
                 antialiasingMode: SceneEnvironment.SSAA
                 antialiasingQuality: SceneEnvironment.High
+            }
+            
+            // Éclairage global pour uniformiser l'éclairage des pyramides attack/release
+            DirectionalLight {
+                eulerRotation.x: -30  // Pointe vers le bas avec un angle
+                eulerRotation.y: 0
+                brightness: 1.2  // Lumière forte
+                ambientColor: Qt.rgba(0.4, 0.4, 0.4, 1.0)  // Composante ambiante forte
             }
             
             PerspectiveCamera {
