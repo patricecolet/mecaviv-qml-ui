@@ -215,12 +215,12 @@ PrincipledMaterial {
 
 | CC# | Paramètre | Conversion | Plage |
 |-----|-----------|------------|-------|
-| 1 | Vibrato Amount | `value/127 * 2.0` | 0.0 - 2.0 |
-| 9 | Vibrato Rate | `1.0 + value/127 * 9.0` | 1.0 - 10.0 Hz |
-| 15 | Tremolo Rate | `1.0 + value/127 * 9.0` | 1.0 - 10.0 Hz |
-| 72 | Release Time | `value/127 * 2000` | 0 - 2000 ms |
-| 73 | Attack Time | `value/127 * 500` | 0 - 500 ms |
-| 92 | Tremolo Amount | `value/127 * 0.3` | 0.0 - 0.3 |
+| 1 | Vibrato Amount | `value/127 * 4.0` | 0.0 - 4.0 |
+| 9 | Vibrato Rate | `1.0 + value/127 * 19.0` | 1.0 - 20.0 Hz |
+| 15 | Tremolo Rate | `1.0 + value/127 * 19.0` | 1.0 - 20.0 Hz |
+| 72 | Release Time | `value/127 * 4000` | 0 - 4000 ms |
+| 73 | Attack Time | `value/127 * 1000` | 0 - 1000 ms |
+| 92 | Tremolo Amount | `value/127 * 0.6` | 0.0 - 0.6 |
 
 **Flux des CC :**
 1. WebSocket reçoit `[0x05, CC#, value]`

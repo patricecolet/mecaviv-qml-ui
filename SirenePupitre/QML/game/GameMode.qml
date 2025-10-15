@@ -187,27 +187,29 @@ Node {
     
     // Gérer les Control Change MIDI
     function handleControlChange(ccNumber, ccValue) {
-        // Normaliser la valeur MIDI (0-127)
-        var normalized = ccValue / 127.0;
+        // Sécurité : clamp à 0-127 (plage MIDI valide)
+        var clampedValue = Math.max(0, Math.min(127, ccValue));
+        // Normaliser la valeur MIDI (0-127 → 0.0-1.0)
+        var normalized = clampedValue / 127.0;
         
         switch(ccNumber) {
             case 1:  // Vibrato Amount
-                vibratoAmount = normalized * 2.0;  // 0.0 à 2.0
+                vibratoAmount = normalized * 4.0;  // 0.0 à 4.0 (×2)
                 break;
             case 9:  // Vibrato Rate
-                vibratoRate = 1.0 + normalized * 9.0;  // 1.0 à 10.0 Hz
+                vibratoRate = 1.0 + normalized * 19.0;  // 1.0 à 20.0 Hz (×2)
                 break;
             case 92:  // Tremolo Amount
-                tremoloAmount = normalized * 0.3;  // 0.0 à 0.3
+                tremoloAmount = normalized * 0.6;  // 0.0 à 0.6 (×2)
                 break;
             case 15:  // Tremolo Rate
-                tremoloRate = 1.0 + normalized * 9.0;  // 1.0 à 10.0 Hz
+                tremoloRate = 1.0 + normalized * 19.0;  // 1.0 à 20.0 Hz (×2)
                 break;
             case 73:  // Attack Time
-                attackTime = normalized * 500.0;  // 0 à 500ms
+                attackTime = normalized * 1000.0;  // 0 à 1000ms (×2)
                 break;
             case 72:  // Release Time
-                releaseTime = normalized * 2000.0;  // 0 à 2000ms
+                releaseTime = normalized * 4000.0;  // 0 à 4000ms (×2)
                 break;
         }
     }

@@ -58,42 +58,42 @@ duration_ms = duration_lsb + (duration_msb << 8)
 [0x05, 0x01, 0x40]
 ```
 - CC: 1 (0x01) - Vibrato Amount
-- Valeur: 64 (0x40) → normalisée à 0.5 → vibratoAmount = 1.0
+- Valeur: 64 (0x40) → normalisée à 0.5 → vibratoAmount = 2.0
 
 ### CC9 (Vibrato Rate) - valeur 80 (63%)
 ```
 [0x05, 0x09, 0x50]
 ```
 - CC: 9 (0x09) - Vibrato Rate
-- Valeur: 80 (0x50) → normalisée à 0.63 → vibratoRate = 6.67 Hz
+- Valeur: 80 (0x50) → normalisée à 0.63 → vibratoRate = 12.97 Hz
 
 ### CC92 (Tremolo Amount) - valeur 32 (25%)
 ```
 [0x05, 0x5C, 0x20]
 ```
 - CC: 92 (0x5C) - Tremolo Amount
-- Valeur: 32 (0x20) → normalisée à 0.25 → tremoloAmount = 0.075
+- Valeur: 32 (0x20) → normalisée à 0.25 → tremoloAmount = 0.15
 
 ### CC15 (Tremolo Rate) - valeur 100 (79%)
 ```
 [0x05, 0x0F, 0x64]
 ```
 - CC: 15 (0x0F) - Tremolo Rate
-- Valeur: 100 (0x64) → normalisée à 0.79 → tremoloRate = 8.11 Hz
+- Valeur: 100 (0x64) → normalisée à 0.79 → tremoloRate = 16.01 Hz
 
 ### CC73 (Attack Time) - valeur 64 (50%)
 ```
 [0x05, 0x49, 0x40]
 ```
 - CC: 73 (0x49) - Attack Time
-- Valeur: 64 (0x40) → normalisée à 0.5 → attackTime = 250ms
+- Valeur: 64 (0x40) → normalisée à 0.5 → attackTime = 500ms
 
 ### CC72 (Release Time) - valeur 96 (76%)
 ```
 [0x05, 0x48, 0x60]
 ```
 - CC: 72 (0x48) - Release Time
-- Valeur: 96 (0x60) → normalisée à 0.76 → releaseTime = 1520ms
+- Valeur: 96 (0x60) → normalisée à 0.76 → releaseTime = 3040ms
 
 ## Conversion rapide
 
@@ -202,12 +202,14 @@ local ccMsg = createCCBinary(1, 64)  -- CC1 = 64
 
 | CC# | Nom | Plage sortie | Description |
 |-----|-----|--------------|-------------|
-| 1 | Vibrato Amount | 0.0 - 2.0 | Amplitude de l'ondulation latérale |
-| 9 | Vibrato Rate | 1.0 - 10.0 Hz | Fréquence du vibrato |
-| 15 | Tremolo Rate | 1.0 - 10.0 Hz | Fréquence du tremolo |
-| 72 | Release Time | 0 - 2000 ms | Durée du release (queue) |
-| 73 | Attack Time | 0 - 500 ms | Durée de l'attack (max 95% de duration) |
-| 92 | Tremolo Amount | 0.0 - 0.3 | Amplitude de la pulsation de largeur |
+| 1 | Vibrato Amount | 0.0 - 4.0 | Amplitude de l'ondulation latérale |
+| 9 | Vibrato Rate | 1.0 - 20.0 Hz | Fréquence du vibrato |
+| 15 | Tremolo Rate | 1.0 - 20.0 Hz | Fréquence du tremolo |
+| 72 | Release Time | 0 - 4000 ms | Durée du release (queue) |
+| 73 | Attack Time | 0 - 1000 ms | Durée de l'attack (max 95% de duration) |
+| 92 | Tremolo Amount | 0.0 - 0.6 | Amplitude de la pulsation de largeur |
+
+**Note :** Toutes les valeurs CC sont clampées à 0-127 (plage MIDI standard) avant conversion.
 
 ## Durées courantes
 
