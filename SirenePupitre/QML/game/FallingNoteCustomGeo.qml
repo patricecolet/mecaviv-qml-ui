@@ -14,7 +14,7 @@ Model {
     property color cubeColor: "#00CED1"
     property real velocity: 127  // Vélocité de la note (0-127)
     property real duration: 1000  // Durée en ms
-    property real releaseTime: 500  // Durée du release en ms
+    property real releaseTime: 1000  // Durée du release en ms
     
     // Propriétés calculées
     property real cubeZ: -50
@@ -28,9 +28,12 @@ Model {
     property real currentY: spawnHeight + totalHeight
     property real currentX: targetX
     
-    // Géométrie custom C++ (hardcodée pour l'instant)
+    // Géométrie custom C++ avec sustainHeight dynamique
     geometry: TaperedBoxGeometry {
-        // NE PAS définir de propriétés - géométrie hardcodée dans le constructeur
+        sustainHeight: noteModel.sustainHeight
+        releaseHeight: noteModel.releaseHeight  // Utilisé pour le calcul futur
+        width: 100.0
+        depth: 100.0
     }
     
     position: Qt.vector3d(currentX, currentY, cubeZ)
