@@ -14,14 +14,14 @@ Model {
     property color cubeColor: "#00CED1"
     property real velocity: 127  // Vélocité de la note (0-127)
     property real duration: 1000  // Durée en ms
-    property real attackTime: 100  // Durée de l'attaque en ms (contrôlée par CC73)
-    property real releaseTime: 200  // Durée du release en ms (contrôlée par CC72)
+    property real attackTime: 0  // Durée de l'attaque en ms (contrôlée par CC73)
+    property real releaseTime: 0  // Durée du release en ms (contrôlée par CC72)
     
-    // Paramètres de modulation (contrôlés par MIDI CC)
-    property real vibratoAmount: 1.12  // CC1
-    property real vibratoRate: 5.0     // CC9
-    property real tremoloAmount: 0.15  // CC92
-    property real tremoloRate: 4.0     // CC15
+    // Paramètres de modulation (contrôlés par MIDI CC) - Désactivés par défaut
+    property real vibratoAmount: 0.0  // CC1
+    property real vibratoRate: 5.0    // CC9
+    property real tremoloAmount: 0.0  // CC92
+    property real tremoloRate: 4.0    // CC15
     
     // Propriétés calculées
     property real cubeZ: -50

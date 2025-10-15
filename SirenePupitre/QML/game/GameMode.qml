@@ -26,13 +26,13 @@ Node {
     // Signal pour recevoir les événements MIDI
     signal midiEventReceived(var event)
     
-    // Paramètres MIDI CC (Control Change)
-    property real vibratoAmount: 1.12   // CC1 (0-127 → 0.0-2.0)
+    // Paramètres MIDI CC (Control Change) - Désactivés par défaut
+    property real vibratoAmount: 0.0    // CC1 (0-127 → 0.0-2.0)
     property real vibratoRate: 5.0      // CC9 (0-127 → 1.0-10.0 Hz)
-    property real tremoloAmount: 0.15   // CC92 (0-127 → 0.0-0.3)
+    property real tremoloAmount: 0.0    // CC92 (0-127 → 0.0-0.3)
     property real tremoloRate: 4.0      // CC15 (0-127 → 1.0-10.0 Hz)
-    property real attackTime: 100       // CC73 (0-127 → 0-500ms)
-    property real releaseTime: 200      // CC72 (0-127 → 0-2000ms)
+    property real attackTime: 0         // CC73 (0-127 → 0-500ms)
+    property real releaseTime: 0        // CC72 (0-127 → 0-2000ms)
     
     // Propriétés de la portée
     property real staffWidth: 1800
