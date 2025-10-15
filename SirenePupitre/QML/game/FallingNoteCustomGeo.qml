@@ -14,24 +14,31 @@ Model {
     property color cubeColor: "#00CED1"
     property real velocity: 127  // Vélocité de la note (0-127)
     property real duration: 1000  // Durée en ms
+    property real attackTime: 500  // Durée de l'attaque en ms
     property real releaseTime: 1000  // Durée du release en ms
     
     // Propriétés calculées
     property real cubeZ: -50
     property real cubeSize: 0.4
-    property real sustainHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed / 2.0)
+    property real totalDurationHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed / 2.0)
+    property real attackHeight: Math.min(
+        Math.max(0.05, (attackTime / 1000.0) * fallSpeed),
+        totalDurationHeight * 0.95  // Attack max 95% de la durée (laisse au moins 5% pour sustain)
+    )
+    property real sustainHeight: totalDurationHeight - attackHeight  // Cube réduit par l'attaque
     property real releaseHeight: Math.max(0.05, (releaseTime / 1000.0) * fallSpeed)
-    property real totalHeight: sustainHeight + releaseHeight
+    property real totalHeight: attackHeight + sustainHeight + releaseHeight
     property real baseWidth: (velocity / 127.0 * 0.8 + 0.2) * cubeSize
     
     // Position
     property real currentY: spawnHeight + totalHeight
     property real currentX: targetX
     
-    // Géométrie custom C++ avec sustainHeight dynamique
+    // Géométrie custom C++ avec attack, sustain, release
     geometry: TaperedBoxGeometry {
+        attackHeight: noteModel.attackHeight
         sustainHeight: noteModel.sustainHeight
-        releaseHeight: noteModel.releaseHeight  // Utilisé pour le calcul futur
+        releaseHeight: noteModel.releaseHeight
         width: 100.0
         depth: 100.0
     }

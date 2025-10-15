@@ -10,6 +10,7 @@ class TaperedBoxGeometry : public QQuick3DGeometry
     Q_OBJECT
     QML_NAMED_ELEMENT(TaperedBoxGeometry)
     
+    Q_PROPERTY(float attackHeight READ attackHeight WRITE setAttackHeight NOTIFY attackHeightChanged)
     Q_PROPERTY(float sustainHeight READ sustainHeight WRITE setSustainHeight NOTIFY sustainHeightChanged)
     Q_PROPERTY(float releaseHeight READ releaseHeight WRITE setReleaseHeight NOTIFY releaseHeightChanged)
     Q_PROPERTY(int releaseSegments READ releaseSegments WRITE setReleaseSegments NOTIFY releaseSegmentsChanged)
@@ -18,6 +19,9 @@ class TaperedBoxGeometry : public QQuick3DGeometry
 
 public:
     explicit TaperedBoxGeometry(QQuick3DObject *parent = nullptr);
+    
+    float attackHeight() const { return m_attackHeight; }
+    void setAttackHeight(float height);
     
     float sustainHeight() const { return m_sustainHeight; }
     void setSustainHeight(float height);
@@ -35,6 +39,7 @@ public:
     void setDepth(float d);
 
 signals:
+    void attackHeightChanged();
     void sustainHeightChanged();
     void releaseHeightChanged();
     void releaseSegmentsChanged();
@@ -44,6 +49,7 @@ signals:
 private:
     void updateGeometry();
     
+    float m_attackHeight = 0.1f;
     float m_sustainHeight = 1.0f;
     float m_releaseHeight = 0.3f;
     int m_releaseSegments = 4;
