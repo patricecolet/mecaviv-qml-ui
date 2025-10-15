@@ -20,7 +20,7 @@ Model {
     property real cubeZ: -50
     property real cubeSize: 0.4
     property real sustainHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed / 2.0)
-    property real releaseHeight: Math.max(0.05, (releaseTime / 1000.0) * fallSpeed / 2.0)
+    property real releaseHeight: Math.max(0.05, (releaseTime / 1000.0) * fallSpeed)
     property real totalHeight: sustainHeight + releaseHeight
     property real baseWidth: (velocity / 127.0 * 0.8 + 0.2) * cubeSize
     
@@ -46,10 +46,36 @@ Model {
     )
     
     materials: [
-        PrincipledMaterial {
-            baseColor: cubeColor
-            metalness: 0.7
-            roughness: 0.2
+        CustomMaterial {
+            id: noteMaterial
+            
+            // Tremolo + Vibrato combinés
+            vertexShader: "shaders/tremolo_vibrato.vert"
+            fragmentShader: "shaders/bend.frag"
+            
+            property color baseColor: cubeColor
+            property real metalness: 0.7
+            property real roughness: 0.2
+            property real time: 0  // Temps pour l'animation (en ms)
+            
+            // Intensités des effets musicaux
+            property real tremoloIntensity: 0.15  // Variation de largeur
+            property real vibratoIntensity: 1.12  // Ondulation latérale
+            
+            // Fréquences (vitesse) des effets musicaux (Hz)
+            property real tremoloSpeed: 4.0  // 4 Hz
+            property real vibratoSpeed: 5.0  // 5 Hz
+            
+            shadingMode: CustomMaterial.Shaded
+            
+            // Animation continue du temps pour les oscillations
+            NumberAnimation on time {
+                from: 0
+                to: 100000
+                duration: 100000
+                running: true
+                loops: Animation.Infinite
+            }
         }
     ]
     
