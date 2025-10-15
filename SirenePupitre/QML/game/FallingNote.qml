@@ -148,7 +148,7 @@ Node {
                 
                 scale: Qt.vector3d(
                     noteModel.baseWidth * releaseModel.modelTaperFactor,
-                    noteModel.releaseSegmentHeight,
+                    noteModel.releaseSegmentHeight * noteModel.cubeSize / 20,
                     noteModel.cubeSize * releaseModel.modelTaperFactor
                 )
                 
