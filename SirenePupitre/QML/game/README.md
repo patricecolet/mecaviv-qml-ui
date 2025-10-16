@@ -178,7 +178,13 @@ PrincipledMaterial {
 - Hérite de `QQuick3DGeometry`
 - Génère une géométrie custom : Attack (pyramide inversée) + Sustain (cube) + Release (pyramide)
 - 18 vertices, 18 triangles
-- Propriétés exposées : `attackHeight`, `sustainHeight`, `releaseHeight`, `width`, `depth`
+- Propriétés exposées : `attackTime`, `duration`, `totalHeight`, `releaseHeight`, `velocity`, `baseSize`
+- **Calculs ADSR automatiques en C++** :
+  - `attackRatio = min(1.0, duration / attackTime)` → portion d'attack complétée
+  - `effectiveVelocity = velocity * attackRatio` → vélocité réellement atteinte
+  - `attackHeightVisual = totalHeight * attackRatio` → hauteur de la pyramide attack
+  - `sustainHeight = totalHeight - attackHeightVisual` → hauteur du cube
+  - `width = (effectiveVelocity/127 * 0.8 + 0.2) * baseSize` → largeur basée sur effectiveVelocity
 
 **Fichiers C++ :**
 - `taperedboxgeometry.h` : Déclaration de la classe
@@ -201,13 +207,19 @@ PrincipledMaterial {
 **Logique des hauteurs :**
 - `totalDurationHeight` = durée de la note (MIDI duration) convertie en unités visuelles
 - `attackHeight` = min(`attackTime` converti, 95% de `totalDurationHeight`)
-- `sustainHeight` = `totalDurationHeight - attackHeight`
+- `sustainHeight` = calculé automatiquement en C++ : `totalDurationHeight - attackHeight`
 - `releaseHeight` = `releaseTime` converti (s'AJOUTE, ne fait pas partie de duration)
 - **Total affiché** = `attackHeight + sustainHeight + releaseHeight`
 
-**Compensation de scale :**
-- Le scale Y = `sustainHeight * cubeSize / 20`
-- Les hauteurs de pyramides sont divisées par ce scale en C++ pour garder une taille absolue constante/proportionnelle
+**Interface C++/QML :**
+- **QML passe les données musicales brutes** : `attackTime`, `duration`, `totalHeight`, `releaseHeight`, `velocity`, `baseSize`
+- **Le C++ calcule TOUT** : attackRatio, effectiveVelocity, proportions attack/sustain, largeur, génération des vertices
+- **La géométrie est générée à la taille exacte** avec les bonnes proportions ADSR
+- Le scale QML est simplement `(cubeSize, cubeSize, cubeSize)` : un facteur global uniforme à ajuster manuellement
+- **Avantages** : 
+  - Cohérence musicale (effectiveVelocity = velocity × attackRatio)
+  - Séparation claire : QML = données, C++ = géométrie
+  - Dimensions cohérentes en unités visuelles
 
 ### Contrôle MIDI CC
 

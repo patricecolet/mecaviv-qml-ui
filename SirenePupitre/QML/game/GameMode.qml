@@ -31,8 +31,8 @@ Node {
     property real vibratoRate: 5.0      // CC9 (0-127 → 1.0-10.0 Hz)
     property real tremoloAmount: 0.0    // CC92 (0-127 → 0.0-0.3)
     property real tremoloRate: 4.0      // CC15 (0-127 → 1.0-10.0 Hz)
-    property real attackTime: 0         // CC73 (0-127 → 0-500ms)
-    property real releaseTime: 0        // CC72 (0-127 → 0-2000ms)
+    property real attackTime: 0         // CC73 (0-127 → 0-10000ms / 10s)
+    property real releaseTime: 0        // CC72 (0-127 → 0-10000ms / 10s)
     
     // Propriétés de la portée
     property real staffWidth: 1800
@@ -206,10 +206,10 @@ Node {
                 tremoloRate = 1.0 + normalized * 19.0;  // 1.0 à 20.0 Hz (×2)
                 break;
             case 73:  // Attack Time
-                attackTime = normalized * 1000.0;  // 0 à 1000ms (×2)
+                attackTime = normalized * 10000.0;  // 0 à 10000ms (10s)
                 break;
             case 72:  // Release Time
-                releaseTime = normalized * 4000.0;  // 0 à 4000ms (×2)
+                releaseTime = normalized * 10000.0;  // 0 à 10000ms (10s)
                 break;
         }
     }

@@ -14,20 +14,45 @@ TaperedBoxGeometry::TaperedBoxGeometry(QQuick3DObject *parent)
         float nx, ny, nz;
     };
     
-    const float w = 50.0f;  // Demi-largeur
-    const float h = 50.0f;  // Demi-hauteur du cube
-    const float d = 50.0f;  // Demi-profondeur
+    // === CALCULS MUSICAUX ADSR ===
+    // 1. Ratio de la durée utilisée par l'attack (pour la HAUTEUR)
+    const float attackRatio = (m_attackTime > 0.0f && m_duration > 0.0f) 
+        ? qMin(1.0f, m_attackTime / m_duration)  // Proportion de durée pour l'attack
+        : 0.0f;  // Pas d'attack si attackTime = 0
     
-    // Calcul des hauteurs de pyramides (compensées par le scale)
-    const float cubeSize = 0.4f;
-    const float scale = m_sustainHeight * cubeSize / 20.0f;
-    const float hAttackPyramid = (scale > 0) ? (m_attackHeight / scale) : 20.0f;
-    const float hReleasePyramid = (scale > 0) ? (m_releaseHeight / scale) : 20.0f;
+    // 2. Ratio d'attack complété (pour la VÉLOCITÉ)
+    const float velocityRatio = (m_attackTime > 0.0f && m_duration > 0.0f)
+        ? qMin(1.0f, m_duration / m_attackTime)  // Portion d'attack complétée
+        : 1.0f;  // Vélocité immédiate si pas d'attack
     
-    const float yAttackBottom = -h - hAttackPyramid; // Pointe de l'attaque (tout en bas)
-    const float yBot = -h;                           // Base de l'attaque = Bas du cube
-    const float yTop = h;                            // Haut du cube = Base du release
-    const float yPeak = h + hReleasePyramid;         // Sommet du release
+    // 3. Vélocité effective atteinte
+    const float effectiveVelocity = m_velocity * velocityRatio;
+    const float velocityFactor = (effectiveVelocity / 127.0f * 0.8f + 0.2f);  // 0.2 à 1.0
+    
+    // 4. Dimensions basées sur effectiveVelocity
+    const float w = velocityFactor * m_baseSize / 2.0f;  // Demi-largeur
+    const float d = m_baseSize / 2.0f;  // Demi-profondeur
+    
+    // 5. Hauteurs visuelles pour attack et sustain
+    // attackHeight visuelle = portion de totalHeight utilisée pour l'attack
+    const float attackHeightVisual = m_totalHeight * attackRatio;
+    const float sustainHeight = m_totalHeight - attackHeightVisual;
+    
+    // 6. Hauteurs des pyramides
+    const float hAttackPyramid = attackHeightVisual;
+    const float hReleasePyramid = m_releaseHeight;
+    
+    // 7. Coordonnées Y - CENTRE SUR TOTALHEIGHT (attack+sustain constant)
+    // Le centre des bounds pour totalHeight est à Y=0 (ne bouge pas avec attack)
+    const float halfTotal = m_totalHeight / 2.0f;
+    const float yAttackBottom = -halfTotal;                    // Bas (pointe attack)
+    const float yBot = -halfTotal + hAttackPyramid;            // Fin attack = début sustain
+    const float yTop = halfTotal;                              // Haut sustain
+    const float yPeak = halfTotal + hReleasePyramid;           // Sommet release
+    
+    qDebug() << "Constructor - attackTime:" << m_attackTime << "duration:" << m_duration 
+             << "attackRatio:" << attackRatio << "effectiveVelocity:" << effectiveVelocity
+             << "attackHeightVisual:" << attackHeightVisual << "sustainHeight:" << sustainHeight;
     
     // 18 vertices : 5 (attack) + 8 (cube) + 5 (release)
     Vertex vertices[] = {
@@ -109,21 +134,30 @@ TaperedBoxGeometry::TaperedBoxGeometry(QQuick3DObject *parent)
     qDebug() << "Geometry ready";
 }
 
-void TaperedBoxGeometry::setAttackHeight(float height)
+void TaperedBoxGeometry::setAttackTime(float time)
 {
-    if (qFuzzyCompare(m_attackHeight, height))
+    if (qFuzzyCompare(m_attackTime, time))
         return;
-    m_attackHeight = height;
-    emit attackHeightChanged();
+    m_attackTime = time;
+    emit attackTimeChanged();
     updateGeometry();
 }
 
-void TaperedBoxGeometry::setSustainHeight(float height)
+void TaperedBoxGeometry::setDuration(float dur)
 {
-    if (qFuzzyCompare(m_sustainHeight, height))
+    if (qFuzzyCompare(m_duration, dur))
         return;
-    m_sustainHeight = height;
-    emit sustainHeightChanged();
+    m_duration = dur;
+    emit durationChanged();
+    updateGeometry();
+}
+
+void TaperedBoxGeometry::setTotalHeight(float height)
+{
+    if (qFuzzyCompare(m_totalHeight, height))
+        return;
+    m_totalHeight = height;
+    emit totalHeightChanged();
     updateGeometry();
 }
 
@@ -136,6 +170,24 @@ void TaperedBoxGeometry::setReleaseHeight(float height)
     updateGeometry();
 }
 
+void TaperedBoxGeometry::setVelocity(float vel)
+{
+    if (qFuzzyCompare(m_velocity, vel))
+        return;
+    m_velocity = vel;
+    emit velocityChanged();
+    updateGeometry();
+}
+
+void TaperedBoxGeometry::setBaseSize(float size)
+{
+    if (qFuzzyCompare(m_baseSize, size))
+        return;
+    m_baseSize = size;
+    emit baseSizeChanged();
+    updateGeometry();
+}
+
 void TaperedBoxGeometry::setReleaseSegments(int segments)
 {
     if (m_releaseSegments == segments)
@@ -145,47 +197,55 @@ void TaperedBoxGeometry::setReleaseSegments(int segments)
     updateGeometry();
 }
 
-void TaperedBoxGeometry::setWidth(float w)
-{
-    if (qFuzzyCompare(m_width, w))
-        return;
-    m_width = w;
-    emit widthChanged();
-    updateGeometry();
-}
-
-void TaperedBoxGeometry::setDepth(float d)
-{
-    if (qFuzzyCompare(m_depth, d))
-        return;
-    m_depth = d;
-    emit depthChanged();
-    updateGeometry();
-}
-
 void TaperedBoxGeometry::updateGeometry()
 {
-    qDebug() << "updateGeometry() - attack:" << m_attackHeight << "sustain:" << m_sustainHeight << "release:" << m_releaseHeight;
-    
     // Même logique que le constructeur
     struct Vertex {
         float x, y, z;
         float nx, ny, nz;
     };
     
-    const float w = 50.0f;
-    const float h = 50.0f;
-    const float d = 50.0f;
+    // === CALCULS MUSICAUX ADSR ===
+    // 1. Ratio de la durée utilisée par l'attack (pour la HAUTEUR)
+    const float attackRatio = (m_attackTime > 0.0f && m_duration > 0.0f) 
+        ? qMin(1.0f, m_attackTime / m_duration)  // Proportion de durée pour l'attack
+        : 0.0f;  // Pas d'attack si attackTime = 0
     
-    const float cubeSize = 0.4f;
-    const float scale = m_sustainHeight * cubeSize / 20.0f;
-    const float hAttackPyramid = (scale > 0) ? (m_attackHeight / scale) : 20.0f;
-    const float hReleasePyramid = (scale > 0) ? (m_releaseHeight / scale) : 20.0f;
+    // 2. Ratio d'attack complété (pour la VÉLOCITÉ)
+    const float velocityRatio = (m_attackTime > 0.0f && m_duration > 0.0f)
+        ? qMin(1.0f, m_duration / m_attackTime)  // Portion d'attack complétée
+        : 1.0f;  // Vélocité immédiate si pas d'attack
     
-    const float yAttackBottom = -h - hAttackPyramid;
-    const float yBot = -h;
-    const float yTop = h;
-    const float yPeak = h + hReleasePyramid;
+    // 3. Vélocité effective atteinte
+    const float effectiveVelocity = m_velocity * velocityRatio;
+    const float velocityFactor = (effectiveVelocity / 127.0f * 0.8f + 0.2f);  // 0.2 à 1.0
+    
+    // 4. Dimensions basées sur effectiveVelocity
+    const float w = velocityFactor * m_baseSize / 2.0f;  // Demi-largeur
+    const float d = m_baseSize / 2.0f;  // Demi-profondeur
+    
+    // 5. Hauteurs visuelles pour attack et sustain
+    // attackHeight visuelle = portion de totalHeight utilisée pour l'attack
+    const float attackHeightVisual = m_totalHeight * attackRatio;
+    const float sustainHeight = m_totalHeight - attackHeightVisual;
+    
+    // 6. Hauteurs des pyramides
+    const float hAttackPyramid = attackHeightVisual;
+    const float hReleasePyramid = m_releaseHeight;
+    
+    // 7. Coordonnées Y - CENTRE SUR TOTALHEIGHT (attack+sustain constant)
+    // Le centre des bounds pour totalHeight est à Y=0 (ne bouge pas avec attack)
+    const float halfTotal = m_totalHeight / 2.0f;
+    const float yAttackBottom = -halfTotal;                    // Bas (pointe attack)
+    const float yBot = -halfTotal + hAttackPyramid;            // Fin attack = début sustain
+    const float yTop = halfTotal;                              // Haut sustain
+    const float yPeak = halfTotal + hReleasePyramid;           // Sommet release
+    
+    qDebug() << "updateGeometry() - attackTime:" << m_attackTime << "duration:" << m_duration 
+             << "attackRatio:" << attackRatio << "effectiveVelocity:" << effectiveVelocity
+             << "attackHeightVisual:" << attackHeightVisual << "sustainHeight:" << sustainHeight
+             << "releaseHeight:" << m_releaseHeight << "width:" << (w*2) << "depth:" << (d*2)
+             << "bounds: yAttackBottom=" << yAttackBottom << "yPeak=" << yPeak;
     
     // 18 vertices
     Vertex vertices[] = {

@@ -25,38 +25,35 @@ Model {
     
     // Propriétés calculées
     property real cubeZ: -50
-    property real cubeSize: 0.4
-    property real totalDurationHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed / 2.0)
-    property real attackHeight: Math.min(
-        Math.max(0.05, (attackTime / 1000.0) * fallSpeed),
-        totalDurationHeight * 0.95  // Attack max 95% de la durée (laisse au moins 5% pour sustain)
-    )
-    property real sustainHeight: totalDurationHeight - attackHeight  // Cube réduit par l'attaque
+    property real cubeSize: 1.0
+    property real totalDurationHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed )
     property real releaseHeight: Math.max(0.05, (releaseTime / 1000.0) * fallSpeed)
-    property real totalHeight: attackHeight + sustainHeight + releaseHeight
-    property real baseWidth: (velocity / 127.0 * 0.8 + 0.2) * cubeSize
+    property real totalHeight: totalDurationHeight + releaseHeight  // Release additif
     
-    // Position
-    property real currentY: spawnHeight + totalHeight
+    // Position simplifiée - Le centre de l'objet C++ est au point NOTE ON (fin attack/début sustain)
+    property real currentY: spawnHeight  + totalHeight
     property real currentX: targetX
     
-    // Géométrie custom C++ avec attack, sustain, release
+    // Calcul du sustain pour le shader (modulation proportionnelle)
+    property real attackRatio: attackTime > 0 ? Math.min(1.0, attackTime / duration) : 0.0
+    property real sustainHeight: totalDurationHeight * (1.0 - attackRatio)
+    
+    // Géométrie custom C++ - Le C++ calcule TOUT (ADSR, effectiveVelocity, proportions)
+    // Passe les données musicales brutes, le C++ s'occupe du reste
     geometry: TaperedBoxGeometry {
-        attackHeight: noteModel.attackHeight
-        sustainHeight: noteModel.sustainHeight
-        releaseHeight: noteModel.releaseHeight
-        width: 100.0
-        depth: 100.0
+        attackTime: noteModel.attackTime            // Temps d'attack en ms
+        duration: noteModel.duration                // Durée de la note en ms
+        totalHeight: noteModel.totalDurationHeight  // Hauteur visuelle pour la note
+        releaseHeight: noteModel.releaseHeight      // Hauteur visuelle pour le release
+        velocity: noteModel.velocity                // Vélocité MIDI (0-127)
+        baseSize: 20.0                              // Taille de référence en unités visuelles
     }
     
+    // Position - Le centre C++ (Y=0) correspond au point NOTE ON
     position: Qt.vector3d(currentX, currentY, cubeZ)
     
-    // Scale calculé selon la durée (comme FallingCube)
-    scale: Qt.vector3d(
-        baseWidth,
-        sustainHeight * cubeSize / 20,
-        cubeSize
-    )
+    // Scale simple et uniforme (à ajuster manuellement pour correspondre au timing)
+    scale: Qt.vector3d(cubeSize*2, cubeSize, cubeSize)
     
     materials: [
         CustomMaterial {
@@ -95,12 +92,12 @@ Model {
         }
     ]
     
-    // Animation de chute
+    // Animation de chute - Le centre de l'objet atteint targetY
     NumberAnimation on currentY {
         id: fallAnimation
-        from: currentY
-        to: targetY - totalHeight
-        duration: Math.max(100, (spawnHeight - (targetY - totalHeight * 2)) / fallSpeed * 1000)
+        from: spawnHeight + (totalDurationHeight / 2.0) * cubeSize
+        to: targetY + (totalDurationHeight / 2.0) * cubeSize
+        duration: Math.max(100, (spawnHeight - targetY)/ fallSpeed * 1000)
         running: false
         
         onFinished: {
@@ -109,8 +106,9 @@ Model {
     }
     
     Component.onCompleted: {
-        console.log("FallingNoteCustomGeo created - sustainHeight:", sustainHeight, 
-                   "releaseHeight:", releaseHeight, "geometry:", geometry,
+        console.log("FallingNoteCustomGeo created - attackTime:", attackTime,
+                   "duration:", duration, "totalDurationHeight:", totalDurationHeight,
+                   "releaseHeight:", releaseHeight, "velocity:", velocity,
                    "position:", position, "scale:", scale, "visible:", visible)
         fallAnimation.start()
     }

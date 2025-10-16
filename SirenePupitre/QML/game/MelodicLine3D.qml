@@ -15,7 +15,7 @@ Node {
     property real staffWidth: 1800
     property real ambitusOffset: 0
     property real fallSpeed: 150  // Vitesse de chute
-    property real spawnHeight: 500  // Hauteur de départ
+    property real spawnHeight: 550  // Hauteur de départ
     property int octaveOffset: 0 
     property string clef: "treble"
     
