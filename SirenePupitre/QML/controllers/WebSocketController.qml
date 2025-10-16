@@ -22,6 +22,7 @@ Item {
     // Signal émis quand on reçoit des données
     signal dataReceived(var data)
     signal configReceived(var config)
+    signal controlChangeReceived(int ccNumber, int ccValue)  // Signal pour les CC MIDI
     property var configController: null
     
     // Propriétés pour la réception binaire
@@ -37,6 +38,17 @@ Item {
         onBinaryMessageReceived: function(message) {
             try {
                 var bytes = new Uint8Array(message);
+                
+                // Format binaire pour Control Change (3 bytes)
+                if (bytes.length === 3 && bytes[0] === 0x05) {
+                    // Format: [0x05, CC_number, value]
+                    var ccNumber = bytes[1];
+                    var ccValue = bytes[2];  // 0-127
+                    
+                    // Émettre un signal pour les CC
+                    controller.controlChangeReceived(ccNumber, ccValue);
+                    return;
+                }
                 
                 // Format binaire optimisé pour les notes MIDI avec durée (5 bytes)
                 if (bytes.length === 5 && bytes[0] === 0x04) {

@@ -16,6 +16,7 @@ Item {
     
     // Propriété pour le mode jeu
     property bool gameMode: false
+    property alias gameModeComponent: gameModeComponent  // Exposer le GameMode pour les connexions externes
     
     // Propriétés calculées depuis sirenController
     property real rpm: sirenController ? sirenController.trueRpm : 0  // Vraies valeurs
@@ -86,6 +87,35 @@ Item {
                 backgroundMode: SceneEnvironment.Color
                 antialiasingMode: SceneEnvironment.SSAA
                 antialiasingQuality: SceneEnvironment.High
+            }
+            
+            // Éclairage global pour uniformiser l'éclairage des pyramides attack/release
+            
+            // Lumière principale depuis le haut (éclaire vers le bas)
+            DirectionalLight {
+                position: Qt.vector3d(0, 0, -50)  // Même Z que les cubes
+                eulerRotation.x: -45  // Pointe vers le bas
+                eulerRotation.y: 0
+                brightness: 1.0
+                ambientColor: Qt.rgba(0.3, 0.3, 0.3, 1.0)
+            }
+            
+            // Lumière depuis le bas (éclaire vers le haut) pour la pyramide attack
+            DirectionalLight {
+                position: Qt.vector3d(0, 0, -50)  // Même Z que les cubes
+                eulerRotation.x: 45  // Pointe vers le haut
+                eulerRotation.y: 0
+                brightness: 0.8  // Moins forte que celle du haut
+                ambientColor: Qt.rgba(0.2, 0.2, 0.2, 1.0)
+            }
+            
+            // Lumière frontale pour uniformiser
+            DirectionalLight {
+                position: Qt.vector3d(0, 0, -50)  // Même Z que les cubes
+                eulerRotation.x: 0  // Frontale
+                eulerRotation.y: 0
+                brightness: 0.5
+                ambientColor: Qt.rgba(0.3, 0.3, 0.3, 1.0)
             }
             
             PerspectiveCamera {

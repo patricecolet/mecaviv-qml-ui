@@ -96,6 +96,13 @@ Window {
             }
         }
         
+        onControlChangeReceived: function(ccNumber, ccValue) {
+            // Transmettre les CC au mode jeu pour contrôler l'enveloppe et les modulations
+            if (display.gameMode && display.gameModeComponent) {
+                display.gameModeComponent.handleControlChange(ccNumber, ccValue);
+            }
+        }
+        
         onConfigReceived: function(config) {
             // Configuration reçue
         }

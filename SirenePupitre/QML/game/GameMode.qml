@@ -26,6 +26,14 @@ Node {
     // Signal pour recevoir les événements MIDI
     signal midiEventReceived(var event)
     
+    // Paramètres MIDI CC (Control Change) - Désactivés par défaut
+    property real vibratoAmount: 0.0    // CC1 (0-127 → 0.0-2.0)
+    property real vibratoRate: 5.0      // CC9 (0-127 → 1.0-10.0 Hz)
+    property real tremoloAmount: 0.0    // CC92 (0-127 → 0.0-0.3)
+    property real tremoloRate: 4.0      // CC15 (0-127 → 1.0-10.0 Hz)
+    property real attackTime: 0         // CC73 (0-127 → 0-10000ms / 10s)
+    property real releaseTime: 0        // CC72 (0-127 → 0-10000ms / 10s)
+    
     // Propriétés de la portée
     property real staffWidth: 1800
     property real lineSpacing: 20
@@ -98,8 +106,15 @@ Node {
         ambitusMax: root.ambitusMax
         staffWidth: root.staffWidth
         ambitusOffset: root.ambitusOffset
-        octaveOffset: sirenInfo ? sirenInfo.displayOctaveOffset : 0 
-        clef: root.clef
+        octaveOffset: sirenInfo ? sirenInfo.displayOctaveOffset : 0
+        
+        // Paramètres MIDI CC pour les modulations et l'enveloppe
+        vibratoAmount: root.vibratoAmount
+        vibratoRate: root.vibratoRate
+        tremoloAmount: root.tremoloAmount
+        tremoloRate: root.tremoloRate
+        attackTime: root.attackTime
+        releaseTime: root.releaseTime
     }
     
     // Fonction pour traiter les événements MIDI
@@ -168,6 +183,35 @@ Node {
             duration: event.duration ?? 500,  // Durée en ms
             controllers: event.controllers ?? {}
         })
+    }
+    
+    // Gérer les Control Change MIDI
+    function handleControlChange(ccNumber, ccValue) {
+        // Sécurité : clamp à 0-127 (plage MIDI valide)
+        var clampedValue = Math.max(0, Math.min(127, ccValue));
+        // Normaliser la valeur MIDI (0-127 → 0.0-1.0)
+        var normalized = clampedValue / 127.0;
+        
+        switch(ccNumber) {
+            case 1:  // Vibrato Amount
+                vibratoAmount = normalized * 4.0;  // 0.0 à 4.0 (×2)
+                break;
+            case 9:  // Vibrato Rate
+                vibratoRate = 1.0 + normalized * 19.0;  // 1.0 à 20.0 Hz (×2)
+                break;
+            case 92:  // Tremolo Amount
+                tremoloAmount = normalized * 0.6;  // 0.0 à 0.6 (×2)
+                break;
+            case 15:  // Tremolo Rate
+                tremoloRate = 1.0 + normalized * 19.0;  // 1.0 à 20.0 Hz (×2)
+                break;
+            case 73:  // Attack Time
+                attackTime = normalized * 10000.0;  // 0 à 10000ms (10s)
+                break;
+            case 72:  // Release Time
+                releaseTime = normalized * 10000.0;  // 0 à 10000ms (10s)
+                break;
+        }
     }
     
     // Mettre à jour les segments quand les événements changent

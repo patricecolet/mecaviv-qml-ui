@@ -54,6 +54,8 @@
         <file>QML/game/MelodicLine3D.qml</file>
         <file>QML/game/GameMode.qml</file>
         <file>QML/game/FallingCube.qml</file>
+        <file>QML/game/FallingNoteCustomGeo.qml</file>
+        <file>QML/game/TestSimpleGeo.qml</file>
         <file>QML/game/shaders/bend.vert</file>
         <file>QML/game/shaders/squash.vert</file>
         <file>QML/game/shaders/bend_uniform.vert</file>
