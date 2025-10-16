@@ -12,7 +12,8 @@ Node {
     property real lineSpacing: 20
     property real ambitusMin: 48.0
     property real ambitusMax: 84.0
-    property real staffWidth: 1800
+    property real staffWidth: 1600
+    property real staffPosX: 0
     property real ambitusOffset: 0
     property real fallSpeed: 150  // Vitesse de chute
     property real spawnHeight: 550  // Hauteur de départ
@@ -39,20 +40,19 @@ Node {
     
 // Fonction pour convertir une note MIDI en position Y sur la portée
 function noteToY(note) {
-    // Appliquer octaveOffset comme dans AmbitusDisplay3D pour que les cubes atteignent les notes
+    // Appliquer octaveOffset comme AmbitusDisplay3D pour alignement avec la portée visible
     var offsetNote = note + (octaveOffset * 12)
     var y = noteCalc.calculateNoteYPosition(offsetNote, lineSpacing, clef)
     return y
 }
 function noteToX(note) {
-    // Utiliser la même fonction que AmbitusDisplay3D pour la cohérence
-    // staffPosX = 0 + ambitusOffset/2 (comme dans AmbitusDisplay3D)
-    // staffWidth = staffWidth - ambitusOffset (comme dans AmbitusDisplay3D)
-    var staffPosX = ambitusOffset / 2
-    var effectiveStaffWidth = staffWidth - ambitusOffset
-    var x = noteCalc.calculateNoteXPosition(note, ambitusMin, ambitusMax, staffPosX, effectiveStaffWidth)
-    
-    //console.log("🎵 noteToX - note:", note, "ambitusMin:", ambitusMin, "ambitusMax:", ambitusMax, "staffPosX:", staffPosX, "effectiveStaffWidth:", effectiveStaffWidth, "X:", x.toFixed(1))
+    // Utiliser EXACTEMENT les mêmes paramètres que MusicalStaff3D passe à AmbitusDisplay3D
+    // IMPORTANT : floor/ceil comme dans MusicalStaff3D ligne 112-113 !
+    var flooredMin = Math.floor(ambitusMin)
+    var ceiledMax = Math.ceil(ambitusMax)
+    var adjustedStaffPosX = staffPosX + ambitusOffset / 2
+    var adjustedStaffWidth = staffWidth - ambitusOffset
+    var x = noteCalc.calculateNoteXPosition(note, flooredMin, ceiledMax, adjustedStaffPosX, adjustedStaffWidth)
     return x
 }
 
