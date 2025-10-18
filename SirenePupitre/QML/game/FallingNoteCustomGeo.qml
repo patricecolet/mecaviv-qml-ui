@@ -43,7 +43,8 @@ Model {
     property real clipOffset: 0  // Devrait être constant pour toutes les notes!
     
     // Clipping supérieur relatif (suit la note automatiquement)
-    property real clipYTopLocal: totalHeight * 1.0  // Position locale de troncature (1.0 = sommet, désactivé par défaut)
+    // En coordonnées locales C++, le sommet du release est à totalHeight/2 + releaseHeight
+    property real clipYTopLocal: totalDurationHeight / 2.0 + releaseHeight + 100  // Position locale, +100 pour désactiver par défaut
     
     // Géométrie custom C++ - Le C++ calcule TOUT (ADSR, effectiveVelocity, proportions)
     // Passe les données musicales brutes, le C++ s'occupe du reste

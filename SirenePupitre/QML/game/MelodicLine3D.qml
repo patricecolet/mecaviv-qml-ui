@@ -77,13 +77,7 @@ function noteToX(note) {
             return  // Ne pas créer de cube pour noteOff
         }
         
-        // MODE MONOPHONIQUE : Si une note est déjà en cours, la tronquer
-        if (currentNote !== null) {
-            // Option B : Tronquer à 0 (couper tout le sommet, ne montrer que la partie descendue)
-            currentNote.truncateNote(0)
-        }
-        
-        // Créer la nouvelle note
+        // Créer la nouvelle note d'abord
         var newNote = cubeComponent.createObject(root, {
             "targetY": noteToY(segment.note),
             "targetX": noteToX(segment.note),
@@ -100,6 +94,22 @@ function noteToX(note) {
             "tremoloAmount": root.tremoloAmount,
             "tremoloRate": root.tremoloRate
         })
+        
+        // MODE MONOPHONIQUE : Si une note était déjà en cours, la tronquer au niveau du bas de la nouvelle
+        if (currentNote !== null && newNote !== null) {
+            // Calculer le bas de la nouvelle note (centre - moitié de la durée, SANS le release)
+            // Le release est au-dessus, donc on utilise totalDurationHeight, pas totalHeight
+            var newNoteBottom = newNote.currentY - (newNote.totalDurationHeight * newNote.scale.y) / 2.0
+            
+            // Convertir en coordonnées locales de currentNote
+            var deltaY = newNoteBottom - currentNote.currentY
+            var localClip = deltaY / currentNote.scale.y
+            
+            console.log("TRUNCATE: newNoteBottom=" + newNoteBottom + " currentY=" + currentNote.currentY + 
+                       " deltaY=" + deltaY + " scale.y=" + currentNote.scale.y + " localClip=" + localClip +
+                       " totalDurationHeight=" + newNote.totalDurationHeight + " releaseHeight=" + newNote.releaseHeight)
+            currentNote.truncateNote(localClip)
+        }
         
         // Garder la référence de la note courante
         currentNote = newNote
