@@ -12,7 +12,8 @@ Node {
     property real lineSpacing: 20
     property real ambitusMin: 48.0
     property real ambitusMax: 84.0
-    property real staffWidth: 1800
+    property real staffWidth: 1600
+    property real staffPosX: 0
     property real ambitusOffset: 0
     property real fallSpeed: 150  // Vitesse de chute
     property real spawnHeight: 550  // Hauteur de départ
@@ -30,6 +31,10 @@ Node {
     readonly property real ambitusRange: ambitusMax - ambitusMin
     readonly property real staffHeight: ambitusRange * lineSpacing
     
+    // Mode monophonique - Référence à la note courante
+    property var currentNote: null
+    
+    
     // Component pour créer les cubes (créé une seule fois)
     Component {
         id: cubeComponent
@@ -39,20 +44,19 @@ Node {
     
 // Fonction pour convertir une note MIDI en position Y sur la portée
 function noteToY(note) {
-    // Appliquer octaveOffset comme dans AmbitusDisplay3D pour que les cubes atteignent les notes
+    // Appliquer octaveOffset comme AmbitusDisplay3D pour alignement avec la portée visible
     var offsetNote = note + (octaveOffset * 12)
     var y = noteCalc.calculateNoteYPosition(offsetNote, lineSpacing, clef)
     return y
 }
 function noteToX(note) {
-    // Utiliser la même fonction que AmbitusDisplay3D pour la cohérence
-    // staffPosX = 0 + ambitusOffset/2 (comme dans AmbitusDisplay3D)
-    // staffWidth = staffWidth - ambitusOffset (comme dans AmbitusDisplay3D)
-    var staffPosX = ambitusOffset / 2
-    var effectiveStaffWidth = staffWidth - ambitusOffset
-    var x = noteCalc.calculateNoteXPosition(note, ambitusMin, ambitusMax, staffPosX, effectiveStaffWidth)
-    
-    //console.log("🎵 noteToX - note:", note, "ambitusMin:", ambitusMin, "ambitusMax:", ambitusMax, "staffPosX:", staffPosX, "effectiveStaffWidth:", effectiveStaffWidth, "X:", x.toFixed(1))
+    // Utiliser EXACTEMENT les mêmes paramètres que MusicalStaff3D passe à AmbitusDisplay3D
+    // IMPORTANT : floor/ceil comme dans MusicalStaff3D ligne 112-113 !
+    var flooredMin = Math.floor(ambitusMin)
+    var ceiledMax = Math.ceil(ambitusMax)
+    var adjustedStaffPosX = staffPosX + ambitusOffset / 2
+    var adjustedStaffWidth = staffWidth - ambitusOffset
+    var x = noteCalc.calculateNoteXPosition(note, flooredMin, ceiledMax, adjustedStaffPosX, adjustedStaffWidth)
     return x
 }
 
@@ -73,7 +77,8 @@ function noteToX(note) {
             return  // Ne pas créer de cube pour noteOff
         }
         
-        cubeComponent.createObject(root, {
+        // Créer la nouvelle note d'abord
+        var newNote = cubeComponent.createObject(root, {
             "targetY": noteToY(segment.note),
             "targetX": noteToX(segment.note),
             "spawnHeight": root.spawnHeight,
@@ -89,6 +94,25 @@ function noteToX(note) {
             "tremoloAmount": root.tremoloAmount,
             "tremoloRate": root.tremoloRate
         })
+        
+        // MODE MONOPHONIQUE : Si une note était déjà en cours, la tronquer au niveau du bas de la nouvelle
+        if (currentNote !== null && newNote !== null) {
+            // Calculer le bas de la nouvelle note (centre - moitié de la durée, SANS le release)
+            // Le release est au-dessus, donc on utilise totalDurationHeight, pas totalHeight
+            var newNoteBottom = newNote.currentY - (newNote.totalDurationHeight * newNote.scale.y) / 2.0
+            
+            // Convertir en coordonnées locales de currentNote
+            var deltaY = newNoteBottom - currentNote.currentY
+            var localClip = deltaY / currentNote.scale.y
+            
+            console.log("TRUNCATE: newNoteBottom=" + newNoteBottom + " currentY=" + currentNote.currentY + 
+                       " deltaY=" + deltaY + " scale.y=" + currentNote.scale.y + " localClip=" + localClip +
+                       " totalDurationHeight=" + newNote.totalDurationHeight + " releaseHeight=" + newNote.releaseHeight)
+            currentNote.truncateNote(localClip)
+        }
+        
+        // Garder la référence de la note courante
+        currentNote = newNote
     }
     
     // Surveiller les changements de lineSegments

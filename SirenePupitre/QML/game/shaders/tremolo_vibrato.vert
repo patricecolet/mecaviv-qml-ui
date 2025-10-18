@@ -1,5 +1,6 @@
 VARYING vec3 vPosition;
 VARYING vec3 vNormal;
+VARYING vec3 vWorldPosition;
 
 void MAIN()
 {
@@ -33,5 +34,8 @@ void MAIN()
     
     vNormal = NORMAL;
     vPosition = pos;
+    
+    // Calculer la position en coordonnées monde pour le clipping
+    vWorldPosition = (MODEL_MATRIX * vec4(pos, 1.0)).xyz;
 }
 

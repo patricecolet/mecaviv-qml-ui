@@ -219,16 +219,18 @@ Item {
                         return configController.isComponentVisible("musicalStaff")
                     }
                 }
-            
-            // Mode Jeu (à l'intérieur du View3D)
+                
+                // Mode Jeu (DANS le même Node scalé pour partager le référentiel)
                 GameMode {
                     id: gameModeComponent
                     configController: root.configController
                     sirenInfo: root.sirenInfo
                     currentNoteMidi: root.clampedNote
-                    isGameModeActive: root.gameMode  // Lier au mode jeu
-                    staffWidth: 1600
-                }                
+                    isGameModeActive: root.gameMode
+                    staffWidth: 1950
+                    staffPosX: 10
+                }
+                
                 // Compteur de notes type speedometer vintage
                 NoteSpeedometer3D {
                     currentNoteMidi: root.clampedNote

@@ -230,8 +230,8 @@ PrincipledMaterial {
 | 1 | Vibrato Amount | `value/127 * 4.0` | 0.0 - 4.0 |
 | 9 | Vibrato Rate | `1.0 + value/127 * 19.0` | 1.0 - 20.0 Hz |
 | 15 | Tremolo Rate | `1.0 + value/127 * 19.0` | 1.0 - 20.0 Hz |
-| 72 | Release Time | `value/127 * 4000` | 0 - 4000 ms |
-| 73 | Attack Time | `value/127 * 1000` | 0 - 1000 ms |
+| 72 | Release Time | `value==0 ? 0 : 38100/(128-value)` | 0ms - 38.1s |
+| 73 | Attack Time | `value==0 ? 0 : 38100/(128-value)` | 0ms - 38.1s |
 | 92 | Tremolo Amount | `value/127 * 0.6` | 0.0 - 0.6 |
 
 **Flux des CC :**

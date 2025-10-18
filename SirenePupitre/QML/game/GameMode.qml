@@ -31,11 +31,12 @@ Node {
     property real vibratoRate: 5.0      // CC9 (0-127 → 1.0-10.0 Hz)
     property real tremoloAmount: 0.0    // CC92 (0-127 → 0.0-0.3)
     property real tremoloRate: 4.0      // CC15 (0-127 → 1.0-10.0 Hz)
-    property real attackTime: 0         // CC73 (0-127 → 0-10000ms / 10s)
-    property real releaseTime: 0        // CC72 (0-127 → 0-10000ms / 10s)
+    property real attackTime: 0         // CC73 (0-127 → 0ms-38.1s, formule: 38100/(128-cc))
+    property real releaseTime: 0        // CC72 (0-127 → 0ms-38.1s, formule: 38100/(128-cc))
     
     // Propriétés de la portée
-    property real staffWidth: 1800
+    property real staffWidth: 1600
+    property real staffPosX: 0
     property real lineSpacing: 20
     
     // Propriétés calculées avec réévaluation forcée
@@ -67,17 +68,29 @@ Node {
     }
     
     property int octaveOffset: {
+        // Utiliser le MÊME octaveOffset que la portée visible pour alignement
         if (!sirenInfo) return 0
-        // Forcer la réévaluation avec updateCounter
         if (configController) {
             var dummy = configController.updateCounter
         }
         return sirenInfo.displayOctaveOffset || 0
     }
     
-    // Calcul de l'offset pour la clé (comme dans MusicalStaff3D)
-    property real clefWidth: 100  // Largeur de la clé
-    property real ambitusOffset: clefWidth  // Offset pour l'ambitus
+    // Accès à la config pour calculer ambitusOffset (comme dans MusicalStaff3D)
+    property var staffConfig: {
+        if (!configController) return {}
+        var dummy = configController.updateCounter
+        return configController.getConfigValue("displayConfig.components.musicalStaff", {})
+    }
+    property var clefConfig: staffConfig.clef || {}
+    property var keySignatureConfig: staffConfig.keySignature || {}
+    
+    // Calcul dynamique des offsets (EXACTEMENT comme MusicalStaff3D)
+    property bool showClef: clefConfig.visible !== false // true par défaut
+    property bool showKeySignature: keySignatureConfig.visible === true // false par défaut
+    property real clefWidth: showClef ? (clefConfig.width || 100) : 0
+    property real keySignatureWidth: showKeySignature ? (keySignatureConfig.width || 80) : 0
+    property real ambitusOffset: clefWidth + keySignatureWidth
     
     // Portée musicale (cachée en mode normal)
     MusicalStaff3D {
@@ -102,11 +115,13 @@ Node {
         
         lineSegments: lineSegmentsData
         lineSpacing: root.lineSpacing
+        clef: root.clef  // IMPORTANT : passer la clé depuis sirenInfo
         ambitusMin: root.ambitusMin
         ambitusMax: root.ambitusMax
         staffWidth: root.staffWidth
+        staffPosX: root.staffPosX  // Utiliser la valeur reçue de SirenDisplay
         ambitusOffset: root.ambitusOffset
-        octaveOffset: sirenInfo ? sirenInfo.displayOctaveOffset : 0
+        octaveOffset: root.octaveOffset  // Utiliser root.octaveOffset
         
         // Paramètres MIDI CC pour les modulations et l'enveloppe
         vibratoAmount: root.vibratoAmount
@@ -206,10 +221,10 @@ Node {
                 tremoloRate = 1.0 + normalized * 19.0;  // 1.0 à 20.0 Hz (×2)
                 break;
             case 73:  // Attack Time
-                attackTime = normalized * 10000.0;  // 0 à 10000ms (10s)
+                attackTime = (ccValue == 0) ? 0 : 38100 / (128 - ccValue);  // Formule exacte du firmware
                 break;
             case 72:  // Release Time
-                releaseTime = normalized * 10000.0;  // 0 à 10000ms (10s)
+                releaseTime = (ccValue == 0) ? 0 : 38100 / (128 - ccValue);  // Formule exacte du firmware
                 break;
         }
     }

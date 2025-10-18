@@ -24,19 +24,27 @@ Model {
     property real tremoloRate: 4.0    // CC15
     
     // Propriétés calculées
-    property real cubeZ: -50
     property real cubeSize: 1.0
     property real totalDurationHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed )
     property real releaseHeight: Math.max(0.05, (releaseTime / 1000.0) * fallSpeed)
     property real totalHeight: totalDurationHeight + releaseHeight  // Release additif
     
-    // Position simplifiée - Le centre de l'objet C++ est au point NOTE ON (fin attack/début sustain)
-    property real currentY: spawnHeight  + totalHeight
+    // Position et profondeur
+    property real currentY: spawnHeight
     property real currentX: targetX
+    property real currentZ: -500  // Départ du fond de la scène
+    property real targetZ: -5  // Z de la portée (arrivée)
     
     // Calcul du sustain pour le shader (modulation proportionnelle)
     property real attackRatio: attackTime > 0 ? Math.min(1.0, attackTime / duration) : 0.0
     property real sustainHeight: totalDurationHeight * (1.0 - attackRatio)
+    
+    // Offset de clipping - constant maintenant que Z=0 (même plan que la portée)
+    property real clipOffset: 0  // Devrait être constant pour toutes les notes!
+    
+    // Clipping supérieur relatif (suit la note automatiquement)
+    // En coordonnées locales C++, le sommet du release est à totalHeight/2 + releaseHeight
+    property real clipYTopLocal: totalDurationHeight / 2.0 + releaseHeight + 100  // Position locale, +100 pour désactiver par défaut
     
     // Géométrie custom C++ - Le C++ calcule TOUT (ADSR, effectiveVelocity, proportions)
     // Passe les données musicales brutes, le C++ s'occupe du reste
@@ -50,10 +58,16 @@ Model {
     }
     
     // Position - Le centre C++ (Y=0) correspond au point NOTE ON
-    position: Qt.vector3d(currentX, currentY, cubeZ)
+    position: Qt.vector3d(currentX, currentY, currentZ)
     
     // Scale simple et uniforme (à ajuster manuellement pour correspondre au timing)
-    scale: Qt.vector3d(cubeSize*2, cubeSize, cubeSize)
+    scale: Qt.vector3d(cubeSize*4, cubeSize, cubeSize)
+    
+    // Fonction de troncature pour mode monophonique
+    // Définit la position locale où tronquer (0 = bas de la note, totalHeight = sommet)
+    function truncateNote(atLocalY) {
+        clipYTopLocal = atLocalY
+    }
     
     materials: [
         CustomMaterial {
@@ -64,9 +78,11 @@ Model {
             fragmentShader: "shaders/bend.frag"
             
             property color baseColor: cubeColor
-            property real metalness: 1.0
-            property real roughness: 0.5
+            property real metalness: 0.0
+            property real roughness: 0.0
             property real time: 0  // Temps pour l'animation (en ms)
+            property real clipY: noteModel.targetY + noteModel.clipOffset  // Ligne de clipping bas (espace monde)
+            property real clipYTopLocal: noteModel.clipYTopLocal  // Ligne de clipping haut (espace local, suit la note)
             
             // Intensités des effets musicaux (contrôlées par MIDI CC)
             property real tremoloIntensity: noteModel.tremoloAmount  // CC92
@@ -92,12 +108,12 @@ Model {
         }
     ]
     
-    // Animation de chute - Le centre de l'objet atteint targetY
+    // Animation de chute - Passe à travers targetY, le shader clippe
     NumberAnimation on currentY {
         id: fallAnimation
-        from: spawnHeight + (totalDurationHeight / 2.0) * cubeSize
-        to: targetY + (totalDurationHeight / 2.0) * cubeSize
-        duration: Math.max(100, (spawnHeight - targetY)/ fallSpeed * 1000)
+        from: spawnHeight
+        to: targetY - totalHeight * cubeSize  // Continue sous targetY pour clipping progressif
+        duration: Math.max(100, (spawnHeight - (targetY - totalHeight * cubeSize)) / fallSpeed * 1000)
         running: false
         
         onFinished: {
@@ -105,11 +121,16 @@ Model {
         }
     }
     
+/*     // Animation de profondeur - Se rapproche plus vite pour arriver au bon Z avant la note
+    NumberAnimation on currentZ {
+        id: depthAnimation
+        from: -500  // Fond de la scène
+        to: targetZ  // Position de la portée
+        duration: Math.max(100, fallAnimation.duration - (totalHeight*2 * cubeSize / fallSpeed * 1000))  // Arrive au bon Z avant la note
+        running: false
+    } */
+    
     Component.onCompleted: {
-        console.log("FallingNoteCustomGeo created - attackTime:", attackTime,
-                   "duration:", duration, "totalDurationHeight:", totalDurationHeight,
-                   "releaseHeight:", releaseHeight, "velocity:", velocity,
-                   "position:", position, "scale:", scale, "visible:", visible)
         fallAnimation.start()
     }
 }

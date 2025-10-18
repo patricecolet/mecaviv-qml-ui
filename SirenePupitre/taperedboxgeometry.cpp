@@ -6,7 +6,7 @@
 TaperedBoxGeometry::TaperedBoxGeometry(QQuick3DObject *parent)
     : QQuick3DGeometry(parent)
 {
-    qDebug() << "TaperedBoxGeometry constructor";
+    // qDebug() << "TaperedBoxGeometry constructor";
     
     // Attack (pyramide inversée) + Cube (sustain) + Release (pyramide)
     struct Vertex {
@@ -50,9 +50,9 @@ TaperedBoxGeometry::TaperedBoxGeometry(QQuick3DObject *parent)
     const float yTop = halfTotal;                              // Haut sustain
     const float yPeak = halfTotal + hReleasePyramid;           // Sommet release
     
-    qDebug() << "Constructor - attackTime:" << m_attackTime << "duration:" << m_duration 
-             << "attackRatio:" << attackRatio << "effectiveVelocity:" << effectiveVelocity
-             << "attackHeightVisual:" << attackHeightVisual << "sustainHeight:" << sustainHeight;
+    // qDebug() << "Constructor - attackTime:" << m_attackTime << "duration:" << m_duration 
+    //          << "attackRatio:" << attackRatio << "effectiveVelocity:" << effectiveVelocity
+    //          << "attackHeightVisual:" << attackHeightVisual << "sustainHeight:" << sustainHeight;
     
     // 18 vertices : 5 (attack) + 8 (cube) + 5 (release)
     Vertex vertices[] = {
@@ -112,8 +112,8 @@ TaperedBoxGeometry::TaperedBoxGeometry(QQuick3DObject *parent)
     QByteArray vertexBuffer(reinterpret_cast<char*>(vertices), sizeof(vertices));
     QByteArray indexBuffer(reinterpret_cast<char*>(indices), sizeof(indices));
     
-    qDebug() << "Setting up geometry - vertexBuffer:" << vertexBuffer.size() 
-             << "indexBuffer:" << indexBuffer.size();
+    // qDebug() << "Setting up geometry - vertexBuffer:" << vertexBuffer.size() 
+    //          << "indexBuffer:" << indexBuffer.size();
     
     setStride(sizeof(Vertex));
     setVertexData(vertexBuffer);
@@ -129,9 +129,9 @@ TaperedBoxGeometry::TaperedBoxGeometry(QQuick3DObject *parent)
     addAttribute(QQuick3DGeometry::Attribute::IndexSemantic, 0,
                  QQuick3DGeometry::Attribute::U32Type);
     
-    qDebug() << "Geometry configured, calling update()";
+    // qDebug() << "Geometry configured, calling update()";
     update();
-    qDebug() << "Geometry ready";
+    // qDebug() << "Geometry ready";
 }
 
 void TaperedBoxGeometry::setAttackTime(float time)
@@ -241,11 +241,11 @@ void TaperedBoxGeometry::updateGeometry()
     const float yTop = halfTotal;                              // Haut sustain
     const float yPeak = halfTotal + hReleasePyramid;           // Sommet release
     
-    qDebug() << "updateGeometry() - attackTime:" << m_attackTime << "duration:" << m_duration 
-             << "attackRatio:" << attackRatio << "effectiveVelocity:" << effectiveVelocity
-             << "attackHeightVisual:" << attackHeightVisual << "sustainHeight:" << sustainHeight
-             << "releaseHeight:" << m_releaseHeight << "width:" << (w*2) << "depth:" << (d*2)
-             << "bounds: yAttackBottom=" << yAttackBottom << "yPeak=" << yPeak;
+    // qDebug() << "updateGeometry() - attackTime:" << m_attackTime << "duration:" << m_duration 
+    //          << "attackRatio:" << attackRatio << "effectiveVelocity:" << effectiveVelocity
+    //          << "attackHeightVisual:" << attackHeightVisual << "sustainHeight:" << sustainHeight
+    //          << "releaseHeight:" << m_releaseHeight << "width:" << (w*2) << "depth:" << (d*2)
+    //          << "bounds: yAttackBottom=" << yAttackBottom << "yPeak=" << yPeak;
     
     // 18 vertices
     Vertex vertices[] = {
