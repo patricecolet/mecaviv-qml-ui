@@ -9,8 +9,15 @@ Model {
     // Propriétés publiques (compatibles avec FallingCube)
     property real targetY: 0
     property real targetX: 0
-    property real spawnHeight: 500
     property real fallSpeed: 150
+    property real fixedFallTime: 5000  // Temps de chute fixe en ms (5 secondes)
+    
+    // Distance fixe = vitesse × temps (le BAS de toutes les notes parcourt la même distance)
+    property real fixedDistance: fallSpeed * (fixedFallTime / 1000)
+    
+    // Point de spawn du BAS : toujours au même Y
+    // Si le BAS spawn à (cursorBarY + fixedDistance), alors le CENTRE spawn plus haut
+    property real spawnHeight: targetY + fixedDistance + (totalHeight * cubeSize) / 2
     property color cubeColor: "#00CED1"
     property real velocity: 127  // Vélocité de la note (0-127)
     property real duration: 1000  // Durée en ms
@@ -108,12 +115,14 @@ Model {
         }
     ]
     
-    // Animation de chute - Passe à travers targetY, le shader clippe
+    // Animation de chute avec vitesse constante
+    // Phase 1 (fixedFallTime) : le BAS arrive à cursorBarY
+    // Phase 2 (variable) : continue pour clipper tout le haut
     NumberAnimation on currentY {
         id: fallAnimation
         from: spawnHeight
-        to: targetY - totalHeight * cubeSize  // Continue sous targetY pour clipping progressif
-        duration: Math.max(100, (spawnHeight - (targetY - totalHeight * cubeSize)) / fallSpeed * 1000)
+        to: targetY - (totalHeight * cubeSize) / 2  // Le haut passe complètement sous cursorBarY
+        duration: fixedFallTime + (totalHeight * cubeSize / fallSpeed * 1000)
         running: false
         
         onFinished: {

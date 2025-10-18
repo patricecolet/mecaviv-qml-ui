@@ -15,8 +15,14 @@ Node {
     property real staffWidth: 1600
     property real staffPosX: 0
     property real ambitusOffset: 0
-    property real fallSpeed: 150  // Vitesse de chute
-    property real spawnHeight: 550  // Hauteur de départ
+    property real fallSpeed: 150  // Vitesse de chute constante
+    property real fixedFallTime: 5000  // Temps de chute fixe en ms (notes arrivent toutes en 5s)
+    
+    // Position Y de la barre du curseur (calculée comme dans NoteCursor3D.qml)
+    property real cursorOffsetY: 30  // Distance sous la première note (par défaut)
+    property real firstNoteY: noteCalc.calculateNoteYPosition(ambitusMin + (octaveOffset * 12), lineSpacing, clef)
+    property real cursorBarY: firstNoteY - cursorOffsetY  // Bas du curseur vertical
+    
     property int octaveOffset: 0 
     property string clef: "treble"
     
@@ -79,10 +85,10 @@ function noteToX(note) {
         
         // Créer la nouvelle note d'abord
         var newNote = cubeComponent.createObject(root, {
-            "targetY": noteToY(segment.note),
+            "targetY": root.cursorBarY,  // TOUTES les notes disparaissent à la barre du curseur
             "targetX": noteToX(segment.note),
-            "spawnHeight": root.spawnHeight,
             "fallSpeed": root.fallSpeed,
+            "fixedFallTime": root.fixedFallTime,
             "cubeColor": noteToColor(segment.note),
             "velocity": vel,
             "duration": segment.duration ?? 1000,  // Durée en ms
