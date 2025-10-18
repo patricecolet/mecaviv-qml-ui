@@ -42,27 +42,8 @@ Model {
     // Offset de clipping - constant maintenant que Z=0 (même plan que la portée)
     property real clipOffset: 0  // Devrait être constant pour toutes les notes!
     
-    // Clipping supérieur pour troncature monophonique
-    property real truncateAtWorldY: -999999  // Position monde où tronquer (désactivé par défaut)
-    property real clipYTopLocal: 999999  // Calculé dynamiquement
-    
-    // Timer pour mettre à jour le clipping pendant l'animation
-    // (les bindings peuvent ne pas se mettre à jour pendant NumberAnimation)
-    Timer {
-        id: clipUpdateTimer
-        interval: 16  // ~60 FPS
-        running: truncateAtWorldY > -999999
-        repeat: true
-        onTriggered: {
-            if (truncateAtWorldY <= -999999) {
-                clipYTopLocal = 999999
-            } else {
-                // Distance entre le point de troncature et la position actuelle
-                // Divisé par scale.y pour convertir en espace local
-                clipYTopLocal = (truncateAtWorldY - currentY) / scale.y
-            }
-        }
-    }
+    // Clipping supérieur relatif (suit la note automatiquement)
+    property real clipYTopLocal: totalHeight * 1.0  // Position locale de troncature (1.0 = sommet, désactivé par défaut)
     
     // Géométrie custom C++ - Le C++ calcule TOUT (ADSR, effectiveVelocity, proportions)
     // Passe les données musicales brutes, le C++ s'occupe du reste
@@ -82,10 +63,9 @@ Model {
     scale: Qt.vector3d(cubeSize*4, cubeSize, cubeSize)
     
     // Fonction de troncature pour mode monophonique
-    // Définit la position monde où tronquer la note
-    // Le clipping suivra automatiquement la note qui descend
-    function truncateNote(atWorldY) {
-        truncateAtWorldY = atWorldY
+    // Définit la position locale où tronquer (0 = bas de la note, totalHeight = sommet)
+    function truncateNote(atLocalY) {
+        clipYTopLocal = atLocalY
     }
     
     materials: [

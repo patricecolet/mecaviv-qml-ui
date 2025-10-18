@@ -79,7 +79,8 @@ function noteToX(note) {
         
         // MODE MONOPHONIQUE : Si une note est déjà en cours, la tronquer
         if (currentNote !== null) {
-            currentNote.truncateNote(currentNote.currentY)
+            // Option B : Tronquer à 0 (couper tout le sommet, ne montrer que la partie descendue)
+            currentNote.truncateNote(0)
         }
         
         // Créer la nouvelle note
