@@ -31,6 +31,10 @@ Node {
     readonly property real ambitusRange: ambitusMax - ambitusMin
     readonly property real staffHeight: ambitusRange * lineSpacing
     
+    // Mode monophonique - Référence à la note courante
+    property var currentNote: null
+    
+    
     // Component pour créer les cubes (créé une seule fois)
     Component {
         id: cubeComponent
@@ -73,7 +77,13 @@ function noteToX(note) {
             return  // Ne pas créer de cube pour noteOff
         }
         
-        cubeComponent.createObject(root, {
+        // MODE MONOPHONIQUE : Si une note est déjà en cours, la tronquer
+        if (currentNote !== null) {
+            currentNote.truncateNote(currentNote.currentY)
+        }
+        
+        // Créer la nouvelle note
+        var newNote = cubeComponent.createObject(root, {
             "targetY": noteToY(segment.note),
             "targetX": noteToX(segment.note),
             "spawnHeight": root.spawnHeight,
@@ -89,6 +99,9 @@ function noteToX(note) {
             "tremoloAmount": root.tremoloAmount,
             "tremoloRate": root.tremoloRate
         })
+        
+        // Garder la référence de la note courante
+        currentNote = newNote
     }
     
     // Surveiller les changements de lineSegments

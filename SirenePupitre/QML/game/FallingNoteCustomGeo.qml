@@ -42,6 +42,28 @@ Model {
     // Offset de clipping - constant maintenant que Z=0 (même plan que la portée)
     property real clipOffset: 0  // Devrait être constant pour toutes les notes!
     
+    // Clipping supérieur pour troncature monophonique
+    property real truncateAtWorldY: -999999  // Position monde où tronquer (désactivé par défaut)
+    property real clipYTopLocal: 999999  // Calculé dynamiquement
+    
+    // Timer pour mettre à jour le clipping pendant l'animation
+    // (les bindings peuvent ne pas se mettre à jour pendant NumberAnimation)
+    Timer {
+        id: clipUpdateTimer
+        interval: 16  // ~60 FPS
+        running: truncateAtWorldY > -999999
+        repeat: true
+        onTriggered: {
+            if (truncateAtWorldY <= -999999) {
+                clipYTopLocal = 999999
+            } else {
+                // Distance entre le point de troncature et la position actuelle
+                // Divisé par scale.y pour convertir en espace local
+                clipYTopLocal = (truncateAtWorldY - currentY) / scale.y
+            }
+        }
+    }
+    
     // Géométrie custom C++ - Le C++ calcule TOUT (ADSR, effectiveVelocity, proportions)
     // Passe les données musicales brutes, le C++ s'occupe du reste
     geometry: TaperedBoxGeometry {
@@ -59,6 +81,13 @@ Model {
     // Scale simple et uniforme (à ajuster manuellement pour correspondre au timing)
     scale: Qt.vector3d(cubeSize*4, cubeSize, cubeSize)
     
+    // Fonction de troncature pour mode monophonique
+    // Définit la position monde où tronquer la note
+    // Le clipping suivra automatiquement la note qui descend
+    function truncateNote(atWorldY) {
+        truncateAtWorldY = atWorldY
+    }
+    
     materials: [
         CustomMaterial {
             id: noteMaterial
@@ -71,7 +100,8 @@ Model {
             property real metalness: 0.0
             property real roughness: 0.0
             property real time: 0  // Temps pour l'animation (en ms)
-            property real clipY: noteModel.targetY + noteModel.clipOffset  // Ligne de clipping (ajustable)
+            property real clipY: noteModel.targetY + noteModel.clipOffset  // Ligne de clipping bas (espace monde)
+            property real clipYTopLocal: noteModel.clipYTopLocal  // Ligne de clipping haut (espace local, suit la note)
             
             // Intensités des effets musicaux (contrôlées par MIDI CC)
             property real tremoloIntensity: noteModel.tremoloAmount  // CC92
@@ -121,7 +151,6 @@ Model {
     
     Component.onCompleted: {
         fallAnimation.start()
-////        depthAnimation.start()
     }
 }
 

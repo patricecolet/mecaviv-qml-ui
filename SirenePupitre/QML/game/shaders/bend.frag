@@ -4,8 +4,14 @@ VARYING vec3 vWorldPosition;
 
 void MAIN()
 {
-    // Clipping magique - tout ce qui passe sous targetY disparaît
+    // Clipping bas - tout ce qui passe sous targetY disparaît (espace monde)
     if (vWorldPosition.y < clipY) {
+        discard;  // Pixel invisible
+    }
+    
+    // Clipping haut - pour troncature monophonique (espace local, suit la note)
+    // Utilise vPosition.y (coordonnées locales) pour que le clip suive la note qui descend
+    if (vPosition.y > clipYTopLocal) {
         discard;  // Pixel invisible
     }
     
