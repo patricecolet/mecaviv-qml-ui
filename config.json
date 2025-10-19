@@ -19,7 +19,8 @@
     }
   },
   
-  "sirenConfig": {
+  "sirenConfig": {   
+    "cb4techID": 8,
     "mode": "restricted",
     "currentSiren": "1",
     "sirens": [
