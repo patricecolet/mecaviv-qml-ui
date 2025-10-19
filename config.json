@@ -22,7 +22,7 @@
   "sirenConfig": {   
     "cb4techID": 8,
     "mode": "restricted",
-    "currentSiren": "1",
+    "currentSiren": "S1",
     "sirens": [
       {
         "id": "1",
