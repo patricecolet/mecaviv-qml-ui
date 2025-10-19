@@ -39,13 +39,100 @@ Item {
             try {
                 var bytes = new Uint8Array(message);
                 
-                // Format binaire pour Control Change (3 bytes)
+                // Format binaire pour CONTROLLERS (type 0x02, 16 bytes) - CONTRÔLEURS PHYSIQUES
+                if (bytes.length === 16 && bytes[0] === 0x02) {
+                    // Décoder les données
+                    // Volant position (uint16, déjà en degrés 0-360)
+                    var wheelPos = bytes[1] | (bytes[2] << 8);
+                    
+                    // Pads (2 pads distincts)
+                    var pad1After = bytes[3];
+                    var pad1Vel = bytes[4];
+                    var pad2After = bytes[5];
+                    var pad2Vel = bytes[6];
+                    
+                    // Joystick (int8 signés)
+                    var joyX = bytes[7];
+                    if (joyX > 127) joyX -= 256;
+                    var joyY = bytes[8];
+                    if (joyY > 127) joyY -= 256;
+                    var joyZ = bytes[9];
+                    if (joyZ > 127) joyZ -= 256;
+                    
+                    // Joystick bouton
+                    var joyBtn = bytes[10] > 0 ? 1 : 0;
+                    
+                    // Sélecteur 5 vitesses (0-4)
+                    var selector = bytes[11];
+                    
+                    // Fader et pédale
+                    var fader = bytes[12];
+                    var pedal = bytes[13];
+                    
+                    // Boutons supplémentaires
+                    var btn1 = bytes[14] > 0 ? 1 : 0;
+                    var btn2 = bytes[15] > 0 ? 1 : 0;
+                    
+                    // Mapper le mode GearShift (5 positions)
+                    var gearModeNames = ["SEMITONE", "THIRD", "MINOR_SIXTH", "OCTAVE", "DOUBLE_OCTAVE"];
+                    var gearModeName = gearModeNames[selector] || "SEMITONE";
+                    
+                    // Créer l'objet contrôleurs
+                    var controllers = {
+                        wheel: {
+                            position: wheelPos,  // 0-360 degrés (déjà converti par PureData)
+                            velocity: 0  // Non disponible dans ce format
+                        },
+                        joystick: {
+                            x: joyX,
+                            y: joyY,
+                            z: joyZ,
+                            button: joyBtn === 1
+                        },
+                        gearShift: {
+                            position: selector,      // 0-4 (5 vitesses)
+                            mode: gearModeName
+                        },
+                        fader: {
+                            value: fader
+                        },
+                        modPedal: {
+                            value: pedal,
+                            percent: (pedal / 127.0) * 100.0
+                        },
+                        pad1: {
+                            velocity: pad1Vel,
+                            aftertouch: pad1After,
+                            active: pad1Vel > 0
+                        },
+                        pad2: {
+                            velocity: pad2Vel,
+                            aftertouch: pad2After,
+                            active: pad2Vel > 0
+                        },
+                        buttons: {
+                            button1: btn1 === 1,
+                            button2: btn2 === 1
+                        }
+                    };
+                    
+                    // Émettre via dataReceived avec un flag
+                    controller.dataReceived({
+                        controllers: controllers,
+                        isControllersOnly: true,  // Flag pour identifier ce type de message
+                        timestamp: Date.now()
+                    });
+                    
+                    return;
+                }
+                
+                // Format binaire pour Control Change (3 bytes) - CC MIDI SÉQUENCE
                 if (bytes.length === 3 && bytes[0] === 0x05) {
                     // Format: [0x05, CC_number, value]
                     var ccNumber = bytes[1];
                     var ccValue = bytes[2];  // 0-127
                     
-                    // Émettre un signal pour les CC
+                    // Émettre un signal pour les CC de séquence
                     controller.controlChangeReceived(ccNumber, ccValue);
                     return;
                 }

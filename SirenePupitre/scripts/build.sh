@@ -127,6 +127,23 @@ build_web() {
     # Copier les fichiers dans webfiles
     print_info "Copie des fichiers WebAssembly..."
     cp build/appSirenePupitre.* webfiles/
+    
+    # FIX : Corriger l'ordre des scripts dans le HTML
+    # Qt génère le HTML avec appSirenePupitre.js avant qtloader.js, ce qui cause "qtLoad is not defined"
+    # On inverse l'ordre pour que qtloader.js soit chargé en premier
+    print_info "Correction de l'ordre des scripts dans le HTML..."
+    if [ -f "webfiles/appSirenePupitre.html" ]; then
+        # Supprimer la ligne appSirenePupitre.js
+        sed -i.bak -e '/<script src="appSirenePupitre.js"><\/script>/d' webfiles/appSirenePupitre.html
+        # Réinsérer appSirenePupitre.js APRÈS qtloader.js
+        sed -i.bak -e 's|<script type="text/javascript" src="qtloader.js"></script>|<script type="text/javascript" src="qtloader.js"></script>\n    <script src="appSirenePupitre.js"></script>|' webfiles/appSirenePupitre.html
+        # Nettoyer les fichiers backup
+        rm -f webfiles/appSirenePupitre.html.bak
+        print_success "Ordre des scripts corrigé (qtloader.js → appSirenePupitre.js)"
+    else
+        print_warning "Fichier HTML non trouvé, impossible de corriger l'ordre des scripts"
+    fi
+    
     # Copier les polices nécessaires pour le rendu 2D (Clef2D)
     mkdir -p webfiles/fonts || true
     if compgen -G "QML/fonts/*.*tf" > /dev/null; then

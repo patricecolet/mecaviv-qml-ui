@@ -324,12 +324,23 @@ var configData = {
 
 Le **premier byte** de chaque message binaire identifie son type :
 
-| Type | Hex | Usage | Taille |
-|------|-----|-------|--------|
-| CONFIG | 0x00 | Configuration complète (JSON) | Variable (8 bytes header + données) |
-| MIDI_NOTE | 0x01 | Note MIDI + Pitch Bend combinés | 5 bytes |
-| CONTROLLERS | 0x02 | États contrôleurs | 15 bytes |
-| MIDI_NOTE_DURATION | 0x04 | Note MIDI avec durée (optimisé mode jeu) | 5 bytes |
+| Type | Hex | Usage | Taille | Source |
+|------|-----|-------|--------|--------|
+| CONFIG | 0x00 | Configuration complète (JSON) | Variable (8 bytes header + données) | PureData |
+| **MIDI_NOTE** | **0x01** | **Note MIDI du volant (contrôleur)** | **5 bytes** | **Volant physique** |
+| **CONTROLLERS** | **0x02** | **États contrôleurs physiques** | **16 bytes** | **Contrôleurs physiques** |
+| MIDI_NOTE_DURATION | 0x04 | Note MIDI avec durée (séquence) | 5 bytes | Fichier MIDI |
+| CONTROL_CHANGE | 0x05 | CC MIDI (séquence) | 3 bytes | Fichier MIDI |
+
+### Distinction importante : Contrôleurs physiques vs Séquence MIDI
+
+**CONTRÔLEURS PHYSIQUES** (temps réel, ~60-100 Hz) :
+- `0x01` : Position du volant convertie en note MIDI → Déplace le curseur sur la portée
+- `0x02` : Tous les autres contrôleurs (joystick, pads, fader, etc.) → Indicateurs visuels
+
+**SÉQUENCE MIDI** (depuis fichier MIDI) :
+- `0x04` : Notes de la séquence avec durée → Mode jeu uniquement
+- `0x05` : Control Change (vibrato, tremolo, enveloppe) → Modulations en mode jeu
 
 **Note MIDI avec micro-tonalité (type 0x01)** :
 ```
@@ -392,6 +403,56 @@ Le **premier byte** de chaque message binaire identifie son type :
 - **Parsing ultra-rapide** (pas de JSON.parse)
 - **Parfait pour le mode jeu** avec beaucoup de notes
 - **Durée précise** pour la hauteur des cubes
+
+**Contrôleurs physiques (type 0x02) - 16 BYTES** :
+```
+[0x02][Volant_L][Volant_H][Pad1_A][Pad1_V][Pad2_A][Pad2_V][Joy_X][Joy_Y][Joy_Z][Joy_B][Sel][Fader][Pedal][Btn1][Btn2]
+```
+
+| Byte | Champ | Type | Plage | Description |
+|------|-------|------|-------|-------------|
+| 0 | Type | uint8 | 0x02 | Identifiant CONTROLLERS |
+| 1-2 | Volant | uint16 | 0-360 | Position en degrés (LSB/MSB) |
+| 3 | Pad1_After | uint8 | 0-127 | Aftertouch pad 1 |
+| 4 | Pad1_Vel | uint8 | 0-127 | Vélocité pad 1 |
+| 5 | Pad2_After | uint8 | 0-127 | Aftertouch pad 2 |
+| 6 | Pad2_Vel | uint8 | 0-127 | Vélocité pad 2 |
+| 7 | Joy_X | int8 | -127 à +127 | Position X joystick |
+| 8 | Joy_Y | int8 | -127 à +127 | Position Y joystick |
+| 9 | Joy_Z | int8 | -127 à +127 | Rotation Z joystick |
+| 10 | Joy_Btn | uint8 | 0/1 | Bouton joystick (>0 = 1) |
+| 11 | Selector | uint8 | 0-4 | Sélecteur/GearShift (5 vitesses) |
+| 12 | Fader | uint8 | 0-127 | Potentiomètre/Fader |
+| 13 | Pedal | uint8 | 0-127 | Pédale de modulation |
+| 14 | Button1 | uint8 | 0/1 | Bouton 1 (>0 = 1) |
+| 15 | Button2 | uint8 | 0/1 | Bouton 2 (>0 = 1) |
+
+**Mapping Sélecteur/GearShift** :
+- Position 0 : SEMITONE (demi-ton)
+- Position 1 : THIRD (tierce)
+- Position 2 : MINOR_SIXTH (sixte mineure)
+- Position 3 : OCTAVE (octave)
+- Position 4 : DOUBLE_OCTAVE (double octave)
+
+**Exemple** : Volant à 180°, Pad1 actif (vel=100, after=50), Joystick centré, Sélecteur en position 2
+```
+[0x02, 0xB4, 0x00, 0x32, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x30, 0x00, 0x00]
+  │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │
+  │     └─────┴─ 0x00B4 = 180 degrés
+  │           └─────┴─ Pad1: after=50, vel=100
+  │                 └─────┴─ Pad2: after=0, vel=0
+  │                       └─────────────────┴─ Joystick: X=0, Y=0, Z=0, Btn=0
+  │                                         └─ Sélecteur: 2 (MINOR_SIXTH)
+  │                                           └─────┴─ Fader=64, Pedal=48
+  │                                                 └─────┴─ Btn1=0, Btn2=0
+  └─ Type: CONTROLLERS
+```
+
+**Avantages du format 0x02** :
+- **40x plus compact** que JSON (~16 bytes vs ~600+ bytes)
+- **Parsing ultra-rapide** (accès direct par index)
+- **Fréquence élevée** (60-100 Hz) sans surcharge réseau
+- **Séparation claire** entre contrôleurs et séquence MIDI
 
 **3. Dans ConfigController**, la méthode d'envoi devra être adaptée** :
 
@@ -526,68 +587,88 @@ webSocketController.sendBinaryMessage({
 ```
 → Utiliser `1` pour activer le mode fretté (notes entières uniquement) pour une sirène spécifique, `0` pour le désactiver.
 
-### Formats des contrôleurs
+### Formats des contrôleurs physiques
 
 #### Volant (Wheel)
 - **position** : entier (0-360) - position en degrés
-- **velocity** : flottant (-100.0 à +100.0 deg/s)
+- **velocity** : flottant (-100.0 à +100.0 deg/s) - Non disponible dans 0x02
+- **Note** : La position est envoyée dans 0x02, la note MIDI résultante dans 0x01
 
 #### Joystick
-- **x** : int (-127 à +127)
-- **y** : int (-127 à +127)
-- **z** : int (-127 à +127) - rotation baton joystick
-- **button** : booléen
+- **x** : int8 (-127 à +127)
+- **y** : int8 (-127 à +127)
+- **z** : int8 (-127 à +127) - rotation baton joystick
+- **button** : booléen (0 ou 1)
 
-#### Levier de vitesse (GearShift)
-- **position** : entier (0-3)
-- **mode** : enum ["SEMITONE", "THIRD", "MINOR_SIXTH", "OCTAVE"]
+#### Sélecteur / Levier de vitesse (GearShift)
+- **position** : entier (0-4) - **5 vitesses**
+- **mode** : enum ["SEMITONE", "THIRD", "MINOR_SIXTH", "OCTAVE", "DOUBLE_OCTAVE"]
 
-#### Fader
+#### Fader / Potentiomètre
 - **value** : entier (0-127)
 
 #### Pédale de modulation (ModPedal)
 - **value** : entier (0-127)
-- **percent** : flottant (0.0-100.0)
+- **percent** : flottant (0.0-100.0) - Calculé côté QML
 
-#### Pad
+#### Pad 1 et Pad 2 (2 pads physiques)
 - **velocity** : entier (0-127)
 - **aftertouch** : entier (0-127)
-- **active** : booléen
-- **x** : entier (0-1)
-- **y** : entier (0-1)
+- **active** : booléen (calculé : velocity > 0)
+
+#### Boutons supplémentaires
+- **button1** : booléen (0 ou 1)
+- **button2** : booléen (0 ou 1)
 
 ## Flux de données
 
-### Phase 1 - Infrastructure de base
+### Phase 1 - Infrastructure de base (Configuration)
 1. **ConfigController** charge config.js comme configuration fallback au démarrage
 2. **WebSocketController** se connecte au serveur défini dans la config
 3. Le pupitre envoie `REQUEST_CONFIG` et reçoit `CONFIG_FULL` de PureData (remplace config.js)
-4. **WebSocketController** reçoit les messages avec la note MIDI
-5. **SirenController** :
-   - Récupère la configuration de la sirène active
-   - Limite la note selon le mode et l'ambitus
-   - Calcule la fréquence avec transposition
-   - Calcule les RPM selon le nombre de sorties
-6. **SirenDisplay** affiche Hz et RPM avec des afficheurs LED 3D
 
-### Phase 2 - Visualisation musicale
-1. **MusicalStaff3D** affiche une portée musicale en 3D
-   - Gère le mode restricted via sirenInfo passé directement
-   - Utilise restrictedMax si mode="restricted"
-2. **AmbitusDisplay3D** affiche toutes les notes de l'ambitus sur la portée
-3. **NoteCursor3D** suit la note actuelle avec un curseur vertical dynamique
-4. **NoteProgressBar3D** affiche la progression dans l'ambitus
-5. **LedgerLines3D** ajoute des lignes supplémentaires pour les notes hors portée
-6. **Clef3D** affiche la clé de sol ou de fa
+### Phase 2 - Données temps réel (Contrôleurs physiques)
+1. **Format 0x01 (MIDI_NOTE)** : PureData envoie la position du volant convertie en note MIDI
+   - **WebSocketController** reçoit et décode la note
+   - **SirenController** calcule fréquence et RPM avec transposition
+   - **MusicalStaff3D** déplace le curseur sur la portée
+   - **SirenDisplay** affiche Hz et RPM avec afficheurs LED 3D
+
+2. **Format 0x02 (CONTROLLERS)** : PureData envoie l'état de tous les contrôleurs (16 bytes)
+   - **WebSocketController** décode le paquet binaire
+   - **ControllersPanel** met à jour tous les indicateurs visuels :
+     - Volant (position physique)
+     - Joystick (X, Y, Z, bouton)
+     - Sélecteur 5 vitesses (GearShift)
+     - Fader
+     - Pédale de modulation
+     - Pad 1 et Pad 2 (velocity + aftertouch)
+     - Boutons 1 et 2
+
+### Phase 3 - Séquence MIDI (Mode jeu)
+1. **Format 0x04 (MIDI_NOTE_DURATION)** : Notes de séquence avec durée
+   - **WebSocketController** décode et émet `isSequence: true`
+   - **GameMode** affiche les cubes 3D avec hauteur = durée
+   
+2. **Format 0x05 (CONTROL_CHANGE)** : CC MIDI de séquence
+   - **WebSocketController** émet `controlChangeReceived()`
+   - **GameMode** applique vibrato, tremolo, enveloppe
+
+### Composants de visualisation
+- **MusicalStaff3D** : Portée musicale 3D avec gestion du mode restricted
+- **AmbitusDisplay3D** : Affichage de toutes les notes de l'ambitus
+- **NoteCursor3D** : Curseur vertical qui suit la note actuelle (depuis 0x01)
+- **NoteProgressBar3D** : Barre de progression dans l'ambitus
+- **LedgerLines3D** : Lignes supplémentaires pour notes hors portée
+- **Clef3D** : Clés de sol et fa (modèles 3D)
+- **ControllersPanel** : Disposition et affichage de tous les contrôleurs (depuis 0x02)
 
 
-### Phase 3 - Contrôleurs visuels
-- Les composants reçoivent directement sirenInfo pour simplifier les bindings
-- ControllersPanel gère la disposition des indicateurs
-- Esthétique à valider pour terminer cette phase
+### ⚠️ Format JSON WebSocket (OBSOLÈTE - Rétrocompatibilité uniquement)
 
+**Ce format est remplacé par le protocole binaire (0x02 pour contrôleurs, 0x01 pour note volant).**  
+Conservé uniquement pour rétrocompatibilité avec d'anciens systèmes.
 
-### Format du message WebSocket
 ```json
 {
     "device": "MUSIC_VISUALIZER",
@@ -628,6 +709,12 @@ webSocketController.sendBinaryMessage({
     }
 }
 ```
+
+**Problèmes du format JSON** :
+- 40x plus lourd (~600 bytes vs 16 bytes binaire)
+- Parsing JSON coûteux en CPU
+- Inadapté aux fréquences élevées (60-100 Hz)
+- Mélange contrôleurs et note MIDI
 
 ## Conversions mathématiques
 

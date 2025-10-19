@@ -74,7 +74,7 @@ Window {
         onDataReceived: function(data) {
             // Logs désactivés pour performance
             
-            // Si c'est une note de séquence (binaire 3 bytes), aller uniquement au mode jeu
+            // Format 0x04 : Note de séquence MIDI -> uniquement au mode jeu
             if (data.isSequence) {
                 if (display.gameMode) {
                     display.sendMidiEventToGame(data)
@@ -82,7 +82,15 @@ Window {
                 return
             }
             
-            // Sinon, traiter les contrôleurs et la note actuelle (JSON)
+            // Format 0x02 : Contrôleurs physiques uniquement -> mettre à jour les indicateurs
+            if (data.isControllersOnly) {
+                if (data.controllers) {
+                    display.updateControllers(data.controllers)
+                }
+                return
+            }
+            
+            // Format JSON legacy (rétrocompatibilité) : Note MIDI + contrôleurs mélangés
             if (data.midiNote !== undefined) {
                 sirenController.midiNote = data.midiNote
             }

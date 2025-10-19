@@ -17,9 +17,17 @@ Rectangle {
     property int faderValue: 0
     property int modPedalValue: 0
     property real modPedalPercent: 0
-    property int padVelocity: 0
-    property int padAftertouch: 0
-    property bool padActive: false
+    // Pad 1
+    property int pad1Velocity: 0
+    property int pad1Aftertouch: 0
+    property bool pad1Active: false
+    // Pad 2
+    property int pad2Velocity: 0
+    property int pad2Aftertouch: 0
+    property bool pad2Active: false
+    // Boutons supplémentaires
+    property bool button1: false
+    property bool button2: false
     
     // Propriétés visuelles
     property color backgroundColor: "#0a0a0a"
@@ -41,13 +49,13 @@ Rectangle {
         width: 10
         height: 10
         radius: 5
-        color: root.wheelSpeed !== 0 || root.faderValue !== 0 || root.padActive ? "#00ff00" : "#ff0000"
+        color: root.wheelSpeed !== 0 || root.faderValue !== 0 || root.pad1Active || root.pad2Active ? "#00ff00" : "#ff0000"
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: 15
         
         SequentialAnimation on opacity {
-            running: root.wheelSpeed !== 0 || root.faderValue !== 0 || root.padActive
+            running: root.wheelSpeed !== 0 || root.faderValue !== 0 || root.pad1Active || root.pad2Active
             loops: Animation.Infinite
             NumberAnimation { to: 0.3; duration: 1000 }
             NumberAnimation { to: 1.0; duration: 1000 }
@@ -208,9 +216,9 @@ Rectangle {
                 }
             }
             
-            // Position 6/6 - Pad
+            // Position 6a/6 - Pad 1
             Node {
-                x: parent.itemSpacing * 2.5
+                x: parent.itemSpacing * 2.3
                 y: 0
                 z: 0
                 visible: {
@@ -220,8 +228,27 @@ Rectangle {
                 }
                 
                 PadIndicator {
-                    aftertouch: root.padAftertouch
-                    scale: Qt.vector3d(1.5, 1.5, 1.5)
+                    aftertouch: root.pad1Aftertouch
+                    scale: Qt.vector3d(1.3, 1.3, 1.3)
+                    orientation: Qt.vector3d(-90, 90, 90)
+                    showValues: showControllerValues()
+                }
+            }
+            
+            // Position 6b/6 - Pad 2
+            Node {
+                x: parent.itemSpacing * 2.7
+                y: 0
+                z: 0
+                visible: {
+                    if (!configController) return true
+                    configController.updateCounter
+                    return configController.isSubComponentVisible("controllers", "pad")
+                }
+                
+                PadIndicator {
+                    aftertouch: root.pad2Aftertouch
+                    scale: Qt.vector3d(1.3, 1.3, 1.3)
                     orientation: Qt.vector3d(-90, 90, 90)
                     showValues: showControllerValues()
                 }
@@ -240,6 +267,75 @@ Rectangle {
         anchors.horizontalCenterOffset: -parent.width * 0.19  // Position centrée au-dessus du GearShift
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 30
+    }
+    
+    // Labels pour les pads
+    Row {
+        visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "pad")
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: parent.width * 0.36
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 30
+        spacing: 50
+        
+        Text {
+            text: "PAD 1"
+            font.pixelSize: 12
+            font.bold: root.pad1Active
+            color: root.pad1Active ? "#00ff00" : "#666666"
+        }
+        
+        Text {
+            text: "PAD 2"
+            font.pixelSize: 12
+            font.bold: root.pad2Active
+            color: root.pad2Active ? "#00ff00" : "#666666"
+        }
+    }
+    
+    // Boutons supplémentaires en overlay 2D (en bas)
+    Row {
+        visible: showControllerValues()
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottomMargin: 5
+        spacing: 15
+        
+        // Bouton 1
+        Rectangle {
+            width: 50
+            height: 30
+            radius: 4
+            color: root.button1 ? "#00ff00" : "#2a2a2a"
+            border.color: root.button1 ? "#00aa00" : "#444444"
+            border.width: 2
+            
+            Text {
+                text: "BTN 1"
+                anchors.centerIn: parent
+                color: root.button1 ? "#000000" : "#666666"
+                font.pixelSize: 10
+                font.bold: root.button1
+            }
+        }
+        
+        // Bouton 2
+        Rectangle {
+            width: 50
+            height: 30
+            radius: 4
+            color: root.button2 ? "#00ff00" : "#2a2a2a"
+            border.color: root.button2 ? "#00aa00" : "#444444"
+            border.width: 2
+            
+            Text {
+                text: "BTN 2"
+                anchors.centerIn: parent
+                color: root.button2 ? "#000000" : "#666666"
+                font.pixelSize: 10
+                font.bold: root.button2
+            }
+        }
     }
     
     // Fonction pour mettre à jour toutes les données
@@ -271,10 +367,31 @@ Rectangle {
             modPedalPercent = controllersData.modPedal.percent || 0
         }
         
-        if (controllersData.pad) {
-            padVelocity = controllersData.pad.velocity || 0
-            padAftertouch = controllersData.pad.aftertouch || 0
-            padActive = controllersData.pad.active || false
+        // Pad 1
+        if (controllersData.pad1) {
+            pad1Velocity = controllersData.pad1.velocity || 0
+            pad1Aftertouch = controllersData.pad1.aftertouch || 0
+            pad1Active = controllersData.pad1.active || false
+        }
+        
+        // Pad 2
+        if (controllersData.pad2) {
+            pad2Velocity = controllersData.pad2.velocity || 0
+            pad2Aftertouch = controllersData.pad2.aftertouch || 0
+            pad2Active = controllersData.pad2.active || false
+        }
+        
+        // Rétrocompatibilité : ancien format "pad" unique -> pad1
+        if (controllersData.pad && !controllersData.pad1) {
+            pad1Velocity = controllersData.pad.velocity || 0
+            pad1Aftertouch = controllersData.pad.aftertouch || 0
+            pad1Active = controllersData.pad.active || false
+        }
+        
+        // Boutons supplémentaires
+        if (controllersData.buttons) {
+            button1 = controllersData.buttons.button1 || false
+            button2 = controllersData.buttons.button2 || false
         }
         
     }
