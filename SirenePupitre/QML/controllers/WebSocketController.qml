@@ -23,6 +23,8 @@ Item {
     signal dataReceived(var data)
     signal configReceived(var config)
     signal controlChangeReceived(int ccNumber, int ccValue)  // Signal pour les CC MIDI
+    signal playbackPositionReceived(bool playing, int bar, int beatInBar, real beat)  // Position lecture
+    signal filesListReceived(var categories)  // Liste fichiers MIDI
     property var configController: null
     
     // Propriétés pour la réception binaire
@@ -51,13 +53,10 @@ Item {
                     var pad2After = bytes[5];
                     var pad2Vel = bytes[6];
                     
-                    // Joystick (int8 signés)
-                    var joyX = bytes[7];
-                    if (joyX > 127) joyX -= 256;
-                    var joyY = bytes[8];
-                    if (joyY > 127) joyY -= 256;
-                    var joyZ = bytes[9];
-                    if (joyZ > 127) joyZ -= 256;
+                    // Joystick : 0-127 = +0 à +127, 128-255 = -0 à -127
+                    var joyX = bytes[7] <= 127 ? bytes[7] : -(bytes[7] - 128);
+                    var joyY = bytes[8] <= 127 ? bytes[8] : -(bytes[8] - 128);
+                    var joyZ = bytes[9] <= 127 ? bytes[9] : -(bytes[9] - 128);
                     
                     // Joystick bouton
                     var joyBtn = bytes[10] > 0 ? 1 : 0;
@@ -123,6 +122,53 @@ Item {
                         timestamp: Date.now()
                     });
                     
+                    return;
+                }
+                
+                // Format binaire 0x01 - POSITION (10 bytes) - Mode autonome
+                if (bytes.length === 10 && bytes[0] === 0x01) {
+                    // Format: [0x01, flags, bar_l, bar_h, beatInBar_l, beatInBar_h, beat_f32LE]
+                    var flags = bytes[1];
+                    var playing = (flags & 0x01) !== 0;
+                    var bar = bytes[2] | (bytes[3] << 8);
+                    var beatInBar = bytes[4] | (bytes[5] << 8);
+                    
+                    // Décoder float32 little-endian pour beat
+                    var f0 = bytes[6], f1 = bytes[7], f2 = bytes[8], f3 = bytes[9];
+                    var beat = new DataView(Uint8Array.of(f0, f1, f2, f3).buffer).getFloat32(0, true);
+                    
+                    // Émettre le signal
+                    controller.playbackPositionReceived(playing, bar, beatInBar, beat);
+                    return;
+                }
+                
+                // Format binaire 0x03 - MIDI_NOTE_VOLANT (5 bytes)
+                if (bytes.length === 5 && bytes[0] === 0x03) {
+                    // Format: [0x03, note, velocity, bend_lsb, bend_msb]
+                    var note = bytes[1];
+                    var velocity = bytes[2];
+                    var bendLsb = bytes[3];
+                    var bendMsb = bytes[4];
+                    
+                    // Calculer le pitch bend (14 bits, centré à 8192)
+                    // bendLsb = 7 bits bas, bendMsb = 7 bits haut
+                    var pitchBend = bendLsb | (bendMsb << 7);
+                    var bendSemitones = ((pitchBend - 8192) / 8192.0) * 2.0;  // ±2 demi-tons
+                    
+                    // Note finale avec micro-tonalité
+                    var midiNote = note + bendSemitones;
+                    
+                    // Créer l'objet événement (va vers sirenController.midiNote)
+                    var event = {
+                        midiNote: midiNote,
+                        note: note,
+                        velocity: velocity,
+                        isVolantNote: true,  // Flag pour distinguer du séquenceur
+                        timestamp: Date.now()
+                    };
+                    
+                    // Transmettre l'événement
+                    controller.dataReceived(event);
                     return;
                 }
                 
@@ -307,6 +353,12 @@ Item {
                     if (controller.configController && data.config) {
                         controller.configController.updateFullConfig(data.config);
                     }
+                    return;
+                }
+                
+                // MIDI_FILES_LIST - Liste des fichiers MIDI disponibles
+                if (data.type === "MIDI_FILES_LIST") {
+                    controller.filesListReceived(data.categories || []);
                     return;
                 }
                 

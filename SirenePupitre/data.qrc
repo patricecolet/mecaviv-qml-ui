@@ -56,6 +56,10 @@
         <file>QML/game/FallingCube.qml</file>
         <file>QML/game/FallingNoteCustomGeo.qml</file>
         <file>QML/game/TestSimpleGeo.qml</file>
+        <file>QML/game/GameAutonomyPanel.qml</file>
+        <file>QML/game/SongSelectorDialog.qml</file>
+        <file>QML/game/PlaybackState.qml</file>
+        <file>QML/game/ScoringEngine.qml</file>
         <file>QML/game/shaders/bend.vert</file>
         <file>QML/game/shaders/squash.vert</file>
         <file>QML/game/shaders/bend_uniform.vert</file>

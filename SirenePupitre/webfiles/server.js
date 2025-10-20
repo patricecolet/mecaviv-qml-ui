@@ -2,6 +2,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Importer l'API MIDI
+const midiAPI = require('./api-midi.js');
+
 // Configuration du serveur
 const PORT = 8000;
 const HOST = '0.0.0.0';
@@ -38,6 +41,12 @@ http.createServer(function (request, response) {
 
     // Gestion des routes
     let filePath = '.' + request.url;
+    
+    // Routes API MIDI
+    if (request.url === '/api/midi/files') {
+        midiAPI.getMidiFilesList(request, response);
+        return;
+    }
     
     // Route principale
     if (request.url === '/' || request.url === '') {

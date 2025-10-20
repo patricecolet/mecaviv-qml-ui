@@ -20,9 +20,9 @@
 | 4 | **Pad1 Velocity** | uint8 | 0-127 | Force de frappe pad 1 |
 | 5 | **Pad2 Aftertouch** | uint8 | 0-127 | Pression continue pad 2 |
 | 6 | **Pad2 Velocity** | uint8 | 0-127 | Force de frappe pad 2 |
-| 7 | **Joystick X** | int8 | -127 à +127 | Position horizontale |
-| 8 | **Joystick Y** | int8 | -127 à +127 | Position verticale |
-| 9 | **Joystick Z** | int8 | -127 à +127 | Rotation du manche |
+| 7 | **Joystick X** | uint8 | 0-255 | Position horizontale (0-127=positif, 128-255=négatif) |
+| 8 | **Joystick Y** | uint8 | 0-255 | Position verticale (0-127=positif, 128-255=négatif) |
+| 9 | **Joystick Z** | uint8 | 0-255 | Rotation du manche (0-127=positif, 128-255=négatif) |
 | 10 | **Joystick Button** | uint8 | 0 ou 1 | Bouton joystick (>0 = appuyé) |
 | 11 | **Sélecteur** | uint8 | 0-4 | Position du levier (5 vitesses) |
 | 12 | **Fader** | uint8 | 0-127 | Position du potentiomètre |
@@ -102,13 +102,22 @@ Byte 15: 0x00 = 0 (bouton 2)
 └─ $btn2
 ```
 
-### Conversion joystick signé → unsigned
+### Conversion joystick (mapping PureData)
 ```
-Si joystick_x est signé (-127 à +127):
-  byte_value = joystick_x (laisser tel quel, complément à 2)
-  
-Côté QML:
-  if (byte > 127) value = byte - 256;
+PureData envoie :
+  0-127   → valeurs positives 0 à +127
+  128-255 → valeurs négatives 0 à -127
+
+Côté QML (décodage) :
+  value = (byte <= 127) ? byte : -(byte - 128)
+
+Exemples :
+  byte 0   → 0
+  byte 64  → +64
+  byte 127 → +127
+  byte 128 → -0 (centre négatif)
+  byte 192 → -64
+  byte 255 → -127
 ```
 
 ## Performance

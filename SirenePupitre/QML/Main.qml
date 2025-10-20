@@ -90,6 +90,12 @@ Window {
                 return
             }
             
+            // Format 0x01 : Note volant uniquement -> curseur portée, PAS le mode jeu
+            if (data.isVolantNote) {
+                sirenController.midiNote = data.midiNote
+                return  // Ne va PAS au mode jeu
+            }
+            
             // Format JSON legacy (rétrocompatibilité) : Note MIDI + contrôleurs mélangés
             if (data.midiNote !== undefined) {
                 sirenController.midiNote = data.midiNote
@@ -98,7 +104,7 @@ Window {
                 display.updateControllers(data.controllers)
             }
             
-            // Si mode jeu actif, transmettre aussi au mode jeu
+            // Si mode jeu actif, transmettre au mode jeu (pour JSON legacy ou autres formats)
             if (display.gameMode) {
                 display.sendMidiEventToGame(data)
             }

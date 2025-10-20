@@ -15,36 +15,117 @@
 
 ### Nouveaux formats binaires
 
-#### Type 0x01 - MIDI_NOTE (5 bytes)
+#### Type 0x01 - POSITION (10 bytes) ⭐ RÉASSIGNÉ (Mode autonome)
+- **Usage** : Position de lecture (bar/beat/beat total)
+- **Source** : PureData/Séquenceur
+- **Destination** : SirenePupitre (mode jeu)
+- **Fréquence** : 50-100 Hz pendant lecture
+
+**Structure** :
+| Byte | Champ | Type | Plage | Description |
+|------|-------|------|-------|-------------|
+| 0 | Type | uint8 | 0x01 | Identifiant POSITION |
+| 1 | Flags | uint8 | 0-255 | bit0=playing, autres réservés |
+| 2-3 | barNumber | uint16 | 0-65535 | Numéro de mesure (LE) |
+| 4-5 | beatInBar | uint16 | 0-65535 | Beat dans la mesure (LE) |
+| 6-9 | beat | float32 | 0.0+ | Beat total décimal (LE) |
+
+**Exemple** : Mesure 13, beat 2, beat total 50.5, playing=true
+```
+[0x01, 0x01, 0x0D, 0x00, 0x02, 0x00, 0x00, 0x00, 0x49, 0x42]
+```
+
+**Décodage** :
+- Flags: 0x01 → bit0=1 (playing=true)
+- barNumber: 0x000D = 13
+- beatInBar: 0x0002 = 2
+- beat: float32(50.5) en little-endian
+
+#### Type 0x03 - MIDI_NOTE_VOLANT (5 bytes) ⭐ NOUVEAU (Remplace ancien 0x01)
 - **Usage** : Position du volant convertie en note MIDI
 - **Source** : Contrôleur physique (volant)
 - **Destination** : Curseur sur la portée musicale
 - **Fréquence** : ~100 Hz
 
-#### Type 0x02 - CONTROLLERS (16 bytes) ⭐ NOUVEAU
+**Structure** :
+| Byte | Champ | Type | Plage | Description |
+|------|-------|------|-------|-------------|
+| 0 | Type | uint8 | 0x03 | Identifiant MIDI_NOTE_VOLANT |
+| 1 | Note | uint8 | 0-127 | Note MIDI du volant |
+| 2 | Velocity | uint8 | 0-127 | Vélocité |
+| 3 | Bend LSB | uint8 | 0-255 | Pitch Bend LSB |
+| 4 | Bend MSB | uint8 | 0-255 | Pitch Bend MSB |
+
+**Exemple** : Note 69 (La4)
+```
+[0x03, 0x45, 0x64, 0x00, 0x40]
+```
+
+#### Type 0x02 - CONTROLLERS (16 bytes)
 - **Usage** : État de tous les contrôleurs physiques
-- **Contenu** :
-  - Volant (position en degrés 0-360)
-  - Pad 1 (velocity + aftertouch)
-  - Pad 2 (velocity + aftertouch) - NOUVEAU
-  - Joystick (X, Y, Z, bouton)
-  - Sélecteur 5 vitesses (0-4) - ÉTENDU de 4 à 5 positions
-  - Fader (0-127)
-  - Pédale (0-127)
-  - Bouton 1 - NOUVEAU
-  - Bouton 2 - NOUVEAU
 - **Fréquence** : ~60 Hz
 - **Performance** : 40x plus compact que JSON (16 bytes vs 600 bytes)
+
+**Structure** :
+| Byte | Champ | Type | Plage | Description |
+|------|-------|------|-------|-------------|
+| 0 | Type | uint8 | 0x02 | Identifiant CONTROLLERS |
+| 1-2 | Volant | uint16 | 0-360 | Position en degrés (LSB/MSB) |
+| 3 | Pad1_After | uint8 | 0-127 | Aftertouch pad 1 |
+| 4 | Pad1_Vel | uint8 | 0-127 | Vélocité pad 1 |
+| 5 | Pad2_After | uint8 | 0-127 | Aftertouch pad 2 (NOUVEAU) |
+| 6 | Pad2_Vel | uint8 | 0-127 | Vélocité pad 2 (NOUVEAU) |
+| 7 | Joy_X | uint8 | 0-255 | Position X (0-127=+, 128-255=-) |
+| 8 | Joy_Y | uint8 | 0-255 | Position Y (0-127=+, 128-255=-) |
+| 9 | Joy_Z | uint8 | 0-255 | Rotation Z (0-127=+, 128-255=-) |
+| 10 | Joy_Btn | uint8 | 0/1 | Bouton joystick |
+| 11 | Selector | uint8 | 0-4 | Sélecteur 5 vitesses (ÉTENDU) |
+| 12 | Fader | uint8 | 0-127 | Potentiomètre |
+| 13 | Pedal | uint8 | 0-127 | Pédale modulation |
+| 14 | Button1 | uint8 | 0/1 | Bouton 1 (NOUVEAU) |
+| 15 | Button2 | uint8 | 0/1 | Bouton 2 (NOUVEAU) |
+
+**Exemple** : Volant à 180°, Pad1 actif
+```
+[0x02, 0xB4, 0x00, 0x32, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x30, 0x00, 0x00]
+```
 
 #### Type 0x04 - MIDI_NOTE_DURATION (5 bytes)
 - **Usage** : Notes de séquence MIDI avec durée
 - **Source** : Fichier MIDI
 - **Destination** : Mode jeu uniquement
 
+**Structure** :
+| Byte | Champ | Type | Plage | Description |
+|------|-------|------|-------|-------------|
+| 0 | Type | uint8 | 0x04 | Identifiant MIDI_NOTE_DURATION |
+| 1 | Note | uint8 | 0-127 | Note MIDI |
+| 2 | Velocity | uint8 | 0-127 | Vélocité |
+| 3 | Duration LSB | uint8 | 0-255 | Durée LSB (ms) |
+| 4 | Duration MSB | uint8 | 0-255 | Durée MSB (ms) |
+
+**Exemple** : Note 69, durée 800ms
+```
+[0x04, 0x45, 0x64, 0x20, 0x03]
+Durée = 0x20 + (0x03 << 8) = 32 + 768 = 800ms
+```
+
 #### Type 0x05 - CONTROL_CHANGE (3 bytes)
 - **Usage** : CC MIDI de séquence
 - **Source** : Fichier MIDI
 - **Destination** : Modulations (vibrato, tremolo, enveloppe)
+
+**Structure** :
+| Byte | Champ | Type | Plage | Description |
+|------|-------|------|-------|-------------|
+| 0 | Type | uint8 | 0x05 | Identifiant CONTROL_CHANGE |
+| 1 | CC Number | uint8 | 0-127 | Numéro du Control Change |
+| 2 | CC Value | uint8 | 0-127 | Valeur du Control Change |
+
+**Exemple** : CC 1 (Vibrato Amount), valeur 64
+```
+[0x05, 0x01, 0x40]
+```
 
 ### Modifications du code
 
@@ -93,8 +174,8 @@
 - **CPU libéré** : Pas de parsing JSON coûteux
 
 #### Architecture
-- **Séparation claire** : Contrôleurs physiques ≠ Séquence MIDI
-- **Types distincts** : 0x01 (volant), 0x02 (contrôleurs), 0x04 (séquence), 0x05 (CC)
+- **Séparation claire** : Contrôleurs physiques ≠ Séquence MIDI ≠ Position lecture
+- **Types distincts** : 0x01 (position), 0x02 (contrôleurs), 0x03 (volant), 0x04 (séquence), 0x05 (CC)
 - **Extensibilité** : Facile d'ajouter de nouveaux types
 
 #### Maintenance
@@ -110,20 +191,69 @@ L'application détecte automatiquement le format (binaire ou JSON) et s'adapte.
 ### Migration PureData
 
 Pour profiter des optimisations, PureData doit envoyer :
-1. **Type 0x01** : Position volant → note MIDI (déjà fait)
+1. **Type 0x01** : Position lecture (bar/beat) en mode autonome (à implémenter)
 2. **Type 0x02** : Paquet de 16 bytes avec tous les contrôleurs (à implémenter)
-3. **Type 0x04** : Notes de séquence (déjà fait)
-4. **Type 0x05** : CC de séquence (déjà fait)
+3. **Type 0x03** : Position volant → note MIDI (à migrer depuis ancien 0x01)
+4. **Type 0x04** : Notes de séquence (déjà fait)
+5. **Type 0x05** : CC de séquence (déjà fait)
+
+### Commandes mode autonome (Pupitre → PureData)
+
+Pour le mode autonome, le Pupitre envoie des commandes JSON encodées en binaire UTF-8 :
+
+**MIDI_FILES_REQUEST** : Demander la liste des morceaux
+```json
+{ "type": "MIDI_FILES_REQUEST", "source": "pupitre" }
+```
+
+**MIDI_FILE_LOAD** : Charger un morceau
+```json
+{ "type": "MIDI_FILE_LOAD", "path": "demo/ex1.mid", "source": "pupitre" }
+```
+
+**MIDI_TRANSPORT** : Contrôler la lecture
+```json
+{ "type": "MIDI_TRANSPORT", "action": "play", "source": "pupitre" }
+{ "type": "MIDI_TRANSPORT", "action": "pause", "source": "pupitre" }
+{ "type": "MIDI_TRANSPORT", "action": "stop", "source": "pupitre" }
+```
+
+**Réponse attendue** : PureData diffuse 0x01 (POSITION) + 0x04/0x05
 
 ### Tests requis
 
-- [ ] Vérifier la réception du format 0x02 depuis PureData
+- [x] Vérifier la réception du format 0x02 depuis PureData ✅
 - [ ] Tester les 2 pads simultanément
 - [ ] Tester les 5 positions du sélecteur
 - [ ] Tester les 2 boutons supplémentaires
 - [ ] Valider la fréquence de mise à jour (60-100 Hz)
 - [ ] Vérifier la performance CPU avec format binaire vs JSON
 - [ ] Tester la rétrocompatibilité JSON
+
+### Corrections post-implémentation
+
+#### Fix conversion joystick (19 octobre 2025)
+
+**Problème** : Conversion incorrecte des valeurs joystick. Le complément à 2 standard générait des valeurs hors limites.
+
+**Mapping PureData** :
+- bytes `0-127` = valeurs `+0` à `+127` (positif)
+- bytes `128-255` = valeurs `-0` à `-127` (négatif)
+
+**Solution** : Remapping linéaire au lieu du complément à 2
+```javascript
+// Avant (incorrect - complément à 2)
+if (joyX > 127) joyX -= 256;  // 128 → -128, 255 → -1
+
+// Après (correct - mapping PureData)
+joyX = bytes[7] <= 127 ? bytes[7] : -(bytes[7] - 128);
+// 0 → 0, 127 → +127, 128 → 0, 255 → -127
+```
+
+**Fichiers modifiés** :
+- `WebSocketController.qml` : Conversion corrigée (lignes 54-57)
+- `STRUCTURE_BINAIRE_0x02.md` : Documentation mise à jour
+- `README.md` : Tableau et formats mis à jour
 
 ### Notes techniques
 

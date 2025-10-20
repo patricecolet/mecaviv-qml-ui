@@ -236,9 +236,10 @@ Item {
                     currentNoteMidi: root.clampedNote
                     ambitusMin: root.sirenInfo ? root.sirenInfo.ambitus.min : 43
                     ambitusMax: root.sirenInfo ? root.sirenInfo.ambitus.max : 86
+                    gameMode: root.gameMode  // Passer le mode pour ajuster le cadre
                     
-                    // Position TOUT EN HAUT
-                    position: Qt.vector3d(0, root.gameMode ? -400 : 400, 100)
+                    // Position TOUT EN HAUT (mode normal) ou EN BAS (mode jeu)
+                    position: Qt.vector3d(0, root.gameMode ? -300 : 400, 100)
                 }
             }
         }
@@ -528,6 +529,21 @@ Item {
                 if (!configController) return false
                 configController.updateCounter // Force la réévaluation
                 return configController.getValueAtPath(["controllersPanel", "visible"], false) && !root.gameMode
+            }
+        }
+        
+        // Panneau autonome (mode jeu uniquement)
+        Loader {
+            id: gameAutonomyPanelLoader
+            active: root.gameMode
+            visible: root.gameMode
+            anchors.fill: parent
+            source: "../game/GameAutonomyPanel.qml"
+            
+            onLoaded: {
+                if (item) {
+                    item.configController = root.configController;
+                }
             }
         }
     }

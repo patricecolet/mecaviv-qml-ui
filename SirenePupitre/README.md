@@ -327,47 +327,72 @@ Le **premier byte** de chaque message binaire identifie son type :
 | Type | Hex | Usage | Taille | Source |
 |------|-----|-------|--------|--------|
 | CONFIG | 0x00 | Configuration complète (JSON) | Variable (8 bytes header + données) | PureData |
-| **MIDI_NOTE** | **0x01** | **Note MIDI du volant (contrôleur)** | **5 bytes** | **Volant physique** |
+| **POSITION** | **0x01** | **Position lecture (bar/beat)** | **10 bytes** | **PureData/Séquenceur** |
 | **CONTROLLERS** | **0x02** | **États contrôleurs physiques** | **16 bytes** | **Contrôleurs physiques** |
+| **MIDI_NOTE_VOLANT** | **0x03** | **Note MIDI du volant (contrôleur)** | **5 bytes** | **Volant physique** |
 | MIDI_NOTE_DURATION | 0x04 | Note MIDI avec durée (séquence) | 5 bytes | Fichier MIDI |
 | CONTROL_CHANGE | 0x05 | CC MIDI (séquence) | 3 bytes | Fichier MIDI |
 
-### Distinction importante : Contrôleurs physiques vs Séquence MIDI
+### Distinction importante : Contrôleurs physiques vs Séquence MIDI vs Position lecture
+
+**POSITION LECTURE** (mode autonome, 50-100 Hz) :
+- `0x01` : Position de lecture (bar, beatInBar, beat total) → Suivi progression en mode jeu
 
 **CONTRÔLEURS PHYSIQUES** (temps réel, ~60-100 Hz) :
-- `0x01` : Position du volant convertie en note MIDI → Déplace le curseur sur la portée
-- `0x02` : Tous les autres contrôleurs (joystick, pads, fader, etc.) → Indicateurs visuels
+- `0x02` : Tous les contrôleurs (joystick, pads, fader, etc.) → Indicateurs visuels
+- `0x03` : Position du volant convertie en note MIDI → Déplace le curseur sur la portée
 
 **SÉQUENCE MIDI** (depuis fichier MIDI) :
 - `0x04` : Notes de la séquence avec durée → Mode jeu uniquement
 - `0x05` : Control Change (vibrato, tremolo, enveloppe) → Modulations en mode jeu
 
-**Note MIDI avec micro-tonalité (type 0x01)** :
+**Position lecture (type 0x01, 10 bytes)** :
+
+| Byte | Champ | Type | Plage | Description |
+|------|-------|------|-------|-------------|
+| 0 | Type | uint8 | 0x01 | Identifiant POSITION |
+| 1 | Flags | uint8 | 0-255 | bit0=playing, autres réservés |
+| 2-3 | barNumber | uint16 | 0-65535 | Numéro de mesure (LE) |
+| 4-5 | beatInBar | uint16 | 0-65535 | Beat dans la mesure (LE) |
+| 6-9 | beat | float32 | 0.0+ | Beat total décimal (LE) |
+
+**Format** :
 ```
-[0x01, note, velocity, bend_lsb, bend_msb]
-   │     │       │         │         │
-   │     │       │         │         └─ Pitch Bend MSB (valeur haute)
-   │     │       │         └─────────── Pitch Bend LSB (valeur basse)
-   │     │       └─────────────────────  Vélocité (0-127)
-   │     └─────────────────────────────  Note MIDI (0-127)
-   └───────────────────────────────────  Type: MIDI_NOTE
+[0x01][Flags][Bar_L][Bar_H][BeatInBar_L][BeatInBar_H][Beat_f32LE]
 ```
 
-**Calcul de la note fractionnelle** :
-- Note entière : byte 1 (0-127)
-- Fraction : calculée depuis Pitch Bend (14 bits = bytes 3-4)
-- Formule QML : `midiNote = note + (pitchBend / 8192) * 2` (range ±2 demi-tons)
+**Exemple** : Mesure 13, beat 2, beat total 50.5, playing=true
+```
+[0x01, 0x01, 0x0D, 0x00, 0x02, 0x00, 0x00, 0x00, 0x49, 0x42]
+```
 
-**Exemple** : Note 69.5 (La4 + 50 centièmes)
+**Note MIDI volant (type 0x03, 5 bytes)** :
+
+| Byte | Champ | Type | Plage | Description |
+|------|-------|------|-------|-------------|
+| 0 | Type | uint8 | 0x03 | Identifiant MIDI_NOTE_VOLANT |
+| 1 | Note | uint8 | 0-127 | Note MIDI (volant) |
+| 2 | Velocity | uint8 | 0-127 | Vélocité |
+| 3 | Bend LSB | uint8 | 0-255 | Pitch Bend LSB (partie basse) |
+| 4 | Bend MSB | uint8 | 0-255 | Pitch Bend MSB (partie haute) |
+
+**Format** :
 ```
-[0x01, 0x45, 0x64, 0x00, 0x10]
-   │     │     │     │     │
-   │     │     │     │     └─ Bend MSB: 0x10 (= +0.5 demi-ton)
-   │     │     │     └─────── Bend LSB: 0x00
-   │     │     └───────────── Vélocité: 100
-   │     └─────────────────── Note: 69 (La4)
-   └───────────────────────── Type: MIDI_NOTE
+[0x03][Note][Velocity][Bend_LSB][Bend_MSB]
 ```
+
+**Exemples** :
+```
+Note 69 (La4) :
+[0x03, 0x45, 0x64, 0x00, 0x40]
+
+Note 60 (Do4) :
+[0x03, 0x3C, 0x64, 0x00, 0x40]
+```
+
+**Note** : Le pitch bend est optionnel. Pour une note simple sans micro-tonalité :
+- Bend LSB = 0x00
+- Bend MSB = 0x40 (neutre, centré)
 
 **Note MIDI avec durée (type 0x04) - OPTIMISÉ POUR LE MODE JEU** :
 ```
@@ -417,9 +442,9 @@ Le **premier byte** de chaque message binaire identifie son type :
 | 4 | Pad1_Vel | uint8 | 0-127 | Vélocité pad 1 |
 | 5 | Pad2_After | uint8 | 0-127 | Aftertouch pad 2 |
 | 6 | Pad2_Vel | uint8 | 0-127 | Vélocité pad 2 |
-| 7 | Joy_X | int8 | -127 à +127 | Position X joystick |
-| 8 | Joy_Y | int8 | -127 à +127 | Position Y joystick |
-| 9 | Joy_Z | int8 | -127 à +127 | Rotation Z joystick |
+| 7 | Joy_X | uint8 | 0-255 | Position X (0-127=positif, 128-255=négatif) |
+| 8 | Joy_Y | uint8 | 0-255 | Position Y (0-127=positif, 128-255=négatif) |
+| 9 | Joy_Z | uint8 | 0-255 | Rotation Z (0-127=positif, 128-255=négatif) |
 | 10 | Joy_Btn | uint8 | 0/1 | Bouton joystick (>0 = 1) |
 | 11 | Selector | uint8 | 0-4 | Sélecteur/GearShift (5 vitesses) |
 | 12 | Fader | uint8 | 0-127 | Potentiomètre/Fader |
@@ -595,9 +620,9 @@ webSocketController.sendBinaryMessage({
 - **Note** : La position est envoyée dans 0x02, la note MIDI résultante dans 0x01
 
 #### Joystick
-- **x** : int8 (-127 à +127)
-- **y** : int8 (-127 à +127)
-- **z** : int8 (-127 à +127) - rotation baton joystick
+- **x** : Byte 0-255 (0-127 = +0 à +127, 128-255 = -0 à -127)
+- **y** : Byte 0-255 (0-127 = +0 à +127, 128-255 = -0 à -127)
+- **z** : Byte 0-255 (0-127 = +0 à +127, 128-255 = -0 à -127) - rotation baton joystick
 - **button** : booléen (0 ou 1)
 
 #### Sélecteur / Levier de vitesse (GearShift)
@@ -628,7 +653,7 @@ webSocketController.sendBinaryMessage({
 3. Le pupitre envoie `REQUEST_CONFIG` et reçoit `CONFIG_FULL` de PureData (remplace config.js)
 
 ### Phase 2 - Données temps réel (Contrôleurs physiques)
-1. **Format 0x01 (MIDI_NOTE)** : PureData envoie la position du volant convertie en note MIDI
+1. **Format 0x03 (MIDI_NOTE_VOLANT)** : PureData envoie la position du volant convertie en note MIDI
    - **WebSocketController** reçoit et décode la note
    - **SirenController** calcule fréquence et RPM avec transposition
    - **MusicalStaff3D** déplace le curseur sur la portée
@@ -646,22 +671,29 @@ webSocketController.sendBinaryMessage({
      - Boutons 1 et 2
 
 ### Phase 3 - Séquence MIDI (Mode jeu)
-1. **Format 0x04 (MIDI_NOTE_DURATION)** : Notes de séquence avec durée
+1. **Format 0x01 (POSITION)** : Position de lecture en mode autonome
+   - **WebSocketController** décode et émet `playbackPositionReceived(playing, bar, beatInBar, beat)`
+   - **GameAutonomyPanel** affiche la progression
+
+2. **Format 0x04 (MIDI_NOTE_DURATION)** : Notes de séquence avec durée
    - **WebSocketController** décode et émet `isSequence: true`
    - **GameMode** affiche les cubes 3D avec hauteur = durée
    
-2. **Format 0x05 (CONTROL_CHANGE)** : CC MIDI de séquence
+3. **Format 0x05 (CONTROL_CHANGE)** : CC MIDI de séquence
    - **WebSocketController** émet `controlChangeReceived()`
    - **GameMode** applique vibrato, tremolo, enveloppe
 
 ### Composants de visualisation
 - **MusicalStaff3D** : Portée musicale 3D avec gestion du mode restricted
 - **AmbitusDisplay3D** : Affichage de toutes les notes de l'ambitus
-- **NoteCursor3D** : Curseur vertical qui suit la note actuelle (depuis 0x01)
+- **NoteCursor3D** : Curseur vertical qui suit la note actuelle (depuis 0x03)
 - **NoteProgressBar3D** : Barre de progression dans l'ambitus
 - **LedgerLines3D** : Lignes supplémentaires pour notes hors portée
 - **Clef3D** : Clés de sol et fa (modèles 3D)
 - **ControllersPanel** : Disposition et affichage de tous les contrôleurs (depuis 0x02)
+- **GameAutonomyPanel** : Contrôles de lecture et sélection de morceaux (mode autonome)
+- **SongSelectorDialog** : Modale de sélection de morceaux
+- **ScoringEngine** : Moteur de scoring pour le mode jeu
 
 
 ### ⚠️ Format JSON WebSocket (OBSOLÈTE - Rétrocompatibilité uniquement)

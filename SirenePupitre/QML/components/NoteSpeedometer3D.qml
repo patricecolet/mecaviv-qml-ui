@@ -9,6 +9,7 @@ Node {
     required property real currentNoteMidi
     property real ambitusMin: 43
     property real ambitusMax: 86
+    property bool gameMode: false  // NOUVEAU : pour ajuster en mode jeu
     
     // Configuration visuelle
     property color cylinderColor: "white"
@@ -18,6 +19,9 @@ Node {
     property real noteCylinderLength: 100  // Longueur du cylindre des notes (réduite)
     property real octaveCylinderLength: 60 // Longueur du cylindre des octaves (plus petit)
     property int visibleNotesCount: 5     // Nombre de notes visibles à travers la fenêtre
+    
+    // Ajustement de la position du cadre selon le mode
+    property real frameYOffset: gameMode ? 4 : 0  // Légèrement plus haut en mode jeu
     
     // Rotation continue (accumule sans reset pour éviter les sauts)
     property real degreesPerSemitone: 30
@@ -60,14 +64,7 @@ Node {
         // Container qui tourne
         Node {
             id: notesRotatingContainer
-            eulerRotation.y: root.targetRotation
-            
-            Behavior on eulerRotation.y {
-                NumberAnimation {
-                    duration: 150
-                    easing.type: Easing.Linear
-                }
-            }
+            eulerRotation.y: root.targetRotation  // Rotation instantanée, ultra-réactive
             
             // Cylindre blanc des notes
             Model {
@@ -152,14 +149,7 @@ Node {
         
         // Container qui tourne
         Node {
-            eulerRotation.y: parent.octaveRotation
-            
-            Behavior on eulerRotation.y {
-                NumberAnimation {
-                    duration: 150
-                    easing.type: Easing.Linear
-                }
-            }
+            eulerRotation.y: parent.octaveRotation  // Rotation instantanée, ultra-réactive
             
             // Cylindre blanc des octaves (plus petit)
             Model {
@@ -225,7 +215,7 @@ Node {
     Model {
         source: "#Cube"
         scale: Qt.vector3d(noteCylinderLength / 100 + 0.3, 0.03, 0.03)
-        position: Qt.vector3d(-20, frameHalfHeight, cylinderRadius + 15)
+        position: Qt.vector3d(-20, frameHalfHeight + root.frameYOffset, cylinderRadius + 15)
         
         materials: PrincipledMaterial {
             baseColor: root.indicatorColor
@@ -238,7 +228,7 @@ Node {
     Model {
         source: "#Cube"
         scale: Qt.vector3d(noteCylinderLength / 100 + 0.3, 0.03, 0.03)
-        position: Qt.vector3d(-20, -frameHalfHeight, cylinderRadius + 15)
+        position: Qt.vector3d(-20, -frameHalfHeight + root.frameYOffset, cylinderRadius + 15)
         
         materials: PrincipledMaterial {
             baseColor: root.indicatorColor
@@ -251,7 +241,7 @@ Node {
     Model {
         source: "#Cube"
         scale: Qt.vector3d(0.03, frameHeight, 0.03)
-        position: Qt.vector3d(-20 - noteCylinderLength/2, 0, cylinderRadius + 15)
+        position: Qt.vector3d(-20 - noteCylinderLength/2, root.frameYOffset, cylinderRadius + 15)
         
         materials: PrincipledMaterial {
             baseColor: root.indicatorColor
@@ -264,7 +254,7 @@ Node {
     Model {
         source: "#Cube"
         scale: Qt.vector3d(0.03, frameHeight, 0.03)
-        position: Qt.vector3d(-20 + noteCylinderLength/2, 0, cylinderRadius + 15)
+        position: Qt.vector3d(-20 + noteCylinderLength/2, root.frameYOffset, cylinderRadius + 15)
         
         materials: PrincipledMaterial {
             baseColor: root.indicatorColor
@@ -279,7 +269,7 @@ Node {
     Model {
         source: "#Cube"
         scale: Qt.vector3d(octaveCylinderLength / 100 + 0.3, 0.03, 0.03)
-        position: Qt.vector3d(80, frameHalfHeight, cylinderRadius + 15)
+        position: Qt.vector3d(80, frameHalfHeight + root.frameYOffset, cylinderRadius + 15)
         
         materials: PrincipledMaterial {
             baseColor: root.indicatorColor
@@ -292,7 +282,7 @@ Node {
     Model {
         source: "#Cube"
         scale: Qt.vector3d(octaveCylinderLength / 100 + 0.3, 0.03, 0.03)
-        position: Qt.vector3d(80, -frameHalfHeight, cylinderRadius + 15)
+        position: Qt.vector3d(80, -frameHalfHeight + root.frameYOffset, cylinderRadius + 15)
         
         materials: PrincipledMaterial {
             baseColor: root.indicatorColor
@@ -305,7 +295,7 @@ Node {
     Model {
         source: "#Cube"
         scale: Qt.vector3d(0.03, frameHeight, 0.03)
-        position: Qt.vector3d(75 - octaveCylinderLength/2, 0, cylinderRadius + 15)
+        position: Qt.vector3d(75 - octaveCylinderLength/2, root.frameYOffset, cylinderRadius + 15)
         
         materials: PrincipledMaterial {
             baseColor: root.indicatorColor
@@ -318,7 +308,7 @@ Node {
     Model {
         source: "#Cube"
         scale: Qt.vector3d(0.03, frameHeight, 0.03)
-        position: Qt.vector3d(80 + octaveCylinderLength/2, 0, cylinderRadius + 15)
+        position: Qt.vector3d(80 + octaveCylinderLength/2, root.frameYOffset, cylinderRadius + 15)
         
         materials: PrincipledMaterial {
             baseColor: root.indicatorColor
