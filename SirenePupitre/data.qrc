@@ -2,22 +2,22 @@
     <qresource prefix="/">
         <file>QML/Main.qml</file>
         <file>QML/controllers/WebSocketController.qml</file>
-        <file>QML/utils/DigitLED3D.qml</file>
-        <file>QML/utils/Knob.qml</file>
-        <file>QML/utils/Knob3D.qml</file>
-        <file>QML/utils/LEDSegment.qml</file>
-        <file>QML/utils/LEDText3D.qml</file>
+        <file>../shared/qml/common/DigitLED3D.qml</file>
+        <file>../shared/qml/common/Knob.qml</file>
+        <file>../shared/qml/common/Knob3D.qml</file>
+        <file>../shared/qml/common/LEDSegment.qml</file>
+        <file>../shared/qml/common/LEDText3D.qml</file>
         <file>QML/components/SirenDisplay.qml</file>
         <file>QML/components/NumberDisplay3D.qml</file>
         <file>QML/controllers/SirenController.qml</file>
-        <file>QML/utils/MusicUtils.qml</file>
+        <file>../shared/qml/common/MusicUtils.qml</file>
         <file>QML/controllers/ConfigController.qml</file>
         <file>config.js</file>
-        <file>QML/utils/Clef3D.qml</file>
-        <file>QML/utils/Clef2D.qml</file>
-        <file>QML/fonts/NotoMusic-Regular.ttf</file>
-        <file>QML/fonts/MusiSync.ttf</file>
-        <file>QML/utils/Clef2DPath.qml</file>
+        <file>../shared/qml/clefs/Clef3D.qml</file>
+        <file>../shared/qml/clefs/Clef2D.qml</file>
+        <file>../shared/qml/fonts/NotoMusic-Regular.ttf</file>
+        <file>../shared/qml/fonts/MusiSync.ttf</file>
+        <file>../shared/qml/clefs/Clef2DPath.qml</file>
         <file>QML/components/ControllersPanel.qml</file>
         <file>QML/utils/Ring3D.qml</file>
         <file>QML/components/StudioView.qml</file>
@@ -73,7 +73,7 @@
     
     <!-- Polices partagées -->
     <qresource prefix="/">
-        <file>../fonts/EmojiFont.qml</file>
-        <file>../fonts/NotoEmoji-VariableFont_wght.ttf</file>
+        <file>../shared/qml/fonts/EmojiFont.qml</file>
+        <file>../shared/qml/fonts/NotoEmoji-VariableFont_wght.ttf</file>
     </qresource>
 </RCC>

@@ -16,7 +16,7 @@ import QtQuick 2.15
  */
 FontLoader {
     id: emojiFont
-    source: "qrc:/fonts/NotoEmoji-VariableFont_wght.ttf"
+    source: "qrc:/shared/qml/fonts/NotoEmoji-VariableFont_wght.ttf"
     
     // Exposer le nom de la police
     readonly property string name: emojiFont.name

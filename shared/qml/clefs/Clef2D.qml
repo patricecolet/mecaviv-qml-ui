@@ -5,7 +5,7 @@ Item {
 
     FontLoader {
         id: clefFont
-        source: "qrc:/QML/fonts/NotoMusic-Regular.ttf"
+        source: "qrc:/shared/qml/fonts/NotoMusic-Regular.ttf"
         onStatusChanged: {
             root.updateTick++
         }
@@ -13,7 +13,7 @@ Item {
 
     FontLoader {
         id: clefFallback
-        source: "qrc:/QML/fonts/MusiSync.ttf"
+        source: "qrc:/shared/qml/fonts/MusiSync.ttf"
         onStatusChanged: {
             root.updateTick++
         }

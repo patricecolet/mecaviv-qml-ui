@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick3D
 import "../../utils" as Utils
+import "../../../../../shared/qml/common" as SharedUtils
 import "../controls"
 import "../monitoring"
 import "../monitoring/midi-display"

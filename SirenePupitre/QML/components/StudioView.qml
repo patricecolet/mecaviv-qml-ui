@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick3D
 import QtQuick.Controls
 import "../utils"  // Pour Ring3D
+import "../../../shared/qml/common"
 import "./indicators"
 Rectangle {
     id: root

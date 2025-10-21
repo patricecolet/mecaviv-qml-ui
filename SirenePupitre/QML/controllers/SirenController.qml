@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import "../utils"
+import "../../../shared/qml/common"
 
 QtObject {
     id: root

@@ -416,28 +416,51 @@ Pour toute question :
 2. Vérifier les [README des projets](#-projets-inclus)
 3. Consulter le [TODO.md](./TODO.md) pour les fonctionnalités en cours
 
-## 🔄 TODO - Restructuration Planifiée
+## 🔄 Restructuration - Dossier partagé `shared/`
 
-### Dossier partagé `shared/` (En cours)
+### ✅ Migration terminée (Octobre 2025)
 
-Pour éviter la duplication de code entre projets, création d'un dossier `shared/` à la racine du monorepo.
+Pour éviter la duplication de code entre projets, un dossier `shared/` a été créé à la racine du monorepo.
 
-#### Structure prévue
+**Résultat** : 
+- **9 composants QML** : 6 utilitaires + 3 clefs
+- **4 polices** : 2 musicales + 2 emoji
+- **2 scripts de conversion** : convert-mesh.sh (générique), convert-clefs.sh
+
+Tous partagés entre SirenePupitre, SirenConsole et (futur) pedalierSirenium, éliminant tous les doublons et facilitant la maintenance.
+
+**Anciens emplacements** : 
+- `fonts/` (racine) - **SUPPRIMÉ**
+- `SirenePupitre/QML/utils/Clef*.qml` - **DÉPLACÉ**
+- `SirenePupitre/scripts/convert-*.sh` - **DÉPLACÉ**
+
+**Nouveau emplacement unique** : `shared/` - Source unique de vérité
+
+#### Structure finale
 
 ```
 mecaviv-qml-ui/
 ├── shared/
-│   └── qml/
-│       ├── common/              # Composants QML partagés
-│       │   ├── DigitLED3D.qml
-│       │   ├── LEDText3D.qml
-│       │   ├── LEDSegment.qml
-│       │   ├── Knob.qml
-│       │   ├── Knob3D.qml
-│       │   └── MusicUtils.qml
-│       └── fonts/                # Polices musicales partagées
-│           ├── MusiSync.ttf
-│           └── NotoMusic-Regular.ttf
+│   ├── qml/
+│   │   ├── clefs/               # Composants clefs musicales (3 fichiers)
+│   │   │   ├── Clef2D.qml       # Clef 2D avec polices
+│   │   │   ├── Clef2DPath.qml   # Clef avec tracé vectoriel
+│   │   │   └── Clef3D.qml       # Clef 3D avec modèles .mesh
+│   │   ├── common/              # Composants QML partagés (6 fichiers)
+│   │   │   ├── DigitLED3D.qml
+│   │   │   ├── LEDText3D.qml
+│   │   │   ├── LEDSegment.qml
+│   │   │   ├── Knob.qml
+│   │   │   ├── Knob3D.qml
+│   │   │   └── MusicUtils.qml
+│   │   └── fonts/               # Polices partagées (4 fichiers)
+│   │       ├── EmojiFont.qml
+│   │       ├── NotoEmoji-VariableFont_wght.ttf
+│   │       ├── MusiSync.ttf
+│   │       └── NotoMusic-Regular.ttf
+│   └── scripts/                 # Scripts de conversion (2 fichiers)
+│       ├── convert-mesh.sh      # Convertit .obj → .mesh (générique)
+│       └── convert-clefs.sh     # Convertit clefs musicales
 ├── SirenePupitre/
 │   └── QML/
 │       └── utils/               # Composants spécifiques au pupitre
@@ -454,7 +477,7 @@ mecaviv-qml-ui/
 
 #### Composants à déplacer vers `shared/qml/common/`
 
-**Actuellement dupliqués** entre SirenePupitre et pedalierSirenium :
+**✅ Migration terminée** - Composants partagés entre SirenePupitre et pedalierSirenium :
 - [X] `DigitLED3D.qml` - Afficheur 7 segments 3D
 - [X] `LEDText3D.qml` - Texte LED 3D
 - [X] `LEDSegment.qml` - Segment LED individuel
@@ -464,32 +487,46 @@ mecaviv-qml-ui/
 
 #### Ressources à déplacer vers `shared/qml/fonts/`
 
-**Polices musicales** utilisées par plusieurs projets :
+**✅ Migration terminée** - Toutes les polices partagées :
 - [X] `MusiSync.ttf` - Symboles musicaux de base
 - [X] `NotoMusic-Regular.ttf` - Police Noto Music (SMuFL)
+- [X] `EmojiFont.qml` - Wrapper QML pour la police emoji
+- [X] `NotoEmoji-VariableFont_wght.ttf` - Police emoji Noto
 
 #### Composants à garder locaux
 
 **Spécifiques à chaque projet** :
-- `meshes/` - Modèles 3D (spécifiques par projet, build complexe)
-- `Clef3D.qml`, `Clef2D.qml` - Clés musicales (SirenePupitre)
+- `meshes/` - Modèles 3D .mesh (94-200K par fichier, générés depuis .obj)
+  - TrebleKey.mesh, BassKey.mesh (restent dans SirenePupitre/QML/utils/meshes/)
 - `Ring3D.qml`, `ColorPicker.qml` - Utilitaires UI (SirenePupitre)
 - `VirtualKeyboard.qml` - Clavier virtuel (pedalierSirenium)
+- `TrebleClef3D.qml` - Version vectorielle simple (pedalierSirenium, à migrer)
 
-#### Modifications nécessaires
+#### ✅ Modifications terminées
 
-**Scripts à adapter** :
-- [ ] `SirenePupitre/scripts/build.sh` - Copier fonts depuis shared/
-- [ ] `pedalierSirenium/scripts/build.sh` - Copier fonts depuis shared/
-- [ ] `scripts/convert-clefs.sh` - Chemins meshes/ (reste local)
+**Scripts adaptés** :
+- [X] `SirenePupitre/scripts/build.sh` - Copie fonts depuis `../shared/qml/fonts/`
+- [X] `pedalierSirenium/scripts/build_run_web.sh` - Copie fonts depuis shared/
+- [ ] `scripts/convert-clefs.sh` - Chemins meshes/ (reste local, si nécessaire)
 
 **Fichiers de ressources** :
-- [ ] `data.qrc` - Références vers `../shared/qml/`
-- [ ] `CMakeLists.txt` - Inclusion des chemins shared/
+- [X] `SirenePupitre/data.qrc` - Références vers `../shared/qml/`
+- [X] `pedalierSirenium/QtFiles/data.qrc` - Références vers `../../shared/qml/`
+- [X] `CMakeLists.txt` (racine) - Variable SHARED_QML_DIR configurée
 
-**Imports QML** (environ 20+ fichiers) :
-- [ ] Mettre à jour les imports `import "../utils"` → `import "../../../shared/qml/common"`
-- [ ] Mettre à jour les imports fonts `qrc:/QML/fonts/` → `qrc:/shared/qml/fonts/`
+**Imports QML** (23 fichiers modifiés) :
+- [X] SirenePupitre : 16 fichiers mis à jour vers `import "../../../shared/qml/common"`
+- [X] pedalierSirenium : 7 fichiers mis à jour avec imports vers shared/
+- [X] Chemins de polices : `qrc:/QML/fonts/` → `qrc:/shared/qml/fonts/`
+
+**Validation** :
+- [X] Build réussi pour SirenePupitre ✅
+- [X] Build réussi pour SirenConsole ✅
+- [X] Consolidation des polices emoji vers shared/ ✅
+- [X] Suppression du dossier fonts/ racine (doublon éliminé) ✅
+- [X] Migration des clefs vers shared/qml/clefs/ ✅
+- [X] Migration des scripts de conversion vers shared/scripts/ ✅
+- [ ] Build pedalierSirenium (refonte prévue, utilisera shared/)
 
 ### Bibliothèque MIDI externe (À faire)
 
@@ -509,12 +546,6 @@ mecaviv-midi-library/           # Nouveau repository
 ├── covers/                     # Adaptations et reprises
 └── presets/                    # Configurations de presets
 ```
-
-**Intégration** :
-- [ ] Créer repository `mecaviv-midi-library`
-- [ ] Déplacer `SirenePupitre/midifiles/` vers le nouveau repo
-- [ ] Ajouter en submodule Git : `git submodule add <url> shared/midi`
-- [ ] Mettre à jour les scripts pour référencer `shared/midi/`
 
 ---
 

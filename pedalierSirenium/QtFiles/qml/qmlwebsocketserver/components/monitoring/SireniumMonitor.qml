@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick3D
 import QtQuick.Controls
 import "../../../utils" as Utils
+import "../../../../../../shared/qml/common" as SharedUtils
 
 Item {
     id: sireniumMonitor

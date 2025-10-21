@@ -26,8 +26,8 @@ echo "🎼 Conversion des clés musicales"
 echo "================================"
 echo ""
 
-# Chemin vers le dossier meshes
-MESH_DIR="$(cd "$(dirname "$0")/../QML/utils/meshes" && pwd)"
+# Chemin vers le dossier meshes (reste dans SirenePupitre)
+MESH_DIR="$(cd "$(dirname "$0")/../../SirenePupitre/QML/utils/meshes" && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 print_info "Dossier des meshes: $MESH_DIR"

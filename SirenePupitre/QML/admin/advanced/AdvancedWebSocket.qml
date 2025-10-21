@@ -156,6 +156,71 @@ GroupBox {
             }
         }
         
+        // Section Debug Protocol 0x02
+        GroupBox {
+            Layout.fillWidth: true
+            Layout.leftMargin: 20
+            Layout.rightMargin: 20
+            title: "Debug - Protocole 0x02"
+            
+            label: Text {
+                text: parent.title
+                color: "#FFD700"
+                font.pixelSize: 14
+                font.bold: true
+            }
+            
+            background: Rectangle {
+                color: "#1a1a1a"
+                border.color: "#444"
+                radius: 5
+            }
+            
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 10
+                
+                Text {
+                    text: "Le protocole binaire 0x02 permet de recevoir l'état des contrôleurs physiques\n" +
+                          "(volant, pads, joystick, fader, pédale, etc.) en temps réel pour debug."
+                    color: "#888"
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+                
+                CheckBox {
+                    id: enable0x02Checkbox
+                    text: "Activer la réception du protocole 0x02"
+                    checked: configController ? configController.enable0x02Protocol : false
+                    
+                    onCheckedChanged: {
+                        if (configController && checked !== configController.enable0x02Protocol) {
+                            configController.set0x02Protocol(checked)
+                            console.log("Protocole 0x02:", checked ? "ACTIVÉ" : "DÉSACTIVÉ")
+                        }
+                    }
+                    
+                    Connections {
+                        target: configController
+                        function onEnable0x02ProtocolChanged() {
+                            if (enable0x02Checkbox.checked !== configController.enable0x02Protocol) {
+                                enable0x02Checkbox.checked = configController.enable0x02Protocol
+                            }
+                        }
+                    }
+                }
+                
+                Text {
+                    text: "⚠️ Activer uniquement pour debug - Peut réduire les performances"
+                    color: "#ff8800"
+                    font.pixelSize: 11
+                    font.italic: true
+                    visible: enable0x02Checkbox.checked
+                }
+            }
+        }
+        
         // Boutons de contrôle
         RowLayout {
             Layout.fillWidth: true

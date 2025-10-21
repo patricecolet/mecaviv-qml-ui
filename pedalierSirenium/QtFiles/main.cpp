@@ -10,13 +10,14 @@
 #include <QSurfaceFormat>
 #include <QDebug>
 #include <QtQuick3D/qquick3d.h>
+#include <QLoggingCategory>
 
 int main(int argc, char *argv[])
 {
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
     QGuiApplication app(argc, argv);
-    
+    QLoggingCategory::setFilterRules(QStringLiteral("qt.qml.binding.removal.info=true"));
     // ========== CONFIGURATION FPS GLOBAL ==========
     QSurfaceFormat format = QQuick3D::idealSurfaceFormat();
     format.setSwapInterval(2);  // 30 FPS max (divise par 2)

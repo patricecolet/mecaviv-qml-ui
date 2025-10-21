@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick3D
-import "../utils"
+import "../../../shared/qml/common"
 
 Node {
     id: root

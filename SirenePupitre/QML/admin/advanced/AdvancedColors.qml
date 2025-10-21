@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../../utils"  // Pour accéder à ColorPicker
+import "../../../../shared/qml/common"
 
 ScrollView {
     id: root

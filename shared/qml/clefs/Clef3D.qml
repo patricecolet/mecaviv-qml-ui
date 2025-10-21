@@ -35,6 +35,7 @@ Node {
     }
     
     // Modèle 3D avec origine (0,0) sur la ligne de référence
+    // Note: Les fichiers .mesh restent dans SirenePupitre/QML/utils/meshes/
     Model {
         id: clefModel
         source: clefType === "treble" 

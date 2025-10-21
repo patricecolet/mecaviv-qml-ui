@@ -144,13 +144,13 @@ build_web() {
         print_warning "Fichier HTML non trouvé, impossible de corriger l'ordre des scripts"
     fi
     
-    # Copier les polices nécessaires pour le rendu 2D (Clef2D)
+    # Copier les polices nécessaires pour le rendu 2D (Clef2D) depuis shared/
     mkdir -p webfiles/fonts || true
-    if compgen -G "QML/fonts/*.*tf" > /dev/null; then
-        cp QML/fonts/*.*tf webfiles/fonts/ || true
-        print_success "Polices copiées dans webfiles/fonts/"
+    if compgen -G "../shared/qml/fonts/*.*tf" > /dev/null; then
+        cp ../shared/qml/fonts/*.*tf webfiles/fonts/ || true
+        print_success "Polices copiées depuis shared/qml/fonts/ vers webfiles/fonts/"
     else
-        print_warning "Aucune police trouvée dans QML/fonts/"
+        print_warning "Aucune police trouvée dans shared/qml/fonts/"
     fi
     
     # Copier les fichiers .mesh pour les modèles 3D

@@ -68,12 +68,12 @@
         <file>qml/qmlwebsocketserver/config.js</file>
         <file>qml/qmlwebsocketserver/sirenSpec.json</file>
         <file>qml/qmlwebsocketserver/sirenSpec.js</file>
-        <file>qml/utils/DigitLED3D.qml</file>
-        <file>qml/utils/Knob.qml</file>
-        <file>qml/utils/Knob3D.qml</file>
-        <file>qml/utils/LEDSegment.qml</file>
-        <file>qml/utils/LEDText3D.qml</file>
-        <file>qml/utils/MusicUtils.qml</file>
+        <file>../../shared/qml/common/DigitLED3D.qml</file>
+        <file>../../shared/qml/common/Knob.qml</file>
+        <file>../../shared/qml/common/Knob3D.qml</file>
+        <file>../../shared/qml/common/LEDSegment.qml</file>
+        <file>../../shared/qml/common/LEDText3D.qml</file>
+        <file>../../shared/qml/common/MusicUtils.qml</file>
         <file>qml/utils/VirtualKeyboard.qml</file>
         
         <!-- Images -->
@@ -110,7 +110,7 @@
     
     <!-- Polices partagées -->
     <qresource prefix="/">
-        <file>../../fonts/EmojiFont.qml</file>
-        <file>../../fonts/NotoEmoji-VariableFont_wght.ttf</file>
+        <file>../../shared/qml/fonts/EmojiFont.qml</file>
+        <file>../../shared/qml/fonts/NotoEmoji-VariableFont_wght.ttf</file>
     </qresource>
 </RCC>

@@ -42,7 +42,9 @@ Item {
                 var bytes = new Uint8Array(message);
                 
                 // Format binaire pour CONTROLLERS (type 0x02, 16 bytes) - CONTRÔLEURS PHYSIQUES
-                if (bytes.length === 16 && bytes[0] === 0x02) {
+                // Filtrer selon la propriété enable0x02Protocol
+                if (bytes.length === 16 && bytes[0] === 0x02 && 
+                    controller.configController && controller.configController.enable0x02Protocol) {
                     // Décoder les données
                     // Volant position (uint16, déjà en degrés 0-360)
                     var wheelPos = bytes[1] | (bytes[2] << 8);

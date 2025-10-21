@@ -124,6 +124,40 @@ Item {
             }
             
             CheckBox {
+                id: speedometerCheckbox
+                text: "Note-o-mètre 3D (vintage)"
+                checked: {
+                    if (!configController) return true
+                    var dummy = configController.updateCounter
+                    return configController.useNoteSpeedometer3D
+                }
+                font.pixelSize: 13
+                
+                contentItem: Text {
+                    text: parent.text
+                    color: "#bbb"
+                    font.pixelSize: parent.font.pixelSize
+                    leftPadding: parent.indicator.width + 8
+                    verticalAlignment: Text.AlignVCenter
+                }
+                
+                onToggled: {
+                    if (configController) {
+                        configController.useNoteSpeedometer3D = checked
+                        console.log("Affichage notes:", checked ? "Note-o-mètre 3D" : "Affichage simple 2D")
+                    }
+                }
+            }
+            
+            Text {
+                Layout.leftMargin: 40
+                text: "↳ Si désactivé : affichage simple 2D (nom de note en haut)"
+                color: "#666"
+                font.pixelSize: 11
+                font.italic: true
+            }
+            
+            CheckBox {
                 text: "Bouton Mode Studio"
                 checked: {
                     if (!configController) return true

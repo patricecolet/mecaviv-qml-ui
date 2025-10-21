@@ -354,12 +354,137 @@ ws.send(jsonString)  // → "Not a JSON object." dans PureData
 
 ---
 
+## 🎮 Mode Autonome SirenePupitre
+
+### Vue d'ensemble
+
+Le **mode autonome** permet à chaque SirenePupitre de lancer et contrôler la lecture de morceaux MIDI indépendamment de SirenConsole. PureData gère le séquenceur MIDI et diffuse la position aux pupitres.
+
+**Architecture** :
+```
+SirenePupitre (QML - interface)
+    ↓ Commandes JSON (binaire UTF-8)
+PureData (Raspberry - séquenceur)
+    ├─ Lecture MIDI locale
+    ├─ Broadcast 0x01 POSITION (10 bytes @ 50ms)
+    ├─ Broadcast 0x04 NOTES (5 bytes)
+    └─ Broadcast 0x05 CC (3 bytes)
+    ↓
+SirenePupitre (affichage jeu)
+```
+
+### Messages : SirenePupitre → PureData
+
+Tous les messages sont encodés en **JSON binaire UTF-8** via `WebSocketController.sendBinaryMessage()`.
+
+#### 1. MIDI_FILES_REQUEST - Demander la liste des morceaux
+
+```json
+{
+  "type": "MIDI_FILES_REQUEST",
+  "source": "pupitre"
+}
+```
+
+**Réponse attendue** : `MIDI_FILES_LIST` (JSON texte)
+
+#### 2. MIDI_FILE_LOAD - Charger un morceau
+
+```json
+{
+  "type": "MIDI_FILE_LOAD",
+  "path": "louette/AnxioGapT.midi",
+  "source": "pupitre"
+}
+```
+
+**Champs** :
+- `path` : Chemin relatif depuis `midiRepository`
+- `source` : `"pupitre"` pour traçabilité
+
+#### 3. MIDI_TRANSPORT - Contrôle play/pause/stop
+
+```json
+{
+  "type": "MIDI_TRANSPORT",
+  "action": "play",
+  "source": "pupitre"
+}
+```
+
+**Actions** :
+- `"play"` : Démarre la lecture
+- `"pause"` : Pause (garde la position)
+- `"stop"` : Arrête et revient à position 0
+
+### Messages : PureData → SirenePupitre
+
+#### MIDI_FILES_LIST (JSON texte)
+
+Réponse à `MIDI_FILES_REQUEST` :
+
+```json
+{
+  "type": "MIDI_FILES_LIST",
+  "categories": [
+    {
+      "name": "Louette",
+      "files": [
+        { "title": "AnxioGapT", "path": "louette/AnxioGapT.midi" },
+        { "title": "HallucinogeneGapT", "path": "louette/HallucinogeneGapT.midi" }
+      ]
+    },
+    {
+      "name": "Patwave",
+      "files": [
+        { "title": "Daphné", "path": "patwave/daphne.midi" }
+      ]
+    }
+  ]
+}
+```
+
+#### 0x01 - POSITION (10 bytes, 50-100ms)
+
+Position de lecture en temps réel :
+
+```
+Offset  Size  Type      Field                    
+------  ----  --------  -----------------------
+0       1     uint8     messageType (0x01)
+1       1     uint8     flags (bit0=playing)
+2       2     uint16    barNumber (LE)
+4       2     uint16    beatInBar (LE)
+6       4     float32   beat (total décimal, LE)
+------  ----  --------  -----------------------
+Total: 10 bytes
+```
+
+**Exemple** : Mesure 13, beat 2, beat total 50.5, playing=true
+```
+[0x01, 0x01, 0x0D, 0x00, 0x02, 0x00, <float32LE(50.5)>]
+```
+
+**Usage** : Progression visuelle en mode jeu (barre de progression, position temporelle)
+
+### Différences avec SirenConsole
+
+| Aspect | SirenConsole | SirenePupitre |
+|--------|--------------|---------------|
+| Séquenceur | Node.js | PureData (local) |
+| Contrôle | HTTP POST | WebSocket binaire |
+| Position | 0x01 broadcast central | 0x01 local |
+| Seek | Oui (MIDI_SEEK) | Non (source PureData) |
+
+---
+
 ## 📚 Références
 
 - **Architecture globale** : `docs/COMPOSESIREN_ARCHITECTURE.md`
 - **Config centralisée** : `config.json`
 - **Proxy Node.js** : `SirenConsole/webfiles/puredata-proxy.js`
 - **Composant QML** : `SirenConsole/QML/components/MidiPlayer.qml`
+- **Mode autonome Pupitre** : `SirenePupitre/QML/game/GameAutonomyPanel.qml`
 
 ---
 

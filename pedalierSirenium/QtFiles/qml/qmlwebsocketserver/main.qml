@@ -12,6 +12,7 @@ import "./components/monitoring/midi-display"
 import "./controllers"
 import "./utils"           // ← Pour Logger.qml (local)
 import "../utils" as Utils // ← Pour VirtualKeyboard.qml (niveau supérieur)
+import "../../../../shared/qml/common" as SharedUtils
 
 Window {
     id: window

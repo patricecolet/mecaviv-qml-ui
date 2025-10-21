@@ -64,6 +64,16 @@ fi
 # Copie config.js pour WASM
 cp -v ../qml/qmlwebsocketserver/config.js "$WEBFILES/"
 
+# Copie des polices musicales depuis shared/
+echo "📋 Copie des polices musicales depuis shared/..."
+mkdir -p "$WEBFILES/fonts"
+if compgen -G "$ROOT_DIR/../../shared/qml/fonts/*.ttf" > /dev/null; then
+  cp -v "$ROOT_DIR/../../shared/qml/fonts/"*.ttf "$WEBFILES/fonts/" || true
+  echo "✅ Polices copiées"
+else
+  echo "⚠️  Aucune police trouvée dans shared/qml/fonts/"
+fi
+
 # 3. Lance le serveur Node.js
 cd "$WEBFILES"
 echo "🚀 Lancement du serveur Node.js..."

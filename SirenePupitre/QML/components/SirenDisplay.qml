@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick3D
 import QtQuick.Controls
-import "../utils"
+import "../../../shared/qml/common"
 import "../components"
 import "./ambitus"
 import "../game"
@@ -240,6 +240,9 @@ Item {
                     
                     // Position TOUT EN HAUT (mode normal) ou EN BAS (mode jeu)
                     position: Qt.vector3d(0, root.gameMode ? -300 : 400, 100)
+                    
+                    // Visibilité conditionnelle selon l'option
+                    visible: configController ? configController.useNoteSpeedometer3D : true
                 }
             }
         }
@@ -460,6 +463,7 @@ Item {
             }
             
             // Encadré avec détails de la note (tout en haut au centre)
+            // Affichage simple 2D - visible quand NoteSpeedometer3D est désactivé
             Rectangle {
                 width: 120
                 height: 80
@@ -470,7 +474,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
                 anchors.topMargin: 50  // Tout en haut
-                visible: false  // TEST: Caché pour tester le nouveau speedometer 3D
+                visible: configController ? !configController.useNoteSpeedometer3D : false
                 
                 Column {
                     anchors.centerIn: parent

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import "../../../utils" as Utils
+import "../../../../../../shared/qml/common" as SharedUtils
 
 Rectangle {
     id: dialog

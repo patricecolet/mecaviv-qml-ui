@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Quick WebSockets)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Quick3D WebSockets)
 
 qt_add_executable(qmlwebsocketserver
     main.cpp
@@ -19,9 +19,11 @@ qt_add_qml_module(qmlwebsocketserver
     NO_RESOURCE_TARGET_PATH
 )
 
+
 target_link_libraries(qmlwebsocketserver
     PRIVATE
     Qt6::Core
     Qt6::Quick
+    Qt6::Quick3D
     Qt6::WebSockets
 )

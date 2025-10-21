@@ -25,6 +25,10 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Configuration du dossier partagé
+set(SHARED_QML_DIR ${CMAKE_SOURCE_DIR}/shared/qml)
+message(STATUS "Shared QML directory: ${SHARED_QML_DIR}")
+
 # Messages de configuration
 message(STATUS "============================================")
 message(STATUS "Mecaviv QML UI Build Configuration")

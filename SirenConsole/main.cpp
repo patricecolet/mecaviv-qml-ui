@@ -3,11 +3,12 @@
 #include <QQmlContext>
 #include <QDir>
 #include <QStandardPaths>
+#include <QLoggingCategory>
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
-
+    QLoggingCategory::setFilterRules(QStringLiteral("qt.qml.binding.removal.info=true"));
     // Configuration de l'application
     app.setApplicationName("SirenConsole");
     app.setApplicationVersion("1.0.0");

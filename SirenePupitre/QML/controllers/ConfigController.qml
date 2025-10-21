@@ -61,6 +61,10 @@ QtObject {
     property int gearShiftPosition: 0
     // État de priorité console
     property bool consoleConnected: false
+    // Protocole 0x02 (contrôleurs physiques) - désactivé par défaut (debug uniquement)
+    property bool enable0x02Protocol: false
+    // Affichage des notes : NoteSpeedometer3D (true) ou affichage simple 2D (false)
+    property bool useNoteSpeedometer3D: true
     
     // Propriété calculée qui se met à jour automatiquement
     property var currentSirenInfo: {
@@ -306,6 +310,20 @@ QtObject {
             }
         }
         return false
+    }
+    
+    // Activer/désactiver le protocole 0x02 (contrôleurs physiques)
+    function set0x02Protocol(enabled) {
+        enable0x02Protocol = enabled
+        console.log("🔧 Protocole 0x02:", enabled ? "ACTIVÉ" : "DÉSACTIVÉ")
+        
+        // Notifier PureData du changement d'état
+        if (webSocketController && webSocketController.connected) {
+            webSocketController.sendBinaryMessage({
+                type: "ENABLE_0x02_PROTOCOL",
+                enabled: enabled
+            })
+        }
     }
     
     function getMaxNote() {
