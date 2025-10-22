@@ -204,6 +204,12 @@
     "roomSize": 0.5,
     "dryWet": 0.3,
     "damp": 0.5
+  },
+  
+  "outputConfig": {
+    "sirenMode": "udp",
+    "composeSirenEnabled": true,
+    "composeSirenVolume": 100
   }
 }
 

@@ -25,6 +25,7 @@
         <file>QML/admin/AdvancedSection.qml</file>
         <file>QML/admin/SirenSelectionSection.qml</file>
         <file>QML/admin/VisibilitySection.qml</file>
+        <file>QML/admin/OutputSection.qml</file>
         <file>QML/admin/visibility/VisibilityControllers.qml</file>
         <file>QML/admin/visibility/VisibilityMainDisplays.qml</file>
         <file>QML/admin/visibility/VisibilityMusicalStaff.qml</file>

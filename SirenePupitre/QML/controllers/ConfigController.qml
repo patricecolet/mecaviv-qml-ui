@@ -52,7 +52,12 @@ QtObject {
             },
             "controllers": { "visible": true, "scale": 0.8 }
         },
-        "reverbConfig": { "enabled": true }
+        "reverbConfig": { "enabled": true },
+        "outputConfig": {
+            "sirenMode": "udp",
+            "composeSirenEnabled": true,
+            "composeSirenVolume": 100
+        }
     })
     property var currentSiren: null
     property string mode: "restricted"
@@ -162,6 +167,23 @@ QtObject {
                 path: path,
                 value: finalValue
             })
+            
+            // Message spécifique pour les changements de configuration de sortie
+            if (path.join(".") === "outputConfig.sirenMode" || 
+                path.join(".") === "outputConfig.composeSirenEnabled" ||
+                path.join(".") === "outputConfig.composeSirenVolume") {
+                
+                var sirenMode = getValueAtPath(["outputConfig", "sirenMode"], "udp")
+                var composeSirenEnabled = getValueAtPath(["outputConfig", "composeSirenEnabled"], true)
+                var composeSirenVolume = getValueAtPath(["outputConfig", "composeSirenVolume"], 100)
+                
+                webSocketController.sendMessage({
+                    type: "OUTPUT_CONFIG_CHANGED",
+                    sirenMode: sirenMode,
+                    composeSirenEnabled: composeSirenEnabled,
+                    composeSirenVolume: composeSirenVolume
+                })
+            }
         }
         
         // Forcer la mise à jour

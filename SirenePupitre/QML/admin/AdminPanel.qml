@@ -188,6 +188,26 @@ Item {
                         radius: 5
                     }
                 }
+                
+                TabButton {
+                    text: "Sorties"
+                    
+                    contentItem: Text {
+                        text: parent.text
+                        color: parent.checked ? "#FFD700" : "#888"
+                        font.pixelSize: 14
+                        font.bold: parent.checked
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    
+                    background: Rectangle {
+                        color: parent.checked ? "#2a2a2a" : (parent.hovered ? "#1a1a1a" : "transparent")
+                        border.color: parent.checked ? "#FFD700" : "transparent"
+                        border.width: parent.checked ? 2 : 0
+                        radius: 5
+                    }
+                }
             }
             
             // Contenu des onglets
@@ -199,6 +219,7 @@ Item {
                         case 0: return "SirenSelectionSection.qml"
                         case 1: return "VisibilitySection.qml"
                         case 2: return "AdvancedSection.qml"
+                        case 3: return "OutputSection.qml"
                         default: return ""
                     }
                 }

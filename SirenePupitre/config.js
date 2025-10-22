@@ -246,5 +246,10 @@ var configData = {
         "color": "#FFFF99"
       }
     }
+  },
+  "outputConfig": {
+    "sirenMode": "udp",
+    "composeSirenEnabled": true,
+    "composeSirenVolume": 100
   }
 };
