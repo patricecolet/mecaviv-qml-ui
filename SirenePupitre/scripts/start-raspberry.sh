@@ -218,6 +218,35 @@ start_browser() {
     fi
 }
 
+# Fonction pour démarrer PulseAudio
+start_pulseaudio() {
+    echo "$(date): Démarrage de PulseAudio..."
+    
+    # Vérifier si PulseAudio tourne déjà
+    if pulseaudio --check 2>/dev/null; then
+        echo "$(date): ✅ PulseAudio déjà actif"
+    else
+        # Démarrer PulseAudio en mode daemon
+        pulseaudio --start --log-target=syslog 2>/dev/null
+        sleep 3
+        
+        if pulseaudio --check 2>/dev/null; then
+            echo "$(date): ✅ PulseAudio démarré"
+        else
+            echo "$(date): ⚠️ PulseAudio n'a pas démarré, continuons..."
+        fi
+    fi
+    
+    # S'assurer que la HifiBerry est la sortie par défaut
+    pactl set-default-sink alsa_output.platform-soc_107c000000_sound.stereo-fallback 2>/dev/null
+    
+    # Afficher la sortie configurée
+    local default_sink=$(pactl get-default-sink 2>/dev/null)
+    if [ -n "$default_sink" ]; then
+        echo "$(date): 🎵 Sortie audio: $default_sink"
+    fi
+}
+
 # Fonction pour démarrer ComposeSiren
 start_composesiren() {
     echo "$(date): Démarrage de ComposeSiren..."
@@ -228,7 +257,7 @@ start_composesiren() {
     if command -v ComposeSiren >/dev/null 2>&1; then
         export DISPLAY=:0
         ComposeSiren &
-        echo "$(date): ✅ ComposeSiren démarré"
+        echo "$(date): ✅ ComposeSiren démarré avec HifiBerry DAC"
     else
         echo "$(date): ❌ ComposeSiren non trouvé dans le PATH"
     fi
@@ -259,29 +288,32 @@ main() {
     # 3. Configurer le volume
     set_volume
     
-    # 4. Arrêter les processus existants
+    # 4. Démarrer PulseAudio (avant les autres processus audio)
+    start_pulseaudio
+    
+    # 5. Arrêter les processus existants
     stop_processes
     
-    # 5. Démarrer les services
+    # 6. Démarrer les services
     start_server
     start_puredata
     
-    # 6. Démarrer le navigateur
+    # 7. Démarrer le navigateur
     start_browser
     
-    # 7. Démarrer ComposeSiren
+    # 8. Démarrer ComposeSiren
     start_composesiren
     
-    # 8. Afficher les informations
+    # 9. Afficher les informations
     local ip=$(get_configured_ip)
     echo "$(date): ✅ Application démarrée!"
     echo "$(date): 🌐 IP: $ip"
     echo "$(date): 🌐 Serveur: http://$ip:8000"
     echo "$(date): 🎵 PureData: ALSA MIDI device 1"
-    echo "$(date): 🎹 ComposeSiren: actif"
+    echo "$(date): 🎹 ComposeSiren: actif avec HifiBerry DAC"
     echo "$(date): 🔊 Volume: 60%"
     
-    # 9. Garder le script en vie
+    # 10. Garder le script en vie
     while true; do
         sleep 60
     done
