@@ -18,7 +18,7 @@ Rectangle {
         websocketManager: consoleController ? consoleController.websocketManager : null
         
         onFilesLoaded: {
-            console.log("Fichiers MIDI chargés:", categories.length, "catégories")
+            // Fichiers MIDI chargés
         }
         
         onLoadError: function(errorMessage) {

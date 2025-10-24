@@ -148,7 +148,7 @@ Rectangle {
                                     if (newBar > 0) {
                                         var newBeat = (newBar - 1) * timeSignatureNum
                                         var newPos = (newBeat * 60000) / tempo
-                                        console.log("⏩ Seek mesure", newBar, "→", Math.floor(newPos), "ms")
+                                        // Seek mesure
                                         seek(Math.floor(newPos))
                                         focus = false
                                     }
@@ -428,8 +428,7 @@ Rectangle {
                 implicitWidth: 60
                 
                 onClicked: {
-                    console.log("🎵 Bouton Play/Pause cliqué - État:", playing ? "PLAY→PAUSE" : "STOP→PLAY")
-                    console.log("🎵 CommandManager:", commandManager ? "OK" : "NULL")
+                    // Bouton Play/Pause cliqué
                     if (playing) {
                         pause()
                     } else {
@@ -462,7 +461,7 @@ Rectangle {
                 implicitWidth: 50
                 
                 onClicked: {
-                    console.log("⏹ Bouton Stop cliqué")
+                    // Bouton Stop cliqué
                     stop()
                 }
                 
@@ -658,7 +657,7 @@ Rectangle {
     // Fonction appelée quand un fichier est chargé depuis la bibliothèque
     function onFileLoaded(path) {
         currentFile = path
-        console.log("📁 Fichier chargé dans le lecteur:", path)
+        // Fichier chargé dans le lecteur
     }
     
     // Timer pour récupérer l'état de lecture depuis PureData

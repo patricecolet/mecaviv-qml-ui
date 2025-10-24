@@ -12048,6 +12048,178 @@ function _emscripten_webgl_make_context_current(contextHandle) {
   return success ? 0 : -5;
 }
 
+var webSockets = new HandleAllocator;
+
+var WS = {
+  socketEvent: null,
+  getSocket(socketId) {
+    if (!webSockets.has(socketId)) {
+      return 0;
+    }
+    return webSockets.get(socketId);
+  },
+  getSocketEvent(socketId) {
+    // Singleton event pointer.  Use EmscriptenWebSocketCloseEvent, which is
+    // the largest event struct
+    this.socketEvent ||= _malloc(520);
+    HEAPU32[((this.socketEvent) >>> 2) >>> 0] = socketId;
+    return this.socketEvent;
+  }
+};
+
+function _emscripten_websocket_close(socketId, code, reason) {
+  reason >>>= 0;
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  var reasonStr = reason ? UTF8ToString(reason) : undefined;
+  // According to WebSocket specification, only close codes that are recognized have integer values
+  // 1000-4999, with 3000-3999 and 4000-4999 denoting user-specified close codes:
+  // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#Status_codes
+  // Therefore be careful to call the .close() function with exact number and types of parameters.
+  // Coerce code==0 to undefined, since Wasm->JS call can only marshal integers, and 0 is not allowed.
+  if (reason) socket.close(code || undefined, UTF8ToString(reason)); else if (code) socket.close(code); else socket.close();
+  return 0;
+}
+
+var _emscripten_websocket_delete = socketId => {
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  socket.onopen = socket.onerror = socket.onclose = socket.onmessage = null;
+  webSockets.free(socketId);
+  return 0;
+};
+
+function _emscripten_websocket_get_ready_state(socketId, readyState) {
+  readyState >>>= 0;
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  HEAP16[((readyState) >>> 1) >>> 0] = socket.readyState;
+  return 0;
+}
+
+function _emscripten_websocket_new(createAttributes) {
+  createAttributes >>>= 0;
+  if (typeof WebSocket == "undefined") {
+    return -1;
+  }
+  if (!createAttributes) {
+    return -5;
+  }
+  var url = UTF8ToString(HEAPU32[((createAttributes) >>> 2) >>> 0]);
+  var protocols = HEAPU32[(((createAttributes) + (4)) >>> 2) >>> 0];
+  // TODO: Add support for createOnMainThread==false; currently all WebSocket connections are created on the main thread.
+  // var createOnMainThread = HEAP8[createAttributes+2];
+  var socket = protocols ? new WebSocket(url, UTF8ToString(protocols).split(",")) : new WebSocket(url);
+  // We always marshal received WebSocket data back to Wasm, so enable receiving the data as arraybuffers for easy marshalling.
+  socket.binaryType = "arraybuffer";
+  // TODO: While strictly not necessary, this ID would be good to be unique across all threads to avoid confusion.
+  var socketId = webSockets.allocate(socket);
+  return socketId;
+}
+
+function _emscripten_websocket_send_binary(socketId, binaryData, dataLength) {
+  binaryData >>>= 0;
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  socket.send(HEAPU8.subarray((binaryData) >>> 0, binaryData + dataLength >>> 0));
+  return 0;
+}
+
+function _emscripten_websocket_send_utf8_text(socketId, textData) {
+  textData >>>= 0;
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  var str = UTF8ToString(textData);
+  socket.send(str);
+  return 0;
+}
+
+function _emscripten_websocket_set_onclose_callback_on_thread(socketId, userData, callbackFunc, thread) {
+  userData >>>= 0;
+  callbackFunc >>>= 0;
+  thread >>>= 0;
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  socket.onclose = function(e) {
+    var eventPtr = WS.getSocketEvent(socketId);
+    HEAP8[(eventPtr) + (4) >>> 0] = e.wasClean, HEAP16[(((eventPtr) + (6)) >>> 1) >>> 0] = e.code, 
+    stringToUTF8(e.reason, eventPtr + 8, 512);
+    getWasmTableEntry(callbackFunc)(0, eventPtr, userData);
+  };
+  return 0;
+}
+
+function _emscripten_websocket_set_onerror_callback_on_thread(socketId, userData, callbackFunc, thread) {
+  userData >>>= 0;
+  callbackFunc >>>= 0;
+  thread >>>= 0;
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  socket.onerror = function(e) {
+    var eventPtr = WS.getSocketEvent(socketId);
+    getWasmTableEntry(callbackFunc)(0, eventPtr, userData);
+  };
+  return 0;
+}
+
+function _emscripten_websocket_set_onmessage_callback_on_thread(socketId, userData, callbackFunc, thread) {
+  userData >>>= 0;
+  callbackFunc >>>= 0;
+  thread >>>= 0;
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  socket.onmessage = function(e) {
+    var isText = typeof e.data == "string";
+    if (isText) {
+      var buf = stringToNewUTF8(e.data);
+      var len = lengthBytesUTF8(e.data) + 1;
+    } else {
+      var len = e.data.byteLength;
+      var buf = _malloc(len);
+      HEAP8.set(new Uint8Array(e.data), buf >>> 0);
+    }
+    var eventPtr = WS.getSocketEvent(socketId);
+    HEAPU32[(((eventPtr) + (4)) >>> 2) >>> 0] = buf, HEAP32[(((eventPtr) + (8)) >>> 2) >>> 0] = len, 
+    HEAP8[(eventPtr) + (12) >>> 0] = isText, getWasmTableEntry(callbackFunc)(0, eventPtr, userData);
+    _free(buf);
+  };
+  return 0;
+}
+
+function _emscripten_websocket_set_onopen_callback_on_thread(socketId, userData, callbackFunc, thread) {
+  userData >>>= 0;
+  callbackFunc >>>= 0;
+  thread >>>= 0;
+  // TODO:
+  //    if (thread == 2 ||
+  //      (thread == _pthread_self()) return emscripten_websocket_set_onopen_callback_on_calling_thread(socketId, userData, callbackFunc);
+  var socket = WS.getSocket(socketId);
+  if (!socket) {
+    return -3;
+  }
+  socket.onopen = function(e) {
+    var eventPtr = WS.getSocketEvent(socketId);
+    getWasmTableEntry(callbackFunc)(0, eventPtr, userData);
+  };
+  return 0;
+}
+
 var ENV = {};
 
 var getExecutableName = () => thisProgram || "./this.program";
@@ -12516,7 +12688,7 @@ var missingLibrarySymbols = [ "writeI53ToI64Clamped", "writeI53ToI64Signaling", 
 
 missingLibrarySymbols.forEach(missingLibrarySymbol);
 
-var unexportedSymbols = [ "run", "addRunDependency", "removeRunDependency", "out", "err", "abort", "wasmMemory", "wasmExports", "HEAPF32", "HEAPF64", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAP64", "HEAPU64", "writeStackCookie", "checkStackCookie", "writeI53ToI64", "readI53FromI64", "readI53FromU64", "convertI32PairToI53", "convertU32PairToI53", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "stackSave", "stackRestore", "stackAlloc", "setTempRet0", "ptrToString", "zeroMemory", "exitJS", "getHeapMax", "growMemory", "ENV", "ERRNO_CODES", "strError", "inetPton4", "inetNtop4", "inetPton6", "inetNtop6", "readSockaddr", "writeSockaddr", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "emscriptenLog", "readEmAsmArgsArray", "readEmAsmArgs", "runEmAsmFunction", "jstoi_q", "jstoi_s", "getExecutableName", "getDynCaller", "dynCall", "handleException", "keepRuntimeAlive", "callUserCallback", "maybeExit", "asyncLoad", "alignMemory", "mmapAlloc", "HandleAllocator", "wasmTable", "noExitRuntime", "addOnPreRun", "addOnExit", "addOnPostRun", "freeTableIndexes", "functionsInTableMap", "reallyNegative", "unSign", "strLen", "reSign", "formatString", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "intArrayFromString", "UTF16Decoder", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "stringToNewUTF8", "stringToUTF8OnStack", "maybeCStringToJsString", "findEventTarget", "findCanvasEventTarget", "getBoundingClientRect", "fillMouseEventData", "registerWheelEventCallback", "registerUiEventCallback", "currentFullscreenStrategy", "restoreOldWindowedStyle", "jsStackTrace", "getCallstack", "UNWIND_CACHE", "ExitStatus", "getEnvStrings", "checkWasiClock", "doReadv", "doWritev", "initRandomFill", "randomFill", "safeSetTimeout", "safeRequestAnimationFrame", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "ExceptionInfo", "findMatchingCatch", "getExceptionMessageCommon", "Browser", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "isLeapYear", "ydayFromDate", "SYSCALLS", "getSocketFromFD", "getSocketAddress", "preloadPlugins", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar_buffer", "FS_stdin_getChar", "FS_createPath", "FS_createDevice", "FS_readFile", "FS_createDataFile", "FS_createLazyFile", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "_setNetworkCallback", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "heapObjectForWebGLType", "toTypedArrayIndex", "webgl_enable_ANGLE_instanced_arrays", "webgl_enable_OES_vertex_array_object", "webgl_enable_WEBGL_draw_buffers", "webgl_enable_WEBGL_multi_draw", "webgl_enable_EXT_polygon_offset_clamp", "webgl_enable_EXT_clip_control", "webgl_enable_WEBGL_polygon_mode", "GL", "emscriptenWebGLGet", "computeUnpackAlignedImageSize", "colorChannelsInGlTextureFormat", "emscriptenWebGLGetTexPixelData", "emscriptenWebGLGetUniform", "webglGetUniformLocation", "webglPrepareUniformLocationsBeforeFirstUse", "webglGetLeftBracePos", "emscriptenWebGLGetVertexAttrib", "__glGetActiveAttribOrUniform", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "SDL", "SDL_gfx", "emscriptenWebGLGetIndexed", "webgl_enable_WEBGL_draw_instanced_base_vertex_base_instance", "webgl_enable_WEBGL_multi_draw_instanced_base_vertex_base_instance", "allocateUTF8", "allocateUTF8OnStack", "print", "printErr", "InternalError", "BindingError", "throwInternalError", "throwBindingError", "registeredTypes", "awaitingDependencies", "typeDependencies", "tupleRegistrations", "structRegistrations", "sharedRegisterType", "whenDependentTypesAreResolved", "embind_charCodes", "embind_init_charCodes", "readLatin1String", "getTypeName", "getFunctionName", "heap32VectorToArray", "requireRegisteredType", "usesDestructorStack", "checkArgCount", "getRequiredArgCount", "createJsInvoker", "UnboundTypeError", "GenericWireTypeSize", "EmValType", "EmValOptionalType", "throwUnboundTypeError", "ensureOverloadTable", "exposePublicSymbol", "replacePublicSymbol", "createNamedFunction", "embindRepr", "registeredInstances", "registeredPointers", "registerType", "integerReadValueFromPointer", "floatReadValueFromPointer", "readPointer", "runDestructors", "craftInvokerFunction", "embind__requireFunction", "finalizationRegistry", "detachFinalizer_deps", "deletionQueue", "delayFunction", "emval_freelist", "emval_handles", "emval_symbols", "init_emval", "count_emval_handles", "getStringOrSymbol", "Emval", "emval_get_global", "emval_returnValue", "emval_lookupTypes", "emval_methodCallers", "emval_addMethodCaller", "reflectConstruct", "Fetch", "fetchDeleteCachedData", "fetchLoadCachedData", "fetchCacheData", "fetchXHR" ];
+var unexportedSymbols = [ "run", "addRunDependency", "removeRunDependency", "out", "err", "abort", "wasmMemory", "wasmExports", "HEAPF32", "HEAPF64", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAP64", "HEAPU64", "writeStackCookie", "checkStackCookie", "writeI53ToI64", "readI53FromI64", "readI53FromU64", "convertI32PairToI53", "convertU32PairToI53", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "stackSave", "stackRestore", "stackAlloc", "setTempRet0", "ptrToString", "zeroMemory", "exitJS", "getHeapMax", "growMemory", "ENV", "ERRNO_CODES", "strError", "inetPton4", "inetNtop4", "inetPton6", "inetNtop6", "readSockaddr", "writeSockaddr", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "emscriptenLog", "readEmAsmArgsArray", "readEmAsmArgs", "runEmAsmFunction", "jstoi_q", "jstoi_s", "getExecutableName", "getDynCaller", "dynCall", "handleException", "keepRuntimeAlive", "callUserCallback", "maybeExit", "asyncLoad", "alignMemory", "mmapAlloc", "HandleAllocator", "wasmTable", "noExitRuntime", "addOnPreRun", "addOnExit", "addOnPostRun", "freeTableIndexes", "functionsInTableMap", "reallyNegative", "unSign", "strLen", "reSign", "formatString", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "intArrayFromString", "UTF16Decoder", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "stringToNewUTF8", "stringToUTF8OnStack", "maybeCStringToJsString", "findEventTarget", "findCanvasEventTarget", "getBoundingClientRect", "fillMouseEventData", "registerWheelEventCallback", "registerUiEventCallback", "currentFullscreenStrategy", "restoreOldWindowedStyle", "jsStackTrace", "getCallstack", "UNWIND_CACHE", "ExitStatus", "getEnvStrings", "checkWasiClock", "doReadv", "doWritev", "initRandomFill", "randomFill", "safeSetTimeout", "safeRequestAnimationFrame", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "ExceptionInfo", "findMatchingCatch", "getExceptionMessageCommon", "Browser", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "isLeapYear", "ydayFromDate", "SYSCALLS", "getSocketFromFD", "getSocketAddress", "preloadPlugins", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar_buffer", "FS_stdin_getChar", "FS_createPath", "FS_createDevice", "FS_readFile", "FS_createDataFile", "FS_createLazyFile", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "_setNetworkCallback", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "heapObjectForWebGLType", "toTypedArrayIndex", "webgl_enable_ANGLE_instanced_arrays", "webgl_enable_OES_vertex_array_object", "webgl_enable_WEBGL_draw_buffers", "webgl_enable_WEBGL_multi_draw", "webgl_enable_EXT_polygon_offset_clamp", "webgl_enable_EXT_clip_control", "webgl_enable_WEBGL_polygon_mode", "GL", "emscriptenWebGLGet", "computeUnpackAlignedImageSize", "colorChannelsInGlTextureFormat", "emscriptenWebGLGetTexPixelData", "emscriptenWebGLGetUniform", "webglGetUniformLocation", "webglPrepareUniformLocationsBeforeFirstUse", "webglGetLeftBracePos", "emscriptenWebGLGetVertexAttrib", "__glGetActiveAttribOrUniform", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "SDL", "SDL_gfx", "emscriptenWebGLGetIndexed", "webgl_enable_WEBGL_draw_instanced_base_vertex_base_instance", "webgl_enable_WEBGL_multi_draw_instanced_base_vertex_base_instance", "allocateUTF8", "allocateUTF8OnStack", "print", "printErr", "InternalError", "BindingError", "throwInternalError", "throwBindingError", "registeredTypes", "awaitingDependencies", "typeDependencies", "tupleRegistrations", "structRegistrations", "sharedRegisterType", "whenDependentTypesAreResolved", "embind_charCodes", "embind_init_charCodes", "readLatin1String", "getTypeName", "getFunctionName", "heap32VectorToArray", "requireRegisteredType", "usesDestructorStack", "checkArgCount", "getRequiredArgCount", "createJsInvoker", "UnboundTypeError", "GenericWireTypeSize", "EmValType", "EmValOptionalType", "throwUnboundTypeError", "ensureOverloadTable", "exposePublicSymbol", "replacePublicSymbol", "createNamedFunction", "embindRepr", "registeredInstances", "registeredPointers", "registerType", "integerReadValueFromPointer", "floatReadValueFromPointer", "readPointer", "runDestructors", "craftInvokerFunction", "embind__requireFunction", "finalizationRegistry", "detachFinalizer_deps", "deletionQueue", "delayFunction", "emval_freelist", "emval_handles", "emval_symbols", "init_emval", "count_emval_handles", "getStringOrSymbol", "Emval", "emval_get_global", "emval_returnValue", "emval_lookupTypes", "emval_methodCallers", "emval_addMethodCaller", "reflectConstruct", "webSockets", "WS", "Fetch", "fetchDeleteCachedData", "fetchLoadCachedData", "fetchCacheData", "fetchXHR" ];
 
 unexportedSymbols.forEach(unexportedRuntimeSymbol);
 
@@ -12535,14 +12707,14 @@ function checkIncomingModuleAPI() {
 }
 
 var ASM_CONSTS = {
-  15220420: () => {
+  15236916: () => {
     Module.qtSuspendResumeControl = ({
       resume: null,
       eventHandlers: {},
       pendingEvents: []
     });
   },
-  15220515: $0 => {
+  15237011: $0 => {
     let index = $0;
     let control = Module.qtSuspendResumeControl;
     let handler = arg => {
@@ -12968,6 +13140,16 @@ var wasmImports = {
   /** @export */ emscripten_webgl_destroy_context: _emscripten_webgl_destroy_context,
   /** @export */ emscripten_webgl_get_context_attributes: _emscripten_webgl_get_context_attributes,
   /** @export */ emscripten_webgl_make_context_current: _emscripten_webgl_make_context_current,
+  /** @export */ emscripten_websocket_close: _emscripten_websocket_close,
+  /** @export */ emscripten_websocket_delete: _emscripten_websocket_delete,
+  /** @export */ emscripten_websocket_get_ready_state: _emscripten_websocket_get_ready_state,
+  /** @export */ emscripten_websocket_new: _emscripten_websocket_new,
+  /** @export */ emscripten_websocket_send_binary: _emscripten_websocket_send_binary,
+  /** @export */ emscripten_websocket_send_utf8_text: _emscripten_websocket_send_utf8_text,
+  /** @export */ emscripten_websocket_set_onclose_callback_on_thread: _emscripten_websocket_set_onclose_callback_on_thread,
+  /** @export */ emscripten_websocket_set_onerror_callback_on_thread: _emscripten_websocket_set_onerror_callback_on_thread,
+  /** @export */ emscripten_websocket_set_onmessage_callback_on_thread: _emscripten_websocket_set_onmessage_callback_on_thread,
+  /** @export */ emscripten_websocket_set_onopen_callback_on_thread: _emscripten_websocket_set_onopen_callback_on_thread,
   /** @export */ environ_get: _environ_get,
   /** @export */ environ_sizes_get: _environ_sizes_get,
   /** @export */ exit: _exit,

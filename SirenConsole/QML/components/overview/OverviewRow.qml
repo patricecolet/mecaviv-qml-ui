@@ -5,12 +5,24 @@ import QtQuick.Layouts 1.15
 Rectangle {
     id: overviewRow
     
-    property var pupitre: null
+    // Propriétés directes au lieu de l'objet pupitre
+    property string pupitreId: parent ? parent.pupitreId : ""
+    property string pupitreStatus: parent ? parent.pupitreStatus : "disconnected"
+    property string pupitreName: parent ? parent.pupitreName : ""
+    property string pupitreHost: parent ? parent.pupitreHost : ""
+    
+Component.onCompleted: {
+console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus)
+}
     
     height: 80
     width: parent.width
-    color: pupitre && pupitre.status === "connected" ? "#2a4a2a" : "#2a2a2a"
-    border.color: pupitre && pupitre.status === "connected" ? "#00ff00" : "#555555"
+    //color: pupitre && pupitre.status === "connected" ? "#2a4a2a" : "#2a2a2a"
+    color: {
+        console.log("🔍 OverviewRow color: pupitreId =", pupitreId, "status =", pupitreStatus)
+        return overviewRow.pupitreStatus === "connected" ? "#2a4a2a" : "#2a2a2a"
+    }
+    border.color: overviewRow.pupitreStatus === "connected" ? "#00ff00" : "#555555"
     border.width: 2
     radius: 8
     
@@ -34,9 +46,9 @@ Rectangle {
                 anchors.centerIn: parent
                 spacing: 8
                 
-                // Nom de la sirène (S1, S2, etc.)
+                // Nom du pupitre (P1, P2, etc.)
                 Text {
-                    text: "S" + (pupitre ? pupitre.id : "?")
+                    text: overviewRow.pupitreId || "P?"
                     color: "#ffffff"
                     font.pixelSize: 16
                     font.bold: true
@@ -50,8 +62,7 @@ Rectangle {
                     radius: 6
                     anchors.horizontalCenter: parent.horizontalCenter
                     color: {
-                        if (!pupitre) return "#666666"
-                        switch(pupitre.status) {
+                        switch(overviewRow.pupitreStatus) {
                             case "connected": return "#00ff00"
                             case "connecting": return "#ffff00"
                             case "error": return "#ff0000"
@@ -77,9 +88,9 @@ Rectangle {
                 anchors.centerIn: parent
                 width: parent.width - 16
                 height: 30
-                minNote: (pupitre && pupitre.ambitus) ? pupitre.ambitus.min : 48
-                maxNote: (pupitre && pupitre.ambitus) ? pupitre.ambitus.max : 72
-                currentNote: (pupitre && pupitre.midiNote !== undefined) ? pupitre.midiNote : 60
+                minNote: 48
+                maxNote: 72
+                currentNote: 60
             }
         }
         
@@ -112,7 +123,7 @@ Rectangle {
                             font.pixelSize: 9
                         }
                         Text {
-                            text: (pupitre && pupitre.motorSpeed !== undefined) ? pupitre.motorSpeed : 0
+                            text: "0"
                             color: "#ffffff"
                             font.pixelSize: 12
                             font.bold: true
@@ -127,7 +138,7 @@ Rectangle {
                             font.pixelSize: 9
                         }
                         Text {
-                            text: (pupitre && pupitre.frequency !== undefined) ? pupitre.frequency.toFixed(1) : "440.0"
+                            text: "440.0"
                             color: "#ffffff"
                             font.pixelSize: 12
                             font.bold: true
@@ -148,7 +159,7 @@ Rectangle {
                             font.pixelSize: 9
                         }
                         Text {
-                            text: (pupitre && pupitre.midiNote !== undefined) ? pupitre.midiNote : 60
+                            text: "60"
                             color: "#ffffff"
                             font.pixelSize: 12
                             font.bold: true
@@ -163,7 +174,7 @@ Rectangle {
                             font.pixelSize: 9
                         }
                         Text {
-                            text: (pupitre && pupitre.frettedMode) ? "ON" : "OFF"
+                            text: "OFF"
                             color: "#ffffff"
                             font.pixelSize: 12
                             font.bold: true
@@ -194,7 +205,7 @@ Rectangle {
                     height: 25
                     font.pixelSize: 10
                     onClicked: {
-                        console.log("Configuration pupitre", pupitre ? pupitre.id : "?")
+                        // Configuration pupitre
                     }
                 }
                 
@@ -204,7 +215,7 @@ Rectangle {
                     height: 25
                     font.pixelSize: 10
                     onClicked: {
-                        console.log("Vue locale pupitre", pupitre ? pupitre.id : "?")
+                        // Vue locale pupitre
                     }
                 }
             }

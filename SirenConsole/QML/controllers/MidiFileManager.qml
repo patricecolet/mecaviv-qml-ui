@@ -62,7 +62,7 @@ QtObject {
         }
         
         var url = apiUrl + "/api/midi/files"
-        console.log("Loading MIDI files from:", url)
+        // Loading MIDI files
         xhr.open("GET", url)
         xhr.send()
     }
@@ -103,7 +103,7 @@ QtObject {
         categories = cats
         files = allFiles
         
-        console.log("📁 Fichiers MIDI traités:", allFiles.length, "fichiers,", cats.length, "catégories")
+        // Fichiers MIDI traités
     }
     
     // Demander le chargement des fichiers (alias pour loadMidiFiles)
@@ -139,7 +139,7 @@ QtObject {
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
-                    console.log("✅ MIDI file load requested:", filePath)
+                    // MIDI file load requested
                 } else {
                     error = "Erreur envoi commande: HTTP " + xhr.status
                     loadError(error)

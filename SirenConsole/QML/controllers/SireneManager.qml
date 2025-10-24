@@ -23,7 +23,7 @@ QtObject {
     // === INITIALISATION ===
     
     Component.onCompleted: {
-        console.log("🎺 SireneManager initialisé")
+        // SireneManager initialisé
         initializeAvailableSirenes()
     }
     
@@ -33,7 +33,7 @@ QtObject {
         for (var i = 1; i <= 7; i++) {
             availableSireneList.push(i)
         }
-        console.log("🎺 Sirènes disponibles:", availableSireneList)
+        // Sirènes disponibles
     }
     
     // === GESTION DE LA PROPRIÉTÉ DES SIRÈNES ===
@@ -42,14 +42,14 @@ QtObject {
     function canAssignSirene(sireneId, pupitreId) {
         // Vérifier si la sirène est utilisée par le séquenceur
         if (sequencerSireneList.indexOf(sireneId) !== -1) {
-            console.log("🚫 Sirène", sireneId, "utilisée par le séquenceur")
+            // Sirène utilisée par le séquenceur
             return false
         }
         
         // Vérifier si la sirène est déjà assignée à un autre pupitre
         var currentOwner = sireneOwnership[sireneId]
         if (currentOwner && currentOwner !== pupitreId) {
-            console.log("🚫 Sirène", sireneId, "déjà assignée à pupitre", currentOwner)
+            // Sirène déjà assignée à pupitre
             return false
         }
         
@@ -66,7 +66,7 @@ QtObject {
         var oldOwner = sireneOwnership[sireneId]
         sireneOwnership[sireneId] = pupitreId
         
-        console.log("✅ Sirène", sireneId, "assignée au pupitre", pupitreId)
+        // Sirène assignée au pupitre
         ownershipChanged(sireneId, oldOwner, pupitreId)
         
         return true
@@ -77,7 +77,7 @@ QtObject {
         var currentOwner = sireneOwnership[sireneId]
         if (currentOwner === pupitreId) {
             delete sireneOwnership[sireneId]
-            console.log("❌ Sirène", sireneId, "désassignée du pupitre", pupitreId)
+            // Sirène désassignée du pupitre
             ownershipChanged(sireneId, pupitreId, "")
             return true
         }
@@ -105,7 +105,7 @@ QtObject {
     // Définir les sirènes utilisées par le séquenceur
     function setSequencerSirenes(sirenes) {
         sequencerSireneList = sirenes || []
-        console.log("🎵 Sirènes du séquenceur:", sequencerSireneList)
+        // Sirènes du séquenceur
         sequencerChanged(sequencerSireneList)
         
         // Vérifier les conflits avec les pupitres
@@ -118,7 +118,7 @@ QtObject {
             var sireneId = sequencerSireneList[i]
             var owner = getSireneOwner(sireneId)
             if (owner) {
-                console.log("⚠️ Conflit détecté: Sirène", sireneId, "utilisée par pupitre", owner, "et séquenceur")
+                // Conflit détecté
                 // Désassigner automatiquement du pupitre
                 unassignSirene(sireneId, owner)
             }
@@ -167,7 +167,7 @@ QtObject {
             var newSireneId = requestedSirenes[j]
             if (currentSirenes.indexOf(newSireneId) === -1) {
                 if (!assignSirene(newSireneId, pupitreId)) {
-                    console.log("⚠️ Impossible d'assigner la sirène", newSireneId, "au pupitre", pupitreId)
+                    // Impossible d'assigner la sirène
                 }
             }
         }

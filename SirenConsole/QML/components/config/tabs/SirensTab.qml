@@ -91,7 +91,7 @@ Item {
             pupitre.sirenes[sireneId][property] = value
         }
         
-        console.log("🔧 Appliqué à tous les pupitres:", property, "=", value, "pour S" + (sireneIndex + 1))
+        // Appliqué à tous les pupitres
         updateTrigger++
     }
     
@@ -254,11 +254,11 @@ Item {
                                         var sireneState = sirensTab.sirenRouterManager.getSireneState(sireneNumber)
                                         var currentController = sirensTab.sirenRouterManager.getSireneController(sireneNumber)
                                         
-                                        console.log(`🔍 État S${sireneNumber}: ${sireneState.status}, Contrôleur: ${currentController}`)
+                                        // État S
                                         
                                         // Si la sirène est contrôlée par une autre source, avertir l'utilisateur
                                         if (currentController && currentController !== "console") {
-                                            console.log(`⚠️ Sirène S${sireneNumber} contrôlée par ${currentController}`)
+                                            // Sirène contrôlée par autre source
                                             // On peut continuer ou afficher un avertissement selon les besoins
                                         }
                                     }
@@ -400,7 +400,7 @@ Item {
                                             }
                                             
                                             sirensTab.pupitre.sirenes[sireneId].ambitusRestricted = checked
-                                            console.log("🔧 Ambitus restreint S" + (index + 1), ":", checked)
+                                            // Ambitus restreint
                                             
                                             // Forcer la mise à jour de l'interface
                                             sirensTab.updateTrigger++
@@ -498,7 +498,7 @@ Item {
                                         }
                                         
                                         sirensTab.pupitre.sirenes[sireneId].frettedMode = checked
-                                        console.log("🔧 Mode fretté S" + (index + 1), ":", checked)
+                                        // Mode fretté
                                         
                                         // Forcer la mise à jour de l'interface
                                         sirensTab.updateTrigger++

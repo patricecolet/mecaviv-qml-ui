@@ -16,7 +16,7 @@ QtObject {
     
     // Initialisation
     Component.onCompleted: {
-        console.log("🎮 CommandManager initialisé")
+        // CommandManager initialisé
     }
     
     // ==========================================
@@ -24,7 +24,7 @@ QtObject {
     // ==========================================
     
     function sendMidiCommand(command) {
-        console.log("🎵 Envoi commande MIDI à PureData:", JSON.stringify(command))
+        // Envoi commande MIDI à PureData
         
         var xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
@@ -34,7 +34,7 @@ QtObject {
                         var response = JSON.parse(xhr.responseText)
                         if (response.success) {
                             commandExecuted("midi_" + command.type, response)
-                            console.log("✅ Commande MIDI envoyée:", command.type)
+                            // Commande MIDI envoyée
                         } else {
                             commandError("midi_" + command.type, response.message || "Erreur inconnue")
                         }
@@ -115,7 +115,7 @@ QtObject {
             return false
         }
         
-        console.log("🎮 Exécution commande:", command, "sur", pupitre.name, parameters)
+        // Exécution commande
         
         var message = {
             type: "command",
@@ -263,7 +263,7 @@ QtObject {
             return false
         }
         
-        console.log("🎮 Exécution en lot de", commands.length, "commandes")
+        // Exécution en lot
         bulkOperationStarted(commands.length)
         
         var successCount = 0
@@ -273,7 +273,7 @@ QtObject {
         function executeNext(index) {
             if (index >= commands.length) {
                 bulkOperationCompleted(successCount, errorCount)
-                console.log("🎮 Opération en lot terminée:", successCount, "succès,", errorCount, "erreurs")
+                // Opération en lot terminée
                 return
             }
             
@@ -371,7 +371,7 @@ QtObject {
             })
         }
         
-        console.log("🔄 Synchronisation de", commands.length, "pupitres")
+        // Synchronisation
         return executeBulkCommands(commands)
     }
     
@@ -394,7 +394,7 @@ QtObject {
             })
         }
         
-        console.log("🔍 Diagnostic de", commands.length, "pupitres")
+        // Diagnostic
         return executeBulkCommands(commands)
     }
     
@@ -460,6 +460,6 @@ QtObject {
     
     function clearCommandHistory() {
         // TODO: Implémenter la suppression de l'historique
-        console.log("🗑️ Historique des commandes effacé")
+        // Historique des commandes effacé
     }
 }

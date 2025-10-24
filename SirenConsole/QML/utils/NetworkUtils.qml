@@ -5,14 +5,23 @@ QtObject {
     
     // Vérifier si une adresse IP est valide
     function isValidIP(ip) {
+        if (!ip || typeof ip !== 'string') return false
         var regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
-        return regex.test(ip)
+        try {
+            var ipString = String(ip)
+            var regexObj = new RegExp(regex)
+            var result = regexObj.test(ipString)
+            return result
+        } catch (e) {
+            return false
+        }
     }
     
     // Vérifier si un port est valide
     function isValidPort(port) {
+        if (!port) return false
         var numPort = parseInt(port)
-        return numPort >= 1 && numPort <= 65535
+        return !isNaN(numPort) && numPort >= 1 && numPort <= 65535
     }
     
     // Construire une URL WebSocket
@@ -22,8 +31,8 @@ QtObject {
         }
         
         var url = "ws://" + host + ":" + port
-        if (path && path !== "") {
-            if (!path.startsWith("/")) {
+        if (path && path !== "" && typeof path === 'string') {
+            if (!String(path).startsWith("/")) {
                 url += "/"
             }
             url += path
@@ -34,16 +43,18 @@ QtObject {
     
     // Tester la connectivité réseau
     function testConnectivity(host, port, callback) {
-        console.log("🔍 Test de connectivité vers", host + ":" + port)
+        // Test de connectivité
         
         // TODO: Implémenter un test de connectivité réel
         // Pour l'instant, on simule
-        setTimeout(function() {
-            var isReachable = Math.random() > 0.3 // 70% de chance de succès
-            if (callback) {
-                callback(isReachable)
-            }
-        }, 1000)
+        if (typeof setTimeout !== 'undefined') {
+            setTimeout(function() {
+                var isReachable = Math.random() > 0.3 // 70% de chance de succès
+                if (callback) {
+                    callback(isReachable)
+                }
+            }, 1000)
+        }
     }
     
     // Obtenir l'adresse IP locale
@@ -54,7 +65,7 @@ QtObject {
     
     // Scanner le réseau pour trouver des pupitres
     function scanNetwork(baseIP, startPort, endPort, callback) {
-        console.log("🔍 Scan réseau:", baseIP, "ports", startPort + "-" + endPort)
+        // Scan réseau
         
         var foundDevices = []
         var baseIPParts = baseIP.split('.')
@@ -90,6 +101,7 @@ QtObject {
     
     // Formater un port
     function formatPort(port) {
+        if (!port) return "Port invalide"
         var numPort = parseInt(port)
         if (!isValidPort(port)) {
             return "Port invalide"

@@ -17,20 +17,28 @@ QtObject {
     
     // Initialisation
     Component.onCompleted: {
-        console.log("🎹 PupitreManager initialisé")
+        // PupitreManager initialisé
     }
     
     // Initialiser les pupitres à partir de la configuration
     function initializePupitres() {
-        if (!configManager || !configManager.config) {
-            console.error("❌ ConfigManager non disponible")
+        // Début initialisation pupitres
+        
+        if (!configManager) {
+            // ConfigManager non disponible
             return false
         }
         
-        console.log("🎹 Initialisation des pupitres...")
+        if (!configManager.config) {
+            // Configuration non chargée
+            return false
+        }
+        
+        // Initialisation des pupitres
         
         pupitres = []
         var configPupitres = configManager.getAllPupitres()
+        // Pupitres trouvés
         
         for (var i = 0; i < configPupitres.length; i++) {
             var configPupitre = configPupitres[i]
@@ -40,9 +48,9 @@ QtObject {
                 id: configPupitre.id,
                 name: configPupitre.name,
                 host: configPupitre.host,
-                port: configPupitre.port || 8000,
-                websocketPort: configPupitre.websocketPort || 10001,
-                enabled: configPupitre.enabled || false,
+                port: configPupitre.port,
+                websocketPort: configPupitre.websocketPort,
+                enabled: configPupitre.enabled,
                 description: configPupitre.description || "",
                 
                 // Configuration audio
@@ -85,10 +93,10 @@ QtObject {
             }
             
             pupitres.push(pupitre)
-            console.log("✅ Pupitre initialisé:", pupitre.name, "(" + pupitre.host + ")")
+            // Pupitre initialisé
         }
         
-        console.log("🎹 Initialisation terminée:", pupitres.length, "pupitres")
+        // Initialisation terminée
         return true
     }
     
@@ -119,7 +127,7 @@ QtObject {
     function setCurrentPupitre(index) {
         if (index >= 0 && index < pupitres.length) {
             currentPupitreIndex = index
-            console.log("🎹 Pupitre actuel changé:", getCurrentPupitre().name)
+            // Pupitre actuel changé
             return true
         }
         return false
@@ -129,20 +137,20 @@ QtObject {
     function connectPupitre(pupitreId) {
         var pupitre = getPupitreById(pupitreId)
         if (!pupitre) {
-            console.error("❌ Pupitre non trouvé:", pupitreId)
+            // Pupitre non trouvé
             return false
         }
         
         if (!pupitre.enabled) {
-            console.error("❌ Pupitre désactivé:", pupitreId)
+            // Pupitre désactivé
             return false
         }
         
-        console.log("🔌 Connexion pupitre:", pupitre.name, pupitre.host + ":" + pupitre.websocketPort)
+        // Connexion pupitre
         
         // Mettre à jour le statut
-        pupitre.status = "connecting"
-        pupitreStatusChanged(pupitreId, "connecting")
+        //pupitre.status = "connecting"
+        //pupitreStatusChanged(pupitreId, "connecting")
         
         // Utiliser le WebSocketManager pour la connexion
         if (webSocketManager) {
@@ -156,11 +164,11 @@ QtObject {
     function disconnectPupitre(pupitreId) {
         var pupitre = getPupitreById(pupitreId)
         if (!pupitre) {
-            console.error("❌ Pupitre non trouvé:", pupitreId)
+            // Pupitre non trouvé
             return false
         }
         
-        console.log("🔌 Déconnexion pupitre:", pupitre.name)
+        // Déconnexion pupitre
         
         // Mettre à jour le statut
         pupitre.status = "disconnected"
@@ -177,7 +185,7 @@ QtObject {
     
     // Connecter tous les pupitres activés
     function connectAllPupitres() {
-        console.log("🔌 Connexion de tous les pupitres...")
+        // Connexion de tous les pupitres
         
         var connectedCount = 0
         for (var i = 0; i < pupitres.length; i++) {
@@ -186,13 +194,13 @@ QtObject {
             }
         }
         
-        console.log("✅ Connexion terminée:", connectedCount, "pupitres")
+        // Connexion terminée
         return connectedCount
     }
     
     // Déconnecter tous les pupitres
     function disconnectAllPupitres() {
-        console.log("🔌 Déconnexion de tous les pupitres...")
+        // Déconnexion de tous les pupitres
         
         var disconnectedCount = 0
         for (var i = 0; i < pupitres.length; i++) {
@@ -201,7 +209,7 @@ QtObject {
             }
         }
         
-        console.log("✅ Déconnexion terminée:", disconnectedCount, "pupitres")
+        // Déconnexion terminée
         return disconnectedCount
     }
     
@@ -220,7 +228,7 @@ QtObject {
             pupitre.lastSeen = new Date()
         }
         
-        console.log("📊 Statut pupitre:", pupitre.name, oldStatus, "->", status)
+        // Statut pupitre mis à jour
         pupitreStatusChanged(pupitreId, status)
         
         return true
@@ -250,7 +258,7 @@ QtObject {
     function sendCommand(pupitreId, command, value) {
         var pupitre = getPupitreById(pupitreId)
         if (!pupitre || !pupitre.connected) {
-            console.error("❌ Pupitre non connecté:", pupitreId)
+            // Pupitre non connecté
             return false
         }
         
@@ -261,7 +269,7 @@ QtObject {
             timestamp: Date.now()
         }
         
-        console.log("📤 Commande envoyée:", pupitre.name, command, value)
+        // Commande envoyée
         
         if (webSocketManager) {
             webSocketManager.sendMessage(pupitreId, JSON.stringify(message))
@@ -288,8 +296,7 @@ QtObject {
         sirene.ambitusRestreint = ambitusRestreint !== undefined ? ambitusRestreint : sirene.ambitusRestreint
         sirene.modeFrette = modeFrette !== undefined ? modeFrette : sirene.modeFrette
         
-        console.log("🎵 Contrôle sirène:", pupitre.name, "S" + sireneNumber, 
-                   "enabled:", sirene.enabled, "ambitus:", sirene.ambitusRestreint, "frette:", sirene.modeFrette)
+        // Contrôle sirène
         
         // Envoyer la commande au pupitre
         sendCommand(pupitreId, "sirene_" + sireneNumber, {
@@ -309,7 +316,7 @@ QtObject {
         }
         
         pupitre.ambitus = { min: min, max: max }
-        console.log("🎵 Ambitus défini:", pupitre.name, min, "-", max)
+        // Ambitus défini
         
         // Envoyer la commande au pupitre
         sendCommand(pupitreId, "ambitus", pupitre.ambitus)
@@ -325,7 +332,7 @@ QtObject {
         }
         
         pupitre.frettedMode = frettedMode
-        console.log("🎵 Mode fretté:", pupitre.name, frettedMode)
+        // Mode fretté
         
         // Envoyer la commande au pupitre
         sendCommand(pupitreId, "frettedMode", frettedMode)
@@ -341,7 +348,7 @@ QtObject {
         }
         
         pupitre.motorSpeed = speed
-        console.log("🎵 Vitesse moteur:", pupitre.name, speed)
+        // Vitesse moteur
         
         // Envoyer la commande au pupitre
         sendCommand(pupitreId, "motorSpeed", speed)
@@ -357,7 +364,7 @@ QtObject {
         }
         
         pupitre.frequency = frequency
-        console.log("🎵 Fréquence:", pupitre.name, frequency)
+        // Fréquence
         
         // Envoyer la commande au pupitre
         sendCommand(pupitreId, "frequency", frequency)
@@ -425,7 +432,7 @@ QtObject {
         }
         
         pupitre.enabled = enabled
-        console.log("🎹 Pupitre", enabled ? "activé" : "désactivé", ":", pupitre.name)
+        // Pupitre activé/désactivé
         
         // Si désactivé, déconnecter
         if (!enabled && pupitre.connected) {
@@ -441,7 +448,7 @@ QtObject {
             return false
         }
         
-        console.log("🔄 Synchronisation avec la configuration...")
+        // Synchronisation avec la configuration
         
         var configPupitres = configManager.getAllPupitres()
         for (var i = 0; i < pupitres.length && i < configPupitres.length; i++) {
@@ -451,7 +458,7 @@ QtObject {
             // Mettre à jour les propriétés de configuration
             pupitre.host = configPupitre.host
             pupitre.port = configPupitre.port || 8000
-            pupitre.websocketPort = configPupitre.websocketPort || 10001
+            pupitre.websocketPort = configPupitre.websocketPort || 10002
             pupitre.enabled = configPupitre.enabled || false
             pupitre.description = configPupitre.description || ""
             pupitre.assignedSirenes = configPupitre.assignedSirenes || []
@@ -461,7 +468,7 @@ QtObject {
             pupitre.controllerMapping = configPupitre.controllerMapping || {}
         }
         
-        console.log("✅ Synchronisation terminée")
+        // Synchronisation terminée
         return true
     }
 }

@@ -20,7 +20,7 @@
   },
   
   "sirenConfig": {   
-    "cb4techID": 8,
+    "cb4techID": 1,
     "mode": "restricted",
     "currentSiren": "S1",
     "sirens": [
@@ -31,7 +31,7 @@
         "ambitus": { "min": 43, "max": 86 },
         "clef": "bass",
         "restrictedMax": 72,
-        "transposition": 1,
+        "transposition": 0,
         "displayOctaveOffset": -1,
         "frettedMode": { "enabled": false }
       },
@@ -42,7 +42,7 @@
         "ambitus": { "min": 43, "max": 86 },
         "clef": "bass",
         "restrictedMax": 72,
-        "transposition": 1,
+        "transposition": 0,
         "displayOctaveOffset": -1,
         "frettedMode": { "enabled": false }
       },
@@ -53,7 +53,7 @@
         "ambitus": { "min": 36, "max": 77 },
         "clef": "bass",
         "restrictedMax": 60,
-        "transposition": 1,
+        "transposition": 0,
         "displayOctaveOffset": 0,
         "frettedMode": { "enabled": false }
       },
@@ -64,7 +64,7 @@
         "ambitus": { "min": 36, "max": 79 },
         "clef": "bass",
         "restrictedMax": 60,
-        "transposition": 1,
+        "transposition": 0,
         "displayOctaveOffset": 0,
         "frettedMode": { "enabled": false }
       },
@@ -75,7 +75,7 @@
         "ambitus": { "min": 48, "max": 94 },
         "clef": "treble",
         "restrictedMax": 84,
-        "transposition": 1,
+        "transposition": 0,
         "displayOctaveOffset": 0,
         "frettedMode": { "enabled": false }
       },
@@ -86,7 +86,7 @@
         "ambitus": { "min": 48, "max": 94 },
         "clef": "treble",
         "restrictedMax": 84,
-        "transposition": 1,
+        "transposition": 0,
         "displayOctaveOffset": 0,
         "frettedMode": { "enabled": false }
       },

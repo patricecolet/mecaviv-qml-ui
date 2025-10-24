@@ -123,7 +123,7 @@ Rectangle {
                         try {
                             presetData.config = JSON.parse(presetConfigField.text)
                         } catch (e) {
-                            console.warn("⚠️ Configuration JSON invalide, utilisation de la config par défaut")
+                            // Configuration JSON invalide
                         }
                     }
                     

@@ -19,12 +19,23 @@ QtObject {
     
     // Charger la configuration
     function loadConfiguration() {
+        // Début du chargement de la configuration
         
-        // Essayer de charger depuis config.js d'abord
-        if (loadConfigFromFile(configSource)) {
+        // Essayer de charger depuis webfiles/config.js via HTTP d'abord
+        // Tentative de chargement depuis webfiles/config.js
+        if (loadConfigFromFile("http://localhost:8001/webfiles/config.js")) {
+            // Configuration chargée depuis HTTP
             return
         }
         
+        // Essayer aussi depuis config.js via HTTP (fallback)
+        // Tentative de chargement depuis config.js
+        if (loadConfigFromFile("http://localhost:8001/config.js")) {
+            // Configuration chargée depuis HTTP
+            return
+        }
+        
+        // Échec chargement fichier, utilisation config par défaut
         // Fallback vers la configuration par défaut
         loadDefaultConfig()
     }
@@ -32,17 +43,47 @@ QtObject {
     // Charger depuis un fichier (config.js)
     function loadConfigFromFile(filePath) {
         try {
-            // Dans un navigateur, on utiliserait fetch() ou XMLHttpRequest
-            // Pour l'instant, on simule le chargement
+            // Chargement de la configuration
             
-            // TODO: Implémenter le vrai chargement de fichier
-            // var xhr = new XMLHttpRequest()
-            // xhr.open("GET", filePath)
-            // xhr.onreadystatechange = function() { ... }
+            // Utiliser XMLHttpRequest pour charger le fichier
+            var xhr = new XMLHttpRequest()
+            xhr.open("GET", filePath, false) // Synchronous pour simplifier
+            xhr.send()
             
-            return false // Pour l'instant, toujours utiliser la config par défaut
+            // Status HTTP vérifié
+            if (xhr.status === 200) {
+                // Évaluer le contenu JavaScript pour extraire la config
+                var scriptContent = xhr.responseText
+                // Contenu du fichier chargé
+                
+                // Extraire la variable config du script
+                var configMatch = scriptContent.match(/const config = ({[\s\S]*?});/)
+                if (configMatch && configMatch[1]) {
+                    try {
+                        // Parser le JSON de la configuration
+                        var configObj = JSON.parse(configMatch[1])
+                        config = configObj
+                        isLoaded = true
+                        // Configuration chargée
+                        configLoaded(config)
+                        return true
+                    } catch (parseError) {
+                        // Erreur parsing config
+                        configError("Erreur parsing configuration: " + parseError.message)
+                        return false
+                    }
+                } else {
+                    // Variable 'config' non trouvée dans le fichier
+                    configError("Variable 'config' non trouvée dans " + filePath)
+                    return false
+                }
+            } else {
+                // Erreur HTTP
+                configError("Erreur HTTP " + xhr.status + ": " + xhr.statusText)
+                return false
+            }
         } catch (e) {
-            console.error("❌ Erreur chargement config:", e)
+            // Erreur chargement config
             configError("Erreur chargement configuration: " + e.message)
             return false
         }
@@ -65,7 +106,7 @@ QtObject {
                     name: "Pupitre 1",
                     host: "192.168.1.41",
                     port: 8000,
-                    websocketPort: 10001,
+                    websocketPort: 10002,
                     enabled: true,
                     description: "Pupitre principal - Salle A",
                     ambitus: { min: 48, max: 72 },
@@ -92,7 +133,7 @@ QtObject {
                     name: "Pupitre 2",
                     host: "192.168.1.42",
                     port: 8000,
-                    websocketPort: 10001,
+                    websocketPort: 10002,
                     enabled: true,
                     description: "Pupitre secondaire - Salle B",
                     ambitus: { min: 48, max: 72 },
@@ -119,7 +160,7 @@ QtObject {
                     name: "Pupitre 3",
                     host: "192.168.1.43",
                     port: 8000,
-                    websocketPort: 10001,
+                    websocketPort: 10002,
                     enabled: true,
                     description: "Pupitre de réserve - Salle C",
                     ambitus: { min: 48, max: 72 },
@@ -146,7 +187,7 @@ QtObject {
                     name: "Pupitre 4",
                     host: "192.168.1.44",
                     port: 8000,
-                    websocketPort: 10001,
+                    websocketPort: 10002,
                     enabled: true,
                     description: "Pupitre mobile - Salle D",
                     ambitus: { min: 48, max: 72 },
@@ -173,7 +214,7 @@ QtObject {
                     name: "Pupitre 5",
                     host: "192.168.1.45",
                     port: 8000,
-                    websocketPort: 10001,
+                    websocketPort: 10002,
                     enabled: true,
                     description: "Pupitre de test - Labo",
                     ambitus: { min: 48, max: 72 },
@@ -200,7 +241,7 @@ QtObject {
                     name: "Pupitre 6",
                     host: "192.168.1.46",
                     port: 8000,
-                    websocketPort: 10001,
+                    websocketPort: 10002,
                     enabled: true,
                     description: "Pupitre de démo - Showroom",
                     ambitus: { min: 48, max: 72 },
@@ -227,7 +268,7 @@ QtObject {
                     name: "Pupitre 7",
                     host: "192.168.1.47",
                     port: 8000,
-                    websocketPort: 10001,
+                    websocketPort: 10002,
                     enabled: true,
                     description: "Pupitre de backup - Stockage",
                     ambitus: { min: 48, max: 72 },
@@ -398,7 +439,7 @@ QtObject {
         var pupitre = getPupitreData(pupitreId)
         if (pupitre) {
             pupitre.controllerMapping = controllerMapping
-            console.log("⚙️ Mapping contrôleurs mis à jour pour", pupitreId)
+            // Mapping contrôleurs mis à jour
             return true
         }
         return false
@@ -411,7 +452,7 @@ QtObject {
             pupitre.vstEnabled = vstEnabled
             pupitre.udpEnabled = udpEnabled
             pupitre.rtpMidiEnabled = rtpMidiEnabled
-            console.log("⚙️ Options sortie mises à jour pour", pupitreId, "VST:", vstEnabled, "UDP:", udpEnabled, "RTP:", rtpMidiEnabled)
+            // Options sortie mises à jour
             return true
         }
         return false
@@ -439,19 +480,31 @@ QtObject {
         if (!pupitre) return { vstEnabled: false, udpEnabled: false, rtpMidiEnabled: false }
         
         return {
-            vstEnabled: pupitre.vstEnabled || false,
-            udpEnabled: pupitre.udpEnabled || false,
-            rtpMidiEnabled: pupitre.rtpMidiEnabled || false
+            vstEnabled: (pupitre && pupitre.vstEnabled !== undefined) ? pupitre.vstEnabled : false,
+            udpEnabled: (pupitre && pupitre.udpEnabled !== undefined) ? pupitre.udpEnabled : false,
+            rtpMidiEnabled: (pupitre && pupitre.rtpMidiEnabled !== undefined) ? pupitre.rtpMidiEnabled : false
         }
     }
     
     // Définir les paramètres VST/UDP d'un pupitre
     function setOutputSettings(pupitreId, settings) {
         var pupitre = getPupitreData(pupitreId)
-        if (pupitre) {
-            if (settings.vstEnabled !== undefined) pupitre.vstEnabled = settings.vstEnabled
-            if (settings.udpEnabled !== undefined) pupitre.udpEnabled = settings.udpEnabled
-            if (settings.rtpMidiEnabled !== undefined) pupitre.rtpMidiEnabled = settings.rtpMidiEnabled
+        if (pupitre && settings) {
+            if (settings && typeof settings === 'object' && 'vstEnabled' in settings) {
+                if (typeof settings.vstEnabled !== 'undefined') {
+                    pupitre.vstEnabled = settings.vstEnabled
+                }
+            }
+            if (settings && typeof settings === 'object' && 'udpEnabled' in settings) {
+                if (typeof settings.udpEnabled !== 'undefined') {
+                    pupitre.udpEnabled = settings.udpEnabled
+                }
+            }
+            if (settings && typeof settings === 'object' && 'rtpMidiEnabled' in settings) {
+                if (typeof settings.rtpMidiEnabled !== 'undefined') {
+                    pupitre.rtpMidiEnabled = settings.rtpMidiEnabled
+                }
+            }
             return true
         }
         return false
@@ -459,7 +512,7 @@ QtObject {
     
     // Sauvegarder la configuration
     function saveConfig() {
-        console.log("💾 Sauvegarde de la configuration...")
+        // Sauvegarde de la configuration
         // TODO: Implémenter la sauvegarde vers un fichier
         return true
     }
@@ -479,11 +532,11 @@ QtObject {
             var newConfig = JSON.parse(configJson)
             config = newConfig
             isLoaded = true
-            console.log("✅ Configuration importée avec succès")
+            // Configuration importée avec succès
             configLoaded(config)
             return true
         } catch (e) {
-            console.error("❌ Erreur lors de l'import de la configuration:", e)
+            // Erreur lors de l'import de la configuration
             configError("Erreur import configuration: " + e.message)
             return false
         }

@@ -72,7 +72,7 @@ successful_tests=0
 failed_tests=0
 
 for i in {1..7}; do
-    ip="$BASE_IP.10$i"
+    ip="$BASE_IP.4$i"
     total_tests=$((total_tests + 1))
     
     if test_connection $ip $PORT $i; then

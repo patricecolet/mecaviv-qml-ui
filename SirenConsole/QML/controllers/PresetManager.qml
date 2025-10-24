@@ -17,13 +17,13 @@ QtObject {
     
     // Initialisation
     Component.onCompleted: {
-        console.log("💾 PresetManager initialisé")
+        // PresetManager initialisé
         loadPresetsFromStorage()
     }
     
     // Charger les presets depuis l'API
     function loadPresetsFromStorage() {
-        console.log("📂 Chargement des presets depuis l'API...")
+        // Chargement des presets depuis l'API
         
         var xhr = new XMLHttpRequest()
         xhr.open("GET", "http://localhost:8001/api/presets")
@@ -37,11 +37,11 @@ QtObject {
                         presets = response.presets || []
                         presetsListChanged(presets)
                     } catch (e) {
-                        console.error("❌ Erreur parsing presets:", e)
+                        // Erreur parsing presets
                         presetError("Erreur parsing presets: " + e.message)
                     }
                 } else {
-                    console.error("❌ Erreur chargement presets:", xhr.status, xhr.responseText)
+                    // Erreur chargement presets
                     presetError("Erreur chargement presets: " + xhr.status)
                 }
             }
@@ -52,7 +52,7 @@ QtObject {
     
     // Sauvegarder un preset vers l'API
     function savePresetToAPI(presetData) {
-        console.log("💾 Sauvegarde preset vers API:", presetData.name)
+        // Sauvegarde preset vers API
         
         var xhr = new XMLHttpRequest()
         var url = "http://localhost:8001/api/presets"
@@ -73,17 +73,17 @@ QtObject {
                         if (response.preset && response.preset.id) {
                             presetData.id = response.preset.id
                         }
-                        console.log("✅ Preset sauvegardé:", presetData.name)
+                        // Preset sauvegardé
                         presetSaved(presetData.name)
                         
                         // Recharger la liste des presets
                         loadPresetsFromStorage()
                     } catch (e) {
-                        console.error("❌ Erreur parsing réponse sauvegarde:", e)
+                        // Erreur parsing réponse sauvegarde
                         presetError("Erreur sauvegarde preset: " + e.message)
                     }
                 } else {
-                    console.error("❌ Erreur sauvegarde preset:", xhr.status, xhr.responseText)
+                    // Erreur sauvegarde preset
                     presetError("Erreur sauvegarde preset: " + xhr.status)
                 }
             }
@@ -95,12 +95,12 @@ QtObject {
     // Créer un preset à partir de la configuration actuelle
     function createPresetFromCurrent(presetName, presetDescription) {
         if (!configManager || !configManager.config) {
-            console.error("❌ ConfigManager non disponible")
+            // ConfigManager non disponible
             presetError("ConfigManager non disponible")
             return false
         }
         
-        console.log("🆕 Création preset:", presetName)
+        // Création preset
         
         // Capturer la configuration actuelle de tous les pupitres
         var currentConfig = {
@@ -137,12 +137,12 @@ QtObject {
     
     // Créer un nouveau preset
     function createPreset(presetData) {
-        console.log("🆕 Création preset:", presetData.name)
+        // Création preset
         
         // Vérifier si le nom existe déjà
         for (var i = 0; i < presets.length; i++) {
             if (presets[i].name === presetData.name) {
-                console.error("❌ Preset existe déjà:", presetData.name)
+                // Preset existe déjà
                 presetError("Preset existe déjà: " + presetData.name)
                 return false
             }
@@ -161,7 +161,7 @@ QtObject {
     
     // Mettre à jour un preset existant
     function updatePreset(presetId, presetData) {
-        console.log("📝 Mise à jour preset:", presetId)
+        // Mise à jour preset
         
         var existingPreset = null
         for (var i = 0; i < presets.length; i++) {
@@ -172,7 +172,7 @@ QtObject {
         }
         
         if (!existingPreset) {
-            console.error("❌ Preset non trouvé:", presetId)
+            // Preset non trouvé
             presetError("Preset non trouvé: " + presetId)
             return false
         }
@@ -191,7 +191,7 @@ QtObject {
     
     // Supprimer un preset
     function deletePreset(presetName) {
-        console.log("🗑️ Suppression preset:", presetName)
+        // Suppression preset
         
         var presetToDelete = null
         for (var i = 0; i < presets.length; i++) {
@@ -202,7 +202,7 @@ QtObject {
         }
         
         if (!presetToDelete) {
-            console.error("❌ Preset non trouvé:", presetName)
+            // Preset non trouvé
             presetError("Preset non trouvé: " + presetName)
             return false
         }
@@ -214,13 +214,13 @@ QtObject {
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200 || xhr.status === 204) {
-                    console.log("✅ Preset supprimé:", presetName)
+                    // Preset supprimé
                     presetDeleted(presetName)
                     
                     // Recharger la liste des presets
                     loadPresetsFromStorage()
                 } else {
-                    console.error("❌ Erreur suppression preset:", xhr.status, xhr.responseText)
+                    // Erreur suppression preset
                     presetError("Erreur suppression preset: " + xhr.status)
                 }
             }
@@ -232,7 +232,7 @@ QtObject {
     
     // Charger un preset
     function loadPreset(presetName) {
-        console.log("📂 Chargement preset:", presetName)
+        // Chargement preset
         
         var presetToLoad = null
         for (var i = 0; i < presets.length; i++) {
@@ -243,13 +243,13 @@ QtObject {
         }
         
         if (!presetToLoad) {
-            console.error("❌ Preset non trouvé:", presetName)
+            // Preset non trouvé
             presetError("Preset non trouvé: " + presetName)
             return false
         }
         
         if (!configManager || !configManager.config) {
-            console.error("❌ ConfigManager non disponible")
+            // ConfigManager non disponible
             presetError("ConfigManager non disponible")
             return false
         }
@@ -282,18 +282,18 @@ QtObject {
                         if (presetPupitre.rtpMidiEnabled !== undefined) pupitre.rtpMidiEnabled = presetPupitre.rtpMidiEnabled
                         if (presetPupitre.controllerMapping) pupitre.controllerMapping = presetPupitre.controllerMapping
                         
-                        console.log("✅ Configuration appliquée au pupitre:", pupitre.name)
+                        // Configuration appliquée au pupitre
                     }
                 }
             }
             
             currentPreset = presetName
-            console.log("✅ Preset chargé avec succès:", presetName)
+            // Preset chargé avec succès
             presetLoaded(presetName)
             return true
             
         } catch (e) {
-            console.error("❌ Erreur chargement preset:", e)
+            // Erreur chargement preset
             presetError("Erreur chargement preset: " + e.message)
             return false
         }
@@ -353,11 +353,11 @@ QtObject {
                 }
             }
             
-            console.log("✅ Presets importés:", successCount + "/" + importedPresets.length)
+            // Presets importés
             return { success: true, imported: successCount, total: importedPresets.length }
             
         } catch (e) {
-            console.error("❌ Erreur import presets:", e)
+            // Erreur import presets
             presetError("Erreur import presets: " + e.message)
             return { success: false, error: e.message }
         }

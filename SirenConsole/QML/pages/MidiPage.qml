@@ -39,7 +39,7 @@ Rectangle {
             commandManager: root.commandManager
             
             onLoadFile: function(path) {
-                console.log("🎵 Page MIDI - Chargement fichier:", path)
+                // Page MIDI - Chargement fichier
             }
         }
         

@@ -17,19 +17,19 @@ QtObject {
     
     // Fonctions stub
     function claimSiren(sirenId, source, priority) {
-        console.log("SirenRouterManager.claimSiren:", sirenId, source, priority)
+        // SirenRouterManager.claimSiren
         // TODO: Implémenter POST /api/sirens/:id/claim
         return true
     }
     
     function releaseSiren(sirenId, source) {
-        console.log("SirenRouterManager.releaseSiren:", sirenId, source)
+        // SirenRouterManager.releaseSiren
         // TODO: Implémenter POST /api/sirens/:id/release
         return true
     }
     
     function getSirenStatus(sirenId) {
-        console.log("SirenRouterManager.getSirenStatus:", sirenId)
+        // SirenRouterManager.getSirenStatus
         // TODO: Implémenter GET /api/sirens/:id
         return {
             id: sirenId,
@@ -40,12 +40,12 @@ QtObject {
     }
     
     function getAllSirensStatus() {
-        console.log("SirenRouterManager.getAllSirensStatus")
+        // SirenRouterManager.getAllSirensStatus
         // TODO: Implémenter GET /api/sirens/status
         return []
     }
     
     Component.onCompleted: {
-        console.log("SirenRouterManager initialized (stub version)")
+        // SirenRouterManager initialized
     }
 }

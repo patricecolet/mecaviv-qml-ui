@@ -7,7 +7,25 @@ Rectangle {
     
     color: "#1a1a1a"
     
-    property var consoleController: null
+    property var consoleController: parent ? parent.consoleController : null
+    
+    Component.onCompleted: {
+       // Page initialisée
+    }
+    
+    // Timer pour forcer la mise à jour des pupitres
+    Timer {
+        id: refreshTimer
+        interval: 2000 // Rafraîchir toutes les 2 secondes (backup)
+        running: true
+        repeat: true
+        onTriggered: {
+            // Forcer la mise à jour en rechargeant les composants
+            if (consoleController && consoleController.webSocketManager) {
+                consoleController.webSocketManager.checkPupitresStatus()
+            }
+        }
+    }
     
     ScrollView {
         anchors.fill: parent
@@ -31,43 +49,64 @@ Rectangle {
             // Rangées des pupitres
             Loader {
                 source: "../components/overview/OverviewRow.qml"
-                property var pupitre: consoleController && consoleController.pupitre1 ? consoleController.pupitre1 : null
+                property string pupitreId: "P1"
+                property string pupitreStatus: overviewPage.consoleController.pupitre1Status
+                property string pupitreName: "Pupitre 1"
+                property string pupitreHost: "192.168.1.41"
                 width: parent.width
             }
             
             Loader {
                 source: "../components/overview/OverviewRow.qml"
-                property var pupitre: consoleController && consoleController.pupitre2 ? consoleController.pupitre2 : null
+                property string pupitreId: "P2"
+                property string pupitreStatus: overviewPage.consoleController.pupitre2Status
+                property string pupitreName: "Pupitre 2"
+                property string pupitreHost: "192.168.1.42"
+                width: parent.width
+            }
+            
+            Loader {
+    source: "../components/overview/OverviewRow.qml"
+    property string pupitreId: "P3"
+    property string pupitreStatus: overviewPage.consoleController.pupitre3Status
+    property string pupitreName: "Pupitre 3"
+    property string pupitreHost: "192.168.1.43"
+    width: parent.width
+}
+            
+            Loader {
+                source: "../components/overview/OverviewRow.qml"
+                property string pupitreId: "P4"
+                property string pupitreStatus: overviewPage.consoleController.pupitre4Status
+                property string pupitreName: "Pupitre 4"
+                property string pupitreHost: "192.168.1.44"
                 width: parent.width
             }
             
             Loader {
                 source: "../components/overview/OverviewRow.qml"
-                property var pupitre: consoleController && consoleController.pupitre3 ? consoleController.pupitre3 : null
+                property string pupitreId: "P5"
+                property string pupitreStatus: overviewPage.consoleController.pupitre5Status
+                property string pupitreName: "Pupitre 5"
+                property string pupitreHost: "192.168.1.45"
                 width: parent.width
             }
             
             Loader {
                 source: "../components/overview/OverviewRow.qml"
-                property var pupitre: consoleController && consoleController.pupitre4 ? consoleController.pupitre4 : null
+                property string pupitreId: "P6"
+                property string pupitreStatus: overviewPage.consoleController.pupitre6Status
+                property string pupitreName: "Pupitre 6"
+                property string pupitreHost: "192.168.1.46"
                 width: parent.width
             }
             
             Loader {
                 source: "../components/overview/OverviewRow.qml"
-                property var pupitre: consoleController && consoleController.pupitre5 ? consoleController.pupitre5 : null
-                width: parent.width
-            }
-            
-            Loader {
-                source: "../components/overview/OverviewRow.qml"
-                property var pupitre: consoleController && consoleController.pupitre6 ? consoleController.pupitre6 : null
-                width: parent.width
-            }
-            
-            Loader {
-                source: "../components/overview/OverviewRow.qml"
-                property var pupitre: consoleController && consoleController.pupitre7 ? consoleController.pupitre7 : null
+                property string pupitreId: "P7"
+                property string pupitreStatus: overviewPage.consoleController.pupitre7Status
+                property string pupitreName: "Pupitre 7"
+                property string pupitreHost: "192.168.1.47"
                 width: parent.width
             }
         }

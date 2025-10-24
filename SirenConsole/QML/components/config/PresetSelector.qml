@@ -279,21 +279,19 @@ Rectangle {
     
     // Fonction pour mettre à jour la liste des presets
     function updatePresets() {
-        console.log("🔍 updatePresets appelé")
-        console.log("🔍 consoleController:", consoleController)
+        // updatePresets appelé
         if (consoleController) {
-            console.log("🔍 consoleController.presets:", consoleController.presets)
-            console.log("🔍 consoleController.presets.length:", consoleController.presets ? consoleController.presets.length : "undefined")
+            // consoleController.presets disponible
         }
         
         if (consoleController && consoleController.presets) {
             presets = consoleController.presets
-            console.log("🔄 Presets mis à jour:", presets.length)
+            // Presets mis à jour
             for (var i = 0; i < presets.length; i++) {
-                console.log("📋 Preset", i, ":", presets[i].name)
+                // Preset trouvé
             }
         } else {
-            console.log("❌ Pas de presets disponibles")
+            // Pas de presets disponibles
         }
     }
     

@@ -39,7 +39,7 @@ Rectangle {
                 onClicked: {
                     pupitreSelector.isAllMode = !pupitreSelector.isAllMode
                     pupitreSelector.allModeToggled(pupitreSelector.isAllMode)
-                    console.log("🔧 Mode All:", pupitreSelector.isAllMode ? "activé" : "désactivé")
+                    // Mode All
                 }
                 
                 background: Rectangle {

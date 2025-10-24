@@ -96,7 +96,7 @@ Rectangle {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         if (pupitreData && consoleController && pupitreData.status === "connected") {
-                            console.log("🎯 Basculement mode fretté pupitre", pupitreData.id)
+                            // Basculement mode fretté pupitre
                             consoleController.toggleFrettedMode(pupitreData.id)
                         }
                     }
@@ -139,10 +139,10 @@ Rectangle {
                 onClicked: {
                     if (pupitreData && consoleController) {
                         if (pupitreData.status === "connected") {
-                            console.log("🔌 Déconnexion pupitre", pupitreData.id)
+                            // Déconnexion pupitre
                             consoleController.disconnectPupitre(pupitreData.id)
                         } else {
-                            console.log("🔌 Connexion pupitre", pupitreData.id)
+                            // Connexion pupitre
                             consoleController.connectPupitre(pupitreData.id, pupitreData.host, pupitreData.port)
                         }
                     }
@@ -169,7 +169,7 @@ Rectangle {
                 }
                 onClicked: {
                     if (pupitreData) {
-                        console.log("⚙️ Configuration pupitre", pupitreData.id)
+                            // Configuration pupitre
                         // TODO: Ouvrir panneau de configuration du pupitre
                     }
                 }
@@ -193,7 +193,7 @@ Rectangle {
         
         onClicked: {
             if (pupitreData) {
-                console.log("🖱️ Clic sur pupitre", pupitreData.id)
+                // Clic sur pupitre
                 // TODO: Ouvrir vue détaillée du pupitre
             }
         }

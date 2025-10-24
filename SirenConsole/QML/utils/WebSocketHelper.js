@@ -4,14 +4,14 @@
 .pragma library
 
 function connect(url, onOpenCb, onCloseCb, onMessageCb, onErrorCb) {
-    console.log("🔌 [WebSocketHelper] Connexion à:", url);
+    // Connexion WebSocket
     
     try {
         // Utiliser window.QmlWebSocket défini dans appSirenConsole.html
         var success = QmlWebSocket.connect(url, onOpenCb, onCloseCb, onMessageCb, onErrorCb);
         return success;
     } catch (e) {
-        console.error("❌ [WebSocketHelper] Exception:", e);
+        // Exception WebSocket
         if (onErrorCb) onErrorCb(e.toString());
         return false;
     }

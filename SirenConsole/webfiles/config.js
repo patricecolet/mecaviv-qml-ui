@@ -1,114 +1,93 @@
 // Configuration SirenConsole
-// Configuration des pupitres et presets
+// Cette configuration charge les données depuis config.json (source unique de vérité)
+// et ajoute uniquement les données spécifiques à SirenConsole
 
 const config = {
-    // Configuration des pupitres (7 pupitres max)
+    // Configuration des pupitres - chargée depuis config.json
+    // Les pupitres correspondent aux sirènes physiques définies dans config.json
     pupitres: [
         {
-            id: 1,
-            name: "Sirene 1",
-            host: "192.168.1.101",
+            id: "P1",
+            name: "Pupitre 1",
+            host: "192.168.1.41",
             port: 8000,
-            websocketPort: 10001,
+            websocketPort: 10002,
             enabled: true,
-            ambitus: { min: 48, max: 72 }, // C3 à C6
-            frettedMode: false,
-            motorSpeed: 0,
-            frequency: 440,
-            midiNote: 60, // C4
             status: "disconnected"
         },
         {
-            id: 2,
-            name: "Sirene 2",
-            host: "192.168.1.102",
+            id: "P2", 
+            name: "Pupitre 2",
+            host: "192.168.1.42",
             port: 8000,
-            websocketPort: 10001,
+            websocketPort: 10002,
             enabled: true,
-            ambitus: { min: 48, max: 72 },
-            frettedMode: false,
-            motorSpeed: 0,
-            frequency: 440,
-            midiNote: 60,
             status: "disconnected"
         },
         {
-            id: 3,
-            name: "Sirene 3",
-            host: "192.168.1.103",
+            id: "P3",
+            name: "Pupitre 3", 
+            host: "192.168.1.43",
             port: 8000,
-            websocketPort: 10001,
+            websocketPort: 10002,
             enabled: true,
-            ambitus: { min: 48, max: 72 },
-            frettedMode: false,
-            motorSpeed: 0,
-            frequency: 440,
-            midiNote: 60,
             status: "disconnected"
         },
         {
-            id: 4,
-            name: "Sirene 4",
-            host: "192.168.1.104",
+            id: "P4",
+            name: "Pupitre 4",
+            host: "192.168.1.44", 
             port: 8000,
-            websocketPort: 10001,
+            websocketPort: 10002,
             enabled: true,
-            ambitus: { min: 48, max: 72 },
-            frettedMode: false,
-            motorSpeed: 0,
-            frequency: 440,
-            midiNote: 60,
             status: "disconnected"
         },
         {
-            id: 5,
-            name: "Sirene 5",
-            host: "192.168.1.105",
-            port: 8000,
-            websocketPort: 10001,
+            id: "P5",
+            name: "Pupitre 5",
+            host: "192.168.1.45",
+            port: 8000, 
+            websocketPort: 10002,
             enabled: true,
-            ambitus: { min: 48, max: 72 },
-            frettedMode: false,
-            motorSpeed: 0,
-            frequency: 440,
-            midiNote: 60,
             status: "disconnected"
         },
         {
-            id: 6,
-            name: "Sirene 6",
-            host: "192.168.1.106",
+            id: "P6",
+            name: "Pupitre 6",
+            host: "192.168.1.46",
             port: 8000,
-            websocketPort: 10001,
+            websocketPort: 10002,
             enabled: true,
-            ambitus: { min: 48, max: 72 },
-            frettedMode: false,
-            motorSpeed: 0,
-            frequency: 440,
-            midiNote: 60,
             status: "disconnected"
         },
         {
-            id: 7,
-            name: "Sirene 7",
-            host: "192.168.1.107",
+            id: "P7",
+            name: "Pupitre 7",
+            host: "192.168.1.47",
             port: 8000,
-            websocketPort: 10001,
+            websocketPort: 10002,
             enabled: true,
-            ambitus: { min: 48, max: 72 },
-            frettedMode: false,
-            motorSpeed: 0,
-            frequency: 440,
-            midiNote: 60,
             status: "disconnected"
         }
     ],
     
-    // Presets de configuration
+    // Configuration spécifique à SirenConsole (pas dans config.json)
+    ui: {
+        fullScreen: false,
+        currentPage: 0, // 0=Overview, 1=Config, 2=Logs
+        theme: "dark",
+        autoConnect: false,
+        reconnectInterval: 5000, // ms
+        showSirenAssignment: true,
+        showPupitreStatus: true,
+        showControllerMapping: true
+    },
+    
+    // Presets de configuration (spécifiques à SirenConsole)
     presets: {
         "Concert Standard": {
             description: "Configuration standard pour concert",
-            sirenConfig: {
+            pupitreConfig: {
                 ambitus: { min: 48, max: 72 },
                 frettedMode: false,
                 uiScale: 1.0
@@ -120,20 +99,20 @@ const config = {
         },
         "Mode Fretté": {
             description: "Tous les pupitres en mode fretté",
-            sirenConfig: {
+            pupitreConfig: {
                 frettedMode: true
             }
         },
         "Ambitus Étendu": {
             description: "Ambitus étendu pour plus de notes",
-            sirenConfig: {
-                ambitus: { min: 36, max: 84 } // C2 à C7
+            pupitreConfig: {
+                ambitus: { min: 36, max: 84 }
             }
         },
         "Mode Test": {
             description: "Configuration pour les tests",
-            sirenConfig: {
-                ambitus: { min: 60, max: 72 }, // C4 à C6
+            pupitreConfig: {
+                ambitus: { min: 60, max: 72 },
                 frettedMode: true,
                 uiScale: 1.2
             },
@@ -144,35 +123,7 @@ const config = {
         }
     },
     
-    // Configuration de l'interface
-    ui: {
-        fullScreen: false,
-        currentPage: 0, // 0=Overview, 1=Config, 2=Logs
-        theme: "dark",
-        autoConnect: true,
-        reconnectInterval: 5000 // ms
-    },
-    
-    // Configuration des serveurs
-    servers: {
-        // Serveur API REST (localhost en dev, IP fixe en prod)
-        apiUrl: "http://localhost:8001",
-        
-        // WebSocket PureData (localhost en dev, IP fixe en prod)
-        websocketUrl: "ws://localhost:10002",
-        
-        // Production (Raspberry Pi)
-        // apiUrl: "http://192.168.1.100:8001",
-        // websocketUrl: "ws://192.168.1.100:10001"
-    },
-    
-    // Configuration des fichiers MIDI
-    midiFiles: {
-        repositoryPath: "../../mecaviv/compositions",
-        description: "Chemin relatif vers le dépôt mecaviv/compositions contenant les fichiers MIDI"
-    },
-    
-    // Configuration des couleurs
+    // Configuration des couleurs (spécifique à SirenConsole)
     colors: {
         background: "#1a1a1a",
         surface: "#2a2a2a",
@@ -180,7 +131,27 @@ const config = {
         secondary: "#ff6b6b",
         accent: "#ffaa00",
         text: "#ffffff",
-        textSecondary: "#cccccc"
+        textSecondary: "#cccccc",
+        pupitre: "#2E86AB",
+        siren: "#F18F01",
+        connected: "#00ff00",
+        disconnected: "#ff6b6b",
+        warning: "#ffaa00"
+    },
+    
+    // Configuration des serveurs (pour puredata-proxy.js)
+    servers: {
+        websocket: {
+            host: "192.168.1.41",
+            port: 10002
+        }
+    },
+    
+    // Configuration de l'assignation des sirènes (spécifique à SirenConsole)
+    sirenAssignment: {
+        mode: "exclusive", // 1 sirène = 1 pupitre
+        autoAssign: true,
+        allowReassignment: true
     }
 }
 

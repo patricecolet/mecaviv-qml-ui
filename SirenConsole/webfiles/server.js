@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const WebSocket = require('ws');
 
 // Importer l'API des presets
 const presetAPI = require('./api-presets.js');
@@ -17,9 +18,15 @@ const { analyzeMidiFile, createFileInfoBuffer, createTempoBuffer, createTimeSigB
 // Importer le séquenceur MIDI
 const MidiSequencer = require('./midi-sequencer.js');
 
+// Variables globales
+let lastVolantData = null; // Stocker les dernières données du volant
+
 // Charger la configuration depuis config.json
 const { loadConfig } = require('../../config-loader.js');
 const config = loadConfig();
+
+// Charger aussi la configuration SirenConsole pour les pupitres
+const sirenConsoleConfig = require('../config.js');
 
 // Chemin du répertoire MIDI
 const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH || config.paths.midiRepository;
@@ -31,6 +38,10 @@ const HOST = '0.0.0.0';
 // Initialiser le proxy PureData et le séquenceur
 let pureDataProxy = null;
 let midiSequencer = null;
+
+// Serveur WebSocket pour les connexions clients
+let wss = null;
+let connectedClients = new Set();
 
 // Middleware pour les headers CORS et sécurité
 function setSecurityHeaders(response) {
@@ -46,11 +57,183 @@ function setSecurityHeaders(response) {
     response.setHeader('Sec-WebSocket-Version', '13');
 }
 
+// Fonctions pour gérer les WebSockets
+function broadcastToClients(message) {
+    const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+    connectedClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            try {
+                client.send(messageStr);
+            } catch (error) {
+                console.error('❌ Erreur envoi WebSocket client:', error);
+                connectedClients.delete(client);
+            }
+        }
+    });
+}
+
+// Convertir note MIDI + pitchbend → fréquence (Hz)
+function midiToFrequency(note, pitchbend, transposition = 0) {
+    // Appliquer la transposition (octaves)
+    const transposedNote = note + (transposition * 12)
+    
+    // Formule MIDI standard : f = 440 * 2^((note - 69) / 12)
+    const baseFrequency = 440 * Math.pow(2, (transposedNote - 69) / 12)
+    
+    // Appliquer le pitchbend (0-16383, centre = 8192)
+    const pitchbendFactor = (pitchbend - 8192) / 8192 // -1 à +1
+    const pitchbendSemitones = pitchbendFactor * 0.5 // ±0.5 demi-ton max
+    
+    return baseFrequency * Math.pow(2, pitchbendSemitones / 12)
+}
+
+// Convertir fréquence → RPM pour chaque sirène
+function frequencyToRpm(frequency, outputs) {
+    // RPM = Fréquence × 60 / Nombre de sorties
+    return frequency * 60 / outputs
+}
+
+function handleWebSocketConnection(ws, request) {
+    console.log('🔌 Nouvelle connexion WebSocket');
+    
+    // Attendre un message d'identification pour déterminer le type de client
+    ws.on('message', (message) => {
+        // Vérifier si c'est un message binaire (8 bytes)
+        if (Buffer.isBuffer(message)) {
+            console.log(`📦 Message binaire reçu: ${message.length} bytes`)
+            console.log(`📦 Premier byte: 0x${message.readUInt8(0).toString(16).toUpperCase()}`)
+            if (message.length > 1) {
+                console.log(`📦 Deuxième byte: 0x${message.readUInt8(1).toString(16).toUpperCase()}`)
+            }
+            
+            if (message.length === 8) {
+                const magic = message.readUInt16BE(0)
+                console.log(`📦 Magic bytes: 0x${magic.toString(16).toUpperCase()}`)
+                
+                if (magic === 0x5353) { // Magic "SS"
+                    const type = message.readUInt8(2)
+                    const pupitreId = message.readUInt8(3)
+                    const note = message.readUInt8(4)
+                    const velocity = message.readUInt8(5)
+                    const pitchbend = message.readUInt16BE(6)
+                    
+                    if (type === 0x01 && pupitreId === 3) { // VOLANT_STATE pour P3
+                        // Convertir note MIDI → fréquence → RPM (S3: transposition +1 octave, 8 sorties)
+                        const frequency = midiToFrequency(note, pitchbend, 1) // +1 octave pour S3
+                        const rpm = frequencyToRpm(frequency, 8) // 8 sorties pour S3
+                        
+                        console.log(`🎹 Volant P3: Note=${note}, Velocity=${velocity}, Pitchbend=${pitchbend}, Freq=${frequency.toFixed(2)}Hz, RPM=${rpm.toFixed(1)}`)
+                        
+                        // Stocker les dernières données du volant
+                        lastVolantData = {
+                            pupitreId: pupitreId,
+                            note: note,
+                            velocity: velocity,
+                            pitchbend: pitchbend,
+                            frequency: frequency,
+                            rpm: rpm,
+                            timestamp: Date.now()
+                        };
+                        
+                        // Diffuser aux clients UI
+                        broadcastToClients({
+                            type: 'VOLANT_DATA',
+                            pupitreId: pupitreId,
+                            note: note,
+                            velocity: velocity,
+                            pitchbend: pitchbend,
+                            frequency: frequency,
+                            rpm: rpm,
+                            timestamp: Date.now()
+                        })
+                    }
+                }
+            }
+            return
+        }
+        
+        try {
+            const data = JSON.parse(message);
+            console.log('📥 Message WebSocket reçu:', data.type);
+            
+            // Vérifier si c'est un pupitre qui se connecte
+            if (data.type === 'PUPITRE_IDENTIFICATION' && data.pupitreId) {
+                console.log(`🎛️ Pupitre ${data.pupitreId} identifié`);
+                
+                // Gérer la connexion du pupitre via le proxy PureData
+                if (pureDataProxy) {
+                    const pupitreInfo = {
+                        id: data.pupitreId,
+                        name: data.pupitreName || `Pupitre ${data.pupitreId}`,
+                        host: request.socket.remoteAddress,
+                        port: 8000,
+                        websocketPort: 10002,
+                        enabled: true
+                    };
+                    
+                    pureDataProxy.handleIncomingConnection(ws, data.pupitreId, pupitreInfo);
+                }
+                
+                // Envoyer confirmation au pupitre
+                ws.send(JSON.stringify({
+                    type: 'PUPITRE_CONNECTED',
+                    pupitreId: data.pupitreId,
+                    timestamp: Date.now()
+                }));
+                
+            } else {
+                // C'est un client SirenConsole (interface web)
+                console.log('🌐 Client SirenConsole connecté');
+                connectedClients.add(ws);
+                
+                // Envoyer le statut initial
+                if (pureDataProxy) {
+                    const status = pureDataProxy.getStatus();
+                    ws.send(JSON.stringify({
+                        type: 'INITIAL_STATUS',
+                        data: status
+                    }));
+                }
+                
+                // Traiter les messages des clients
+                switch (data.type) {
+                    case 'PING':
+                        ws.send(JSON.stringify({ type: 'PONG', timestamp: Date.now() }));
+                        break;
+                    case 'GET_STATUS':
+                        if (pureDataProxy) {
+                            const status = pureDataProxy.getStatus();
+                            ws.send(JSON.stringify({
+                                type: 'STATUS_UPDATE',
+                                data: status
+                            }));
+                        }
+                        break;
+                    default:
+                        console.log('⚠️ Type message WebSocket inconnu:', data.type);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Erreur parsing message WebSocket:', error);
+        }
+    });
+    
+    ws.on('close', (code, reason) => {
+        console.log('❌ WebSocket déconnecté:', code, reason.toString());
+        connectedClients.delete(ws);
+    });
+    
+    ws.on('error', (error) => {
+        console.error('❌ Erreur WebSocket:', error);
+        connectedClients.delete(ws);
+    });
+}
+
 // Gestion des requêtes
 const server = http.createServer(function (request, response) {
     // Logs uniquement pour les requêtes intéressantes (pas les GET polling)
     if (request.method !== 'GET' || !request.url.includes('/api/puredata/playback')) {
-        console.log('📥 Requête:', request.method, request.url);
+        // Requête reçue
     }
     
     // Appliquer les headers de sécurité
@@ -65,6 +248,11 @@ const server = http.createServer(function (request, response) {
 
     // Gestion des routes
     let filePath = '.' + request.url;
+    
+    // Route pour config.js (dans le répertoire parent)
+    if (request.url === '/config.js') {
+        filePath = '../config.js';
+    }
     
     // Routes API pour les presets
     if (request.url.startsWith('/api/presets')) {
@@ -81,6 +269,13 @@ const server = http.createServer(function (request, response) {
     
     if (request.url === '/api/midi/categories') {
         midiAPI.getMidiCategories(request, response);
+        return;
+    }
+    
+    // Route API pour les données du volant
+    if (request.url === '/api/volant-data') {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ volantData: lastVolantData }));
         return;
     }
     
@@ -223,6 +418,30 @@ const server = http.createServer(function (request, response) {
         return;
     }
     
+    // API pour obtenir le statut des pupitres (pour les LEDs)
+    if (request.url === '/api/pupitres/status') {
+        const status = pureDataProxy.getStatus();
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(status));
+        return;
+    }
+    
+    // API pour obtenir le statut d'un pupitre spécifique
+    if (request.url.startsWith('/api/pupitres/') && request.url.endsWith('/status')) {
+        const pupitreId = request.url.split('/')[3];
+        const status = pureDataProxy.getStatus();
+        const pupitreStatus = status.connections.find(conn => conn.pupitreId === pupitreId);
+        
+        if (pupitreStatus) {
+            response.writeHead(200, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify(pupitreStatus));
+        } else {
+            response.writeHead(404, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify({ error: 'Pupitre non trouvé' }));
+        }
+        return;
+    }
+    
     // Route principale
     if (request.url === '/' || request.url === '') {
         filePath = './appSirenConsole.html';
@@ -281,15 +500,41 @@ const server = http.createServer(function (request, response) {
 
 // Initialiser l'API des presets et démarrer le serveur
 presetAPI.initializePresetAPI().then(() => {
-    // Initialiser le proxy PureData
-    pureDataProxy = new PureDataProxy(config);
+    // Initialiser le proxy PureData avec la configuration SirenConsole
+    pureDataProxy = new PureDataProxy(sirenConsoleConfig, this, broadcastToClients);
     
     // Initialiser le séquenceur MIDI
     midiSequencer = new MidiSequencer(pureDataProxy);
     
+    // Créer le serveur WebSocket
+    wss = new WebSocket.Server({ 
+        server: server,
+        path: '/ws',
+        perMessageDeflate: false
+    });
+    
+    // Gérer les connexions WebSocket
+    wss.on('connection', handleWebSocketConnection);
+    
+    // Intégrer avec le proxy PureData pour diffuser les événements
+    if (pureDataProxy) {
+        // Écouter les changements de statut des pupitres
+           setInterval(() => {
+               const status = pureDataProxy.getStatus();
+               broadcastToClients({
+                   type: 'PUPITRE_STATUS_UPDATE',
+                   data: status,
+                   timestamp: Date.now()
+               });
+           }, 1000); // Diffuser toutes les secondes
+        
+        // Le proxy PureData gère les connexions vers les pupitres
+    }
+    
     server.listen(PORT, HOST, () => {
         console.log(`🚀 Serveur SirenConsole démarré sur http://${HOST}:${PORT}`);
         console.log(`🌐 Application principale sur http://localhost:${PORT}/appSirenConsole.html`);
+        console.log(`🔌 WebSocket serveur sur ws://localhost:${PORT}/ws`);
         console.log(`🔌 Proxy WebSocket PureData: ${config.servers.websocketUrl}`);
         console.log(`📊 Console de contrôle des pupitres`);
         console.log(`💾 API Presets disponible sur http://localhost:${PORT}/api/presets`);

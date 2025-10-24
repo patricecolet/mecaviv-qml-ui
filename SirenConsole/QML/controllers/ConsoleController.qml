@@ -3,7 +3,20 @@ import QtQuick 2.15
 Item {
     id: consoleController
     
+    // Test simple pour voir si le fichier se charge
+    Component.onCompleted: {
+        // ConsoleController initialisé
+        initializeManagers()
+    }
+    
     // === PROPRIÉTÉS PUBLIQUES ===
+    
+    // Données du volant P3
+    property real volantNote: 60
+    property real volantVelocity: 0
+    property real volantPitchbend: 8192
+    property real volantFrequency: 261.63
+    property real volantRpm: 1308.15
     
     // Exposer les managers pour accès externe
     property alias commandManager: commandManager
@@ -51,13 +64,106 @@ Item {
     property var sirenRouterManager: sirenRouterManager
     
     // Propriétés des pupitres (pour compatibilité avec l'UI existante)
-    property var pupitre1: null
-    property var pupitre2: null
-    property var pupitre3: null
-    property var pupitre4: null
-    property var pupitre5: null
-    property var pupitre6: null
-    property var pupitre7: null
+    property string pupitre1Status: "disconnected"
+    property string pupitre2Status: "disconnected"
+    property string pupitre3Status: "disconnected"
+    property string pupitre4Status: "disconnected"
+    property string pupitre5Status: "disconnected"
+    property string pupitre6Status: "disconnected"
+    property string pupitre7Status: "disconnected"
+    
+    // Objets pupitres pour l'interface (compatibilité) - Réactifs
+    property var pupitre1: QtObject {
+        property string status: consoleController.pupitre1Status
+        property string name: "Pupitre 1"
+        property string host: "192.168.1.41"
+        property string id: "P1"
+        property int ambitusMin: 48
+        property int ambitusMax: 72
+        property int motorSpeed: 0
+        property real frequency: 440.0
+        property int midiNote: 60
+        property bool frettedMode: false
+        property var sirenes: ({})
+    }
+    property var pupitre2: QtObject {
+        property string status: consoleController.pupitre2Status
+        property string name: "Pupitre 2"
+        property string host: "192.168.1.42"
+        property string id: "P2"
+        property int ambitusMin: 48
+        property int ambitusMax: 72
+        property int motorSpeed: 0
+        property real frequency: 440.0
+        property int midiNote: 60
+        property bool frettedMode: false
+        property var sirenes: ({})
+    }
+    property var pupitre3: QtObject {
+        property string status: "disconnected"
+        property string name: "Pupitre 3"
+        property string host: "192.168.1.43"
+        property string id: "P3"
+        property int ambitusMin: 48
+        property int ambitusMax: 72
+        property int motorSpeed: 0
+        property real frequency: 440.0
+        property int midiNote: 60
+        property bool frettedMode: false
+        property var sirenes: ({})
+    }
+    property var pupitre4: QtObject {
+        property string status: consoleController.pupitre4Status
+        property string name: "Pupitre 4"
+        property string host: "192.168.1.44"
+        property string id: "P4"
+        property int ambitusMin: 48
+        property int ambitusMax: 72
+        property int motorSpeed: 0
+        property real frequency: 440.0
+        property int midiNote: 60
+        property bool frettedMode: false
+        property var sirenes: ({})
+    }
+    property var pupitre5: QtObject {
+        property string status: consoleController.pupitre5Status
+        property string name: "Pupitre 5"
+        property string host: "192.168.1.45"
+        property string id: "P5"
+        property int ambitusMin: 48
+        property int ambitusMax: 72
+        property int motorSpeed: 0
+        property real frequency: 440.0
+        property int midiNote: 60
+        property bool frettedMode: false
+        property var sirenes: ({})
+    }
+    property var pupitre6: QtObject {
+        property string status: consoleController.pupitre6Status
+        property string name: "Pupitre 6"
+        property string host: "192.168.1.46"
+        property string id: "P6"
+        property int ambitusMin: 48
+        property int ambitusMax: 72
+        property int motorSpeed: 0
+        property real frequency: 440.0
+        property int midiNote: 60
+        property bool frettedMode: false
+        property var sirenes: ({})
+    }
+    property var pupitre7: QtObject {
+        property string status: consoleController.pupitre7Status
+        property string name: "Pupitre 7"
+        property string host: "192.168.1.47"
+        property string id: "P7"
+        property int ambitusMin: 48
+        property int ambitusMax: 72
+        property int motorSpeed: 0
+        property real frequency: 440.0
+        property int midiNote: 60
+        property bool frettedMode: false
+        property var sirenes: ({})
+    }
     property var pupitres: []
     
     // Propriétés des presets
@@ -85,11 +191,22 @@ Item {
     signal presetsListChanged(var presetsList)
     signal errorOccurred(string error)
     
+    // === TIMER DE VÉRIFICATION ===
+    Timer {
+        id: statusCheckTimer
+        interval: 2000 // Vérifier toutes les 2 secondes (backup)
+        running: true
+        repeat: true
+        onTriggered: {
+            if (consoleController.webSocketManager) {
+                consoleController.webSocketManager.checkPupitresStatus()
+            }
+        }
+    }
+    
     // === INITIALISATION ===
     
-    Component.onCompleted: {
-        initializeManagers()
-    }
+    // Initialisation déplacée dans le premier Component.onCompleted
     
     function initializeManagers() {
         
@@ -144,15 +261,20 @@ Item {
         if (pupitreManager) {
             pupitreManager.pupitreConnected.connect(function(pupitreId) {
                 updateConnectionStatus()
+                updatePupitreStatus(pupitreId, "connected")
             })
             
             pupitreManager.pupitreDisconnected.connect(function(pupitreId) {
                 updateConnectionStatus()
+                updatePupitreStatus(pupitreId, "disconnected")
             })
             
             pupitreManager.pupitreStatusChanged.connect(function(pupitreId, status) {
+                console.log("🔍 pupitreStatusChanged:", pupitreId, "=", status)
                 pupitreStatusChanged(pupitreId, status)
+                updatePupitreStatus(pupitreId, status)
             })
+            
         }
         
         // CommandManager
@@ -165,7 +287,7 @@ Item {
     
     function initializePupitres() {
         if (!pupitreManager || !configManager) {
-            console.error("❌ Managers non disponibles")
+            // Managers non disponibles
             return false
         }
         
@@ -288,6 +410,30 @@ Item {
         return null
     }
     
+    // === MÉTHODES DE COMPATIBILITÉ POUR L'UI ===
+    
+    // Méthodes pour l'interface utilisateur
+    function sendMidiCommand(command) {
+        if (webSocketManager && webSocketManager.connected) {
+            return webSocketManager.sendMidiCommand(command)
+        }
+        return false
+    }
+    
+    function sendPureDataCommand(command) {
+        if (webSocketManager && webSocketManager.connected) {
+            return webSocketManager.sendPureDataCommand(command)
+        }
+        return false
+    }
+    
+    function requestStatus() {
+        if (webSocketManager && webSocketManager.connected) {
+            return webSocketManager.requestStatus()
+        }
+        return false
+    }
+    
     // Contrôle des sirènes
     function controlSirene(pupitreId, sireneNumber, enabled, ambitusRestreint, modeFrette) {
         if (pupitreManager) {
@@ -358,6 +504,53 @@ Item {
             connectionStatusChanged(isConnected)
         }
     }
+    
+    // Mettre à jour les données du volant P3
+    function updateVolantData(note, velocity, pitchbend, frequency, rpm) {
+        console.log(`🎹 ConsoleController: Mise à jour volant - Note=${note}, RPM=${rpm.toFixed(1)}`)
+        
+        volantNote = note
+        volantVelocity = velocity
+        volantPitchbend = pitchbend
+        volantFrequency = frequency
+        volantRpm = rpm
+        
+        // Émettre un signal pour notifier l'interface
+        volantDataChanged(note, velocity, pitchbend, frequency, rpm)
+    }
+    
+    function updatePupitreStatus(pupitreId, status) {
+        // Mise à jour statut pupitre
+        
+        // Mettre à jour les propriétés de statut
+        if (pupitreId === "P1") {
+            pupitre1Status = status
+            // P1 mis à jour
+        } else if (pupitreId === "P2") {
+            pupitre2Status = status
+            // P2 mis à jour
+        } else if (pupitreId === "P3") {
+            pupitre3Status = status
+            // P3 mis à jour
+        } else if (pupitreId === "P4") {
+            pupitre4Status = status
+            // P4 mis à jour
+        } else if (pupitreId === "P5") {
+            pupitre5Status = status
+            // P5 mis à jour
+        } else if (pupitreId === "P6") {
+            pupitre6Status = status
+            // P6 mis à jour
+        } else if (pupitreId === "P7") {
+            pupitre7Status = status
+            // P7 mis à jour
+        }
+        pupitreStatusChanged(pupitreId, status)
+    }
+    
+    
+    
+    
     
     function getPupitresStats() {
         if (pupitreManager) {

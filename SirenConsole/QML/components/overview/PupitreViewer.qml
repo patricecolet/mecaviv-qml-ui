@@ -91,7 +91,7 @@ Rectangle {
                     if (pupitre) {
                         // Ouvrir nouvelle fenêtre avec URL du pupitre
                         var url = "http://" + pupitre.host + ":" + pupitre.port
-                        console.log("Ouverture interface pupitre:", url)
+                        // Ouverture interface pupitre
                         Qt.openUrlExternally(url)
                     }
                 }
@@ -103,7 +103,7 @@ Rectangle {
                 height: 40
                 onClicked: {
                     // TODO: Rafraîchir la connexion
-                    console.log("Rafraîchissement pupitre", pupitre ? pupitre.id : "?")
+                    // Rafraîchissement pupitre
                 }
             }
             
@@ -114,7 +114,7 @@ Rectangle {
                 enabled: pupitre && pupitre.status === "connected"
                 onClicked: {
                     // TODO: Déconnecter le pupitre
-                    console.log("Déconnexion pupitre", pupitre ? pupitre.id : "?")
+                    // Déconnexion pupitre
                 }
             }
         }
