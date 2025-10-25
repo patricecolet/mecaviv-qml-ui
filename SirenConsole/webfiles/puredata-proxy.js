@@ -589,7 +589,7 @@ class PureDataProxy {
                     // Envoyer un ping pour vérifier que la connexion est vivante
                     try {
                         connection.websocket.ping();
-                        console.log(`🏓 Ping envoyé à ${pupitreId}`);
+                        // Ping envoyé (log supprimé pour éviter le spam)
                     } catch (error) {
                         console.log(`❌ Erreur ping ${pupitreId}:`, error.message);
                         connection.connected = false;

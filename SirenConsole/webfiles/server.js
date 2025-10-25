@@ -94,21 +94,45 @@ function frequencyToRpm(frequency, outputs) {
 }
 
 function handleWebSocketConnection(ws, request) {
-    console.log('🔌 Nouvelle connexion WebSocket');
+    // console.log('🔌 Nouvelle connexion WebSocket'); // Désactivé pour éviter le spam
     
     // Attendre un message d'identification pour déterminer le type de client
     ws.on('message', (message) => {
-        // Vérifier si c'est un message binaire (8 bytes)
+        // Vérifier si c'est un message binaire
         if (Buffer.isBuffer(message)) {
-            console.log(`📦 Message binaire reçu: ${message.length} bytes`)
-            console.log(`📦 Premier byte: 0x${message.readUInt8(0).toString(16).toUpperCase()}`)
-            if (message.length > 1) {
-                console.log(`📦 Deuxième byte: 0x${message.readUInt8(1).toString(16).toUpperCase()}`)
+            // Essayer de convertir en string pour voir si c'est du JSON
+            try {
+                const text = message.toString('utf8')
+                const data = JSON.parse(text)
+                
+                // Traiter comme un message JSON
+                if (data.type === 'PING') {
+                    // PING reçu, renvoyer PONG (sans log pour éviter le spam)
+                    ws.send(JSON.stringify({ 
+                        type: 'PONG', 
+                        source: 'SERVER_NODEJS',
+                        timestamp: Date.now() 
+                    }))
+                } else if (data.type === 'SIRENCONSOLE_IDENTIFICATION') {
+                    console.log('🔑 Client SirenConsole QML identifié');
+                    // Ajouter le client à la liste des clients connectés
+                    connectedClients.add(ws);
+                    
+                    // Envoyer le statut initial
+                    if (pureDataProxy) {
+                        const status = pureDataProxy.getStatus();
+                        ws.send(JSON.stringify({
+                            type: 'INITIAL_STATUS',
+                            data: status
+                        }));
+                    }
+                }
+            } catch (e) {
+                // Ignorer les messages binaires qui ne sont pas du JSON
             }
             
             if (message.length === 8) {
                 const magic = message.readUInt16BE(0)
-                console.log(`📦 Magic bytes: 0x${magic.toString(16).toUpperCase()}`)
                 
                 if (magic === 0x5353) { // Magic "SS"
                     const type = message.readUInt8(2)
@@ -121,8 +145,6 @@ function handleWebSocketConnection(ws, request) {
                         // Convertir note MIDI → fréquence → RPM (S3: transposition +1 octave, 8 sorties)
                         const frequency = midiToFrequency(note, pitchbend, 1) // +1 octave pour S3
                         const rpm = frequencyToRpm(frequency, 8) // 8 sorties pour S3
-                        
-                        console.log(`🎹 Volant P3: Note=${note}, Velocity=${velocity}, Pitchbend=${pitchbend}, Freq=${frequency.toFixed(2)}Hz, RPM=${rpm.toFixed(1)}`)
                         
                         // Stocker les dernières données du volant
                         lastVolantData = {
@@ -154,11 +176,11 @@ function handleWebSocketConnection(ws, request) {
         
         try {
             const data = JSON.parse(message);
-            console.log('📥 Message WebSocket reçu:', data.type);
+            // console.log('📥 Message WebSocket reçu:', data.type); // Désactivé pour éviter le spam
             
             // Vérifier si c'est un pupitre qui se connecte
             if (data.type === 'PUPITRE_IDENTIFICATION' && data.pupitreId) {
-                console.log(`🎛️ Pupitre ${data.pupitreId} identifié`);
+                // console.log(`🎛️ Pupitre ${data.pupitreId} identifié`); // Désactivé pour éviter le spam
                 
                 // Gérer la connexion du pupitre via le proxy PureData
                 if (pureDataProxy) {
@@ -183,35 +205,46 @@ function handleWebSocketConnection(ws, request) {
                 
             } else {
                 // C'est un client SirenConsole (interface web)
-                console.log('🌐 Client SirenConsole connecté');
-                connectedClients.add(ws);
+                // console.log('🌐 Client SirenConsole connecté'); // Désactivé pour éviter le spam
                 
-                // Envoyer le statut initial
-                if (pureDataProxy) {
-                    const status = pureDataProxy.getStatus();
-                    ws.send(JSON.stringify({
-                        type: 'INITIAL_STATUS',
-                        data: status
-                    }));
-                }
-                
-                // Traiter les messages des clients
-                switch (data.type) {
-                    case 'PING':
-                        ws.send(JSON.stringify({ type: 'PONG', timestamp: Date.now() }));
-                        break;
-                    case 'GET_STATUS':
-                        if (pureDataProxy) {
-                            const status = pureDataProxy.getStatus();
-                            ws.send(JSON.stringify({
-                                type: 'STATUS_UPDATE',
-                                data: status
-                            }));
+                // Traiter les messages des clients SirenConsole
+                ws.on('message', (message) => {
+                    try {
+                        const data = JSON.parse(message);
+                        // console.log('📥 Message SirenConsole reçu:', data.type); // Désactivé pour éviter le spam
+                        
+                        switch (data.type) {
+                            case 'PING':
+                                // PING reçu, renvoyer PONG (sans log pour éviter le spam)
+                                ws.send(JSON.stringify({ 
+                                    type: 'PONG', 
+                                    source: 'SERVER_NODEJS',
+                                    timestamp: Date.now() 
+                                }));
+                                break;
+                            case 'SIRENCONSOLE_IDENTIFICATION':
+                                console.log('🔑 Client SirenConsole QML identifié');
+                                // Ajouter le client à la liste des clients connectés
+                                connectedClients.add(ws);
+                                
+                                // Envoyer le statut initial
+                                if (pureDataProxy) {
+                                    const status = pureDataProxy.getStatus();
+                                    ws.send(JSON.stringify({
+                                        type: 'INITIAL_STATUS',
+                                        data: status
+                                    }));
+                                }
+                                break;
+                            default:
+                                console.log('⚠️ Type message SirenConsole inconnu:', data.type);
                         }
-                        break;
-                    default:
-                        console.log('⚠️ Type message WebSocket inconnu:', data.type);
-                }
+                    } catch (error) {
+                        console.error('❌ Erreur parsing message SirenConsole:', error);
+                    }
+                });
+                
+                // Les messages sont maintenant traités par le gestionnaire ws.on('message') ci-dessus
             }
         } catch (error) {
             console.error('❌ Erreur parsing message WebSocket:', error);
@@ -521,6 +554,7 @@ presetAPI.initializePresetAPI().then(() => {
         // Écouter les changements de statut des pupitres
            setInterval(() => {
                const status = pureDataProxy.getStatus();
+               console.log("📊 Envoi statut aux clients:", connectedClients.size, "clients connectés");
                broadcastToClients({
                    type: 'PUPITRE_STATUS_UPDATE',
                    data: status,
@@ -529,17 +563,66 @@ presetAPI.initializePresetAPI().then(() => {
            }, 1000); // Diffuser toutes les secondes
         
         // Le proxy PureData gère les connexions vers les pupitres
+        // Désactiver tous les logs du proxy pour éviter le spam
+        // pureDataProxy.setLogLevel('ERROR'); // Cette méthode n'existe pas
+        
+        // Rediriger tous les logs du proxy vers /dev/null
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        
+        console.log = (...args) => {
+            // Ignorer TOUS les logs du proxy sauf les connexions réussies
+            if (args[0] && typeof args[0] === 'string') {
+                // Ignorer tous les logs de connexion, erreur, statut, reconnexion
+                if (args[0].includes('🔌 Connexion à') ||
+                    args[0].includes('❌ Erreur WebSocket') ||
+                    args[0].includes('📊 Statut mis à jour') ||
+                    args[0].includes('❌ Déconnecté de') ||
+                    args[0].includes('🔄 Reconnexion') ||
+                    args[0].includes('Statut') ||
+                    args[0].includes('Reconnexion') ||
+                    args[0].includes('Erreur WebSocket')) {
+                    return; // Ignorer ces logs
+                }
+                // GARDER SEULEMENT le log "Connecté à"
+                if (args[0].includes('✅ Connecté à')) {
+                    originalConsoleLog.apply(console, args);
+                    return;
+                }
+            }
+            originalConsoleLog.apply(console, args);
+        };
+       
+        console.error = (...args) => {
+            // Ignorer TOUS les logs d'erreur du proxy
+            if (args[0] && typeof args[0] === 'string') {
+                if (args[0].includes('🔌 Connexion à') ||
+                    args[0].includes('❌ Erreur WebSocket') ||
+                    args[0].includes('📊 Statut mis à jour') ||
+                    args[0].includes('❌ Déconnecté de') ||
+                    args[0].includes('🔄 Reconnexion') ||
+                    args[0].includes('Statut') ||
+                    args[0].includes('Reconnexion') ||
+                    args[0].includes('Erreur WebSocket')) {
+                    return; // Ignorer ces logs
+                }
+                // GARDER SEULEMENT le log "Connecté à"
+                if (args[0].includes('✅ Connecté à')) {
+                    originalConsoleError.apply(console, args);
+                    return;
+                }
+            }
+            originalConsoleError.apply(console, args);
+        };
     }
     
     server.listen(PORT, HOST, () => {
         console.log(`🚀 Serveur SirenConsole démarré sur http://${HOST}:${PORT}`);
         console.log(`🌐 Application principale sur http://localhost:${PORT}/appSirenConsole.html`);
         console.log(`🔌 WebSocket serveur sur ws://localhost:${PORT}/ws`);
-        console.log(`🔌 Proxy WebSocket PureData: ${config.servers.websocketUrl}`);
-        console.log(`📊 Console de contrôle des pupitres`);
-        console.log(`💾 API Presets disponible sur http://localhost:${PORT}/api/presets`);
-        console.log(`🎵 API MIDI disponible sur http://localhost:${PORT}/api/midi/files`);
-        console.log(`🔀 API PureData Proxy sur http://localhost:${PORT}/api/puredata/*`);
+        console.log(`📝 Logs désactivés pour éviter le spam`);
+        console.log(`🎯 Lancez maintenant SirenConsole Qt6 pour tester WebSocket`);
+        // Tous les autres logs désactivés
     });
 }).catch((error) => {
     console.error('❌ Erreur initialisation:', error);
