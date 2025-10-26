@@ -149,14 +149,14 @@ Node {
         Node {
             position: Qt.vector3d(0, -20, 0)
             eulerRotation: Qt.vector3d(
-                -root.xValue * root.maxAngle,  // X reçu → mouvement Y inversé
-                0,  // Pas de rotation Y ici
-                root.yValue * root.maxAngle  // Y reçu → mouvement X inversé
+                root.yValue * root.maxAngle,   // Y reçu → mouvement avant/arrière (axe X)
+                0,                             // Pas de rotation Y
+                root.xValue * root.maxAngle    // X reçu → mouvement latéral (axe Z)
             )
             
             // Noeud pour la rotation Z du stick
             Node {
-                eulerRotation: Qt.vector3d(0, 90 - root.zValue * 180, 0)  // Rotation inversée + 90° de base
+                eulerRotation: Qt.vector3d(0, 90 + root.zValue * 180, 0)  // Rotation normale + 90° de base
                 
                 // Manche du joystick
                 Model {
