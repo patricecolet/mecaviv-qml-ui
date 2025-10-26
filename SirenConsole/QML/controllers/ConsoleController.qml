@@ -187,6 +187,7 @@ Item {
     signal initializationComplete()
     signal connectionStatusChanged(bool connected)
     signal pupitreStatusChanged(string pupitreId, string status)
+    signal volantDataChanged(int note, int velocity, int pitchbend, real frequency, real rpm)
     signal presetLoaded(string presetName)
     signal presetsListChanged(var presetsList)
     signal errorOccurred(string error)

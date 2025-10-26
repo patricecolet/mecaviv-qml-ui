@@ -53,6 +53,7 @@ Rectangle {
                 property string pupitreStatus: overviewPage.consoleController.pupitre1Status
                 property string pupitreName: "Pupitre 1"
                 property string pupitreHost: "192.168.1.41"
+                property real currentNote: overviewPage.consoleController.volantNote
                 width: parent.width
             }
             

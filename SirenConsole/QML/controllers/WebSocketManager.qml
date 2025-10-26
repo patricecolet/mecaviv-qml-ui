@@ -129,8 +129,11 @@ Item {
                     break
                 case "VOLANT_DATA":
                     console.log("🎹 Données volant reçues:", data)
+                    console.log("🎹 Note:", data.note, "Velocity:", data.velocity, "Pitchbend:", data.pitchbend)
+                    console.log("🎹 Frequency:", data.frequency, "RPM:", data.rpm)
                     // Mettre à jour les données du volant
                     if (consoleController && data.note !== undefined) {
+                        console.log("🎹 Appel updateVolantData avec note:", data.note)
                         consoleController.updateVolantData(
                             data.note, 
                             data.velocity || 0, 
@@ -138,6 +141,8 @@ Item {
                             data.frequency || 261.63, 
                             data.rpm || 1308.15
                         )
+                    } else {
+                        console.log("❌ consoleController non trouvé ou note manquante")
                     }
                     break
                 default:

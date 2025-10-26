@@ -10,9 +10,10 @@ Rectangle {
     property string pupitreStatus: parent ? parent.pupitreStatus : "disconnected"
     property string pupitreName: parent ? parent.pupitreName : ""
     property string pupitreHost: parent ? parent.pupitreHost : ""
+    property real currentNote: parent ? parent.currentNote : 60
     
 Component.onCompleted: {
-console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus)
+console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus, "currentNote =", currentNote)
 }
     
     height: 80
@@ -90,7 +91,7 @@ console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus)
                 height: 30
                 minNote: 48
                 maxNote: 72
-                currentNote: 60
+                currentNote: overviewRow.currentNote
             }
         }
         
