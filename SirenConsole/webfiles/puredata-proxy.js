@@ -248,7 +248,7 @@ class PureDataProxy {
                 }
                 playbackState.duration = buffer.readUInt32LE(2);
                 playbackState.totalBeats = buffer.readUInt32LE(6);
-                console.log(`📁 FILE_INFO ${connection.pupitre.name} (10B): Durée:`, playbackState.duration, 'ms - Total beats:', playbackState.totalBeats);
+                //console.log(`📁 FILE_INFO ${connection.pupitre.name} (10B): Durée:`, playbackState.duration, 'ms - Total beats:', playbackState.totalBeats);
                 break;
                 
             case 0x03: // TEMPO (3 bytes, quand change)
@@ -290,7 +290,8 @@ class PureDataProxy {
         
         // Appliquer le pitchbend (0-16383, centre = 8192)
         const pitchbendFactor = (pitchbend - 8192) / 8192; // -1 à +1
-        const pitchbendSemitones = pitchbendFactor * 0.5; // ±0.5 demi-ton max
+        // Utiliser une échelle ±1 demi-ton pour cohérence UI
+        const pitchbendSemitones = pitchbendFactor * 1.0; // ±1.0 demi-ton
         
         return baseFrequency * Math.pow(2, pitchbendSemitones / 12);
     }
@@ -306,15 +307,16 @@ class PureDataProxy {
         
         // Utiliser la fonction de diffusion directe
         if (this.broadcastToClients) {
-            console.log(`📡 Diffusion vers clients...`);
+            var continuousNote = note + ((pitchbend - 8192) / 8192);
+
+            console.log(`📡 note pour P${pupitreId}: ${note}`);
             this.broadcastToClients({
                 type: 'VOLANT_DATA',
                 pupitreId: pupitreId,
-                note: note,
+                noteFloat: continuousNote,
                 velocity: velocity,
-                pitchbend: pitchbend,
-                frequency: frequency,
-                rpm: rpm,
+                frequency: Math.round(frequency) | 0,
+                rpm: Math.round(rpm) | 0,
                 timestamp: Date.now()
             });
             console.log(`📡 Diffusion terminée`);

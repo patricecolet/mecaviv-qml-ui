@@ -37,15 +37,6 @@ Rectangle {
             width: parent.width
             spacing: 8
             
-            // Titre
-            Text {
-                text: "Vue d'ensemble des Pupitres"
-                color: "#ffffff"
-                font.pixelSize: 24
-                font.bold: true
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-            
             // Rangées des pupitres
             Loader {
                 source: "../components/overview/OverviewRow.qml"
@@ -53,7 +44,13 @@ Rectangle {
                 property string pupitreStatus: overviewPage.consoleController.pupitre1Status
                 property string pupitreName: "Pupitre 1"
                 property string pupitreHost: "192.168.1.41"
-                property real currentNote: overviewPage.consoleController.volantNote
+                property real currentNote: overviewPage.consoleController.volantNoteFloat
+                property real currentHz: overviewPage.consoleController.volantFrequency
+                property real currentRpm: overviewPage.consoleController.volantRpm
+                // Ambitus réel depuis config.json
+                property int ambitusMin: overviewPage.consoleController.p1AmbitusMin
+                property int ambitusMax: overviewPage.consoleController.p1AmbitusMax
+                
                 width: parent.width
             }
             

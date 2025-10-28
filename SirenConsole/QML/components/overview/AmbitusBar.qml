@@ -5,7 +5,7 @@ Rectangle {
     
     property int minNote: 48  // C3
     property int maxNote: 72  // C6
-    property int currentNote: 60  // C4
+    property real currentNote: 60  // C4 (peut bouger de manière fractionnelle avec le pitchbend)
     
     height: 40
     color: "#2a2a2a"
@@ -63,7 +63,7 @@ Rectangle {
     // Note actuelle au centre
     Text {
         anchors.centerIn: parent
-        text: noteToName(currentNote)
+        text: noteToName(Math.round(currentNote))
         color: "#ffffff"
         font.pixelSize: 12
         font.bold: true

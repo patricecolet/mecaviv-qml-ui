@@ -17,7 +17,7 @@ Item {
     property real volantPitchbend: 8192
     property real volantFrequency: 261.63
     property real volantRpm: 1308.15
-    
+    property real volantNoteFloat: 60
     // Exposer les managers pour accès externe
     property alias commandManager: commandManager
     property alias configManager: configManager
@@ -165,6 +165,11 @@ Item {
         property var sirenes: ({})
     }
     property var pupitres: []
+
+    // Ambitus issus de config.json (lecture directe, fallback 48-72)
+    // P1 correspond à sirens[0]
+    property int p1AmbitusMin: (configManager && configManager.config && configManager.config.sirens && configManager.config.sirens.length > 0 && configManager.config.sirens[0].ambitus) ? configManager.config.sirens[0].ambitus.min : 48
+    property int p1AmbitusMax: (configManager && configManager.config && configManager.config.sirens && configManager.config.sirens.length > 0 && configManager.config.sirens[0].ambitus) ? configManager.config.sirens[0].ambitus.max : 72
     
     // Propriétés des presets
     property var presets: []
@@ -231,6 +236,8 @@ Item {
             presetManager.loadPresetsFromStorage()
         }
         
+        // Construire le modèle pupitres depuis la config
+        buildPupitresFromConfig()
     }
     
     function connectSignals() {
@@ -318,6 +325,27 @@ Item {
         }
         
         return false
+    }
+
+    // Construire le tableau pupitres[] depuis config.json
+    function buildPupitresFromConfig() {
+        var built = []
+        if (configManager && configManager.config && configManager.config.sirens) {
+            for (var i = 0; i < configManager.config.sirens.length; i++) {
+                var s = configManager.config.sirens[i]
+                built.push({
+                    id: "P" + (i + 1),
+                    status: "disconnected",
+                    ambitusMin: (s.ambitus && s.ambitus.min !== undefined) ? s.ambitus.min : 48,
+                    ambitusMax: (s.ambitus && s.ambitus.max !== undefined) ? s.ambitus.max : 72,
+                    currentNote: 60.0,
+                    currentHz: 440.0,
+                    currentRpm: 0,
+                    velocity: 0
+                })
+            }
+        }
+        pupitres = built
     }
     
     // === MÉTHODES PUBLIQUES (COMPATIBILITÉ) ===
@@ -506,18 +534,34 @@ Item {
         }
     }
     
-    // Mettre à jour les données du volant P3
-    function updateVolantData(note, velocity, pitchbend, frequency, rpm) {
-        console.log(`🎹 ConsoleController: Mise à jour volant - Note=${note}, RPM=${rpm.toFixed(1)}`)
-        
-        volantNote = note
-        volantVelocity = velocity
-        volantPitchbend = pitchbend
-        volantFrequency = frequency
-        volantRpm = rpm
-        
-        // Émettre un signal pour notifier l'interface
-        volantDataChanged(note, velocity, pitchbend, frequency, rpm)
+    // Mettre à jour les données du volant (compat ancienne signature)
+    function updateVolantData(noteFloat, velocity, pitchbend, frequency, rpm) {
+        // Par défaut, considérer P1
+        updatePupitreVolantData("P1", noteFloat, frequency, rpm, velocity)
+    }
+
+    // Nouvelle API: mise à jour d'un pupitre par id avec note continue
+    function updatePupitreVolantData(pupitreId, noteFloat, frequency, rpm, velocity) {
+        if (!pupitres || pupitres.length === 0) return
+        for (var i = 0; i < pupitres.length; i++) {
+            if (pupitres[i].id === pupitreId) {
+                var p = pupitres[i]
+                p.currentNote = noteFloat
+                p.currentHz = frequency
+                p.currentRpm = rpm
+                p.velocity = velocity
+                pupitres[i] = p // forcer la notification
+                break
+            }
+        }
+        // Maintenir les anciennes props pour compat (pilotent P1)
+        if (pupitreId === "P1") {
+            volantNoteFloat = noteFloat
+            volantNote = Math.round(noteFloat)
+            volantVelocity = velocity
+            volantFrequency = frequency
+            volantRpm = rpm
+        }
     }
     
     function updatePupitreStatus(pupitreId, status) {

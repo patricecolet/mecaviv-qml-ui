@@ -11,18 +11,17 @@ Rectangle {
     property string pupitreName: parent ? parent.pupitreName : ""
     property string pupitreHost: parent ? parent.pupitreHost : ""
     property real currentNote: parent ? parent.currentNote : 60
+    property real currentHz: parent && parent.currentHz !== undefined ? parent.currentHz : 440.0
+    property real currentRpm: parent && parent.currentRpm !== undefined ? parent.currentRpm : 0
+    // Ambitus transmis par le Loader (si présent)
+    property int ambitusMin: parent && parent.ambitusMin !== undefined ? parent.ambitusMin : 48
+    property int ambitusMax: parent && parent.ambitusMax !== undefined ? parent.ambitusMax : 72
     
-Component.onCompleted: {
-console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus, "currentNote =", currentNote)
-}
     
     height: 80
     width: parent.width
     //color: pupitre && pupitre.status === "connected" ? "#2a4a2a" : "#2a2a2a"
-    color: {
-        console.log("🔍 OverviewRow color: pupitreId =", pupitreId, "status =", pupitreStatus)
-        return overviewRow.pupitreStatus === "connected" ? "#2a4a2a" : "#2a2a2a"
-    }
+    color: overviewRow.pupitreStatus === "connected" ? "#2a4a2a" : "#2a2a2a"
     border.color: overviewRow.pupitreStatus === "connected" ? "#00ff00" : "#555555"
     border.width: 2
     radius: 8
@@ -89,8 +88,8 @@ console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus,
                 anchors.centerIn: parent
                 width: parent.width - 16
                 height: 30
-                minNote: 48
-                maxNote: 72
+                minNote: overviewRow.ambitusMin
+                maxNote: overviewRow.ambitusMax
                 currentNote: overviewRow.currentNote
             }
         }
@@ -124,7 +123,7 @@ console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus,
                             font.pixelSize: 9
                         }
                         Text {
-                            text: "0"
+                            text: String(Math.round(overviewRow.currentRpm))
                             color: "#ffffff"
                             font.pixelSize: 12
                             font.bold: true
@@ -139,7 +138,7 @@ console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus,
                             font.pixelSize: 9
                         }
                         Text {
-                            text: "440.0"
+                            text:  String(Math.round(overviewRow.currentHz))
                             color: "#ffffff"
                             font.pixelSize: 12
                             font.bold: true
@@ -160,7 +159,7 @@ console.log("🔍 OverviewRow loaded for", pupitreId, "status =", pupitreStatus,
                             font.pixelSize: 9
                         }
                         Text {
-                            text: "60"
+                            text:  String(Math.round(overviewRow.currentNote))
                             color: "#ffffff"
                             font.pixelSize: 12
                             font.bold: true

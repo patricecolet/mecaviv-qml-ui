@@ -54,9 +54,9 @@ Item {
                     var pad2Vel = bytes[6];
                     
                     // Joystick : 0-127 = +0 à +127, 128-255 = -0 à -127
-                    var joyX = bytes[7] <= 127 ? bytes[7] : -(bytes[7] - 128);
-                    var joyY = bytes[8] <= 127 ? bytes[8] : -(bytes[8] - 128);
-                    var joyZ = bytes[9] <= 127 ? bytes[9] : -(bytes[9] - 128);
+                    var joyX = bytes[7] <= 127 ? bytes[7] : bytes[7] - 255;
+                    var joyY = bytes[8] <= 127 ? bytes[8] : bytes[8] - 255;
+                    var joyZ = bytes[9] <= 127 ? bytes[9] : bytes[9] - 255;
                     
                     // Joystick bouton
                     var joyBtn = bytes[10] > 0 ? 1 : 0;

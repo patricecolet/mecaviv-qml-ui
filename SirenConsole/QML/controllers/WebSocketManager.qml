@@ -128,21 +128,24 @@ Item {
                     }
                     break
                 case "VOLANT_DATA":
-                    console.log("🎹 Données volant reçues:", data)
-                    console.log("🎹 Note:", data.note, "Velocity:", data.velocity, "Pitchbend:", data.pitchbend)
-                    console.log("🎹 Frequency:", data.frequency, "RPM:", data.rpm)
-                    // Mettre à jour les données du volant
-                    if (consoleController && data.note !== undefined) {
-                        console.log("🎹 Appel updateVolantData avec note:", data.note)
-                        consoleController.updateVolantData(
-                            data.note, 
-                            data.velocity || 0, 
-                            data.pitchbend || 8192, 
-                            data.frequency || 261.63, 
-                            data.rpm || 1308.15
+                    // Mettre à jour la note continue du pupitre concerné
+                    if (consoleController && data.pupitreId && data.noteFloat !== undefined) {
+                        consoleController.updatePupitreVolantData(
+                            data.pupitreId,
+                            data.noteFloat,
+                            data.frequency || 261,
+                            data.rpm || 1308,
+                            data.velocity || 0
                         )
-                    } else {
-                        console.log("❌ consoleController non trouvé ou note manquante")
+                    } else if (consoleController && data.noteFloat !== undefined) {
+                        // Compat: si pas d'id, on considère P1
+                        consoleController.updatePupitreVolantData(
+                            "P1",
+                            data.noteFloat,
+                            data.frequency || 261,
+                            data.rpm || 1308,
+                            data.velocity || 0
+                        )
                     }
                     break
                 default:
