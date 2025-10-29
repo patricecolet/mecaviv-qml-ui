@@ -13,7 +13,7 @@ class PureDataProxy {
         this.reconnectInterval = 1000; // 1 seconde pour une reconnexion rapide
         this.reconnectTimers = new Map(); // Timers de reconnexion par pupitre
         
-        console.log('🎛️ PureDataProxy initialisé pour connexions multiples');
+        // console.log('🎛️ PureDataProxy initialisé pour connexions multiples');
         
         // Initialiser les connexions vers tous les pupitres
         this.initializeConnections();
@@ -31,7 +31,7 @@ class PureDataProxy {
             return;
         }
         
-        console.log('🔌 Initialisation des connexions vers', this.config.pupitres.length, 'pupitres');
+        // console.log('🔌 Initialisation des connexions vers', this.config.pupitres.length, 'pupitres');
         
         this.config.pupitres.forEach(pupitre => {
             if (pupitre.enabled) {
@@ -47,7 +47,7 @@ class PureDataProxy {
         const port = pupitre.websocketPort || 10002;
         const url = `ws://${host}:${port}`;
         
-        console.log(`🔌 Connexion à ${pupitre.name} (${pupitreId}): ${url}`);
+        // console.log(`🔌 Connexion à ${pupitre.name} (${pupitreId}): ${url}`);
         
         try {
             // Options pour compatibilité avec PureData
@@ -71,7 +71,7 @@ class PureDataProxy {
             
             // Gestionnaires d'événements
             ws.on('open', () => {
-                console.log(`✅ Connecté à ${pupitre.name} (${pupitreId})`);
+                // console.log(`✅ Connecté à ${pupitre.name} (${pupitreId})`);
                 
                 const connection = this.connections.get(pupitreId);
                 if (connection) {
@@ -87,13 +87,13 @@ class PureDataProxy {
             });
             
             ws.on('close', (code, reason) => {
-                console.log(`❌ Déconnecté de ${pupitre.name} (${pupitreId}) - Code: ${code}, Raison: ${reason}`);
+                // console.log(`❌ Déconnecté de ${pupitre.name} (${pupitreId}) - Code: ${code}, Raison: ${reason}`);
                 
                 const connection = this.connections.get(pupitreId);
                 if (connection) {
                     connection.connected = false;
                     connection.lastSeen = null;
-                    console.log(`📊 Statut mis à jour: ${pupitreId} = disconnected`);
+                    // console.log(`📊 Statut mis à jour: ${pupitreId} = disconnected`);
                 }
                 
                 // Reconnexion immédiate pour les déconnexions inattendues
@@ -107,7 +107,7 @@ class PureDataProxy {
                 if (connection) {
                     connection.connected = false;
                     connection.lastSeen = null;
-                    console.log(`📊 Statut mis à jour: ${pupitreId} = disconnected (erreur)`);
+                    // console.log(`📊 Statut mis à jour: ${pupitreId} = disconnected (erreur)`);
                 }
             });
             
@@ -130,7 +130,7 @@ class PureDataProxy {
         if (Buffer.isBuffer(message)) {
             this.handleBinaryMessage(pupitreId, message);
         } else {
-            console.log(`📥 Message JSON de ${connection.pupitre.name} (${pupitreId}):`, message.substring(0, 100));
+            // console.log(`📥 Message JSON de ${connection.pupitre.name} (${pupitreId}):`, message.substring(0, 100));
             
             try {
                 const data = JSON.parse(message);
@@ -138,7 +138,7 @@ class PureDataProxy {
                 // Traiter les messages d'état de lecture MIDI
                 if (data.type === 'MIDI_PLAYBACK_STATE') {
                     this.playbackStates.set(pupitreId, data);
-                    console.log(`🎵 État lecture MIDI ${connection.pupitre.name}:`, data.playing ? 'PLAY' : 'STOP', '- Position:', data.position, 'ms');
+                    // console.log(`🎵 État lecture MIDI ${connection.pupitre.name}:`, data.playing ? 'PLAY' : 'STOP', '- Position:', data.position, 'ms');
                 }
                 
                 // Ajouter au buffer global avec info pupitre
@@ -176,14 +176,14 @@ class PureDataProxy {
                 const velocity = buffer.readUInt8(4);
                 const pitchbend = buffer.readUInt16BE(5);
                 
-                console.log(`🎹 VOLANT_STATE ${connection.pupitre.name}: Type=${type}, Note=${note}, Velocity=${velocity}, Pitchbend=${pitchbend}`);
+                // console.log(`🎹 VOLANT_STATE ${connection.pupitre.name}: Type=${type}, Note=${note}, Velocity=${velocity}, Pitchbend=${pitchbend}`);
                 
                 if (type === 0x01) { // VOLANT_STATE
                     // Convertir note MIDI → fréquence → RPM (S3: transposition +1 octave, 8 sorties)
                     const frequency = this.midiToFrequency(note, pitchbend, 1); // +1 octave pour S3
                     const rpm = this.frequencyToRpm(frequency, 8); // 8 sorties pour S3
                     
-                    console.log(`🎹 Volant ${connection.pupitre.name}: Note=${note}, Velocity=${velocity}, Pitchbend=${pitchbend}, Freq=${frequency.toFixed(2)}Hz, RPM=${rpm.toFixed(1)}`);
+                    // console.log(`🎹 Volant ${connection.pupitre.name}: Note=${note}, Velocity=${velocity}, Pitchbend=${pitchbend}, Freq=${frequency.toFixed(2)}Hz, RPM=${rpm.toFixed(1)}`);
                     
                     // Diffuser aux clients UI via le serveur
                     this.broadcastVolantData(pupitreId, note, velocity, pitchbend, frequency, rpm);
@@ -234,9 +234,9 @@ class PureDataProxy {
                 // Log compact (max 1/sec par pupitre)
                 const logKey = `pos_${pupitreId}`;
                 if (!this[logKey] || Date.now() - this[logKey] > 1000) {
-                    console.log(`🎵 POSITION ${connection.pupitre.name} (10B):`, playbackState.playing ? 'PLAY' : 'STOP', 
-                               '- Bar:', barNumber, 'Beat:', beatInBar, '/', playbackState.timeSignature?.numerator || 4,
-                               '- Total:', playbackState.beat.toFixed(1));
+                    // console.log(`🎵 POSITION ${connection.pupitre.name} (10B):`, playbackState.playing ? 'PLAY' : 'STOP', 
+                    //            '- Bar:', barNumber, 'Beat:', beatInBar, '/', playbackState.timeSignature?.numerator || 4,
+                    //            '- Total:', playbackState.beat.toFixed(1));
                     this[logKey] = Date.now();
                 }
                 break;
@@ -248,7 +248,7 @@ class PureDataProxy {
                 }
                 playbackState.duration = buffer.readUInt32LE(2);
                 playbackState.totalBeats = buffer.readUInt32LE(6);
-                //console.log(`📁 FILE_INFO ${connection.pupitre.name} (10B): Durée:`, playbackState.duration, 'ms - Total beats:', playbackState.totalBeats);
+                // console.log(`📁 FILE_INFO ${connection.pupitre.name} (10B): Durée:`, playbackState.duration, 'ms - Total beats:', playbackState.totalBeats);
                 break;
                 
             case 0x03: // TEMPO (3 bytes, quand change)
@@ -257,7 +257,7 @@ class PureDataProxy {
                     return;
                 }
                 playbackState.tempo = buffer.readUInt16LE(1);
-                console.log(`🎼 TEMPO ${connection.pupitre.name} (3B):`, playbackState.tempo, 'BPM');
+                // console.log(`🎼 TEMPO ${connection.pupitre.name} (3B):`, playbackState.tempo, 'BPM');
                 break;
                 
             case 0x04: // TIMESIG (3 bytes, quand change)
@@ -267,13 +267,13 @@ class PureDataProxy {
                 }
                 playbackState.timeSignature.numerator = buffer.readUInt8(1);
                 playbackState.timeSignature.denominator = buffer.readUInt8(2);
-                console.log(`🎵 TIMESIG ${connection.pupitre.name} (3B):`, 
-                           playbackState.timeSignature.numerator + '/' + 
-                           playbackState.timeSignature.denominator);
+                // console.log(`🎵 TIMESIG ${connection.pupitre.name} (3B):`, 
+                //           playbackState.timeSignature.numerator + '/' + 
+                //           playbackState.timeSignature.denominator);
                 break;
                 
             default:
-                console.warn(`⚠️ Type message binaire inconnu ${connection.pupitre.name}:`, '0x' + messageType.toString(16).padStart(2, '0'));
+                // console.warn(`⚠️ Type message binaire inconnu ${connection.pupitre.name}:`, '0x' + messageType.toString(16).padStart(2, '0'));
         }
         
         // Mettre à jour l'état
@@ -303,13 +303,10 @@ class PureDataProxy {
     
     // Diffuser les données du volant aux clients UI
     broadcastVolantData(pupitreId, note, velocity, pitchbend, frequency, rpm) {
-        console.log(`📡 Tentative de diffusion VOLANT_DATA pour P${pupitreId}`);
-        
         // Utiliser la fonction de diffusion directe
         if (this.broadcastToClients) {
             var continuousNote = note + ((pitchbend - 8192) / 8192);
 
-            console.log(`📡 note pour P${pupitreId}: ${note}`);
             this.broadcastToClients({
                 type: 'VOLANT_DATA',
                 pupitreId: pupitreId,
@@ -319,9 +316,9 @@ class PureDataProxy {
                 rpm: Math.round(rpm) | 0,
                 timestamp: Date.now()
             });
-            console.log(`📡 Diffusion terminée`);
+            // console.log(`📡 Diffusion terminée`);
         } else {
-            console.log(`❌ Impossible de diffuser: broadcastToClients=${!!this.broadcastToClients}`);
+            // console.log(`❌ Impossible de diffuser: broadcastToClients=${!!this.broadcastToClients}`);
         }
     }
     
@@ -351,7 +348,7 @@ class PureDataProxy {
             }
         }
         
-        console.log(`📤 Commande envoyée à ${successCount}/${totalCount} pupitres`);
+        // console.log(`📤 Commande envoyée à ${successCount}/${totalCount} pupitres`);
         return successCount > 0;
     }
     
@@ -364,7 +361,7 @@ class PureDataProxy {
         
         try {
             const message = JSON.stringify(command);
-            console.log(`📤 Envoi à ${connection.pupitre.name} (${pupitreId}):`, message.substring(0, 100));
+            // console.log(`📤 Envoi à ${connection.pupitre.name} (${pupitreId}):`, message.substring(0, 100));
             
             // Envoyer en mode binaire comme SirenePupitre
             const buffer = Buffer.from(message, 'utf8');
@@ -475,14 +472,14 @@ class PureDataProxy {
             const playbackState = this.playbackStates.get(pupitreId);
             if (playbackState) {
                 playbackState.file = filePath;
-                console.log(`📁 Fichier MIDI mis à jour ${pupitreId}:`, filePath);
+                // console.log(`📁 Fichier MIDI mis à jour ${pupitreId}:`, filePath);
             }
         } else {
             // Mettre à jour tous les pupitres
             for (const [id, playbackState] of this.playbackStates) {
                 playbackState.file = filePath;
             }
-            console.log('📁 Fichier MIDI mis à jour pour tous les pupitres:', filePath);
+            // console.log('📁 Fichier MIDI mis à jour pour tous les pupitres:', filePath);
         }
     }
     
@@ -507,7 +504,7 @@ class PureDataProxy {
         const connection = this.connections.get(pupitreId);
         if (!connection) return;
         
-        console.log(`🔄 Reconnexion ${connection.pupitre.name} (${pupitreId}) dans`, this.reconnectInterval, 'ms');
+        // console.log(`🔄 Reconnexion ${connection.pupitre.name} (${pupitreId}) dans`, this.reconnectInterval, 'ms');
         
         const timer = setTimeout(() => {
             this.reconnectTimers.delete(pupitreId);
@@ -519,7 +516,7 @@ class PureDataProxy {
     
     // Fermer toutes les connexions
     close() {
-        console.log('🔌 Fermeture de toutes les connexions');
+        // console.log('🔌 Fermeture de toutes les connexions');
         
         // Nettoyer les timers
         for (const timer of this.reconnectTimers.values()) {
@@ -539,7 +536,7 @@ class PureDataProxy {
     
     // Gérer une connexion entrante d'un pupitre
     handleIncomingConnection(ws, pupitreId, pupitreInfo) {
-        console.log(`🔌 Connexion entrante du pupitre ${pupitreId}`);
+        // console.log(`🔌 Connexion entrante du pupitre ${pupitreId}`);
         
         // Stocker la connexion
         this.connections.set(pupitreId, {
@@ -552,7 +549,7 @@ class PureDataProxy {
         
         // Gestionnaires d'événements
         ws.on('close', () => {
-            console.log(`❌ Pupitre ${pupitreId} déconnecté`);
+            // console.log(`❌ Pupitre ${pupitreId} déconnecté`);
             const connection = this.connections.get(pupitreId);
             if (connection) {
                 connection.connected = false;
@@ -581,7 +578,7 @@ class PureDataProxy {
                 // Vérifier si la connexion WebSocket est toujours ouverte
                 if (connection.websocket.readyState === WebSocket.CLOSED || 
                     connection.websocket.readyState === WebSocket.CLOSING) {
-                    console.log(`❌ Connexion ${pupitreId} fermée détectée`);
+                    // console.log(`❌ Connexion ${pupitreId} fermée détectée`);
                     connection.connected = false;
                     connection.lastSeen = null;
                     
@@ -593,13 +590,13 @@ class PureDataProxy {
                         connection.websocket.ping();
                         // Ping envoyé (log supprimé pour éviter le spam)
                     } catch (error) {
-                        console.log(`❌ Erreur ping ${pupitreId}:`, error.message);
+                        // console.log(`❌ Erreur ping ${pupitreId}:`, error.message);
                         connection.connected = false;
                         connection.lastSeen = null;
                         this.scheduleReconnect(pupitreId);
                     }
                 } else {
-                    console.log(`⚠️ Connexion ${pupitreId} dans un état inattendu:`, connection.websocket.readyState);
+                    // console.log(`⚠️ Connexion ${pupitreId} dans un état inattendu:`, connection.websocket.readyState);
                 }
             }
         }

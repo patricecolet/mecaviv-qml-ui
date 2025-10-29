@@ -112,8 +112,8 @@ ApplicationWindow {
     property var consoleController: consoleController // Pass reference directly
     onLoaded: {
         item.consoleController = consoleController
-        console.log("🔍 Main: consoleController ID =", consoleController)
-        console.log("🔍 Main: item.consoleController ID =", item.consoleController)
+        // console.log("🔍 Main: consoleController ID =", consoleController)
+        // console.log("🔍 Main: item.consoleController ID =", item.consoleController)
     }
 }
                 

@@ -63,113 +63,83 @@ Item {
     property var sireneManager: sireneManager
     property var sirenRouterManager: sirenRouterManager
     
-    // Propriétés des pupitres (pour compatibilité avec l'UI existante)
-    property string pupitre1Status: "disconnected"
-    property string pupitre2Status: "disconnected"
-    property string pupitre3Status: "disconnected"
-    property string pupitre4Status: "disconnected"
-    property string pupitre5Status: "disconnected"
-    property string pupitre6Status: "disconnected"
-    property string pupitre7Status: "disconnected"
+    // Propriétés calculées réactives pour l'UI (P1-P7)
+    property string pupitre1Status: pupitres.length > 0 ? pupitres[0].status : "disconnected"
+    property string pupitre2Status: pupitres.length > 1 ? pupitres[1].status : "disconnected"
+    property string pupitre3Status: pupitres.length > 2 ? pupitres[2].status : "disconnected"
+    property string pupitre4Status: pupitres.length > 3 ? pupitres[3].status : "disconnected"
+    property string pupitre5Status: pupitres.length > 4 ? pupitres[4].status : "disconnected"
+    property string pupitre6Status: pupitres.length > 5 ? pupitres[5].status : "disconnected"
+    property string pupitre7Status: pupitres.length > 6 ? pupitres[6].status : "disconnected"
     
-    // Objets pupitres pour l'interface (compatibilité) - Réactifs
-    property var pupitre1: QtObject {
-        property string status: consoleController.pupitre1Status
-        property string name: "Pupitre 1"
-        property string host: "192.168.1.41"
-        property string id: "P1"
-        property int ambitusMin: 48
-        property int ambitusMax: 72
-        property int motorSpeed: 0
-        property real frequency: 440.0
-        property int midiNote: 60
-        property bool frettedMode: false
-        property var sirenes: ({})
-    }
-    property var pupitre2: QtObject {
-        property string status: consoleController.pupitre2Status
-        property string name: "Pupitre 2"
-        property string host: "192.168.1.42"
-        property string id: "P2"
-        property int ambitusMin: 48
-        property int ambitusMax: 72
-        property int motorSpeed: 0
-        property real frequency: 440.0
-        property int midiNote: 60
-        property bool frettedMode: false
-        property var sirenes: ({})
-    }
-    property var pupitre3: QtObject {
-        property string status: "disconnected"
-        property string name: "Pupitre 3"
-        property string host: "192.168.1.43"
-        property string id: "P3"
-        property int ambitusMin: 48
-        property int ambitusMax: 72
-        property int motorSpeed: 0
-        property real frequency: 440.0
-        property int midiNote: 60
-        property bool frettedMode: false
-        property var sirenes: ({})
-    }
-    property var pupitre4: QtObject {
-        property string status: consoleController.pupitre4Status
-        property string name: "Pupitre 4"
-        property string host: "192.168.1.44"
-        property string id: "P4"
-        property int ambitusMin: 48
-        property int ambitusMax: 72
-        property int motorSpeed: 0
-        property real frequency: 440.0
-        property int midiNote: 60
-        property bool frettedMode: false
-        property var sirenes: ({})
-    }
-    property var pupitre5: QtObject {
-        property string status: consoleController.pupitre5Status
-        property string name: "Pupitre 5"
-        property string host: "192.168.1.45"
-        property string id: "P5"
-        property int ambitusMin: 48
-        property int ambitusMax: 72
-        property int motorSpeed: 0
-        property real frequency: 440.0
-        property int midiNote: 60
-        property bool frettedMode: false
-        property var sirenes: ({})
-    }
-    property var pupitre6: QtObject {
-        property string status: consoleController.pupitre6Status
-        property string name: "Pupitre 6"
-        property string host: "192.168.1.46"
-        property string id: "P6"
-        property int ambitusMin: 48
-        property int ambitusMax: 72
-        property int motorSpeed: 0
-        property real frequency: 440.0
-        property int midiNote: 60
-        property bool frettedMode: false
-        property var sirenes: ({})
-    }
-    property var pupitre7: QtObject {
-        property string status: consoleController.pupitre7Status
-        property string name: "Pupitre 7"
-        property string host: "192.168.1.47"
-        property string id: "P7"
-        property int ambitusMin: 48
-        property int ambitusMax: 72
-        property int motorSpeed: 0
-        property real frequency: 440.0
-        property int midiNote: 60
-        property bool frettedMode: false
-        property var sirenes: ({})
-    }
-    property var pupitres: []
+    property real pupitre1CurrentNote: pupitres.length > 0 && pupitres[0].currentNote !== undefined ? pupitres[0].currentNote : 60
+    property real pupitre1CurrentHz: pupitres.length > 0 && pupitres[0].currentHz !== undefined ? pupitres[0].currentHz : 440
+    property real pupitre1CurrentRpm: pupitres.length > 0 && pupitres[0].currentRpm !== undefined ? pupitres[0].currentRpm : 0
+    property int pupitre1AmbitusMin: pupitres.length > 0 && pupitres[0].ambitusMin !== undefined ? pupitres[0].ambitusMin : 48
+    property int pupitre1AmbitusMax: pupitres.length > 0 && pupitres[0].ambitusMax !== undefined ? pupitres[0].ambitusMax : 72
+    
+    // Propriétés calculées pour P2-P7
+    property real pupitre2CurrentNote: pupitres.length > 1 && pupitres[1].currentNote !== undefined ? pupitres[1].currentNote : 60
+    property real pupitre2CurrentHz: pupitres.length > 1 && pupitres[1].currentHz !== undefined ? pupitres[1].currentHz : 440
+    property real pupitre2CurrentRpm: pupitres.length > 1 && pupitres[1].currentRpm !== undefined ? pupitres[1].currentRpm : 0
+    property int pupitre2AmbitusMin: pupitres.length > 1 && pupitres[1].ambitusMin !== undefined ? pupitres[1].ambitusMin : 48
+    property int pupitre2AmbitusMax: pupitres.length > 1 && pupitres[1].ambitusMax !== undefined ? pupitres[1].ambitusMax : 72
+    
+    property real pupitre3CurrentNote: pupitres.length > 2 && pupitres[2].currentNote !== undefined ? pupitres[2].currentNote : 60
+    property real pupitre3CurrentHz: pupitres.length > 2 && pupitres[2].currentHz !== undefined ? pupitres[2].currentHz : 440
+    property real pupitre3CurrentRpm: pupitres.length > 2 && pupitres[2].currentRpm !== undefined ? pupitres[2].currentRpm : 0
+    property int pupitre3AmbitusMin: pupitres.length > 2 && pupitres[2].ambitusMin !== undefined ? pupitres[2].ambitusMin : 48
+    property int pupitre3AmbitusMax: pupitres.length > 2 && pupitres[2].ambitusMax !== undefined ? pupitres[2].ambitusMax : 72
+    
+    property real pupitre4CurrentNote: pupitres.length > 3 && pupitres[3].currentNote !== undefined ? pupitres[3].currentNote : 60
+    property real pupitre4CurrentHz: pupitres.length > 3 && pupitres[3].currentHz !== undefined ? pupitres[3].currentHz : 440
+    property real pupitre4CurrentRpm: pupitres.length > 3 && pupitres[3].currentRpm !== undefined ? pupitres[3].currentRpm : 0
+    property int pupitre4AmbitusMin: pupitres.length > 3 && pupitres[3].ambitusMin !== undefined ? pupitres[3].ambitusMin : 48
+    property int pupitre4AmbitusMax: pupitres.length > 3 && pupitres[3].ambitusMax !== undefined ? pupitres[3].ambitusMax : 72
+    
+    property real pupitre5CurrentNote: pupitres.length > 4 && pupitres[4].currentNote !== undefined ? pupitres[4].currentNote : 60
+    property real pupitre5CurrentHz: pupitres.length > 4 && pupitres[4].currentHz !== undefined ? pupitres[4].currentHz : 440
+    property real pupitre5CurrentRpm: pupitres.length > 4 && pupitres[4].currentRpm !== undefined ? pupitres[4].currentRpm : 0
+    property int pupitre5AmbitusMin: pupitres.length > 4 && pupitres[4].ambitusMin !== undefined ? pupitres[4].ambitusMin : 48
+    property int pupitre5AmbitusMax: pupitres.length > 4 && pupitres[4].ambitusMax !== undefined ? pupitres[4].ambitusMax : 72
+    
+    property real pupitre6CurrentNote: pupitres.length > 5 && pupitres[5].currentNote !== undefined ? pupitres[5].currentNote : 60
+    property real pupitre6CurrentHz: pupitres.length > 5 && pupitres[5].currentHz !== undefined ? pupitres[5].currentHz : 440
+    property real pupitre6CurrentRpm: pupitres.length > 5 && pupitres[5].currentRpm !== undefined ? pupitres[5].currentRpm : 0
+    property int pupitre6AmbitusMin: pupitres.length > 5 && pupitres[5].ambitusMin !== undefined ? pupitres[5].ambitusMin : 48
+    property int pupitre6AmbitusMax: pupitres.length > 5 && pupitres[5].ambitusMax !== undefined ? pupitres[5].ambitusMax : 72
+    
+    property real pupitre7CurrentNote: pupitres.length > 6 && pupitres[6].currentNote !== undefined ? pupitres[6].currentNote : 60
+    property real pupitre7CurrentHz: pupitres.length > 6 && pupitres[6].currentHz !== undefined ? pupitres[6].currentHz : 440
+    property real pupitre7CurrentRpm: pupitres.length > 6 && pupitres[6].currentRpm !== undefined ? pupitres[6].currentRpm : 0
+    property int pupitre7AmbitusMin: pupitres.length > 6 && pupitres[6].ambitusMin !== undefined ? pupitres[6].ambitusMin : 48
+    property int pupitre7AmbitusMax: pupitres.length > 6 && pupitres[6].ambitusMax !== undefined ? pupitres[6].ambitusMax : 72
+    
+    // Modèle unique des pupitres (remplace les propriétés individuelles)
+    property var pupitres: [
+        { id: "P1", status: "disconnected", ambitusMin: 43, ambitusMax: 86, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
+        { id: "P2", status: "disconnected", ambitusMin: 43, ambitusMax: 86, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
+        { id: "P3", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
+        { id: "P4", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
+        { id: "P5", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
+        { id: "P6", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
+        { id: "P7", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 }
+    ]
 
-    // Ambitus issus de config.json (lecture directe, fallback 48-72)
-    // P1 correspond à sirens[0]
-    property int p1AmbitusMin: (configManager && configManager.config && configManager.config.sirens && configManager.config.sirens.length > 0 && configManager.config.sirens[0].ambitus) ? configManager.config.sirens[0].ambitus.min : 48
-    property int p1AmbitusMax: (configManager && configManager.config && configManager.config.sirens && configManager.config.sirens.length > 0 && configManager.config.sirens[0].ambitus) ? configManager.config.sirens[0].ambitus.max : 72
+    // Fonctions utilitaires pour accéder aux pupitres
+    function getPupitreById(pupitreId) {
+        if (!pupitres || pupitres.length === 0) return null
+        for (var i = 0; i < pupitres.length; i++) {
+            if (pupitres[i].id === pupitreId) return pupitres[i]
+        }
+        return null
+    }
+    
+    function getPupitreStatus(pupitreId) {
+        var p = getPupitreById(pupitreId)
+        return p ? p.status : "disconnected"
+    }
+
     
     // Propriétés des presets
     property var presets: []
@@ -225,9 +195,9 @@ Item {
         } else {
             // Attendre que la configuration soit chargée
             if (configManager) {
-                configManager.configLoaded.connect(function(config) {
-                    initializePupitres()
-                })
+            configManager.configLoaded.connect(function(config) {
+                initializePupitres()
+            })
             }
         }
         
@@ -236,8 +206,7 @@ Item {
             presetManager.loadPresetsFromStorage()
         }
         
-        // Construire le modèle pupitres depuis la config
-        buildPupitresFromConfig()
+        // Le modèle pupitres est maintenant initialisé par défaut dans la propriété
     }
     
     function connectSignals() {
@@ -278,7 +247,6 @@ Item {
             })
             
             pupitreManager.pupitreStatusChanged.connect(function(pupitreId, status) {
-                console.log("🔍 pupitreStatusChanged:", pupitreId, "=", status)
                 pupitreStatusChanged(pupitreId, status)
                 updatePupitreStatus(pupitreId, status)
             })
@@ -304,15 +272,6 @@ Item {
         if (pupitreManager.initializePupitres()) {
             // Mettre à jour les propriétés pour compatibilité
             pupitres = pupitreManager.pupitres
-            
-            // Mapper les pupitres individuels
-            pupitre1 = pupitres.length > 0 ? pupitres[0] : null
-            pupitre2 = pupitres.length > 1 ? pupitres[1] : null
-            pupitre3 = pupitres.length > 2 ? pupitres[2] : null
-            pupitre4 = pupitres.length > 3 ? pupitres[3] : null
-            pupitre5 = pupitres.length > 4 ? pupitres[4] : null
-            pupitre6 = pupitres.length > 5 ? pupitres[5] : null
-            pupitre7 = pupitres.length > 6 ? pupitres[6] : null
             
             // Auto-connexion si activée
             if (configManager.config && configManager.config.console && configManager.config.console.autoConnect) {
@@ -432,12 +391,6 @@ Item {
         return false
     }
     
-    function getPupitreById(pupitreId) {
-        if (pupitreManager) {
-            return pupitreManager.getPupitreById(pupitreId)
-        }
-        return null
-    }
     
     // === MÉTHODES DE COMPATIBILITÉ POUR L'UI ===
     
@@ -543,17 +496,28 @@ Item {
     // Nouvelle API: mise à jour d'un pupitre par id avec note continue
     function updatePupitreVolantData(pupitreId, noteFloat, frequency, rpm, velocity) {
         if (!pupitres || pupitres.length === 0) return
+        
+        // Créer un nouveau tableau pour forcer QML à détecter le changement
+        var updated = []
         for (var i = 0; i < pupitres.length; i++) {
-            if (pupitres[i].id === pupitreId) {
-                var p = pupitres[i]
-                p.currentNote = noteFloat
-                p.currentHz = frequency
-                p.currentRpm = rpm
-                p.velocity = velocity
-                pupitres[i] = p // forcer la notification
-                break
+            var p = pupitres[i]
+            if (p.id === pupitreId) {
+                updated.push({
+                    id: p.id,
+                    status: p.status,
+                    ambitusMin: p.ambitusMin,
+                    ambitusMax: p.ambitusMax,
+                    currentNote: noteFloat,
+                    currentHz: frequency,
+                    currentRpm: rpm,
+                    velocity: velocity
+                })
+            } else {
+                updated.push(p)
             }
         }
+        pupitres = updated
+        
         // Maintenir les anciennes props pour compat (pilotent P1)
         if (pupitreId === "P1") {
             volantNoteFloat = noteFloat
@@ -565,31 +529,33 @@ Item {
     }
     
     function updatePupitreStatus(pupitreId, status) {
-        // Mise à jour statut pupitre
-        
-        // Mettre à jour les propriétés de statut
-        if (pupitreId === "P1") {
-            pupitre1Status = status
-            // P1 mis à jour
-        } else if (pupitreId === "P2") {
-            pupitre2Status = status
-            // P2 mis à jour
-        } else if (pupitreId === "P3") {
-            pupitre3Status = status
-            // P3 mis à jour
-        } else if (pupitreId === "P4") {
-            pupitre4Status = status
-            // P4 mis à jour
-        } else if (pupitreId === "P5") {
-            pupitre5Status = status
-            // P5 mis à jour
-        } else if (pupitreId === "P6") {
-            pupitre6Status = status
-            // P6 mis à jour
-        } else if (pupitreId === "P7") {
-            pupitre7Status = status
-            // P7 mis à jour
+        // Mettre à jour le statut dans le modèle pupitres[]
+        if (!pupitres || pupitres.length === 0) {
+            return
         }
+        
+        // Créer un nouveau tableau pour forcer QML à détecter le changement
+        var updated = []
+        for (var i = 0; i < pupitres.length; i++) {
+            var p = pupitres[i]
+            if (p.id === pupitreId) {
+                updated.push({
+                    id: p.id,
+                    status: status,
+                    ambitusMin: p.ambitusMin,
+                    ambitusMax: p.ambitusMax,
+                    currentNote: p.currentNote,
+                    currentHz: p.currentHz,
+                    currentRpm: p.currentRpm,
+                    velocity: p.velocity
+                })
+            } else {
+                updated.push(p)
+            }
+        }
+        pupitres = updated
+        
+        // Émettre le signal pour compatibilité
         pupitreStatusChanged(pupitreId, status)
     }
     

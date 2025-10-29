@@ -63,15 +63,15 @@ Item {
                     if (status === WebSocket.Open) {
                         webSocketManager.connected = true
                         webSocketManager.connectionOpened(url)
-                        console.log("🔌 WebSocket connecté au serveur Node.js")
+                        // console.log("🔌 WebSocket connecté au serveur Node.js")
                     } else if (status === WebSocket.Closed) {
                         webSocketManager.connected = false
                         webSocketManager.connectionClosed(url)
-                        console.log("❌ WebSocket déconnecté du serveur Node.js")
+                        // console.log("❌ WebSocket déconnecté du serveur Node.js")
                     } else if (status === WebSocket.Error) {
                         webSocketManager.connected = false
                         webSocketManager.errorOccurred(url, "Erreur connexion WebSocket")
-                        console.log("❌ Erreur WebSocket:", errorString)
+                        // console.log("❌ Erreur WebSocket:", errorString)
                     }
                 }
                 
@@ -84,11 +84,11 @@ Item {
     
     // Gérer les messages WebSocket reçus
     function handleWebSocketMessage(message) {
-        console.log("📥 Message WebSocket reçu:", message.substring(0, 100))
+        // console.log("📥 Message WebSocket reçu:", message.substring(0, 100))
         
         try {
             var data = JSON.parse(message)
-            console.log("📥 Type de message:", data.type)
+            // console.log("📥 Type de message:", data.type)
             
             // Traiter les messages du serveur
             switch (data.type) {
@@ -96,7 +96,7 @@ Item {
                     // Pong reçu (log supprimé pour éviter le spam)
                     break
                 case "INITIAL_STATUS":
-                    console.log("📊 Statut initial reçu:", data.data)
+                    // console.log("📊 Statut initial reçu:", data.data)
                     // Mettre à jour les statuts initiaux des pupitres
                     if (data.data && data.data.connections && consoleController) {
                         for (var i = 0; i < data.data.connections.length; i++) {
@@ -107,24 +107,24 @@ Item {
                     }
                     break
                 case "PUPITRE_STATUS_UPDATE":
-                    console.log("🎛️ Mise à jour pupitres:", data.data)
-                    console.log("📊 Connected count:", data.data.connectedCount)
-                    console.log("📊 Total connections:", data.data.totalConnections)
+                    // console.log("🎛️ Mise à jour pupitres:", data.data)
+                    // console.log("📊 Connected count:", data.data.connectedCount)
+                    // console.log("📊 Total connections:", data.data.totalConnections)
                     // Mettre à jour les statuts des pupitres dans l'interface
                     if (data.data && data.data.connections && consoleController) {
-                        console.log("🎛️ consoleController trouvé, mise à jour des statuts")
+                        // console.log("🎛️ consoleController trouvé, mise à jour des statuts")
                         for (var i = 0; i < data.data.connections.length; i++) {
                             var pupitreStatus = data.data.connections[i]
-                            console.log("🎛️ Pupitre", pupitreStatus.pupitreId, "connected:", pupitreStatus.connected)
+                            // console.log("🎛️ Pupitre", pupitreStatus.pupitreId, "connected:", pupitreStatus.connected)
                             var statusText = pupitreStatus.connected ? "connected" : "disconnected"
-                            console.log("🎛️ Appel updatePupitreStatus pour", pupitreStatus.pupitreId, "avec status:", statusText)
+                            // console.log("🎛️ Appel updatePupitreStatus pour", pupitreStatus.pupitreId, "avec status:", statusText)
                             consoleController.updatePupitreStatus(pupitreStatus.pupitreId, statusText)
                         }
                     } else {
-                        console.log("❌ consoleController non trouvé ou données manquantes")
-                        console.log("❌ consoleController:", consoleController)
-                        console.log("❌ data.data:", data.data)
-                        console.log("❌ data.data.connections:", data.data ? data.data.connections : "undefined")
+                        // console.log("❌ consoleController non trouvé ou données manquantes")
+                        // console.log("❌ consoleController:", consoleController)
+                        // console.log("❌ data.data:", data.data)
+                        // console.log("❌ data.data.connections:", data.data ? data.data.connections : "undefined")
                     }
                     break
                 case "VOLANT_DATA":
@@ -149,10 +149,10 @@ Item {
                     }
                     break
                 default:
-                    console.log("📨 Autre message reçu:", data.type)
+                    // console.log("📨 Autre message reçu:", data.type)
             }
         } catch (e) {
-            console.log("📦 Message non-JSON reçu:", message.substring(0, 50))
+            // console.log("📦 Message non-JSON reçu:", message.substring(0, 50))
         }
         
         messageReceived(serverUrl, message)
@@ -209,7 +209,7 @@ Item {
     
     // Se connecter au serveur Node.js
     function connect() {
-        console.log("🔌 Connexion au serveur Node.js:", serverUrl)
+        // console.log("🔌 Connexion au serveur Node.js:", serverUrl)
         createWebSocket()
         return true
     }
@@ -222,13 +222,13 @@ Item {
             webSocket = null
         }
         connected = false
-        console.log("❌ Déconnecté du serveur Node.js")
+        // console.log("❌ Déconnecté du serveur Node.js")
     }
     
     // Envoyer un message au serveur Node.js
     function sendMessage(message) {
         if (!connected || !webSocket) {
-            console.error("❌ WebSocket non connecté")
+            // console.error("❌ WebSocket non connecté")
             return false
         }
         
@@ -381,7 +381,7 @@ Item {
         repeat: false
         onTriggered: {
             if (webSocketManager.connected) {
-                console.log("🔑 Envoi identification SirenConsole QML")
+                // console.log("🔑 Envoi identification SirenConsole QML")
                 webSocketManager.sendMessage({
                     type: "SIRENCONSOLE_IDENTIFICATION",
                     source: "SIRENCONSOLE_QML",
@@ -393,7 +393,7 @@ Item {
 
     // === INITIALISATION ===
     Component.onCompleted: {
-        console.log("🔌 WebSocketManager initialisé")
+        // console.log("🔌 WebSocketManager initialisé")
         // Se connecter automatiquement au démarrage
         connect()
         
@@ -402,7 +402,7 @@ Item {
     }
     
     Component.onDestruction: {
-        console.log("🔌 WebSocketManager détruit")
+        // console.log("🔌 WebSocketManager détruit")
         disconnect()
     }
 }

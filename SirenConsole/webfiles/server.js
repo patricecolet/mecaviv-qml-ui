@@ -114,7 +114,7 @@ function handleWebSocketConnection(ws, request) {
                         timestamp: Date.now() 
                     }))
                 } else if (data.type === 'SIRENCONSOLE_IDENTIFICATION') {
-                    console.log('🔑 Client SirenConsole QML identifié');
+                    // console.log('🔑 Client SirenConsole QML identifié');
                     // Ajouter le client à la liste des clients connectés
                     connectedClients.add(ws);
                     
@@ -223,7 +223,7 @@ function handleWebSocketConnection(ws, request) {
                                 }));
                                 break;
                             case 'SIRENCONSOLE_IDENTIFICATION':
-                                console.log('🔑 Client SirenConsole QML identifié');
+                                // console.log('🔑 Client SirenConsole QML identifié');
                                 // Ajouter le client à la liste des clients connectés
                                 connectedClients.add(ws);
                                 
@@ -237,7 +237,7 @@ function handleWebSocketConnection(ws, request) {
                                 }
                                 break;
                             default:
-                                console.log('⚠️ Type message SirenConsole inconnu:', data.type);
+                                // console.log('⚠️ Type message SirenConsole inconnu:', data.type);
                         }
                     } catch (error) {
                         console.error('❌ Erreur parsing message SirenConsole:', error);
@@ -252,7 +252,7 @@ function handleWebSocketConnection(ws, request) {
     });
     
     ws.on('close', (code, reason) => {
-        console.log('❌ WebSocket déconnecté:', code, reason.toString());
+        // console.log('❌ WebSocket déconnecté:', code, reason.toString());
         connectedClients.delete(ws);
     });
     
@@ -325,7 +325,7 @@ const server = http.createServer(function (request, response) {
                 let message = '';
                 
                 if (command.type === 'MIDI_FILE_LOAD' && command.path) {
-                    console.log('📁 MIDI_FILE_LOAD:', command.path);
+                    // console.log('📁 MIDI_FILE_LOAD:', command.path);
                     
                     // Construire le chemin complet
                     const fullPath = path.resolve(MIDI_REPO_PATH, command.path);
@@ -342,7 +342,7 @@ const server = http.createServer(function (request, response) {
                         
                         // Envoyer le message MIDI_FILE_LOAD à PureData
                         pureDataProxy.sendCommand(command);
-                        console.log('📤 MIDI_FILE_LOAD envoyé à PureData:', command.path);
+                        // console.log('📤 MIDI_FILE_LOAD envoyé à PureData:', command.path);
                         
                         // Envoyer les infos binaires
                         const fileInfoBuffer = createFileInfoBuffer(midiInfo.duration, midiInfo.totalBeats);
@@ -354,14 +354,14 @@ const server = http.createServer(function (request, response) {
                         const timeSigBuffer = createTimeSigBuffer(midiInfo.timeSignature.numerator, midiInfo.timeSignature.denominator);
                         pureDataProxy.broadcastBinaryToClients(timeSigBuffer);
                         
-                        console.log('✅ Fichier MIDI chargé et métadonnées envoyées');
+                        // console.log('✅ Fichier MIDI chargé et métadonnées envoyées');
                         message = 'Fichier chargé';
                     } else {
                         message = 'Erreur chargement fichier';
                     }
                     
                 } else if (command.type === 'MIDI_TRANSPORT') {
-                    console.log('🎵 MIDI_TRANSPORT:', command.action);
+                    // console.log('🎵 MIDI_TRANSPORT:', command.action);
                     
                     switch (command.action) {
                         case 'play':
@@ -386,28 +386,28 @@ const server = http.createServer(function (request, response) {
                         const state = midiSequencer.getState();
                         command.position = Math.floor(state.beat * midiSequencer.ppq);
                         pureDataProxy.sendCommand(command);
-                        console.log('📤 Transport envoyé à PureData:', command.action, '- Position:', command.position, 'ticks');
+                        // console.log('📤 Transport envoyé à PureData:', command.action, '- Position:', command.position, 'ticks');
                     }
                     
                 } else if (command.type === 'MIDI_SEEK' && command.position !== undefined) {
-                    console.log('⏩ MIDI_SEEK:', command.position, 'ms');
+                    // console.log('⏩ MIDI_SEEK:', command.position, 'ms');
                     success = midiSequencer.seek(command.position);
                     
                     // Envoyer aussi à PureData
                     if (success) {
                         pureDataProxy.sendCommand(command);
-                        console.log('📤 Seek envoyé à PureData:', command.position, 'ms');
+                        // console.log('📤 Seek envoyé à PureData:', command.position, 'ms');
                     }
                     
                     message = 'Position mise à jour';
                     
                 } else if (command.type === 'TEMPO_CHANGE' && command.tempo) {
-                    console.log('🎼 TEMPO_CHANGE:', command.tempo, 'BPM');
+                    // console.log('🎼 TEMPO_CHANGE:', command.tempo, 'BPM');
                     success = midiSequencer.setTempo(command.tempo);
                     
                     // Envoyer aussi à PureData pour qu'il soit au courant
                     pureDataProxy.sendCommand(command);
-                    console.log('📤 Tempo envoyé à PureData:', command.tempo, 'BPM');
+                    // console.log('📤 Tempo envoyé à PureData:', command.tempo, 'BPM');
                     
                     message = 'Tempo changé';
                     
@@ -524,7 +524,7 @@ const server = http.createServer(function (request, response) {
                 response.end('Server Error: ' + error.code);
             }
         } else {
-            console.log('✅ Fichier servi:', filePath);
+            // console.log('✅ Fichier servi:', filePath);
             response.writeHead(200, { 'Content-Type': contentType });
             response.end(content, 'utf-8');
         }
@@ -554,7 +554,7 @@ presetAPI.initializePresetAPI().then(() => {
         // Écouter les changements de statut des pupitres
            setInterval(() => {
                const status = pureDataProxy.getStatus();
-               console.log("📊 Envoi statut aux clients:", connectedClients.size, "clients connectés");
+               // console.log("📊 Envoi statut aux clients:", connectedClients.size, "clients connectés");
                broadcastToClients({
                    type: 'PUPITRE_STATUS_UPDATE',
                    data: status,
@@ -617,11 +617,11 @@ presetAPI.initializePresetAPI().then(() => {
     }
     
     server.listen(PORT, HOST, () => {
-        console.log(`🚀 Serveur SirenConsole démarré sur http://${HOST}:${PORT}`);
-        console.log(`🌐 Application principale sur http://localhost:${PORT}/appSirenConsole.html`);
-        console.log(`🔌 WebSocket serveur sur ws://localhost:${PORT}/ws`);
-        console.log(`📝 Logs désactivés pour éviter le spam`);
-        console.log(`🎯 Lancez maintenant SirenConsole Qt6 pour tester WebSocket`);
+        // console.log(`🚀 Serveur SirenConsole démarré sur http://${HOST}:${PORT}`);
+        // console.log(`🌐 Application principale sur http://localhost:${PORT}/appSirenConsole.html`);
+        // console.log(`🔌 WebSocket serveur sur ws://localhost:${PORT}/ws`);
+        // console.log(`📝 Logs désactivés pour éviter le spam`);
+        // console.log(`🎯 Lancez maintenant SirenConsole Qt6 pour tester WebSocket`);
         // Tous les autres logs désactivés
     });
 }).catch((error) => {
