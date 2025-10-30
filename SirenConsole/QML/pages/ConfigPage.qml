@@ -47,6 +47,10 @@ Rectangle {
     onCurrentPupitreIndexChanged: {
         loadCurrentPresetAndBind()
     }
+    // Recharger aussi le snapshot quand on change d'onglet
+    onCurrentTabIndexChanged: {
+        loadCurrentPresetAndBind()
+    }
     
     function updateTabData() {
         // Mettre à jour les données du pupitre pour le tab actuel
@@ -180,6 +184,9 @@ Rectangle {
                         
                         if (item.hasOwnProperty('consoleController')) {
                             item.consoleController = configPage.consoleController
+                        }
+                        if (item.hasOwnProperty('currentPresetSnapshot')) {
+                            item.currentPresetSnapshot = _currentPreset
                         }
                         if (item.hasOwnProperty('sireneManager') && configPage.consoleController && configPage.consoleController.sireneManager) {
                             item.sireneManager = configPage.consoleController.sireneManager

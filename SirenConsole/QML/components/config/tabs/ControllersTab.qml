@@ -6,6 +6,34 @@ Item {
     id: controllersTab
     
     property var pupitre: null
+    // Snapshot et rafraîchissement local (comme Outputs/Sirens)
+    property var currentPresetSnapshot: null
+    property int updateTrigger: 0
+    function forceRefresh() { updateTrigger++ }
+    function patchAndApply(url, body, applyFn) {
+        var xhr = new XMLHttpRequest()
+        xhr.open("PATCH", url)
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                if (applyFn) applyFn()
+                forceRefresh()
+            }
+        }
+        xhr.send(JSON.stringify(body))
+    }
+    function updateSnapshotControllerMapping(pupitreId, ctrlKey, changes) {
+        if (!controllersTab.currentPresetSnapshot || !controllersTab.currentPresetSnapshot.config) return
+        var list = controllersTab.currentPresetSnapshot.config.pupitres || []
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === pupitreId) {
+                if (!list[i].controllerMapping) list[i].controllerMapping = {}
+                if (!list[i].controllerMapping[ctrlKey]) list[i].controllerMapping[ctrlKey] = {}
+                for (var k in changes) list[i].controllerMapping[ctrlKey][k] = changes[k]
+                break
+            }
+        }
+    }
     
     function patchControllerMapping(ctrlKey, cc, curve) {
         if (!pupitre || !pupitre.id) return
@@ -81,7 +109,17 @@ Item {
                             Layout.preferredHeight: 35
                             from: 0
                             to: 127
-                            value: pupitre && pupitre.controllerMapping && pupitre.controllerMapping[modelData.key] ? pupitre.controllerMapping[modelData.key].cc : 1
+                            value: {
+                                var _ = controllersTab.updateTrigger
+                                if (!controllersTab.currentPresetSnapshot || !controllersTab.currentPresetSnapshot.config || !pupitre) return 1
+                                var list = controllersTab.currentPresetSnapshot.config.pupitres || []
+                                for (var i = 0; i < list.length; i++) if (list[i].id === pupitre.id) {
+                                    var m = list[i].controllerMapping || {}
+                                    var entry = m[modelData.key]
+                                    return (entry && entry.cc !== undefined) ? entry.cc : 1
+                                }
+                                return 1
+                            }
                             
                             editable: true
                             
@@ -102,11 +140,23 @@ Item {
                             }
                             
                             onValueChanged: {
-                                if (pupitre && pupitre.controllerMapping) {
-                                    if (!pupitre.controllerMapping[modelData.key]) pupitre.controllerMapping[modelData.key] = {}
-                                    pupitre.controllerMapping[modelData.key].cc = value
-                                    patchControllerMapping(modelData.key, value, undefined)
+                                if (!pupitre || !controllersTab.currentPresetSnapshot || !controllersTab.currentPresetSnapshot.config) return
+                                var pid = pupitre.id
+                                var ctrl = modelData.key
+                                // Ne pas PATCH si identique au snapshot
+                                var list = controllersTab.currentPresetSnapshot.config.pupitres || []
+                                for (var i = 0; i < list.length; i++) if (list[i].id === pid) {
+                                    var m = list[i].controllerMapping || {}
+                                    var entry = m[ctrl]
+                                    var prev = (entry && entry.cc !== undefined) ? entry.cc : 1
+                                    if (prev === value) return
+                                    break
                                 }
+                                patchAndApply(
+                                    "http://localhost:8001/api/presets/current/controller-mapping",
+                                    { pupitreId: pid, controller: ctrl, cc: value },
+                                    function() { updateSnapshotControllerMapping(pid, ctrl, { cc: value }) }
+                                )
                             }
                         }
                         Text {
@@ -119,8 +169,14 @@ Item {
                             Layout.preferredHeight: 35
                             model: ["linear", "parabolic", "hyperbolic", "s curve"]
                             currentIndex: {
-                                if (pupitre && pupitre.controllerMapping && pupitre.controllerMapping[modelData.key]) {
-                                    return model.indexOf(pupitre.controllerMapping[modelData.key].curve)
+                                var _ = controllersTab.updateTrigger
+                                if (!controllersTab.currentPresetSnapshot || !controllersTab.currentPresetSnapshot.config || !pupitre) return 0
+                                var list = controllersTab.currentPresetSnapshot.config.pupitres || []
+                                for (var i = 0; i < list.length; i++) if (list[i].id === pupitre.id) {
+                                    var m = list[i].controllerMapping || {}
+                                    var entry = m[modelData.key]
+                                    var curve = entry && entry.curve ? entry.curve : "linear"
+                                    return model.indexOf(curve)
                                 }
                                 return 0
                             }
@@ -150,11 +206,24 @@ Item {
                             }
                             
                             onCurrentTextChanged: {
-                                if (pupitre && pupitre.controllerMapping) {
-                                    if (!pupitre.controllerMapping[modelData.key]) pupitre.controllerMapping[modelData.key] = {}
-                                    pupitre.controllerMapping[modelData.key].curve = currentText
-                                    patchControllerMapping(modelData.key, undefined, currentText)
+                                if (!pupitre || !controllersTab.currentPresetSnapshot || !controllersTab.currentPresetSnapshot.config) return
+                                var pid = pupitre.id
+                                var ctrl = modelData.key
+                                var curve = currentText
+                                // Ne pas PATCH si identique au snapshot
+                                var list = controllersTab.currentPresetSnapshot.config.pupitres || []
+                                for (var i = 0; i < list.length; i++) if (list[i].id === pid) {
+                                    var m = list[i].controllerMapping || {}
+                                    var entry = m[ctrl]
+                                    var prev = entry && entry.curve ? entry.curve : "linear"
+                                    if (prev === curve) return
+                                    break
                                 }
+                                patchAndApply(
+                                    "http://localhost:8001/api/presets/current/controller-mapping",
+                                    { pupitreId: pid, controller: ctrl, curve: curve },
+                                    function() { updateSnapshotControllerMapping(pid, ctrl, { curve: curve }) }
+                                )
                             }
                         }
                     }

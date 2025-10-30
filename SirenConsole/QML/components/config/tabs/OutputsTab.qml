@@ -6,13 +6,37 @@ Item {
     id: outputsTab
     
     property var pupitre: null
+    // Snapshot du preset courant, injecté par ConfigPage si présent
+    property var currentPresetSnapshot: null
+    // Pour forcer la mise à jour visuelle
+    property int updateTrigger: 0
     
-    function patchOutputs(changes) {
-        if (!pupitre || !pupitre.id) return
+    function forceRefresh() { updateTrigger++ }
+    
+    function patchAndApply(url, body, applyFn) {
         var xhr = new XMLHttpRequest()
-        xhr.open("PATCH", "http://localhost:8001/api/presets/current/outputs")
+        xhr.open("PATCH", url)
         xhr.setRequestHeader("Content-Type", "application/json")
-        xhr.send(JSON.stringify({ pupitreId: pupitre.id, changes: changes }))
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                if (applyFn) applyFn()
+                forceRefresh()
+            }
+        }
+        xhr.send(JSON.stringify(body))
+    }
+    
+    function updateSnapshotOutputs(pupitreId, changes) {
+        if (!outputsTab.currentPresetSnapshot || !outputsTab.currentPresetSnapshot.config) return
+        var list = outputsTab.currentPresetSnapshot.config.pupitres || []
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === pupitreId) {
+                if (changes.hasOwnProperty('vstEnabled')) list[i].vstEnabled = !!changes.vstEnabled
+                if (changes.hasOwnProperty('udpEnabled')) list[i].udpEnabled = !!changes.udpEnabled
+                if (changes.hasOwnProperty('rtpMidiEnabled')) list[i].rtpMidiEnabled = !!changes.rtpMidiEnabled
+                break
+            }
+        }
     }
     
     ColumnLayout {
@@ -22,18 +46,54 @@ Item {
         
         CheckBox {
             text: "VST Enabled"
-            checked: pupitre ? pupitre.vstEnabled : false
-            onCheckedChanged: if (pupitre) { pupitre.vstEnabled = checked; patchOutputs({ vstEnabled: checked }) }
+            checked: {
+                var _ = outputsTab.updateTrigger
+                if (!outputsTab.currentPresetSnapshot || !outputsTab.currentPresetSnapshot.config || !pupitre) return false
+                var list = outputsTab.currentPresetSnapshot.config.pupitres || []
+                for (var i = 0; i < list.length; i++) if (list[i].id === pupitre.id) return !!list[i].vstEnabled
+                return false
+            }
+            onCheckedChanged: if (pupitre) {
+                patchAndApply(
+                    "http://localhost:8001/api/presets/current/outputs",
+                    { pupitreId: pupitre.id, changes: { vstEnabled: !!checked } },
+                    function() { updateSnapshotOutputs(pupitre.id, { vstEnabled: !!checked }) }
+                )
+            }
         }
         CheckBox {
             text: "UDP Enabled"
-            checked: pupitre ? pupitre.udpEnabled : false
-            onCheckedChanged: if (pupitre) { pupitre.udpEnabled = checked; patchOutputs({ udpEnabled: checked }) }
+            checked: {
+                var _ = outputsTab.updateTrigger
+                if (!outputsTab.currentPresetSnapshot || !outputsTab.currentPresetSnapshot.config || !pupitre) return false
+                var list = outputsTab.currentPresetSnapshot.config.pupitres || []
+                for (var i = 0; i < list.length; i++) if (list[i].id === pupitre.id) return !!list[i].udpEnabled
+                return false
+            }
+            onCheckedChanged: if (pupitre) {
+                patchAndApply(
+                    "http://localhost:8001/api/presets/current/outputs",
+                    { pupitreId: pupitre.id, changes: { udpEnabled: !!checked } },
+                    function() { updateSnapshotOutputs(pupitre.id, { udpEnabled: !!checked }) }
+                )
+            }
         }
         CheckBox {
             text: "RTP MIDI Enabled"
-            checked: pupitre ? pupitre.rtpMidiEnabled : false
-            onCheckedChanged: if (pupitre) { pupitre.rtpMidiEnabled = checked; patchOutputs({ rtpMidiEnabled: checked }) }
+            checked: {
+                var _ = outputsTab.updateTrigger
+                if (!outputsTab.currentPresetSnapshot || !outputsTab.currentPresetSnapshot.config || !pupitre) return false
+                var list = outputsTab.currentPresetSnapshot.config.pupitres || []
+                for (var i = 0; i < list.length; i++) if (list[i].id === pupitre.id) return !!list[i].rtpMidiEnabled
+                return false
+            }
+            onCheckedChanged: if (pupitre) {
+                patchAndApply(
+                    "http://localhost:8001/api/presets/current/outputs",
+                    { pupitreId: pupitre.id, changes: { rtpMidiEnabled: !!checked } },
+                    function() { updateSnapshotOutputs(pupitre.id, { rtpMidiEnabled: !!checked }) }
+                )
+            }
         }
         
         Item { Layout.fillHeight: true }

@@ -20,11 +20,11 @@
             "rtpMidiEnabled": true,
             "controllerMapping": {
               "joystickX": {
-                "cc": 1,
+                "cc": 11,
                 "curve": "linear"
               },
               "joystickY": {
-                "cc": 2,
+                "cc": 1,
                 "curve": "parabolic"
               },
               "fader": {
@@ -32,12 +32,15 @@
                 "curve": "hyperbolic"
               },
               "selector": {
-                "cc": 4,
+                "cc": 6,
                 "curve": "s curve"
               },
               "pedalId": {
-                "cc": 5,
+                "cc": 95,
                 "curve": "linear"
+              },
+              "joystickZ": {
+                "cc": 3
               }
             },
             "sirenes": {
@@ -57,12 +60,12 @@
             "assignedSirenes": [
               2
             ],
-            "vstEnabled": false,
+            "vstEnabled": true,
             "udpEnabled": true,
-            "rtpMidiEnabled": false,
+            "rtpMidiEnabled": true,
             "controllerMapping": {
               "joystickX": {
-                "cc": 1,
+                "cc": 2,
                 "curve": "linear"
               },
               "joystickY": {
@@ -80,6 +83,9 @@
               "pedalId": {
                 "cc": 5,
                 "curve": "linear"
+              },
+              "joystickZ": {
+                "cc": 1
               }
             },
             "sirenes": {
@@ -103,9 +109,9 @@
             "assignedSirenes": [
               3
             ],
-            "vstEnabled": false,
+            "vstEnabled": true,
             "udpEnabled": true,
-            "rtpMidiEnabled": false,
+            "rtpMidiEnabled": true,
             "controllerMapping": {
               "joystickX": {
                 "cc": 1,
@@ -145,9 +151,9 @@
             "assignedSirenes": [
               4
             ],
-            "vstEnabled": false,
+            "vstEnabled": true,
             "udpEnabled": true,
-            "rtpMidiEnabled": false,
+            "rtpMidiEnabled": true,
             "controllerMapping": {
               "joystickX": {
                 "cc": 1,
@@ -187,9 +193,9 @@
             "assignedSirenes": [
               5
             ],
-            "vstEnabled": false,
+            "vstEnabled": true,
             "udpEnabled": true,
-            "rtpMidiEnabled": false,
+            "rtpMidiEnabled": true,
             "controllerMapping": {
               "joystickX": {
                 "cc": 1,
@@ -229,9 +235,9 @@
             "assignedSirenes": [
               6
             ],
-            "vstEnabled": false,
+            "vstEnabled": true,
             "udpEnabled": true,
-            "rtpMidiEnabled": false,
+            "rtpMidiEnabled": true,
             "controllerMapping": {
               "joystickX": {
                 "cc": 1,
@@ -271,9 +277,9 @@
             "assignedSirenes": [
               7
             ],
-            "vstEnabled": false,
+            "vstEnabled": true,
             "udpEnabled": true,
-            "rtpMidiEnabled": false,
+            "rtpMidiEnabled": true,
             "controllerMapping": {
               "joystickX": {
                 "cc": 1,
