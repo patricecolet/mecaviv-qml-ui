@@ -1,5 +1,6 @@
 const fs = require('fs');
 const midiFile = require('midi-file');
+const { performance } = require('perf_hooks');
 
 /**
  * Séquenceur MIDI pour Node.js
@@ -34,12 +35,15 @@ class MidiSequencer {
         this.timerInterval = 50;         // Broadcast toutes les 50ms
         this.lastTickTime = 0;           // Pour calcul delta temps
         this.startTime = 0;              // Timestamp démarrage
+        // Plus d'horloge MIDI ni d'envoi binaire côté pupitres
         
         // Map des changements de signature (pour calcul bar/beat)
         this.signatureChanges = [];      // [{tick, numerator, denominator, barAtThisTick}]
         
         console.log('🎵 MidiSequencer initialisé');
     }
+
+    // Plus d'horloge MIDI ni seek/tick binaire
     
     /**
      * Charger un fichier MIDI
@@ -229,9 +233,14 @@ class MidiSequencer {
         console.log('   Elapsed:', elapsedMs.toFixed(0), 'ms - StartTime:', this.startTime);
         
         // Démarrer le timer
+        this.lastTickTime = performance.now();
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
         this.timer = setInterval(() => this.tick(), this.timerInterval);
         
-        // Broadcast immédiat
+        // Broadcast immédiat (UI) uniquement
         this.broadcastPosition();
         
         return true;
@@ -251,6 +260,7 @@ class MidiSequencer {
             this.timer = null;
         }
         
+        // Broadcaster position (UI) uniquement
         this.broadcastPosition();
         return true;
     }
@@ -272,6 +282,7 @@ class MidiSequencer {
             this.timer = null;
         }
         
+        // Broadcaster position (UI) uniquement
         this.broadcastPosition();
         return true;
     }
@@ -303,9 +314,11 @@ class MidiSequencer {
         }
         
         if (this.playing) {
-            this.startTime = Date.now() - (positionMs);
+            // Recalibrer l'horloge incrémentale
+            this.lastTickTime = performance.now();
         }
         
+        // Broadcaster position (UI) uniquement
         this.broadcastPosition();
         return true;
     }
@@ -314,14 +327,11 @@ class MidiSequencer {
      * Changer le tempo
      */
     setTempo(bpm) {
-        this.tempo = Math.floor(60000000 / bpm);
+        const safeBpm = Math.max(1, Math.floor(bpm));
+        this.tempo = Math.floor(60000000 / safeBpm);
         console.log('🎼 Tempo changé:', bpm, 'BPM');
         
-        // Broadcaster le nouveau tempo (0x03)
-        const buffer = Buffer.allocUnsafe(3);
-        buffer.writeUInt8(0x03, 0);
-        buffer.writeUInt16LE(bpm, 1);
-        this.pureDataProxy.broadcastBinaryToClients(buffer);
+        // Pas d'envoi binaire; le tempo est relayé en JSON par server.js
         
         return true;
     }
@@ -332,36 +342,43 @@ class MidiSequencer {
     tick() {
         if (!this.playing || !this.midiData) return;
         
-        const now = Date.now();
-        const elapsedMs = now - this.startTime;
-        
-        // Calculer le tick actuel basé sur le temps écoulé
-        const bpm = 60000000 / this.tempo;
-        const currentBeat = (elapsedMs / 60000) * bpm;
-        const targetTick = Math.floor(currentBeat * this.ppq);
-        
-        // Jouer tous les événements entre currentTick et targetTick
-        while (this.eventIndex < this.events.length && this.events[this.eventIndex].tick <= targetTick) {
-            const event = this.events[this.eventIndex];
-            this.processEvent(event);
-            this.eventIndex++;
+        // Intégration incrémentale basée sur delta temps (horloge monotone)
+        const now = performance.now();
+        const deltaMs = now - this.lastTickTime;
+        this.lastTickTime = now;
+
+        // this.tempo est en microsecondes par noire (uspb)
+        if (!Number.isFinite(this.tempo) || this.tempo <= 0) {
+            // Tempo invalide, ignorer ce tick
+            return;
+        }
+        const beatIncrement = Math.max(0, deltaMs) / (this.tempo / 1000); // ms / (uspb_ms)
+        const tickIncrementFloat = beatIncrement * this.ppq;
+        const tickIncrement = tickIncrementFloat >= 1 ? Math.floor(tickIncrementFloat) : 0;
+
+        if (tickIncrement > 0) {
+            const targetTick = this.currentTick + tickIncrement;
+            // Jouer tous les événements entre currentTick et targetTick
+            while (this.eventIndex < this.events.length && this.events[this.eventIndex].tick <= targetTick) {
+                const event = this.events[this.eventIndex];
+                this.processEvent(event);
+                this.eventIndex++;
+            }
+            this.currentTick = targetTick;
+            this.currentBeat = this.currentTick / this.ppq;
         }
         
-        // Mettre à jour position
-        this.currentTick = targetTick;
-        this.currentBeat = currentBeat;
-        
         // Calculer bar/beat
-        const barBeat = this.getBarBeatFromTick(targetTick);
+        const barBeat = this.getBarBeatFromTick(this.currentTick);
         this.currentBar = barBeat.barNumber;
         this.currentBeatInBar = barBeat.beatInBar;
         this.timeSignature = barBeat.currentSignature;
         
-        // Broadcaster position
+        // Broadcaster position pour l'UI uniquement
         this.broadcastPosition();
         
         // Vérifier fin
-        if (this.eventIndex >= this.events.length || currentBeat >= this.totalBeats) {
+        if (this.eventIndex >= this.events.length || this.currentBeat >= this.totalBeats) {
             console.log('🏁 Fin du morceau');
             this.stop();
         }
@@ -383,9 +400,8 @@ class MidiSequencer {
             buffer.writeUInt16LE(newBpm, 1);
             this.pureDataProxy.broadcastBinaryToClients(buffer);
             
-            // Ajuster startTime pour maintenir la position
-            const elapsedMs = (this.currentTick / this.ppq / (60000000 / this.tempo)) * 60000;
-            this.startTime = Date.now() - elapsedMs;
+            // Recalibrer la référence de temps pour l'intégration
+            this.lastTickTime = performance.now();
         }
         
         if (event.timeSignature) {
@@ -425,20 +441,33 @@ class MidiSequencer {
     }
     
     /**
-     * Broadcaster la position actuelle (0x01 - 10 bytes)
+     * Met à jour l'état de lecture pour l'UI (sans envoyer 0x01 aux pupitres)
      */
     broadcastPosition() {
-        const buffer = Buffer.allocUnsafe(10);
-        
-        buffer.writeUInt8(0x01, 0);                           // messageType
-        buffer.writeUInt8(this.playing ? 0x01 : 0x00, 1);    // flags
-        buffer.writeUInt16LE(this.currentBar, 2);             // barNumber
-        buffer.writeUInt16LE(this.currentBeatInBar, 4);       // beatInBar
-        buffer.writeFloatLE(this.currentBeat, 6);             // beat total
-        
-        // Envoyer via le proxy
         if (this.pureDataProxy) {
-            this.pureDataProxy.handleBinaryMessage(buffer);
+            this.pureDataProxy.updatePlaybackFromSequencer({
+                playing: this.playing,
+                bar: this.currentBar,
+                beatInBar: this.currentBeatInBar,
+                beat: this.currentBeat,
+            });
+        }
+    }
+    
+    /**
+     * Broadcaster la position en ticks (0x06 - 6 bytes) pour PureData
+     * Format: [0x06, flags(1=play/0=stop), tick_u32_LE]
+     */
+    broadcastTickPosition(tickOverride) {
+        const buffer = Buffer.allocUnsafe(6);
+        
+        buffer.writeUInt8(0x06, 0);                           // messageType (TICK_POSITION)
+        buffer.writeUInt8(this.playing ? 0x01 : 0x00, 1);    // flags (bit0=playing)
+        buffer.writeUInt32LE((tickOverride !== undefined ? tickOverride : this.currentTick), 2);           // tick position (uint32, little-endian)
+        
+        // Envoyer via le proxy (envoie vraiment via WebSocket aux pupitres)
+        if (this.pureDataProxy) {
+            this.pureDataProxy.broadcastBinaryToClients(buffer);
         }
     }
     

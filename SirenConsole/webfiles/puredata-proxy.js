@@ -12,6 +12,7 @@ class PureDataProxy {
         this.playbackStates = new Map(); // États de lecture par pupitre
         this.reconnectInterval = 1000; // 1 seconde pour une reconnexion rapide
         this.reconnectTimers = new Map(); // Timers de reconnexion par pupitre
+        this.sequencerPlayback = null; // État global fourni par le séquenceur Node (pour l'UI)
         
         // console.log('🎛️ PureDataProxy initialisé pour connexions multiples');
         
@@ -22,6 +23,31 @@ class PureDataProxy {
         setInterval(() => {
             this.checkConnectionsHealth();
         }, 2000); // Vérifier toutes les 2 secondes
+    }
+
+    // Mettre à jour l'état de lecture depuis le séquenceur (sans envoyer aux pupitres)
+    updatePlaybackFromSequencer(playback) {
+        // playback: { playing, bar, beatInBar, beat }
+        // Mettre à jour un état global séquenceur
+        this.sequencerPlayback = {
+            type: 'MIDI_PLAYBACK_STATE',
+            playing: !!playback.playing,
+            bar: playback.bar || 0,
+            beatInBar: playback.beatInBar || 0,
+            beat: playback.beat || 0,
+        };
+
+        // Mettre à jour toutes les entrées playbackStates existantes (pour API / UI)
+        for (const [pupitreId, state] of this.playbackStates) {
+            state.playing = this.sequencerPlayback.playing;
+            state.bar = this.sequencerPlayback.bar;
+            state.beatInBar = this.sequencerPlayback.beatInBar;
+            state.beat = this.sequencerPlayback.beat;
+            // position (ms) dérivée si tempo connu
+            const bpm = state.tempo || 120;
+            state.position = Math.floor((state.beat / bpm) * 60000);
+            this.playbackStates.set(pupitreId, state);
+        }
     }
     
     // Initialiser les connexions vers tous les pupitres
@@ -261,8 +287,9 @@ class PureDataProxy {
                 break;
                 
             case 0x04: // TIMESIG (3 bytes, quand change)
-                if (buffer.length < 3) {
-                    console.error(`❌ TIMESIG trop court ${connection.pupitre.name}:`, buffer.length, 'bytes (attendu 3)');
+                // Attention: certains flux utilisent 0x04 sur 5 octets (note+duration) → ignorer
+                if (buffer.length !== 3) {
+                    // Ignorer formats inattendus pour éviter de corrompre l'UI
                     return;
                 }
                 playbackState.timeSignature.numerator = buffer.readUInt8(1);
@@ -270,6 +297,30 @@ class PureDataProxy {
                 // console.log(`🎵 TIMESIG ${connection.pupitre.name} (3B):`, 
                 //           playbackState.timeSignature.numerator + '/' + 
                 //           playbackState.timeSignature.denominator);
+                break;
+                
+            case 0x06: // TICK_POSITION (6 ou 8 bytes) - Position en ticks pour PureData
+                if (buffer.length < 6) {
+                    console.error(`❌ TICK_POSITION trop court ${connection.pupitre.name}:`, buffer.length, 'bytes (attendu 6/8)');
+                    return;
+                }
+                const tickFlags = buffer.readUInt8(1);
+                playbackState.playing = (tickFlags & 0x01) !== 0;
+                const tickPosition = buffer.readUInt32LE(2);
+                // ppq optionnel (ancien format 8 octets). Ignoré si absent
+                const tickPpq = buffer.length >= 8 ? buffer.readUInt16LE(6) : (playbackState.ppq || 480);
+                
+                // Stocker la position en ticks pour PureData
+                playbackState.tick = tickPosition;
+                playbackState.ppq = tickPpq;
+                
+                // Log compact (max 1/sec par pupitre)
+                const tickLogKey = `tick_${pupitreId}`;
+                if (!this[tickLogKey] || Date.now() - this[tickLogKey] > 1000) {
+                    // console.log(`⏱️ TICK_POSITION ${connection.pupitre.name} (8B):`, playbackState.playing ? 'PLAY' : 'STOP', 
+                    //            '- Tick:', tickPosition, '- PPQ:', tickPpq);
+                    this[tickLogKey] = Date.now();
+                }
                 break;
                 
             default:
@@ -439,6 +490,21 @@ class PureDataProxy {
         // Retourner l'état global (moyenne de tous les pupitres)
         const states = Array.from(this.playbackStates.values());
         if (states.length === 0) {
+            // Si aucun état pupitre, retourner l'état du séquenceur si disponible
+            if (this.sequencerPlayback) {
+                return {
+                    playing: this.sequencerPlayback.playing,
+                    position: 0,
+                    beat: this.sequencerPlayback.beat,
+                    tempo: 120,
+                    timeSignature: { numerator: 4, denominator: 4 },
+                    duration: 0,
+                    totalBeats: 0,
+                    file: "",
+                    bar: this.sequencerPlayback.bar,
+                    beatInBar: this.sequencerPlayback.beatInBar,
+                };
+            }
             return {
                 playing: false,
                 position: 0,
@@ -463,6 +529,12 @@ class PureDataProxy {
             file: states[0].file // Prendre le premier
         };
         
+        // Si un état séquenceur est disponible, forcer bar/beat globaux cohérents
+        if (this.sequencerPlayback) {
+            avgState.bar = this.sequencerPlayback.bar;
+            avgState.beatInBar = this.sequencerPlayback.beatInBar;
+            avgState.beat = this.sequencerPlayback.beat;
+        }
         return avgState;
     }
     
@@ -486,12 +558,28 @@ class PureDataProxy {
     // Broadcaster un buffer binaire directement
     broadcastBinaryToClients(buffer, pupitreId = null) {
         if (pupitreId) {
-            this.handleBinaryMessage(pupitreId, buffer);
+            // Envoyer à un pupitre spécifique
+            const connection = this.connections.get(pupitreId);
+            if (connection && connection.connected && connection.websocket) {
+                try {
+                    connection.websocket.send(buffer);
+                    // Traiter localement aussi pour mettre à jour l'état
+                    this.handleBinaryMessage(pupitreId, buffer);
+                } catch (error) {
+                    console.error(`❌ Erreur envoi binaire ${connection.pupitre.name} (${pupitreId}):`, error);
+                }
+            }
         } else {
             // Broadcaster à tous les pupitres connectés
             for (const [id, connection] of this.connections) {
-                if (connection.connected) {
-                    this.handleBinaryMessage(id, buffer);
+                if (connection.connected && connection.websocket) {
+                    try {
+                        connection.websocket.send(buffer);
+                        // Traiter localement aussi pour mettre à jour l'état
+                        this.handleBinaryMessage(id, buffer);
+                    } catch (error) {
+                        console.error(`❌ Erreur envoi binaire ${connection.pupitre.name} (${id}):`, error);
+                    }
                 }
             }
         }

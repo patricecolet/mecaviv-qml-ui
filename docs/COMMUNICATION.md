@@ -446,6 +446,12 @@ Le pupitre informe PureData d'un changement local.
 
 Les messages MIDI sont transmis en **binaire** pour minimiser la latence.
 
+**⚠️ IMPORTANT - Simplification du Protocole (2024-10-30)** :
+- **SirenConsole → PureData** : Communication **JSON uniquement** (plus de binaire)
+- **Messages utilisés** : `MIDI_FILE_LOAD`, `MIDI_TRANSPORT`, `MIDI_SEEK`, `TEMPO_CHANGE`
+- **Raison** : Éviter la duplication de code PureData et simplifier la synchronisation
+- **SirenePupitre ↔ PureData** : Garde le binaire MIDI (inchangé)
+
 #### Note On
 
 ```
@@ -672,6 +678,10 @@ Récupère l'état d'une sirène spécifique.
 | → Pupitre | CONSOLE_CONNECT | JSON | 8000 WS |
 | → Pupitre | CONSOLE_DISCONNECT | JSON | 8000 WS |
 | → Pupitre | PARAM_UPDATE | JSON | 8000 WS |
+| → PureData | MIDI_FILE_LOAD | JSON | 10002 WS |
+| → PureData | MIDI_TRANSPORT | JSON | 10002 WS |
+| → PureData | MIDI_SEEK | JSON | 10002 WS |
+| → PureData | TEMPO_CHANGE | JSON | 10002 WS |
 | ← Pupitre | PUPITRE_STATUS | JSON | 8000 WS |
 | ← Router | sirene_status_changed | JSON | 8003 WS |
 

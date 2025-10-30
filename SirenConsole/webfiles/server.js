@@ -344,15 +344,7 @@ const server = http.createServer(function (request, response) {
                         pureDataProxy.sendCommand(command);
                         // console.log('📤 MIDI_FILE_LOAD envoyé à PureData:', command.path);
                         
-                        // Envoyer les infos binaires
-                        const fileInfoBuffer = createFileInfoBuffer(midiInfo.duration, midiInfo.totalBeats);
-                        pureDataProxy.broadcastBinaryToClients(fileInfoBuffer);
-                        
-                        const tempoBuffer = createTempoBuffer(midiInfo.tempo);
-                        pureDataProxy.broadcastBinaryToClients(tempoBuffer);
-                        
-                        const timeSigBuffer = createTimeSigBuffer(midiInfo.timeSignature.numerator, midiInfo.timeSignature.denominator);
-                        pureDataProxy.broadcastBinaryToClients(timeSigBuffer);
+                        // Pas d'envoi binaire: PureData lit localement; la Console n'envoie que JSON
                         
                         // console.log('✅ Fichier MIDI chargé et métadonnées envoyées');
                         message = 'Fichier chargé';
@@ -380,13 +372,11 @@ const server = http.createServer(function (request, response) {
                             message = 'Action inconnue: ' + command.action;
                     }
                     
-                    // Envoyer aussi à PureData pour synchronisation
+                    // Relayer aussi à PureData en JSON pour synchronisation
                     if (success) {
-                        // Ajouter la position en ticks
                         const state = midiSequencer.getState();
                         command.position = Math.floor(state.beat * midiSequencer.ppq);
                         pureDataProxy.sendCommand(command);
-                        // console.log('📤 Transport envoyé à PureData:', command.action, '- Position:', command.position, 'ticks');
                     }
                     
                 } else if (command.type === 'MIDI_SEEK' && command.position !== undefined) {
