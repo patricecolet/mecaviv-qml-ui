@@ -10,6 +10,7 @@ Rectangle {
     property var consoleController: null
     property int currentPupitreIndex: 0
     property int currentTabIndex: 0
+    property var _currentPreset: null
     
     // Déclencher la mise à jour des Loader quand consoleController devient disponible
     onConsoleControllerChanged: {
@@ -44,7 +45,7 @@ Rectangle {
     
     // Mettre à jour les données des tabs quand on change de pupitre
     onCurrentPupitreIndexChanged: {
-        updateTabData()
+        loadCurrentPresetAndBind()
     }
     
     function updateTabData() {
@@ -82,6 +83,8 @@ Rectangle {
         if (pupitreSelectorLoader.item) {
             pupitreSelectorLoader.item.pupitres = pupitres
         }
+        // Re-binder aussi le pupitre courant dans l'onglet actif
+        updateTabData()
     }
     
     ColumnLayout {
@@ -202,5 +205,23 @@ Rectangle {
                 pupitreSelectorLoader.item.pupitres = consoleController ? consoleController.pupitres : []
             }
         }
+    }
+
+    function loadCurrentPresetAndBind() {
+        var xhr = new XMLHttpRequest()
+        xhr.open("GET", "http://localhost:8001/api/presets/current")
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var res = JSON.parse(xhr.responseText)
+                    _currentPreset = res && res.preset ? res.preset : null
+                    if (tabLoader.item && tabLoader.item.hasOwnProperty('currentPresetSnapshot')) {
+                        tabLoader.item.currentPresetSnapshot = _currentPreset
+                    }
+                    updateTabData()
+                } catch (e) {}
+            }
+        }
+        xhr.send()
     }
 }

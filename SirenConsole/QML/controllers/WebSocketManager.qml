@@ -22,18 +22,18 @@ Item {
     signal messageReceived(string url, string message)
     signal errorOccurred(string url, string error)
     
-    // === TIMER DE VÉRIFICATION ===
+    // === TIMER DE VÉRIFICATION (statut pupitres + ping) ===
     Timer {
         id: statusTimer
         interval: 2000 // Vérifier toutes les 2 secondes
         running: true
         repeat: true
         onTriggered: {
-            // Garder le polling HTTP comme backup
+            // Poll HTTP en secours
             webSocketManager.checkPureDataStatus()
             webSocketManager.checkPupitresStatus()
             
-            // Envoyer un ping WebSocket pour maintenir la connexion
+            // Ping pour maintenir la connexion WS
             if (webSocketManager.connected) {
                 webSocketManager.sendMessage({
                     type: "PING",

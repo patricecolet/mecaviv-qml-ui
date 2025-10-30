@@ -5,6 +5,7 @@ const WebSocket = require('ws');
 
 // Importer l'API des presets
 const presetAPI = require('./api-presets.js');
+let currentPresetId = null;
 
 // Importer l'API MIDI
 const midiAPI = require('./api-midi.js');
@@ -47,7 +48,7 @@ let connectedClients = new Set();
 function setSecurityHeaders(response) {
     // Headers CORS basiques
     response.setHeader('Access-Control-Allow-Origin', '*');
-    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Sec-WebSocket-Protocol, Sec-WebSocket-Version');
     response.setHeader('Vary', 'Origin');
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -287,10 +288,77 @@ const server = http.createServer(function (request, response) {
         filePath = '../config.js';
     }
     
-    // Routes API pour les presets
-    if (request.url.startsWith('/api/presets')) {
+    // --- Current preset endpoints ---
+    if (request.url === '/api/presets/current' || (request.url.startsWith('/api/presets/current') && request.method === 'GET')) {
+        (async () => {
+            try {
+                const data = await presetAPI.readPresets();
+                let preset = null;
+                if (currentPresetId) preset = data.presets.find(p => p.id === currentPresetId) || null;
+                if (!preset) {
+                    preset = data.presets[0] || null;
+                    currentPresetId = preset ? preset.id : null;
+                }
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ preset, currentId: currentPresetId }));
+            } catch (e) {
+                response.writeHead(500, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ error: e.message }));
+            }
+        })();
+        return;
+    }
+    
+    // Routes API pour les presets (générique) - exclure explicitement /api/presets/current...
+    if (request.url.startsWith('/api/presets')
+        && !request.url.startsWith('/api/presets/current')) {
         // Rediriger vers l'API des presets
         presetAPI.app(request, response);
+        return;
+    }
+    if ((request.url === '/api/presets/current' || request.url.startsWith('/api/presets/current')) && request.method === 'PUT') {
+        let body = '';
+        request.on('data', chunk => body += chunk);
+        request.on('end', async () => {
+            try {
+                const updatedPreset = JSON.parse(body);
+                const data = await presetAPI.readPresets();
+                const idx = data.presets.findIndex(p => p.id === updatedPreset.id);
+                if (idx === -1) data.presets.push(updatedPreset); else data.presets[idx] = updatedPreset;
+                currentPresetId = updatedPreset.id;
+                await presetAPI.writePresets(data);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ preset: updatedPreset, currentId: currentPresetId }));
+            } catch (e) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ error: e.message }));
+            }
+        });
+        return;
+    }
+    if ((request.url === '/api/presets/current/assigned-sirenes' || request.url.startsWith('/api/presets/current/assigned-sirenes')) && request.method === 'PATCH') {
+        let body = '';
+        request.on('data', chunk => body += chunk);
+        request.on('end', async () => {
+            try {
+                const { pupitreId, assignedSirenes } = JSON.parse(body);
+                const data = await presetAPI.readPresets();
+                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
+                if (!preset) throw new Error('No current preset');
+                if (!preset.config) preset.config = {};
+                if (!preset.config.pupitres) preset.config.pupitres = [];
+                const list = preset.config.pupitres;
+                const p = list.find(x => x.id === pupitreId);
+                if (!p) throw new Error('Pupitre not found');
+                p.assignedSirenes = Array.isArray(assignedSirenes) ? assignedSirenes : [];
+                await presetAPI.writePresets(data);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: true, presetId: preset.id, pupitreId, assignedSirenes: p.assignedSirenes }));
+            } catch (e) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
         return;
     }
     

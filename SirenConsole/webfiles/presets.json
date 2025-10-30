@@ -13,9 +13,7 @@
             },
             "frettedMode": false,
             "assignedSirenes": [
-              1,
-              2,
-              3
+              1
             ],
             "vstEnabled": true,
             "udpEnabled": true,
@@ -50,7 +48,9 @@
               "max": 72
             },
             "frettedMode": false,
-            "assignedSirenes": [],
+            "assignedSirenes": [
+              2
+            ],
             "vstEnabled": false,
             "udpEnabled": true,
             "rtpMidiEnabled": false,
@@ -84,7 +84,9 @@
               "max": 72
             },
             "frettedMode": false,
-            "assignedSirenes": [],
+            "assignedSirenes": [
+              3
+            ],
             "vstEnabled": false,
             "udpEnabled": true,
             "rtpMidiEnabled": false,
@@ -118,7 +120,9 @@
               "max": 72
             },
             "frettedMode": false,
-            "assignedSirenes": [],
+            "assignedSirenes": [
+              4
+            ],
             "vstEnabled": false,
             "udpEnabled": true,
             "rtpMidiEnabled": false,
@@ -152,7 +156,9 @@
               "max": 72
             },
             "frettedMode": false,
-            "assignedSirenes": [],
+            "assignedSirenes": [
+              5
+            ],
             "vstEnabled": false,
             "udpEnabled": true,
             "rtpMidiEnabled": false,
@@ -186,7 +192,9 @@
               "max": 72
             },
             "frettedMode": false,
-            "assignedSirenes": [],
+            "assignedSirenes": [
+              6
+            ],
             "vstEnabled": false,
             "udpEnabled": true,
             "rtpMidiEnabled": false,
@@ -220,7 +228,9 @@
               "max": 72
             },
             "frettedMode": false,
-            "assignedSirenes": [],
+            "assignedSirenes": [
+              7
+            ],
             "vstEnabled": false,
             "udpEnabled": true,
             "rtpMidiEnabled": false,

@@ -17,6 +17,8 @@ Item {
     property var allPupitres: [] // Tous les pupitres pour le mode "All"
     property var sireneManager: null // Gestionnaire des sirènes
     property var sirenRouterManager: null // Gestionnaire du Router
+    // Snapshot du preset courant, injecté par ConfigPage
+    property var currentPresetSnapshot: null
     
     onConsoleControllerChanged: {
         // ConsoleController mis à jour
@@ -188,15 +190,16 @@ Item {
                                 }
                                     
                                 property bool isEnabled: {
-                                    // Utiliser updateTrigger pour forcer la mise à jour
                                     var _ = sirensTab.updateTrigger
                                     var sireneId = index + 1
-                                    
-                                    // Vérifier si la sirène est assignée au pupitre actuel
-                                    if (sirensTab.pupitre && sirensTab.pupitre.assignedSirenes) {
-                                        return sirensTab.pupitre.assignedSirenes.indexOf(sireneId) !== -1
+                                    if (!sirensTab.currentPresetSnapshot || !sirensTab.currentPresetSnapshot.config || !sirensTab.pupitre) return false
+                                    var list = sirensTab.currentPresetSnapshot.config.pupitres || []
+                                    for (var ii = 0; ii < list.length; ii++) {
+                                        if (list[ii].id === sirensTab.pupitre.id) {
+                                            var as = list[ii].assignedSirenes || []
+                                            return as.indexOf(sireneId) !== -1
+                                        }
                                     }
-                                    
                                     return false
                                 }
                                 
@@ -263,63 +266,46 @@ Item {
                                         }
                                     }
                                     
-                                    // Synchroniser le SireneManager avant toute opération
+                                    // Synchroniser le SireneManager avant toute opération (statut runtime)
                                     syncSireneManager()
-                                    
-                                    if (!sirensTab.pupitre.assignedSirenes) {
-                                        sirensTab.pupitre.assignedSirenes = []
-                                    }
-                                    
+
                                     var sireneNumber = index + 1
-                                    var sireneIndex = sirensTab.pupitre.assignedSirenes.indexOf(sireneNumber)
                                     var pupitreId = sirensTab.pupitre.id || "pupitre" + (sirensTab.currentPupitreIndex + 1)
-                                    
-                                    if (sireneIndex === -1) {
-                                        // Tenter d'ajouter la sirène
-                                        if (sirensTab.sireneManager) {
-                                            // Vérifier si la sirène est utilisée par le séquenceur
-                                            if (sirensTab.sireneManager.getSireneStatus(sireneNumber) === "sequencer") {
-                                                return
-                                            }
-                                            
-                                            // Vérifier si la sirène est assignée à un autre pupitre
-                                            var currentOwner = sirensTab.sireneManager.getSireneOwner(sireneNumber)
-                                            
-                                            if (currentOwner && currentOwner !== pupitreId) {
-                                                // Retirer de la liste de l'autre pupitre AVANT de désassigner
-                                                updateOtherPupitreSirenes(currentOwner, sireneNumber, false)
-                                                // Désassigner de l'autre pupitre
-                                                sirensTab.sireneManager.unassignSirene(sireneNumber, currentOwner)
-                                            }
-                                            
-                                            // Assigner au pupitre actuel
-                                            if (sirensTab.sireneManager.assignSirene(sireneNumber, pupitreId)) {
-                                                sirensTab.pupitre.assignedSirenes.push(sireneNumber)
-                                                // Persister dans la config centrale
-                                                if (sirensTab.consoleController && sirensTab.consoleController.configManager) {
-                                                    sirensTab.consoleController.configManager.setAssignedSirenes(pupitreId, sirensTab.pupitre.assignedSirenes)
+
+                                    // Lire depuis le snapshot
+                                    function snapshotList(pid) {
+                                        var list = sirensTab.currentPresetSnapshot && sirensTab.currentPresetSnapshot.config ? sirensTab.currentPresetSnapshot.config.pupitres : []
+                                        for (var kk = 0; kk < list.length; kk++) {
+                                            if (list[kk].id === pid) return (list[kk].assignedSirenes || []).slice(0)
+                                        }
+                                        return []
+                                    }
+                                    var list = snapshotList(pupitreId)
+                                    var pos = list.indexOf(sireneNumber)
+                                    if (pos === -1) list.push(sireneNumber)
+                                    else list.splice(pos, 1)
+
+                                    // PATCH côté serveur puis recharge du snapshot
+                                    var xhr = new XMLHttpRequest()
+                                    xhr.open("PATCH", "http://localhost:8001/api/presets/current/assigned-sirenes")
+                                    xhr.setRequestHeader("Content-Type", "application/json")
+                                    xhr.onreadystatechange = function() {
+                                        if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                                            // Mettre à jour localement le snapshot courant pour refléter la réponse
+                                            if (sirensTab.currentPresetSnapshot && sirensTab.currentPresetSnapshot.config) {
+                                                var listP = sirensTab.currentPresetSnapshot.config.pupitres || []
+                                                for (var ii = 0; ii < listP.length; ii++) {
+                                                    if (listP[ii].id === pupitreId) {
+                                                        listP[ii].assignedSirenes = list.slice(0)
+                                                        break
+                                                    }
                                                 }
                                             }
-                                        } else {
-                                            // Mode sans SireneManager - assignation directe
-                                            sirensTab.pupitre.assignedSirenes.push(sireneNumber)
-                                            if (sirensTab.consoleController && sirensTab.consoleController.configManager) {
-                                                sirensTab.consoleController.configManager.setAssignedSirenes(pupitreId, sirensTab.pupitre.assignedSirenes)
-                                            }
-                                        }
-                                    } else {
-                                        // Retirer la sirène
-                                        if (sirensTab.sireneManager) {
-                                            sirensTab.sireneManager.unassignSirene(sireneNumber, pupitreId)
-                                        }
-                                        sirensTab.pupitre.assignedSirenes.splice(sireneIndex, 1)
-                                        if (sirensTab.consoleController && sirensTab.consoleController.configManager) {
-                                            sirensTab.consoleController.configManager.setAssignedSirenes(pupitreId, sirensTab.pupitre.assignedSirenes)
+                                            // Forcer le rafraîchissement visuel immédiat
+                                            sirensTab.updateTrigger++
                                         }
                                     }
-                                    
-                                    // Forcer la mise à jour de l'interface
-                                    sirensTab.updateTrigger++
+                                    xhr.send(JSON.stringify({ pupitreId: pupitreId, assignedSirenes: list }))
                                 }
                             }
                             

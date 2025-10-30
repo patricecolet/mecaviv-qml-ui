@@ -13,18 +13,13 @@ Rectangle {
        // Page initialisée
     }
     
-    // Timer pour forcer la mise à jour des pupitres
+    // Timer de refresh désactivé (polling manuel via WebSocketManager si besoin)
     Timer {
         id: refreshTimer
-        interval: 2000 // Rafraîchir toutes les 2 secondes (backup)
-        running: true
-        repeat: true
-        onTriggered: {
-            // Forcer la mise à jour en rechargeant les composants
-            if (consoleController && consoleController.webSocketManager) {
-                consoleController.webSocketManager.checkPupitresStatus()
-            }
-        }
+        interval: 2000
+        running: false
+        repeat: false
+        onTriggered: {}
     }
     
     ScrollView {

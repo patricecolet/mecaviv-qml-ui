@@ -11,6 +11,7 @@ QtObject {
     // Signaux
     signal configLoaded(var config)
     signal configError(string error)
+    signal assignedSirenesChanged(string pupitreId, var sirenes)
     
     // Initialisation
     Component.onCompleted: {
@@ -116,7 +117,7 @@ QtObject {
                     midiNote: 60,
                     status: "disconnected",
                     restrictedMax: 72,
-                    assignedSirenes: [1, 2, 3],
+                    assignedSirenes: [1],
                     vstEnabled: true,
                     udpEnabled: true,
                     rtpMidiEnabled: true,
@@ -143,7 +144,7 @@ QtObject {
                     midiNote: 60,
                     status: "disconnected",
                     restrictedMax: 72,
-                    assignedSirenes: [],
+                    assignedSirenes: [2],
                     vstEnabled: false,
                     udpEnabled: true,
                     rtpMidiEnabled: false,
@@ -170,7 +171,7 @@ QtObject {
                     midiNote: 60,
                     status: "disconnected",
                     restrictedMax: 72,
-                    assignedSirenes: [],
+                    assignedSirenes: [3],
                     vstEnabled: false,
                     udpEnabled: true,
                     rtpMidiEnabled: false,
@@ -197,7 +198,7 @@ QtObject {
                     midiNote: 60,
                     status: "disconnected",
                     restrictedMax: 72,
-                    assignedSirenes: [],
+                    assignedSirenes: [4],
                     vstEnabled: false,
                     udpEnabled: true,
                     rtpMidiEnabled: false,
@@ -224,7 +225,7 @@ QtObject {
                     midiNote: 60,
                     status: "disconnected",
                     restrictedMax: 72,
-                    assignedSirenes: [],
+                    assignedSirenes: [5],
                     vstEnabled: false,
                     udpEnabled: true,
                     rtpMidiEnabled: false,
@@ -251,7 +252,7 @@ QtObject {
                     midiNote: 60,
                     status: "disconnected",
                     restrictedMax: 72,
-                    assignedSirenes: [],
+                    assignedSirenes: [6],
                     vstEnabled: false,
                     udpEnabled: true,
                     rtpMidiEnabled: false,
@@ -278,7 +279,7 @@ QtObject {
                     midiNote: 60,
                     status: "disconnected",
                     restrictedMax: 72,
-                    assignedSirenes: [],
+                    assignedSirenes: [7],
                     vstEnabled: false,
                     udpEnabled: true,
                     rtpMidiEnabled: false,
@@ -409,6 +410,8 @@ QtObject {
         var pupitre = getPupitreData(pupitreId)
         if (pupitre) {
             pupitre.assignedSirenes = sirenes
+            // Notifier les observateurs
+            assignedSirenesChanged(pupitreId, sirenes)
             return true
         }
         return false

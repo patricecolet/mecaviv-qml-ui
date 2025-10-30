@@ -167,17 +167,13 @@ Item {
     signal presetsListChanged(var presetsList)
     signal errorOccurred(string error)
     
-    // === TIMER DE VÉRIFICATION ===
+    // === TIMER DE VÉRIFICATION (désactivé) ===
     Timer {
         id: statusCheckTimer
-        interval: 2000 // Vérifier toutes les 2 secondes (backup)
-        running: true
-        repeat: true
-        onTriggered: {
-            if (consoleController.webSocketManager) {
-                consoleController.webSocketManager.checkPupitresStatus()
-            }
-        }
+        interval: 2000
+        running: false
+        repeat: false
+        onTriggered: {}
     }
     
     // === INITIALISATION ===
@@ -214,6 +210,30 @@ Item {
         if (configManager) {
             configManager.configError.connect(function(error) {
                 errorOccurred("Configuration: " + error)
+            })
+            // Mettre à jour le modèle local quand les sirènes assignées changent
+            configManager.assignedSirenesChanged.connect(function(pupitreId, sirenes) {
+                if (!pupitres || pupitres.length === 0) return
+                var updated = []
+                for (var i = 0; i < pupitres.length; i++) {
+                    var p = pupitres[i]
+                    if (p.id === pupitreId) {
+                        updated.push({
+                            id: p.id,
+                            status: p.status,
+                            ambitusMin: p.ambitusMin,
+                            ambitusMax: p.ambitusMax,
+                            currentNote: p.currentNote,
+                            currentHz: p.currentHz,
+                            currentRpm: p.currentRpm,
+                            velocity: p.velocity,
+                            assignedSirenes: sirenes || []
+                        })
+                    } else {
+                        updated.push(p)
+                    }
+                }
+                pupitres = updated
             })
         }
         
