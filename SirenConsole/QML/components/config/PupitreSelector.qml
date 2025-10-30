@@ -82,18 +82,18 @@ Rectangle {
                     contentItem: RowLayout {
                         spacing: 6
                         
-                        // Indicateur de statut
+                        // Indicateur de statut (connected/error/déconnecté)
                         Rectangle {
                             width: 8
                             height: 8
                             radius: 4
                             color: {
                                 var pupitre = pupitreSelector.pupitres[index]
-                                if (!pupitre) return "#888888"
+                                if (!pupitre) return "#666666" // déconnecté
                                 switch(pupitre.status) {
-                                    case "connected": return "#00ff00"
-                                    case "error": return "#ff0000"
-                                    default: return "#ffaa00"
+                                    case "connected": return "#00CC66"   // vert
+                                    case "error":     return "#FF3333"   // rouge
+                                    default:           return "#666666"   // déconnecté
                                 }
                             }
                         }

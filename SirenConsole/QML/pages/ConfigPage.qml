@@ -21,6 +21,10 @@ Rectangle {
                     presetSelectorLoader.item.presetManager = consoleController.presetManager
                 }
             }
+            // Mettre à jour le PupitreSelector avec le modèle réel
+            if (pupitreSelectorLoader.item) {
+                pupitreSelectorLoader.item.pupitres = consoleController ? consoleController.pupitres : []
+            }
             
             // Mettre à jour le SireneManager quand il devient disponible
             if (consoleController.sireneManager) {
@@ -70,16 +74,15 @@ Rectangle {
         "P5", "P6", "P7"
     ]
     
-    // Liste des pupitres
-    property var pupitres: [
-        consoleController ? consoleController.pupitre1 : null,
-        consoleController ? consoleController.pupitre2 : null,
-        consoleController ? consoleController.pupitre3 : null,
-        consoleController ? consoleController.pupitre4 : null,
-        consoleController ? consoleController.pupitre5 : null,
-        consoleController ? consoleController.pupitre6 : null,
-        consoleController ? consoleController.pupitre7 : null
-    ]
+    // Liste des pupitres (lier directement le modèle du contrôleur)
+    property var pupitres: consoleController ? consoleController.pupitres : []
+    
+    // Repropager la liste vers le PupitreSelector quand elle change
+    onPupitresChanged: {
+        if (pupitreSelectorLoader.item) {
+            pupitreSelectorLoader.item.pupitres = pupitres
+        }
+    }
     
     ColumnLayout {
         anchors.fill: parent
@@ -187,6 +190,16 @@ Rectangle {
                         })
                     }
                 }
+            }
+        }
+    }
+
+    // Rafraîchir les voyants à chaque changement de statut d'un pupitre
+    Connections {
+        target: consoleController
+        function onPupitreStatusChanged(pupitreId, status) {
+            if (pupitreSelectorLoader.item) {
+                pupitreSelectorLoader.item.pupitres = consoleController ? consoleController.pupitres : []
             }
         }
     }

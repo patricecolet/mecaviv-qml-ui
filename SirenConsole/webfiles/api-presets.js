@@ -26,22 +26,24 @@ async function initializePresetsFile() {
                     created: new Date().toISOString(),
                     modified: new Date().toISOString(),
                     version: "1.0",
-                    pupitres: [
-                        {
-                            id: "P1",
-                            assignedSirenes: [1, 2, 3],
-                            vstEnabled: true,
-                            udpEnabled: true,
-                            rtpMidiEnabled: true,
-                            controllerMapping: {
-                                joystickX: { cc: 1, curve: "linear" },
-                                joystickY: { cc: 2, curve: "parabolic" },
-                                fader: { cc: 3, curve: "hyperbolic" },
-                                selector: { cc: 4, curve: "s curve" },
-                                pedalId: { cc: 5, curve: "linear" }
+                    config: {
+                        pupitres: [
+                            {
+                                id: "P1",
+                                assignedSirenes: [1, 2, 3],
+                                vstEnabled: true,
+                                udpEnabled: true,
+                                rtpMidiEnabled: true,
+                                controllerMapping: {
+                                    joystickX: { cc: 1, curve: "linear" },
+                                    joystickY: { cc: 2, curve: "parabolic" },
+                                    fader: { cc: 3, curve: "hyperbolic" },
+                                    selector: { cc: 4, curve: "s curve" },
+                                    pedalId: { cc: 5, curve: "linear" }
+                                }
                             }
-                        }
-                    ]
+                        ]
+                    }
                 },
                 {
                     id: "preset_002",
@@ -50,22 +52,24 @@ async function initializePresetsFile() {
                     created: new Date().toISOString(),
                     modified: new Date().toISOString(),
                     version: "1.0",
-                    pupitres: [
-                        {
-                            id: "P1",
-                            assignedSirenes: [4, 5, 6],
-                            vstEnabled: false,
-                            udpEnabled: true,
-                            rtpMidiEnabled: false,
-                            controllerMapping: {
-                                joystickX: { cc: 10, curve: "parabolic" },
-                                joystickY: { cc: 11, curve: "hyperbolic" },
-                                fader: { cc: 12, curve: "linear" },
-                                selector: { cc: 13, curve: "s curve" },
-                                pedalId: { cc: 14, curve: "linear" }
+                    config: {
+                        pupitres: [
+                            {
+                                id: "P1",
+                                assignedSirenes: [4, 5, 6],
+                                vstEnabled: false,
+                                udpEnabled: true,
+                                rtpMidiEnabled: false,
+                                controllerMapping: {
+                                    joystickX: { cc: 10, curve: "parabolic" },
+                                    joystickY: { cc: 11, curve: "hyperbolic" },
+                                    fader: { cc: 12, curve: "linear" },
+                                    selector: { cc: 13, curve: "s curve" },
+                                    pedalId: { cc: 14, curve: "linear" }
+                                }
                             }
-                        }
-                    ]
+                        ]
+                    }
                 }
             ]
         };
@@ -159,7 +163,7 @@ app.post('/api/presets', async (req, res) => {
         
         if (await writePresets(data)) {
             console.log("✅ Preset créé:", presetData.id);
-            res.status(201).json(presetData);
+            res.status(201).json({ preset: presetData });
         } else {
             res.status(500).json({ error: "Erreur sauvegarde" });
         }
@@ -197,7 +201,7 @@ app.put('/api/presets/:id', async (req, res) => {
         
         if (await writePresets(data)) {
             console.log("✅ Preset mis à jour:", presetId);
-            res.json(presetData);
+            res.json({ preset: presetData });
         } else {
             res.status(500).json({ error: "Erreur sauvegarde" });
         }
