@@ -295,10 +295,17 @@ Item {
                                             // Assigner au pupitre actuel
                                             if (sirensTab.sireneManager.assignSirene(sireneNumber, pupitreId)) {
                                                 sirensTab.pupitre.assignedSirenes.push(sireneNumber)
+                                                // Persister dans la config centrale
+                                                if (sirensTab.consoleController && sirensTab.consoleController.configManager) {
+                                                    sirensTab.consoleController.configManager.setAssignedSirenes(pupitreId, sirensTab.pupitre.assignedSirenes)
+                                                }
                                             }
                                         } else {
                                             // Mode sans SireneManager - assignation directe
                                             sirensTab.pupitre.assignedSirenes.push(sireneNumber)
+                                            if (sirensTab.consoleController && sirensTab.consoleController.configManager) {
+                                                sirensTab.consoleController.configManager.setAssignedSirenes(pupitreId, sirensTab.pupitre.assignedSirenes)
+                                            }
                                         }
                                     } else {
                                         // Retirer la sirène
@@ -306,6 +313,9 @@ Item {
                                             sirensTab.sireneManager.unassignSirene(sireneNumber, pupitreId)
                                         }
                                         sirensTab.pupitre.assignedSirenes.splice(sireneIndex, 1)
+                                        if (sirensTab.consoleController && sirensTab.consoleController.configManager) {
+                                            sirensTab.consoleController.configManager.setAssignedSirenes(pupitreId, sirensTab.pupitre.assignedSirenes)
+                                        }
                                     }
                                     
                                     // Forcer la mise à jour de l'interface
