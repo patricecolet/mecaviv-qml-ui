@@ -356,26 +356,19 @@ Item {
                                     
                                     property bool isRestricted: {
                                         var _ = sirensTab.updateTrigger
-                                        
                                         if (sirensTab.isAllMode) {
-                                            // Mode "All" : utiliser la valeur du premier pupitre
                                             return sirensTab.getFirstConfigValue(index, "ambitusRestricted")
                                         } else {
-                                            // Mode normal : utiliser le pupitre actuel
-                                            if (!sirensTab.pupitre) return false
-                                            
-                                            var sireneId = "sirene" + (index + 1)
-                                            if (!sirensTab.pupitre.sirenes) {
-                                                sirensTab.pupitre.sirenes = {}
-                                            }
-                                            if (!sirensTab.pupitre.sirenes[sireneId]) {
-                                                sirensTab.pupitre.sirenes[sireneId] = {
-                                                    ambitusRestricted: false,
-                                                    frettedMode: false
+                                            if (!sirensTab.currentPresetSnapshot || !sirensTab.currentPresetSnapshot.config || !sirensTab.pupitre) return false
+                                            var list = sirensTab.currentPresetSnapshot.config.pupitres || []
+                                            var key = "sirene" + (index + 1)
+                                            for (var ii = 0; ii < list.length; ii++) {
+                                                if (list[ii].id === sirensTab.pupitre.id) {
+                                                    var sc = (list[ii].sirenes && list[ii].sirenes[key]) ? list[ii].sirenes[key] : null
+                                                    return sc ? !!sc.ambitusRestricted : false
                                                 }
                                             }
-                                            
-                                            return sirensTab.pupitre.sirenes[sireneId].ambitusRestricted
+                                            return false
                                         }
                                     }
                                     
@@ -431,26 +424,19 @@ Item {
                                 
                                 property bool isFretted: {
                                     var _ = sirensTab.updateTrigger
-                                    
                                     if (sirensTab.isAllMode) {
-                                        // Mode "All" : utiliser la valeur du premier pupitre
                                         return sirensTab.getFirstConfigValue(index, "frettedMode")
                                     } else {
-                                        // Mode normal : utiliser le pupitre actuel
-                                        if (!sirensTab.pupitre) return false
-                                        
-                                        var sireneId = "sirene" + (index + 1)
-                                        if (!sirensTab.pupitre.sirenes) {
-                                            sirensTab.pupitre.sirenes = {}
-                                        }
-                                        if (!sirensTab.pupitre.sirenes[sireneId]) {
-                                            sirensTab.pupitre.sirenes[sireneId] = {
-                                                ambitusRestricted: false,
-                                                frettedMode: false
+                                        if (!sirensTab.currentPresetSnapshot || !sirensTab.currentPresetSnapshot.config || !sirensTab.pupitre) return false
+                                        var list = sirensTab.currentPresetSnapshot.config.pupitres || []
+                                        var key = "sirene" + (index + 1)
+                                        for (var ii = 0; ii < list.length; ii++) {
+                                            if (list[ii].id === sirensTab.pupitre.id) {
+                                                var sc = (list[ii].sirenes && list[ii].sirenes[key]) ? list[ii].sirenes[key] : null
+                                                return sc ? !!sc.frettedMode : false
                                             }
                                         }
-                                        
-                                        return sirensTab.pupitre.sirenes[sireneId].frettedMode
+                                        return false
                                     }
                                 }
                                 

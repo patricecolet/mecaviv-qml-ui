@@ -39,6 +39,12 @@
                 "cc": 5,
                 "curve": "linear"
               }
+            },
+            "sirenes": {
+              "sirene1": {
+                "ambitusRestricted": false,
+                "frettedMode": true
+              }
             }
           },
           {
@@ -74,6 +80,16 @@
               "pedalId": {
                 "cc": 5,
                 "curve": "linear"
+              }
+            },
+            "sirenes": {
+              "sirene1": {
+                "ambitusRestricted": false,
+                "frettedMode": false
+              },
+              "sirene2": {
+                "ambitusRestricted": false,
+                "frettedMode": true
               }
             }
           },
@@ -111,6 +127,12 @@
                 "cc": 5,
                 "curve": "linear"
               }
+            },
+            "sirenes": {
+              "sirene3": {
+                "ambitusRestricted": false,
+                "frettedMode": true
+              }
             }
           },
           {
@@ -146,6 +168,12 @@
               "pedalId": {
                 "cc": 5,
                 "curve": "linear"
+              }
+            },
+            "sirenes": {
+              "sirene4": {
+                "ambitusRestricted": false,
+                "frettedMode": true
               }
             }
           },
@@ -183,6 +211,12 @@
                 "cc": 5,
                 "curve": "linear"
               }
+            },
+            "sirenes": {
+              "sirene5": {
+                "ambitusRestricted": false,
+                "frettedMode": true
+              }
             }
           },
           {
@@ -219,6 +253,12 @@
                 "cc": 5,
                 "curve": "linear"
               }
+            },
+            "sirenes": {
+              "sirene6": {
+                "ambitusRestricted": false,
+                "frettedMode": true
+              }
             }
           },
           {
@@ -254,6 +294,12 @@
               "pedalId": {
                 "cc": 5,
                 "curve": "linear"
+              }
+            },
+            "sirenes": {
+              "sirene7": {
+                "ambitusRestricted": false,
+                "frettedMode": true
               }
             }
           }
