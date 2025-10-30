@@ -36,6 +36,49 @@ Item {
         // SirensTab initialisé
     }
     
+    // Helpers génériques pour PATCH et rafraîchissement
+    function forceRefresh() {
+        updateTrigger++
+    }
+
+    function patchAndApply(url, body, applyFn) {
+        var xhr = new XMLHttpRequest()
+        xhr.open("PATCH", url)
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                if (applyFn) applyFn()
+                forceRefresh()
+            }
+        }
+        xhr.send(JSON.stringify(body))
+    }
+
+    function updateSnapshotAssigned(pupitreId, assigned) {
+        if (!sirensTab.currentPresetSnapshot || !sirensTab.currentPresetSnapshot.config) return
+        var listP = sirensTab.currentPresetSnapshot.config.pupitres || []
+        for (var ii = 0; ii < listP.length; ii++) {
+            if (listP[ii].id === pupitreId) {
+                listP[ii].assignedSirenes = assigned.slice(0)
+                break
+            }
+        }
+    }
+
+    function updateSnapshotSireneConfig(pupitreId, sireneNumber, changes) {
+        if (!sirensTab.currentPresetSnapshot || !sirensTab.currentPresetSnapshot.config) return
+        var listP = sirensTab.currentPresetSnapshot.config.pupitres || []
+        for (var ii = 0; ii < listP.length; ii++) {
+            if (listP[ii].id === pupitreId) {
+                if (!listP[ii].sirenes) listP[ii].sirenes = {}
+                var key = "sirene" + sireneNumber
+                if (!listP[ii].sirenes[key]) listP[ii].sirenes[key] = { ambitusRestricted: false, frettedMode: false }
+                for (var k in changes) { listP[ii].sirenes[key][k] = changes[k] }
+                break
+            }
+        }
+    }
+
     // Fonctions utilitaires pour le mode "All"
     function getSireneConfigForAll(sireneIndex) {
         if (!isAllMode || allPupitres.length === 0) return null
@@ -285,27 +328,12 @@ Item {
                                     if (pos === -1) list.push(sireneNumber)
                                     else list.splice(pos, 1)
 
-                                    // PATCH côté serveur puis recharge du snapshot
-                                    var xhr = new XMLHttpRequest()
-                                    xhr.open("PATCH", "http://localhost:8001/api/presets/current/assigned-sirenes")
-                                    xhr.setRequestHeader("Content-Type", "application/json")
-                                    xhr.onreadystatechange = function() {
-                                        if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                                            // Mettre à jour localement le snapshot courant pour refléter la réponse
-                                            if (sirensTab.currentPresetSnapshot && sirensTab.currentPresetSnapshot.config) {
-                                                var listP = sirensTab.currentPresetSnapshot.config.pupitres || []
-                                                for (var ii = 0; ii < listP.length; ii++) {
-                                                    if (listP[ii].id === pupitreId) {
-                                                        listP[ii].assignedSirenes = list.slice(0)
-                                                        break
-                                                    }
-                                                }
-                                            }
-                                            // Forcer le rafraîchissement visuel immédiat
-                                            sirensTab.updateTrigger++
-                                        }
-                                    }
-                                    xhr.send(JSON.stringify({ pupitreId: pupitreId, assignedSirenes: list }))
+                                    // PATCH + mise à jour snapshot locale
+                                    patchAndApply(
+                                        "http://localhost:8001/api/presets/current/assigned-sirenes",
+                                        { pupitreId: pupitreId, assignedSirenes: list },
+                                        function() { updateSnapshotAssigned(pupitreId, list) }
+                                    )
                                 }
                             }
                             
@@ -384,22 +412,13 @@ Item {
                                             // Mode normal : appliquer au pupitre actuel
                                             if (!sirensTab.pupitre) return
                                             
-                                            var sireneId = "sirene" + (index + 1)
-                                            if (!sirensTab.pupitre.sirenes) {
-                                                sirensTab.pupitre.sirenes = {}
-                                            }
-                                            if (!sirensTab.pupitre.sirenes[sireneId]) {
-                                                sirensTab.pupitre.sirenes[sireneId] = {
-                                                    ambitusRestricted: false,
-                                                    frettedMode: false
-                                                }
-                                            }
-                                            
-                                            sirensTab.pupitre.sirenes[sireneId].ambitusRestricted = checked
-                                            // Ambitus restreint
-                                            
-                                            // Forcer la mise à jour de l'interface
-                                            sirensTab.updateTrigger++
+                                            var pupitreId = sirensTab.pupitre.id || "pupitre" + (sirensTab.currentPupitreIndex + 1)
+                                            var sirNum = index + 1
+                                            patchAndApply(
+                                                "http://localhost:8001/api/presets/current/sirene-config",
+                                                { pupitreId: pupitreId, sireneId: sirNum, changes: { ambitusRestricted: checked } },
+                                                function() { updateSnapshotSireneConfig(pupitreId, sirNum, { ambitusRestricted: checked }) }
+                                            )
                                         }
                                     }
                                 }
@@ -482,22 +501,13 @@ Item {
                                         // Mode normal : appliquer au pupitre actuel
                                         if (!sirensTab.pupitre) return
                                         
-                                        var sireneId = "sirene" + (index + 1)
-                                        if (!sirensTab.pupitre.sirenes) {
-                                            sirensTab.pupitre.sirenes = {}
-                                        }
-                                        if (!sirensTab.pupitre.sirenes[sireneId]) {
-                                            sirensTab.pupitre.sirenes[sireneId] = {
-                                                ambitusRestricted: false,
-                                                frettedMode: false
-                                            }
-                                        }
-                                        
-                                        sirensTab.pupitre.sirenes[sireneId].frettedMode = checked
-                                        // Mode fretté
-                                        
-                                        // Forcer la mise à jour de l'interface
-                                        sirensTab.updateTrigger++
+                                        var pupitreId = sirensTab.pupitre.id || "pupitre" + (sirensTab.currentPupitreIndex + 1)
+                                        var sirNum = index + 1
+                                        patchAndApply(
+                                            "http://localhost:8001/api/presets/current/sirene-config",
+                                            { pupitreId: pupitreId, sireneId: sirNum, changes: { frettedMode: checked } },
+                                            function() { updateSnapshotSireneConfig(pupitreId, sirNum, { frettedMode: checked }) }
+                                        )
                                     }
                                 }
                             }

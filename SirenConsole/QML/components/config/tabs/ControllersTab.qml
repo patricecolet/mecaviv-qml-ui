@@ -7,6 +7,17 @@ Item {
     
     property var pupitre: null
     
+    function patchControllerMapping(ctrlKey, cc, curve) {
+        if (!pupitre || !pupitre.id) return
+        var payload = { pupitreId: pupitre.id, controller: ctrlKey }
+        if (cc !== undefined) payload.cc = cc
+        if (curve !== undefined) payload.curve = curve
+        var xhr = new XMLHttpRequest()
+        xhr.open("PATCH", "http://localhost:8001/api/presets/current/controller-mapping")
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.send(JSON.stringify(payload))
+    }
+    
     // Fond gris pour l'ensemble du tab
     Rectangle {
         anchors.fill: parent
@@ -94,6 +105,7 @@ Item {
                                 if (pupitre && pupitre.controllerMapping) {
                                     if (!pupitre.controllerMapping[modelData.key]) pupitre.controllerMapping[modelData.key] = {}
                                     pupitre.controllerMapping[modelData.key].cc = value
+                                    patchControllerMapping(modelData.key, value, undefined)
                                 }
                             }
                         }
@@ -141,6 +153,7 @@ Item {
                                 if (pupitre && pupitre.controllerMapping) {
                                     if (!pupitre.controllerMapping[modelData.key]) pupitre.controllerMapping[modelData.key] = {}
                                     pupitre.controllerMapping[modelData.key].curve = currentText
+                                    patchControllerMapping(modelData.key, undefined, currentText)
                                 }
                             }
                         }

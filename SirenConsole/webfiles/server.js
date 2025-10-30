@@ -361,6 +361,89 @@ const server = http.createServer(function (request, response) {
         });
         return;
     }
+    if ((request.url === '/api/presets/current/sirene-config' || request.url.startsWith('/api/presets/current/sirene-config')) && request.method === 'PATCH') {
+        let body = '';
+        request.on('data', chunk => body += chunk);
+        request.on('end', async () => {
+            try {
+                const { pupitreId, sireneId, changes } = JSON.parse(body);
+                const data = await presetAPI.readPresets();
+                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
+                if (!preset) throw new Error('No current preset');
+                if (!preset.config) preset.config = {};
+                if (!preset.config.pupitres) preset.config.pupitres = [];
+                const list = preset.config.pupitres;
+                const p = list.find(x => x.id === pupitreId);
+                if (!p) throw new Error('Pupitre not found');
+                if (!p.sirenes) p.sirenes = {};
+                const key = 'sirene' + (typeof sireneId === 'number' ? sireneId : parseInt(sireneId, 10));
+                if (!p.sirenes[key]) p.sirenes[key] = { ambitusRestricted: false, frettedMode: false };
+                const ch = changes || {};
+                Object.keys(ch).forEach(k => { p.sirenes[key][k] = ch[k]; });
+                await presetAPI.writePresets(data);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: true, presetId: preset.id, pupitreId, sireneId, sirene: p.sirenes[key] }));
+            } catch (e) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+    if ((request.url === '/api/presets/current/outputs' || request.url.startsWith('/api/presets/current/outputs')) && request.method === 'PATCH') {
+        let body = '';
+        request.on('data', chunk => body += chunk);
+        request.on('end', async () => {
+            try {
+                const { pupitreId, changes } = JSON.parse(body);
+                const data = await presetAPI.readPresets();
+                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
+                if (!preset) throw new Error('No current preset');
+                if (!preset.config) preset.config = {};
+                if (!preset.config.pupitres) preset.config.pupitres = [];
+                const list = preset.config.pupitres;
+                const p = list.find(x => x.id === pupitreId);
+                if (!p) throw new Error('Pupitre not found');
+                const ch = changes || {};
+                ['vstEnabled','udpEnabled','rtpMidiEnabled'].forEach(k => { if (k in ch) p[k] = !!ch[k]; });
+                await presetAPI.writePresets(data);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: true, presetId: preset.id, pupitreId, outputs: { vstEnabled: p.vstEnabled, udpEnabled: p.udpEnabled, rtpMidiEnabled: p.rtpMidiEnabled } }));
+            } catch (e) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+    if ((request.url === '/api/presets/current/controller-mapping' || request.url.startsWith('/api/presets/current/controller-mapping')) && request.method === 'PATCH') {
+        let body = '';
+        request.on('data', chunk => body += chunk);
+        request.on('end', async () => {
+            try {
+                const { pupitreId, controller, cc, curve } = JSON.parse(body);
+                const data = await presetAPI.readPresets();
+                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
+                if (!preset) throw new Error('No current preset');
+                if (!preset.config) preset.config = {};
+                if (!preset.config.pupitres) preset.config.pupitres = [];
+                const list = preset.config.pupitres;
+                const p = list.find(x => x.id === pupitreId);
+                if (!p) throw new Error('Pupitre not found');
+                if (!p.controllerMapping) p.controllerMapping = {};
+                if (!p.controllerMapping[controller]) p.controllerMapping[controller] = {};
+                if (cc !== undefined) p.controllerMapping[controller].cc = parseInt(cc, 10);
+                if (curve) p.controllerMapping[controller].curve = String(curve);
+                await presetAPI.writePresets(data);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: true, presetId: preset.id, pupitreId, controller, mapping: p.controllerMapping[controller] }));
+            } catch (e) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
     
     // Routes API MIDI
     if (request.url === '/api/midi/files') {
