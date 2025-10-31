@@ -38,11 +38,11 @@ QtObject {
     }
     
     function calculate() {
-        if (!configController || !configController.currentSiren) {
+        if (!configController || !configController.primarySiren) {
             return
         }
         
-        var siren = configController.currentSiren
+        var siren = configController.primarySiren
         sirenName = siren.name
         
         // Limiter la note selon le mode et l'ambitus
@@ -51,7 +51,8 @@ QtObject {
         clampedNote = Math.max(minNote, Math.min(midiNote, maxNote))
         
         // Appliquer le mode fretté si activé pour la sirène actuelle
-        var currentSirenId = configController.getValueAtPath(["sirenConfig", "currentSiren"], "1")
+        var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
+        var currentSirenId = ids.length > 0 ? ids[0] : "1"
         var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
             return siren.id === currentSirenId
         })?.frettedMode?.enabled || false

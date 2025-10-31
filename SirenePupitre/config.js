@@ -15,7 +15,7 @@ var configData = {
   },
   "sirenConfig": {
     "mode": "restricted",
-    "currentSiren": "1",
+    "currentSirens": ["1"],
     "sirens": [
       {
         "id": "1",

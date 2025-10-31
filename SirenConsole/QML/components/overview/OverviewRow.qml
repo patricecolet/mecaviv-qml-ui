@@ -16,6 +16,8 @@ Rectangle {
     // Ambitus transmis par le Loader (si présent)
     property int ambitusMin: parent && parent.ambitusMin !== undefined ? parent.ambitusMin : 48
     property int ambitusMax: parent && parent.ambitusMax !== undefined ? parent.ambitusMax : 72
+    // État de synchronisation
+    property bool pupitreSynced: parent ? (parent.pupitreSynced || false) : false
     
     
     height: 80
@@ -55,18 +57,46 @@ Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
                 
-                // Indicateur de statut (diode)
-                Rectangle {
-                    width: 12
-                    height: 12
-                    radius: 6
+                // Indicateurs: connexion et synchronisation
+                Column {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    color: {
-                        switch(overviewRow.pupitreStatus) {
-                            case "connected": return "#00ff00"
-                            case "connecting": return "#ffff00"
-                            case "error": return "#ff0000"
-                            default: return "#666666"
+                    spacing: 4
+                    
+                    // Indicateur de statut (diode connexion)
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: 6
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        color: {
+                            switch(overviewRow.pupitreStatus) {
+                                case "connected": return "#00ff00"
+                                case "connecting": return "#ffff00"
+                                case "error": return "#ff0000"
+                                default: return "#666666"
+                            }
+                        }
+                    }
+                    
+                    // Indicateur de synchronisation (diode sync) - en dessous du voyant connexion
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: 6
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        color: overviewRow.pupitreSynced ? "#00ff00" : "#666666"
+                        
+                        ToolTip {
+                            visible: syncMouseArea.containsMouse
+                            text: overviewRow.pupitreSynced ? "Synchronisé" : "Non synchronisé"
+                            delay: 500
+                        }
+                        
+                        MouseArea {
+                            id: syncMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
                         }
                     }
                 }

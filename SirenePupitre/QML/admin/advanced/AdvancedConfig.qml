@@ -58,7 +58,7 @@ Item {
                 }
                 
                 Text {
-                    text: "Sirène active: " + (configController?.currentSiren?.name || "N/A")
+                    text: "Sirène active: " + (configController?.primarySiren?.name || "N/A")
                     color: "#bbb"
                     font.pixelSize: 13
                 }

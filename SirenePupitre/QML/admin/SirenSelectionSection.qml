@@ -55,8 +55,8 @@ Item {
                         height: 80
                         
                         property bool isSelected: root.configController &&
-                                                 root.configController.currentSiren &&
-                                                 root.configController.currentSiren.id === modelData.id
+                                                 root.configController.primarySiren &&
+                                                 root.configController.primarySiren.id === modelData.id
                         
                         background: Rectangle {
                             color: sirenButton.isSelected ? "#FFD700" :
@@ -108,9 +108,9 @@ Item {
                         }
                         
                         onClicked: {
-                            if (root.configController) {
-                                root.configController.selectSiren(modelData.id)
-                            }
+                    if (root.configController) {
+                        root.configController.setValueAtPath(["sirenConfig", "currentSirens"], [modelData.id])
+                    }
                         }
                     }
                 }
@@ -141,8 +141,8 @@ Item {
                 
                 // En-tête avec le nom de la sirène
                 Text {
-                    text: configController && configController.currentSiren ? 
-                          "Sirène " + configController.currentSiren.name : "Aucune sirène sélectionnée"
+                    text: configController && configController.primarySiren ? 
+                          "Sirène " + configController.primarySiren.name : "Aucune sirène sélectionnée"
                     color: "#FFD700"
                     font.pixelSize: 18
                     font.bold: true
@@ -180,12 +180,12 @@ Item {
                         
                         SpinBox {
                             id: restrictedMaxSpinBox
-                            from: configController && configController.currentSiren ? configController.currentSiren.ambitus.min : 0
-                            to: configController && configController.currentSiren ? configController.currentSiren.ambitus.max : 127
+                            from: configController && configController.primarySiren ? configController.primarySiren.ambitus.min : 0
+                            to: configController && configController.primarySiren ? configController.primarySiren.ambitus.max : 127
                             value: {
-                                if (!configController || !configController.currentSiren) return 72
+                                if (!configController || !configController.primarySiren) return 72
                                 var dummy = configController.updateCounter  // Force la réévaluation
-                                return configController.currentSiren.restrictedMax
+                                return configController.primarySiren.restrictedMax
                             }
                             editable: true
                             
@@ -247,7 +247,7 @@ Item {
                         }
                         
                         Text {
-                            text: configController && configController.currentSiren ? 
+                            text: configController && configController.primarySiren ? 
                                   musicUtils.midiToNoteName(restrictedMaxSpinBox.value) : ""
                             color: "#FFD700"
                             font.pixelSize: 14
@@ -260,15 +260,15 @@ Item {
                 // Infos de la sirène
                 DetailItem {
                     label: "Ambitus"
-                    value: configController && configController.currentSiren ? 
-                           musicUtils.midiToNoteName(configController.currentSiren.ambitus.min) + 
-                           " - " + musicUtils.midiToNoteName(configController.currentSiren.ambitus.max) : "-"
+                    value: configController && configController.primarySiren ? 
+                           musicUtils.midiToNoteName(configController.primarySiren.ambitus.min) + 
+                           " - " + musicUtils.midiToNoteName(configController.primarySiren.ambitus.max) : "-"
                 }
                 
                        DetailItem {
                            label: "Transposition"
-                           value: configController && configController.currentSiren ? 
-                                  configController.currentSiren.transposition + " octave(s)" : "-"
+                           value: configController && configController.primarySiren ? 
+                                  configController.primarySiren.transposition + " octave(s)" : "-"
                        }
                 
                        // Transposition d'affichage
@@ -288,9 +288,9 @@ Item {
                                from: -4
                                to: 4
                                value: {
-                                   if (!configController || !configController.currentSiren) return 0
+                                   if (!configController || !configController.primarySiren) return 0
                                    var dummy = configController.updateCounter
-                                   return configController.currentSiren.displayOctaveOffset || 0
+                                   return configController.primarySiren.displayOctaveOffset || 0
                                }
                         
                                contentItem: TextInput {
@@ -349,10 +349,10 @@ Item {
                                }
                         
                                onValueModified: {
-                                   if (configController && configController.currentSiren) {
+                                   if (configController && configController.primarySiren) {
                                        var sirens = configController.config.sirenConfig.sirens
                                        for (var i = 0; i < sirens.length; i++) {
-                                           if (sirens[i].id === configController.currentSiren.id) {
+                                           if (sirens[i].id === configController.primarySiren.id) {
                                                configController.setValueAtPath(["sirenConfig", "sirens", i, "displayOctaveOffset"], value)
                                                break
                                            }

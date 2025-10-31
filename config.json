@@ -22,7 +22,7 @@
   "sirenConfig": {   
     "cb4techID": 1,
     "mode": "restricted",
-    "currentSiren": "S1",
+    "currentSirens": ["1"],
     "sirens": [
       {
         "id": "1",
@@ -33,7 +33,7 @@
         "restrictedMax": 72,
         "transposition": 0,
         "displayOctaveOffset": -1,
-        "frettedMode": { "enabled": false }
+        "frettedMode": { "enabled": true }
       },
       {
         "id": "2",

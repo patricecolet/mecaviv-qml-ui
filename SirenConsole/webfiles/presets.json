@@ -15,38 +15,32 @@
             "assignedSirenes": [
               1
             ],
-            "vstEnabled": true,
-            "udpEnabled": true,
-            "rtpMidiEnabled": true,
-            "controllerMapping": {
-              "joystickX": {
-                "cc": 11,
-                "curve": "linear"
-              },
-              "joystickY": {
-                "cc": 1,
-                "curve": "parabolic"
-              },
-              "fader": {
-                "cc": 3,
-                "curve": "hyperbolic"
-              },
-              "selector": {
-                "cc": 6,
-                "curve": "s curve"
-              },
-              "pedalId": {
-                "cc": 95,
-                "curve": "linear"
-              },
-              "joystickZ": {
-                "cc": 3
-              }
-            },
+            "vstEnabled": false,
+            "udpEnabled": false,
+            "rtpMidiEnabled": false,
+            "controllerMapping": {},
             "sirenes": {
               "sirene1": {
                 "ambitusRestricted": false,
                 "frettedMode": true
+              },
+              "sirene2": {
+                "frettedMode": false
+              },
+              "sirene3": {
+                "frettedMode": false
+              },
+              "sirene4": {
+                "frettedMode": false
+              },
+              "sirene5": {
+                "frettedMode": false
+              },
+              "sirene6": {
+                "frettedMode": false
+              },
+              "sirene7": {
+                "frettedMode": false
               }
             }
           },

@@ -100,6 +100,71 @@ Modification d'un paramètre de configuration.
 - `value` : Nouvelle valeur (any type)
 - `source` : "console" pour éviter la réémission vers PureData
 
+## 1.5️⃣ SirenConsole ↔ PureData
+
+### Messages Console → PureData
+
+#### REQUEST_PUPITRE_CONFIG - Demande de Configuration Complète d'un Pupitre
+
+La console demande à PureData (source de vérité) la configuration complète d'un pupitre spécifique.
+
+```json
+{
+  "type": "REQUEST_PUPITRE_CONFIG",
+  "pupitreId": "P1",
+  "source": "console"
+}
+```
+
+**Champs** :
+- `pupitreId` : Identifiant du pupitre (P1, P2, etc.)
+- `source` : "console" pour identifier l'origine
+
+**Effet** :
+- PureData répond avec `CONFIG_FULL` contenant la configuration complète du pupitre
+- Utilisé lors d'un "Download" depuis la console pour récupérer la configuration depuis la source de vérité
+
+### Messages PureData → Console
+
+#### CONFIG_FULL (réponse à REQUEST_PUPITRE_CONFIG)
+
+PureData envoie la configuration complète d'un pupitre à la console.
+
+```json
+{
+  "type": "CONFIG_FULL",
+  "pupitreId": "P1",
+  "config": {
+    "sirenConfig": {
+      "assignedSirenes": [1, 2, 3],
+      "sirens": [
+        {
+          "ambitus": { "restricted": false },
+          "frettedMode": { "enabled": true }
+        }
+      ]
+    },
+    "outputConfig": {
+      "vstEnabled": true,
+      "udpEnabled": true,
+      "rtpMidiEnabled": true
+    },
+    "controllerMapping": {
+      "joystickX": { "cc": 1, "curve": "linear" },
+      "joystickY": { "cc": 2, "curve": "parabolic" }
+    }
+  }
+}
+```
+
+**Moment d'envoi** :
+- En réponse à `REQUEST_PUPITRE_CONFIG`
+- Utilisé pour synchroniser la configuration du pupitre depuis PureData vers la console (Download)
+
+**Note** : PureData est la source de vérité pour toutes les configurations de pupitres.
+
+## 1️⃣ SirenConsole ↔ SirenePupitre
+
 **Exemples de chemins** :
 ```json
 // Visibilité d'un composant
@@ -134,7 +199,7 @@ Le pupitre envoie son statut à la console.
     "id": "P1",
     "name": "Pupitre 1",
     "ip": "192.168.1.41",
-    "port": 10001,
+    "port": 10002,
     "status": "connected",
     "assignedSirenes": [1, 2, 3],
     "currentSiren": 1,
@@ -148,15 +213,29 @@ Le pupitre envoie son statut à la console.
       "joystickX": { "cc": 1, "curve": "linear" },
       "joystickY": { "cc": 2, "curve": "parabolic" },
       "fader": { "cc": 3, "curve": "hyperbolic" }
-    }
-  }
+    },
+    "sirens": [
+      {
+        "id": "1",
+        "ambitus": { "restricted": false },
+        "frettedMode": { "enabled": true }
+      }
+    ]
+  },
+  "isRequested": false
 }
 ```
 
 **Fréquence d'envoi** : 
 - À la connexion (initial)
-- Toutes les 5 secondes (heartbeat)
+- Toutes les 5 secondes (heartbeat) - `isRequested: false` ou absent
 - Lors de changements significatifs
+- En réponse à `REQUEST_CONFIG_FROM_CONSOLE` - `isRequested: true`
+
+**Champ `isRequested`** :
+- `false` ou absent : Message périodique (heartbeat), ignoré par la synchronisation de preset
+- `true` : Réponse explicite à une demande, traité pour mettre à jour le preset
+
 
 ## 2️⃣ SirenePupitre ↔ PureData
 
@@ -170,7 +249,7 @@ PureData envoie la configuration complète au pupitre.
 {
   "type": "CONFIG_FULL",
   "config": {
-    "serverUrl": "ws://localhost:10001",
+    "serverUrl": "ws://localhost:10002",
     "admin": {
       "enabled": true
     },
@@ -678,10 +757,12 @@ Récupère l'état d'une sirène spécifique.
 | → Pupitre | CONSOLE_CONNECT | JSON | 8000 WS |
 | → Pupitre | CONSOLE_DISCONNECT | JSON | 8000 WS |
 | → Pupitre | PARAM_UPDATE | JSON | 8000 WS |
+| → PureData | REQUEST_PUPITRE_CONFIG | JSON | 10002 WS |
 | → PureData | MIDI_FILE_LOAD | JSON | 10002 WS |
 | → PureData | MIDI_TRANSPORT | JSON | 10002 WS |
 | → PureData | MIDI_SEEK | JSON | 10002 WS |
 | → PureData | TEMPO_CHANGE | JSON | 10002 WS |
+| ← PureData | CONFIG_FULL | JSON | 10002 WS |
 | ← Pupitre | PUPITRE_STATUS | JSON | 8000 WS |
 | ← Router | sirene_status_changed | JSON | 8003 WS |
 
@@ -692,11 +773,11 @@ Récupère l'état d'une sirène spécifique.
 | ← Console | CONSOLE_CONNECT/DISCONNECT | JSON | 8000 WS |
 | ← Console | PARAM_UPDATE | JSON | 8000 WS |
 | → Console | PUPITRE_STATUS | JSON | 8000 WS |
-| ← PureData | CONFIG_FULL | JSON | 10001 WS |
-| ← PureData | PARAM_UPDATE | JSON | 10001 WS |
-| ← PureData | MIDI Messages | Binaire | 10001 WS |
-| → PureData | REQUEST_CONFIG | JSON | 10001 WS |
-| → PureData | PARAM_CHANGED | JSON | 10001 WS |
+| ← PureData | CONFIG_FULL | JSON | 10002 WS |
+| ← PureData | PARAM_UPDATE | JSON | 10002 WS |
+| ← PureData | MIDI Messages | Binaire | 10002 WS |
+| → PureData | REQUEST_CONFIG | JSON | 10002 WS |
+| → PureData | PARAM_CHANGED | JSON | 10002 WS |
 
 #### pedalierSirenium
 

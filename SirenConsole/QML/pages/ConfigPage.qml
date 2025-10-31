@@ -25,6 +25,7 @@ Rectangle {
             // Mettre à jour le PupitreSelector avec le modèle réel
             if (pupitreSelectorLoader.item) {
                 pupitreSelectorLoader.item.pupitres = consoleController ? consoleController.pupitres : []
+                pupitreSelectorLoader.item.consoleController = consoleController
             }
             
             // Mettre à jour le SireneManager quand il devient disponible
@@ -108,6 +109,10 @@ Rectangle {
                 if (configPage.consoleController && configPage.consoleController.presetManager) {
                     item.presetManager = configPage.consoleController.presetManager
                 }
+                // Écouter le signal de download pour recharger le snapshot
+                item.presetDownloaded.connect(function() {
+                    loadCurrentPresetAndBind()
+                })
             }
         }
         

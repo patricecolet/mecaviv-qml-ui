@@ -12,6 +12,9 @@ Rectangle {
     // Connexion directe au PresetManager
     property var presetManager: null
     
+    // Signal émis après un download réussi
+    signal presetDownloaded()
+    
     // Timer pour vérification périodique des connexions
     Timer {
         id: connectionTimer
@@ -22,6 +25,16 @@ Rectangle {
                 updatePresets()
                 stop() // Arrêter le timer une fois les presets trouvés
             }
+        }
+    }
+    
+    // Timer pour rafraîchir le snapshot après un download
+    Timer {
+        id: downloadRefreshTimer
+        interval: 1500 // 1.5 secondes pour laisser le temps au serveur de traiter
+        repeat: false
+        onTriggered: {
+            presetDownloaded()
         }
     }
     
@@ -273,6 +286,89 @@ Rectangle {
                 if (currentPreset !== "") {
                     deletePresetDialog.open()
                 }
+            }
+        }
+        
+        // Séparateur visuel
+        Rectangle {
+            Layout.preferredWidth: 1
+            Layout.fillHeight: true
+            color: "#555555"
+        }
+        
+        // Bouton Upload (envoyer preset vers pupitres)
+        Button {
+            text: "Upload"
+            Layout.preferredWidth: 80
+            enabled: currentPreset !== ""
+            property bool uploading: false
+            
+            onClicked: {
+                if (uploading) return
+                uploading = true
+                text = "Upload..."
+                enabled = false
+                
+                var xhr = new XMLHttpRequest()
+                xhr.open("POST", "http://localhost:8001/api/presets/current/upload")
+                xhr.setRequestHeader("Content-Type", "application/json")
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === XMLHttpRequest.DONE) {
+                        uploading = false
+                        text = "Upload"
+                        enabled = true
+                        if (xhr.status === 200) {
+                            var res = JSON.parse(xhr.responseText)
+                            console.log("✅ Upload réussi:", res)
+                        } else {
+                            console.error("❌ Erreur upload:", xhr.status, xhr.responseText)
+                        }
+                    }
+                }
+                xhr.send()
+            }
+        }
+        
+        // Bouton Download (récupérer config depuis pupitres)
+        Button {
+            text: "Download"
+            Layout.preferredWidth: 80
+            // Activé même sans preset sélectionné - le backend utilisera le preset courant ou le premier disponible
+            enabled: !downloading
+            property bool downloading: false
+            
+            onClicked: {
+                if (downloading) return
+                downloading = true
+                text = "Download..."
+                enabled = false
+                
+                var xhr = new XMLHttpRequest()
+                xhr.open("POST", "http://localhost:8001/api/presets/current/download")
+                xhr.setRequestHeader("Content-Type", "application/json")
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === XMLHttpRequest.DONE) {
+                        downloading = false
+                        text = "Download"
+                        enabled = true
+                        if (xhr.status === 200) {
+                            var res = JSON.parse(xhr.responseText)
+                            console.log("✅ Download initié:", res)
+                            // Recharger les presets après download pour voir les mises à jour
+                            if (presetSelector.consoleController) {
+                                Qt.callLater(function() {
+                                    presetSelector.consoleController.loadPresetsFromStorage()
+                                })
+                            }
+                            // Émettre le signal pour recharger le snapshot après un délai
+                            // (le serveur a besoin de temps pour traiter les réponses des pupitres)
+                            downloadRefreshTimer.start()
+                        } else {
+                            console.error("❌ Erreur download:", xhr.status, xhr.responseText)
+                        }
+                    }
+                }
+                xhr.send()
             }
         }
     }

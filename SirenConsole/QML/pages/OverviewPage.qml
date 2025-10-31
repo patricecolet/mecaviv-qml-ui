@@ -44,6 +44,7 @@ Rectangle {
                 property real currentRpm: overviewPage.consoleController.pupitre1CurrentRpm
                 property int ambitusMin: overviewPage.consoleController.pupitre1AmbitusMin
                 property int ambitusMax: overviewPage.consoleController.pupitre1AmbitusMax
+                property bool pupitreSynced: overviewPage.consoleController ? overviewPage.consoleController.pupitre1Synced : false
                 
                 width: parent.width
             }
@@ -60,6 +61,7 @@ Rectangle {
                 property real currentRpm: overviewPage.consoleController.pupitre2CurrentRpm
                 property int ambitusMin: overviewPage.consoleController.pupitre2AmbitusMin
                 property int ambitusMax: overviewPage.consoleController.pupitre2AmbitusMax
+                property bool pupitreSynced: overviewPage.consoleController ? overviewPage.consoleController.pupitre2Synced : false
                 width: parent.width
             }
             
@@ -75,6 +77,7 @@ Rectangle {
                 property real currentRpm: overviewPage.consoleController.pupitre3CurrentRpm
                 property int ambitusMin: overviewPage.consoleController.pupitre3AmbitusMin
                 property int ambitusMax: overviewPage.consoleController.pupitre3AmbitusMax
+                property bool pupitreSynced: overviewPage.consoleController ? overviewPage.consoleController.pupitre3Synced : false
                 width: parent.width
             }
             
@@ -90,6 +93,7 @@ Rectangle {
                 property real currentRpm: overviewPage.consoleController.pupitre4CurrentRpm
                 property int ambitusMin: overviewPage.consoleController.pupitre4AmbitusMin
                 property int ambitusMax: overviewPage.consoleController.pupitre4AmbitusMax
+                property bool pupitreSynced: overviewPage.consoleController ? overviewPage.consoleController.pupitre4Synced : false
                 width: parent.width
             }
             
@@ -105,6 +109,7 @@ Rectangle {
                 property real currentRpm: overviewPage.consoleController.pupitre5CurrentRpm
                 property int ambitusMin: overviewPage.consoleController.pupitre5AmbitusMin
                 property int ambitusMax: overviewPage.consoleController.pupitre5AmbitusMax
+                property bool pupitreSynced: overviewPage.consoleController ? overviewPage.consoleController.pupitre5Synced : false
                 width: parent.width
             }
             
@@ -120,6 +125,7 @@ Rectangle {
                 property real currentRpm: overviewPage.consoleController.pupitre6CurrentRpm
                 property int ambitusMin: overviewPage.consoleController.pupitre6AmbitusMin
                 property int ambitusMax: overviewPage.consoleController.pupitre6AmbitusMax
+                property bool pupitreSynced: overviewPage.consoleController ? overviewPage.consoleController.pupitre6Synced : false
                 width: parent.width
             }
             
@@ -135,6 +141,7 @@ Rectangle {
                 property real currentRpm: overviewPage.consoleController.pupitre7CurrentRpm
                 property int ambitusMin: overviewPage.consoleController.pupitre7AmbitusMin
                 property int ambitusMax: overviewPage.consoleController.pupitre7AmbitusMax
+                property bool pupitreSynced: overviewPage.consoleController ? overviewPage.consoleController.pupitre7Synced : false
                 width: parent.width
             }
         }

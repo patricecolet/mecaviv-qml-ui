@@ -3,10 +3,38 @@ import QtQuick 2.15
 Item {
     id: consoleController
     
+    // Fonction pour charger l'état de synchronisation de tous les pupitres
+    function loadSyncStatus() {
+        for (var i = 1; i <= 7; i++) {
+            (function(index) {
+                var pupitreId = "P" + index
+                var xhr = new XMLHttpRequest()
+                xhr.open("GET", "http://localhost:8001/api/pupitres/" + pupitreId + "/sync-status")
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                        try {
+                            var res = JSON.parse(xhr.responseText)
+                            var propName = "pupitre" + index + "Synced"
+                            consoleController[propName] = res.isSynced || false
+                        } catch (e) {
+                            console.error("Erreur parsing sync status:", e)
+                        }
+                    }
+                }
+                xhr.send()
+            })(i)
+        }
+    }
+    
     // Test simple pour voir si le fichier se charge
     Component.onCompleted: {
         // ConsoleController initialisé
         initializeManagers()
+        
+        // Charger l'état de synchronisation après un délai
+        Qt.callLater(function() {
+            loadSyncStatus()
+        })
     }
     
     // === PROPRIÉTÉS PUBLIQUES ===
@@ -114,6 +142,15 @@ Item {
     property real pupitre7CurrentRpm: pupitres.length > 6 && pupitres[6].currentRpm !== undefined ? pupitres[6].currentRpm : 0
     property int pupitre7AmbitusMin: pupitres.length > 6 && pupitres[6].ambitusMin !== undefined ? pupitres[6].ambitusMin : 48
     property int pupitre7AmbitusMax: pupitres.length > 6 && pupitres[6].ambitusMax !== undefined ? pupitres[6].ambitusMax : 72
+    
+    // Propriétés de synchronisation (bindées depuis serveur)
+    property bool pupitre1Synced: false
+    property bool pupitre2Synced: false
+    property bool pupitre3Synced: false
+    property bool pupitre4Synced: false
+    property bool pupitre5Synced: false
+    property bool pupitre6Synced: false
+    property bool pupitre7Synced: false
     
     // Modèle unique des pupitres (remplace les propriétés individuelles)
     property var pupitres: [

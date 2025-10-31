@@ -13,7 +13,7 @@ QtObject {
         "midiFiles": { "repositoryPath": "../mecaviv/compositions" },
         "sirenConfig": { 
             "mode": "restricted", 
-            "currentSiren": "1",
+            "currentSirens": ["1"],
             "sirens": [
                 {
                     "id": "1",
@@ -59,7 +59,8 @@ QtObject {
             "composeSirenVolume": 100
         }
     })
-    property var currentSiren: null
+    property var currentSirens: []
+    property var primarySiren: currentSirens && currentSirens.length > 0 ? currentSirens[0] : null
     property string mode: "restricted"
     property var webSocketController: null
     property int updateCounter: 0
@@ -71,18 +72,18 @@ QtObject {
     property var currentSirenInfo: {
         updateCounter // Forcer la réévaluation
         
-        if (!currentSiren) return null
+        if (!primarySiren) return null
         
         return {
-            id: currentSiren.id,
-            name: currentSiren.name,
-            outputs: currentSiren.outputs,
-            transposition: currentSiren.transposition,
-            ambitus: currentSiren.ambitus,
-            clef: currentSiren.clef,
-            restrictedMax: currentSiren.restrictedMax,
+            id: primarySiren.id,
+            name: primarySiren.name,
+            outputs: primarySiren.outputs,
+            transposition: primarySiren.transposition,
+            ambitus: primarySiren.ambitus,
+            clef: primarySiren.clef,
+            restrictedMax: primarySiren.restrictedMax,
             mode: mode,
-            displayOctaveOffset: currentSiren.displayOctaveOffset
+            displayOctaveOffset: primarySiren.displayOctaveOffset
         }
     }
     
@@ -97,11 +98,10 @@ QtObject {
         // Valeur par défaut
         mode = (config && config.mode) ? config.mode : "restricted"
         
-        // Sélectionner la sirène par défaut
+        // Sélectionner la/les sirènes par défaut
         if (config.sirenConfig && config.sirenConfig.sirens && config.sirenConfig.sirens.length > 0) {
-            var selected = selectSiren(config.sirenConfig.currentSiren)
-            if (selected) {
-            }
+            var ids0 = config.sirenConfig.currentSirens || ["1"]
+            selectSirens(ids0)
         }
         
         ready()
@@ -143,9 +143,13 @@ QtObject {
             finalValue = parseFloat(value) || parseInt(value) || 0
         }
         
-        // Conversion spéciale pour currentSiren
-        if (path.join(".") === "sirenConfig.currentSiren" && typeof value === "number") {
-            finalValue = value.toString();
+        // Conversion spéciale pour currentSirens (forcer un tableau de strings)
+        if (path.join(".") === "sirenConfig.currentSirens") {
+            if (Array.isArray(value)) {
+                finalValue = value.map(function(v) { return (typeof v === "number") ? v.toString() : v })
+            } else {
+                finalValue = [ (typeof value === "number") ? value.toString() : value ]
+            }
         }
         // Définir la valeur
         current[key] = finalValue
@@ -216,20 +220,20 @@ QtObject {
             case "mode":
                 mode = value
                 break
-            case "sirenConfig.currentSiren":
-                selectSiren(value)
+            case "sirenConfig.currentSirens":
+                selectSirens(value)
                 break
         }
         
-        // Mise à jour de currentSiren si c'est une propriété de la sirène active
+        // Mise à jour de primarySiren si c'est une propriété de la sirène active
         if (path[0] === "sirenConfig" && path[1] === "sirens" && path.length >= 4) {
             var sirenIndex = parseInt(path[2])
-            if (config.sirenConfig.sirens[sirenIndex] && currentSiren) {
+            if (config.sirenConfig.sirens[sirenIndex] && primarySiren) {
                 var sirenId = config.sirenConfig.sirens[sirenIndex].id
-                if (currentSiren.id === sirenId) {
+                if (primarySiren.id === sirenId) {
                     // Mettre à jour la propriété dans currentSiren
                     var propertyName = path[3]
-                    currentSiren[propertyName] = value
+                    primarySiren[propertyName] = value
                     
                     // Forcer la mise à jour
                     currentSirenInfoChanged()
@@ -245,11 +249,11 @@ QtObject {
     }
     
     function setRestrictedMax(value) {
-        if (!currentSiren) return
+        if (!primarySiren) return
         // Trouver l'index de la sirène courante
         var sirens = config.sirenConfig.sirens
         for (var i = 0; i < sirens.length; i++) {
-            if (sirens[i].id === currentSiren.id) {
+            if (sirens[i].id === primarySiren.id) {
                 setValueAtPath(["sirenConfig", "sirens", i, "restrictedMax"], value)
                 break
             }
@@ -288,56 +292,60 @@ QtObject {
     
     // Fonctions utilitaires existantes
     
-    function selectSiren(id) {
+    function selectSirens(ids) {
         if (!config) return false
-        
-        // Normaliser l'ID pour accepter différents formats
-        var normalizedId = id
-        if (typeof id === "number") {
-            normalizedId = id.toString()
-        } else if (typeof id === "string") {
-            // Si c'est "S2", extraire "2"
-            if (id.startsWith("S") && id.length > 1) {
-                normalizedId = id.substring(1)
-            }
-        }
-        
-        
+        var list = Array.isArray(ids) ? ids : [ids]
+        // normaliser en strings
+        list = list.map(function(id) {
+            if (typeof id === "number") return id.toString()
+            if (typeof id === "string" && id.startsWith("S") && id.length > 1) return id.substring(1)
+            return id
+        })
+
+        // Construire le tableau d'objets sirènes correspondants
         var sirens = config.sirenConfig.sirens
-        for (var i = 0; i < sirens.length; i++) {
-            if (sirens[i].id === normalizedId) {
-                currentSiren = sirens[i]
-                config.sirenConfig.currentSiren = normalizedId
-                
-                // AJOUTER CES LIGNES
-                updateCounter++
-                currentSirenInfoChanged()
-                
-                settingsUpdated()
-                
-                // 🔧 ENVOYER LE NUMÉRO DE SIRÈNE PAR WEBSOCKET
-                if (webSocketController && webSocketController.connected) {
-                    webSocketController.sendBinaryMessage({
-                        type: "SIREN_SELECTED",
-                        sirenId: normalizedId,
-                        sirenNumber: parseInt(normalizedId)  // Convertir en nombre
-                    })
+        var selectedObjs = []
+        for (var j = 0; j < list.length; j++) {
+            var id = list[j]
+            for (var k = 0; k < sirens.length; k++) {
+                if (sirens[k].id === id) {
+                    selectedObjs.push(sirens[k])
+                    break
                 }
-                
-                return true
             }
         }
-        return false
+
+        currentSirens = selectedObjs
+        config.sirenConfig.currentSirens = list
+
+        updateCounter++
+        currentSirenInfoChanged()
+        settingsUpdated()
+
+        // Envoi WS (liste)
+        if (webSocketController && webSocketController.connected) {
+            webSocketController.sendBinaryMessage({
+                type: "SIRENS_SELECTED",
+                sirenIds: list,
+                sirenNumbers: list.map(function(x) { return parseInt(x) })
+            })
+        }
+        return true
+    }
+
+    function selectSiren(id) {
+        // compat mono-sélection
+        return selectSirens([id])
     }
     
     function getMaxNote() {
-        if (!currentSiren) return 127
-        return mode === "restricted" ? currentSiren.restrictedMax : currentSiren.ambitus.max
+        if (!primarySiren) return 127
+        return mode === "restricted" ? primarySiren.restrictedMax : primarySiren.ambitus.max
     }
     
     function getMinNote() {
-        if (!currentSiren) return 0
-        return currentSiren.ambitus.min
+        if (!primarySiren) return 0
+        return primarySiren.ambitus.min
     }
     
     // Fonctions de compatibilité (utilisant les nouvelles génériques)
@@ -360,7 +368,8 @@ QtObject {
         // Réinitialiser l'état local depuis la nouvelle config
         mode = newConfig.mode || "restricted";
         if (newConfig.sirenConfig) {
-            selectSiren(newConfig.sirenConfig.currentSiren || "1");
+            var ids = newConfig.sirenConfig.currentSirens || ["1"]
+            selectSirens(ids);
         }
         
         // Forcer la mise à jour de tous les bindings

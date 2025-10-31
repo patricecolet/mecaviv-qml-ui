@@ -106,6 +106,14 @@ Item {
                         }
                     }
                     break
+                case "SYNC_STATUS_CHANGED":
+                    // Mettre à jour l'état de synchronisation
+                    if (data.pupitreId && consoleController) {
+                        var propName = "pupitre" + data.pupitreId.substring(1) + "Synced" // P1 -> pupitre1Synced
+                        consoleController[propName] = data.isSynced || false
+                    }
+                    break
+                    
                 case "PUPITRE_STATUS_UPDATE":
                     // console.log("🎛️ Mise à jour pupitres:", data.data)
                     // console.log("📊 Connected count:", data.data.connectedCount)

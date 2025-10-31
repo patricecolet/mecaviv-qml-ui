@@ -52,7 +52,7 @@ Item {
             return
         }
         
-        configController.setValueAtPath(["sirenConfig", "currentSiren"], sirenId)
+        configController.setValueAtPath(["sirenConfig", "currentSirens"], [sirenId])
     }
     
     // Fonction pour transmettre les événements MIDI au mode jeu
@@ -274,7 +274,8 @@ Item {
                 // Index actuel basé sur la sirène sélectionnée
                 currentIndex: {
                     if (!configController || !configController.config) return 0
-                    var currentId = configController.config.sirenConfig.currentSiren
+                    var list = configController.config.sirenConfig.currentSirens || []
+                    var currentId = list.length > 0 ? list[0] : null
                     for (var i = 0; i < model.length; i++) {
                         if (model[i].id === currentId) {
                             return i
@@ -382,7 +383,8 @@ Item {
                 color: {
                     if (!configController) return "#666666"
                     var dummy = configController.updateCounter // Force la réévaluation
-                    var currentSirenId = configController.getValueAtPath(["sirenConfig", "currentSiren"], "1")
+                    var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
+                    var currentSirenId = ids.length > 0 ? ids[0] : "1"
                     var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
                         return siren.id === currentSirenId
                     })?.frettedMode?.enabled || false
@@ -391,7 +393,8 @@ Item {
                 border.color: {
                     if (!configController) return "#888888"
                     var dummy = configController.updateCounter // Force la réévaluation
-                    var currentSirenId = configController.getValueAtPath(["sirenConfig", "currentSiren"], "1")
+                    var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
+                    var currentSirenId = ids.length > 0 ? ids[0] : "1"
                     var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
                         return siren.id === currentSirenId
                     })?.frettedMode?.enabled || false
@@ -416,7 +419,8 @@ Item {
                     color: {
                         if (!configController) return "#CCCCCC"
                         var dummy = configController.updateCounter // Force la réévaluation
-                        var currentSirenId = configController.getValueAtPath(["sirenConfig", "currentSiren"], "1")
+                        var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
+                        var currentSirenId = ids.length > 0 ? ids[0] : "1"
                         var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
                             return siren.id === currentSirenId
                         })?.frettedMode?.enabled || false
@@ -429,7 +433,8 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         if (configController) {
-                            var currentSirenId = configController.getValueAtPath(["sirenConfig", "currentSiren"], "1")
+                            var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
+                            var currentSirenId = ids.length > 0 ? ids[0] : "1"
                             var sirens = configController.getValueAtPath(["sirenConfig", "sirens"], [])
                             var currentSiren = sirens.find(function(siren) {
                                 return siren.id === currentSirenId

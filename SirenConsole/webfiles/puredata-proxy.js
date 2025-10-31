@@ -2,10 +2,12 @@ const WebSocket = require('ws');
 
 // Proxy WebSocket vers PureData - Gestion des connexions multiples
 class PureDataProxy {
-    constructor(config, server = null, broadcastToClients = null) {
+    constructor(config, server = null, broadcastToClients = null, handleParamChanged = null, handlePupitreConfig = null) {
         this.config = config;
         this.server = server; // Référence au serveur pour diffusion
         this.broadcastToClients = broadcastToClients; // Fonction de diffusion directe
+        this.handleParamChanged = handleParamChanged; // Callback pour PARAM_CHANGED depuis pupitres
+        this.handlePupitreConfig = handlePupitreConfig; // Callback pour configuration complète depuis pupitres
         this.connections = new Map(); // Map des connexions par pupitre
         this.eventBuffer = []; // Buffer global pour événements temps réel
         this.maxBufferSize = 100;
@@ -13,10 +15,11 @@ class PureDataProxy {
         this.reconnectInterval = 1000; // 1 seconde pour une reconnexion rapide
         this.reconnectTimers = new Map(); // Timers de reconnexion par pupitre
         this.sequencerPlayback = null; // État global fourni par le séquenceur Node (pour l'UI)
+        this.binaryChunkStates = new Map(); // Accumulation binaire (format SirenePupitre) par pupitre
         
         // console.log('🎛️ PureDataProxy initialisé pour connexions multiples');
         
-        // Initialiser les connexions vers tous les pupitres
+        // Initialiser les connexions vers tous les pupitres (via PureData qui fait le routage)
         this.initializeConnections();
         
         // Vérifier périodiquement l'état des connexions
@@ -48,6 +51,64 @@ class PureDataProxy {
             state.position = Math.floor((state.beat / bpm) * 60000);
             this.playbackStates.set(pupitreId, state);
         }
+    }
+    
+    // Convertir config PureData vers format pupitre pour le preset
+    convertPureDataConfigToPupitreConfig(pureDataConfig, pupitreId) {
+        const config = {
+            assignedSirenes: [],
+            vstEnabled: false,
+            udpEnabled: false,
+            rtpMidiEnabled: false,
+            controllerMapping: {},
+            sirens: []
+        };
+        
+        // Extraire assignedSirenes depuis sirenConfig
+        if (pureDataConfig.sirenConfig && pureDataConfig.sirenConfig.assignedSirenes) {
+            config.assignedSirenes = Array.isArray(pureDataConfig.sirenConfig.assignedSirenes) 
+                ? pureDataConfig.sirenConfig.assignedSirenes 
+                : [];
+        }
+        // NEW: si currentSirens présent, l'utiliser comme source des assignedSirenes
+        if (pureDataConfig.sirenConfig && Array.isArray(pureDataConfig.sirenConfig.currentSirens)) {
+            config.assignedSirenes = pureDataConfig.sirenConfig.currentSirens
+                .map(v => (typeof v === 'string' ? parseInt(v, 10) : v))
+                .filter(v => !isNaN(v));
+        }
+        
+        // Extraire sirens
+        if (pureDataConfig.sirenConfig && Array.isArray(pureDataConfig.sirenConfig.sirens)) {
+            config.sirens = pureDataConfig.sirenConfig.sirens;
+        }
+        
+        // Extraire outputConfig
+        if (pureDataConfig.outputConfig) {
+            config.vstEnabled = !!pureDataConfig.outputConfig.vstEnabled;
+            config.udpEnabled = !!pureDataConfig.outputConfig.udpEnabled;
+            config.rtpMidiEnabled = !!pureDataConfig.outputConfig.rtpMidiEnabled;
+        }
+        
+        // Extraire controllerMapping
+        if (pureDataConfig.controllerMapping) {
+            config.controllerMapping = pureDataConfig.controllerMapping;
+        }
+        
+        return config;
+    }
+    
+    // Envoyer REQUEST_PUPITRE_CONFIG à PureData via sendCommand (routage via pupitre)
+    // PureData doit intercepter ce message et répondre avec CONFIG_FULL
+    requestPupitreConfig(pupitreId) {
+        console.log(`📤 requestPupitreConfig appelé pour ${pupitreId}`);
+        // Envoyer via sendCommand - PureData fera le routage
+        const result = this.sendCommand({
+            type: "REQUEST_CONFIG",
+            pupitreId: pupitreId,
+            source: "console"
+        }, pupitreId);
+        console.log(`📤 requestPupitreConfig résultat pour ${pupitreId}:`, result);
+        return result;
     }
     
     // Initialiser les connexions vers tous les pupitres
@@ -154,12 +215,51 @@ class PureDataProxy {
         
         // Détecter si binaire (Buffer) ou texte (string)
         if (Buffer.isBuffer(message)) {
+            try {
+                console.log(`📦 Binaire reçu de ${connection.pupitre.name} (${pupitreId}), taille=${message.length} bytes`);
+            } catch (_) {}
             this.handleBinaryMessage(pupitreId, message);
         } else {
             // console.log(`📥 Message JSON de ${connection.pupitre.name} (${pupitreId}):`, message.substring(0, 100));
             
             try {
                 const data = JSON.parse(message);
+                
+                // Log tous les messages reçus pour debug (limité aux types importants)
+                if (data.type === 'CONFIG_FULL' || data.type === 'PUPITRE_STATUS' || data.type === 'REQUEST_PUPITRE_CONFIG') {
+                    console.log(`📥 Message reçu de ${connection.pupitre.name} (${pupitreId}):`, {
+                        type: data.type,
+                        hasConfig: !!data.config,
+                        hasData: !!data.data,
+                        pupitreId: data.pupitreId || pupitreId
+                    });
+                }
+                
+                // Traiter PARAM_CHANGED depuis pupitres (source: "pupitre")
+                if (data.type === 'PARAM_CHANGED' && data.source === 'pupitre' && this.handleParamChanged) {
+                    this.handleParamChanged(pupitreId, data.path, data.value);
+                }
+                
+                // Traiter CONFIG_FULL depuis PureData (réponse à REQUEST_PUPITRE_CONFIG)
+                // PureData envoie CONFIG_FULL via la connexion pupitre avec pupitreId
+                if (data.type === 'CONFIG_FULL') {
+                    console.log(`📥 CONFIG_FULL reçu depuis PureData pour ${pupitreId}, config:`, !!data.config, 'pupitreId dans message:', data.pupitreId);
+                    if (data.config && this.handlePupitreConfig) {
+                        // Convertir format PureData vers format attendu
+                        const configData = this.convertPureDataConfigToPupitreConfig(data.config, data.pupitreId || pupitreId);
+                        this.handlePupitreConfig(data.pupitreId || pupitreId, configData, true); // Toujours traiter comme demandé
+                    } else {
+                        console.warn(`⚠️ CONFIG_FULL reçu mais config manquant ou handlePupitreConfig non défini`);
+                    }
+                }
+                
+                // Traiter PUPITRE_STATUS qui contient la configuration complète du pupitre
+                // Seulement si c'est une réponse à une demande (flag isRequested)
+                if (data.type === 'PUPITRE_STATUS' && data.data && this.handlePupitreConfig) {
+                    // isRequested = true si c'est une réponse explicite, false si c'est juste un heartbeat
+                    const isRequested = data.isRequested || false;
+                    this.handlePupitreConfig(pupitreId, data.data, isRequested);
+                }
                 
                 // Traiter les messages d'état de lecture MIDI
                 if (data.type === 'MIDI_PLAYBACK_STATE') {
@@ -218,6 +318,60 @@ class PureDataProxy {
             }
         }
         
+        // Support JSON binaire brut (sans octet de type): commence par '{' (0x7B)
+        if (buffer[0] === 0x7B) {
+            try {
+                const jsonStr = buffer.toString('utf8');
+                const json = JSON.parse(jsonStr);
+                // Accepter soit un wrapper CONFIG_FULL, soit la config directe
+                const hasWrapper = json && (json.type === 'CONFIG_FULL' || json.config);
+                const configPayload = hasWrapper ? (json.config || {}) : json;
+                if (this.handlePupitreConfig && configPayload) {
+                    console.log(`📥 CONFIG (binaire JSON brut) reçu pour ${connection.pupitre.name} (${pupitreId})`);
+                    const configData = this.convertPureDataConfigToPupitreConfig(configPayload, pupitreId);
+                    this.handlePupitreConfig(pupitreId, configData, true);
+                    return;
+                }
+            } catch (e) {
+                // Laisser continuer le traitement si ce n'est pas du JSON valide
+            }
+        }
+
+        // Protocole strict SirenePupitre: header 8 octets (LE) + payload JSON chunk
+        if (buffer.length >= 8) {
+            const totalSize = buffer.readUInt32LE(0);
+            const position  = buffer.readUInt32LE(4);
+            const payload   = buffer.slice(8);
+            if (totalSize > 0 && totalSize <= 10 * 1024 * 1024 && position >= 0 && position < totalSize) {
+                let state = this.binaryChunkStates.get(pupitreId);
+                if (!state || state.expectedSize !== totalSize) {
+                    state = { expectedSize: totalSize, receivedBytes: 0, buffer: Buffer.allocUnsafe(totalSize) };
+                    this.binaryChunkStates.set(pupitreId, state);
+                }
+                payload.copy(state.buffer, position);
+                state.receivedBytes += payload.length;
+                try { console.log(`🔹 Chunk SP ${connection.pupitre.name} (${pupitreId}): +${payload.length} @${position}, total=${state.receivedBytes}/${state.expectedSize}`); } catch (_) {}
+                if (state.receivedBytes >= state.expectedSize) {
+                    try {
+                        const jsonString = state.buffer.toString('utf8');
+                        const jsonData = JSON.parse(jsonString);
+                        const hasWrapper = jsonData && (jsonData.type === 'CONFIG_FULL' || jsonData.config);
+                        const configPayload = hasWrapper ? (jsonData.config || {}) : jsonData;
+                        if (this.handlePupitreConfig && configPayload) {
+                            const configData = this.convertPureDataConfigToPupitreConfig(configPayload, pupitreId);
+                            this.handlePupitreConfig(pupitreId, configData, true);
+                        }
+                    } catch (e) {
+                        console.error(`❌ Erreur parsing CONFIG_FULL (SP) ${connection.pupitre.name} (${pupitreId}):`, e);
+                    } finally {
+                        this.binaryChunkStates.delete(pupitreId);
+                    }
+                    return;
+                }
+                return;
+            }
+        }
+
         const messageType = buffer.readUInt8(0);
         
         // Initialiser playbackState pour ce pupitre si nécessaire
@@ -238,6 +392,7 @@ class PureDataProxy {
         const playbackState = this.playbackStates.get(pupitreId);
         
         switch (messageType) {
+            // case 0x00: // Désactivé: on n'utilise plus le type 0x00 pour CONFIG, on suit le protocole SP
             case 0x01: // POSITION (10 bytes, 50ms)
                 if (buffer.length < 10) {
                     console.error(`❌ POSITION trop court ${connection.pupitre.name}:`, buffer.length, 'bytes (attendu 10)');
@@ -375,14 +530,17 @@ class PureDataProxy {
     
     // Envoyer une commande à un pupitre spécifique
     sendCommand(command, pupitreId = null) {
+        console.log(`📤 sendCommand appelé - type: ${command.type}, pupitreId: ${pupitreId || 'all'}`);
+        
         // Si pupitreId spécifié, envoyer à ce pupitre uniquement
         if (pupitreId) {
             const connection = this.connections.get(pupitreId);
             if (!connection || !connection.connected || !connection.websocket) {
-                console.error(`❌ Pupitre ${pupitreId} non connecté`);
+                console.error(`❌ Pupitre ${pupitreId} non connecté - connection: ${!!connection}, connected: ${connection?.connected}, websocket: ${!!connection?.websocket}`);
                 return false;
             }
             
+            console.log(`📤 Envoi via sendToPupitre pour ${pupitreId}`);
             return this.sendToPupitre(pupitreId, command);
         }
         
@@ -407,17 +565,19 @@ class PureDataProxy {
     sendToPupitre(pupitreId, command) {
         const connection = this.connections.get(pupitreId);
         if (!connection || !connection.connected || !connection.websocket) {
+            console.error(`❌ sendToPupitre échoué pour ${pupitreId} - connection: ${!!connection}, connected: ${connection?.connected}, websocket: ${!!connection?.websocket}`);
             return false;
         }
         
         try {
             const message = JSON.stringify(command);
-            // console.log(`📤 Envoi à ${connection.pupitre.name} (${pupitreId}):`, message.substring(0, 100));
+            console.log(`📤 Envoi à ${connection.pupitre.name} (${pupitreId}):`, message);
             
             // Envoyer en mode binaire comme SirenePupitre
             const buffer = Buffer.from(message, 'utf8');
             connection.websocket.send(buffer);
             
+            console.log(`✅ Message envoyé avec succès à ${pupitreId}`);
             return true;
         } catch (error) {
             console.error(`❌ Erreur envoi ${connection.pupitre.name} (${pupitreId}):`, error);

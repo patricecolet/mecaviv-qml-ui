@@ -10,6 +10,7 @@ Rectangle {
     property var pupitres: []
     property int currentPupitreIndex: 0
     property bool isAllMode: false // Mode "All" activé
+    property var consoleController: null // Référence au ConsoleController pour accéder à l'état de sync
     
     // Signal émis quand un pupitre est sélectionné
     signal pupitreSelected(int index)
@@ -95,6 +96,23 @@ Rectangle {
                                     case "error":     return "#FF3333"   // rouge
                                     default:           return "#666666"   // déconnecté
                                 }
+                            }
+                        }
+                        
+                        // Indicateur de synchronisation
+                        Rectangle {
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: {
+                                // Obtenir l'état de sync depuis ConsoleController
+                                if (pupitreSelector.consoleController) {
+                                    var pupitreId = "P" + (index + 1)
+                                    var propName = "pupitre" + (index + 1) + "Synced"
+                                    var isSynced = pupitreSelector.consoleController[propName] || false
+                                    return isSynced ? "#00ff00" : "#666666"
+                                }
+                                return "#666666" // non synchronisé par défaut
                             }
                         }
                         
