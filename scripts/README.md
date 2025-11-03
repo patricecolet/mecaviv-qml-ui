@@ -125,13 +125,11 @@ Met à jour automatiquement tous les pupitres via SSH avec les dernières versio
 - Charge automatiquement les IPs depuis `SirenConsole/config.js`
 - Pour chaque pupitre :
   1. Test de connexion SSH
-  2. `git pull` dans `~/dev/src/mecaviv/puredata-abstractions`
-  3. `git pull` dans `~/dev/src/mecaviv-qml-ui`
+  2. `git reset --hard` dans `~/dev/src/mecaviv/puredata-abstractions` (écrase modifications locales)
+  3. `git reset --hard` dans `~/dev/src/mecaviv-qml-ui` (récupère la dernière version)
   4. `rsync` de `SirenePupitre/webfiles/` vers le pupitre
   5. (Optionnel) `sudo reboot` si `--reboot` est spécifié
 - Affiche un rapport détaillé avec réussites/échecs
-
-**⚠️ Note importante** : Le script **ne modifie PAS automatiquement** `cb4techID` et `currentSirens` dans `config.json`. Vous devez configurer ces valeurs manuellement sur chaque pupitre selon son numéro.
 
 **Prérequis** :
 - **Sur votre machine (macOS)** :
@@ -144,13 +142,8 @@ Met à jour automatiquement tous les pupitres via SSH avec les dernières versio
 **Configuration** :
 Les IPs sont automatiquement chargées depuis la section `pupitres` de `SirenConsole/config.js`.
 
-**Configuration manuelle de l'identité des pupitres** :
-Après avoir exécuté le script, vous devez manuellement configurer `cb4techID` et `currentSirens` dans `config.json` sur chaque pupitre :
-- Pupitre à l'IP `192.168.1.41` → `cb4techID: 1`, `currentSirens: ["1"]`
-- Pupitre à l'IP `192.168.1.42` → `cb4techID: 2`, `currentSirens: ["2"]`
-- etc.
-
-Vous pouvez le faire via SSH ou en utilisant le panneau admin de chaque pupitre.
+**⚠️ Note sur `config.json`** :
+Le script **ne modifie PAS** `config.json`. Le fichier est simplement mis à jour via `git reset --hard`. Vous devez configurer manuellement `cb4techID` et `currentSirens` sur chaque pupitre selon ses besoins.
 
 **Note sur le reboot** :
 Le redémarrage prend environ 1-2 minutes. Les pupitres seront automatiquement opérationnels au démarrage grâce au script `start-raspberry.sh` configuré dans crontab.

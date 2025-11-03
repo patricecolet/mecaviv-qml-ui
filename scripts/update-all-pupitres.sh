@@ -279,23 +279,27 @@ update_pupitre() {
     fi
     print_success "Connexion établie"
     
-    # 1. Git pull puredata-abstractions
-    print_status "Git pull dans ~/dev/src/mecaviv/puredata-abstractions..."
+    # 1. Git pull puredata-abstractions (avec reset --hard pour écraser les modifications locales)
+    print_status "Mise à jour de ~/dev/src/mecaviv/puredata-abstractions..."
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-        "cd ~/dev/src/mecaviv/puredata-abstractions && GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git fetch && git pull 2>&1 || (git pull origin \$(git rev-parse --abbrev-ref HEAD) 2>&1)"; then
-        print_success "puredata-abstractions mis à jour"
+        "cd ~/dev/src/mecaviv/puredata-abstractions && \
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git fetch origin && \
+         git reset --hard origin/\$(git rev-parse --abbrev-ref HEAD)"; then
+        print_success "puredata-abstractions mis à jour (reset --hard)"
     else
-        print_error "Échec du git pull puredata-abstractions sur ${host}"
+        print_error "Échec de la mise à jour puredata-abstractions sur ${host}"
         return 1
     fi
     
-    # 2. Git pull mecaviv-qml-ui
-    print_status "Git pull dans ~/dev/src/mecaviv-qml-ui..."
+    # 2. Git pull mecaviv-qml-ui (avec reset --hard pour écraser les modifications locales)
+    print_status "Mise à jour de ~/dev/src/mecaviv-qml-ui..."
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-        "cd ~/dev/src/mecaviv-qml-ui && GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git fetch && git pull 2>&1 || (git pull origin \$(git rev-parse --abbrev-ref HEAD) 2>&1)"; then
-        print_success "mecaviv-qml-ui mis à jour"
+        "cd ~/dev/src/mecaviv-qml-ui && \
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git fetch origin && \
+         git reset --hard origin/\$(git rev-parse --abbrev-ref HEAD)"; then
+        print_success "mecaviv-qml-ui mis à jour (reset --hard)"
     else
-        print_error "Échec du git pull mecaviv-qml-ui sur ${host}"
+        print_error "Échec de la mise à jour mecaviv-qml-ui sur ${host}"
         return 1
     fi
     
