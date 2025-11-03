@@ -150,7 +150,7 @@ stop_processes() {
     echo "$(date): Arrêt des processus..."
     
     pkill -f "node server.js" 2>/dev/null || true
-    pkill -f "pd -alsamidi" 2>/dev/null || true
+    pkill -f "pd" 2>/dev/null || true
     pkill -f "chromium-browser" 2>/dev/null || true
     pkill -f "ComposeSiren" 2>/dev/null || true
     
@@ -252,7 +252,7 @@ start_composesiren() {
     echo "$(date): Démarrage de ComposeSiren..."
     
     # Attendre que le navigateur soit lancé
-    sleep 5
+    #sleep 5
     
     if command -v ComposeSiren >/dev/null 2>&1; then
         export DISPLAY=:0
@@ -298,11 +298,11 @@ main() {
     start_server
     start_puredata
     
+    # 8. Démarrer ComposeSiren
+    start_composesiren
     # 7. Démarrer le navigateur
     start_browser
     
-    # 8. Démarrer ComposeSiren
-    start_composesiren
     
     # 9. Afficher les informations
     local ip=$(get_configured_ip)

@@ -2,10 +2,11 @@ const WebSocket = require('ws');
 
 // Proxy WebSocket vers PureData - Gestion des connexions multiples
 class PureDataProxy {
-    constructor(config, server = null, broadcastToClients = null, handleParamChanged = null, handlePupitreConfig = null) {
+    constructor(config, server = null, broadcastToClients = null, handleParamChanged = null, handlePupitreConfig = null, broadcastBinaryToUIClients = null) {
         this.config = config;
         this.server = server; // Référence au serveur pour diffusion
-        this.broadcastToClients = broadcastToClients; // Fonction de diffusion directe
+        this.broadcastToClients = broadcastToClients; // Fonction de diffusion directe (JSON)
+        this.broadcastBinaryToUIClients = broadcastBinaryToUIClients; // Fonction de diffusion binaire aux clients UI
         this.handleParamChanged = handleParamChanged; // Callback pour PARAM_CHANGED depuis pupitres
         this.handlePupitreConfig = handlePupitreConfig; // Callback pour configuration complète depuis pupitres
         this.connections = new Map(); // Map des connexions par pupitre
@@ -215,9 +216,9 @@ class PureDataProxy {
         
         // Détecter si binaire (Buffer) ou texte (string)
         if (Buffer.isBuffer(message)) {
-            try {
+            /*try {
                 console.log(`📦 Binaire reçu de ${connection.pupitre.name} (${pupitreId}), taille=${message.length} bytes`);
-            } catch (_) {}
+            } catch (_) {} */
             this.handleBinaryMessage(pupitreId, message);
         } else {
             // console.log(`📥 Message JSON de ${connection.pupitre.name} (${pupitreId}):`, message.substring(0, 100));
@@ -265,6 +266,17 @@ class PureDataProxy {
                 if (data.type === 'MIDI_PLAYBACK_STATE') {
                     this.playbackStates.set(pupitreId, data);
                     // console.log(`🎵 État lecture MIDI ${connection.pupitre.name}:`, data.playing ? 'PLAY' : 'STOP', '- Position:', data.position, 'ms');
+                }
+                
+                // Traiter les messages GAME_MODE de PureData et les broadcaster à tous les pupitres
+                if (data.type === 'GAME_MODE' && this.broadcastToClients) {
+                    console.log(`🎮 GAME_MODE reçu de PureData (${pupitreId}):`, data.enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ');
+                    // Broadcaster à tous les pupitres
+                    this.broadcastToClients({
+                        type: 'GAME_MODE',
+                        enabled: data.enabled || false,
+                        source: 'puredata'
+                    });
                 }
                 
                 // Ajouter au buffer global avec info pupitre
@@ -717,6 +729,7 @@ class PureDataProxy {
     
     // Broadcaster un buffer binaire directement
     broadcastBinaryToClients(buffer, pupitreId = null) {
+        console.log('📡 broadcastBinaryToClients appelé, buffer[0]=0x' + buffer[0].toString(16).padStart(2, '0'), 'taille:', buffer.length);
         if (pupitreId) {
             // Envoyer à un pupitre spécifique
             const connection = this.connections.get(pupitreId);
@@ -731,6 +744,8 @@ class PureDataProxy {
             }
         } else {
             // Broadcaster à tous les pupitres connectés
+            const count = this.connections.size;
+            console.log('📡 Broadcast à', count, 'pupitres natifs');
             for (const [id, connection] of this.connections) {
                 if (connection.connected && connection.websocket) {
                     try {

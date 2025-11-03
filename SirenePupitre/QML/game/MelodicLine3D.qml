@@ -129,4 +129,19 @@ function noteToX(note) {
             createCube(lastSegment)
         }
     }
+    
+    // Fonction pour réinitialiser toutes les notes (appelée lors d'un stop)
+    function clearAllNotes() {
+        // Détruire toutes les notes enfants
+        for (var i = root.children.length - 1; i >= 0; i--) {
+            var child = root.children[i]
+            // Vérifier si c'est un FallingNoteCustomGeo (pas le NotePositionCalculator)
+            if (child && child.targetY !== undefined) {
+                child.destroy()
+            }
+        }
+        // Réinitialiser la référence
+        currentNote = null
+        console.log("✨ Notes effacées (stop)")
+    }
 }

@@ -83,6 +83,141 @@ Supprime tous les dossiers de build, node_modules et fichiers temporaires.
 - Supprime les logs temporaires
 - Tue tous les serveurs en cours
 
+### `update-all-pupitres.sh` - Mise à jour des pupitres
+
+Met à jour automatiquement tous les pupitres via SSH avec les dernières versions du code.
+
+```bash
+# Mise à jour simple (tous les pupitres)
+./scripts/update-all-pupitres.sh
+
+# Avec mot de passe personnalisé
+./scripts/update-all-pupitres.sh --password MOTDEPASSE
+
+# Avec redémarrage automatique
+./scripts/update-all-pupitres.sh --reboot
+
+# Pupitres spécifiques uniquement
+./scripts/update-all-pupitres.sh --pupitres "192.168.1.41,192.168.1.42"
+
+# Exclure certains pupitres
+./scripts/update-all-pupitres.sh --exclude "192.168.1.47"
+
+# Mode interactif pour sélectionner les pupitres
+./scripts/update-all-pupitres.sh --interactive
+./scripts/update-all-pupitres.sh -i  # Version courte
+
+# Combinaisons
+./scripts/update-all-pupitres.sh --pupitres "192.168.1.41,192.168.1.42" --reboot
+./scripts/update-all-pupitres.sh --exclude "192.168.1.47" --reboot --password MOTDEPASSE
+./scripts/update-all-pupitres.sh -i --reboot
+```
+
+**Options** :
+- `--password PASSWORD` : Mot de passe SSH personnalisé (défaut: SIRENS)
+- `--reboot` : Redémarre les pupitres après la mise à jour avec `sudo reboot`
+- `--pupitres IPS` : Met à jour uniquement les IPs spécifiées (séparées par des virgules)
+- `--exclude IPS` : Exclut les IPs spécifiées de la mise à jour
+- `--interactive`, `-i` : Mode interactif pour sélectionner les pupitres avec un menu numéroté
+- `--help`, `-h` : Affiche l'aide détaillée
+
+**Ce qu'il fait** :
+- Charge automatiquement les IPs depuis `SirenConsole/config.js`
+- Pour chaque pupitre :
+  1. Test de connexion SSH
+  2. `git pull` dans `~/dev/src/mecaviv/puredata-abstractions`
+  3. `git pull` dans `~/dev/src/mecaviv-qml-ui`
+  4. `rsync` de `SirenePupitre/webfiles/` vers le pupitre
+  5. (Optionnel) `sudo reboot` si `--reboot` est spécifié
+- Affiche un rapport détaillé avec réussites/échecs
+
+**⚠️ Note importante** : Le script **ne modifie PAS automatiquement** `cb4techID` et `currentSirens` dans `config.json`. Vous devez configurer ces valeurs manuellement sur chaque pupitre selon son numéro.
+
+**Prérequis** :
+- **Sur votre machine (macOS)** :
+  - `sshpass` installé : `brew install hudochenkov/sshpass/sshpass`
+- **Sur chaque pupitre (Raspberry Pi)** :
+  - L'utilisateur `sirenateur` doit avoir les droits `sudo` pour le reboot (si `--reboot` est utilisé)
+- Les pupitres doivent être accessibles sur le réseau
+- Les IPs configurées dans `SirenConsole/config.js`
+
+**Configuration** :
+Les IPs sont automatiquement chargées depuis la section `pupitres` de `SirenConsole/config.js`.
+
+**Configuration manuelle de l'identité des pupitres** :
+Après avoir exécuté le script, vous devez manuellement configurer `cb4techID` et `currentSirens` dans `config.json` sur chaque pupitre :
+- Pupitre à l'IP `192.168.1.41` → `cb4techID: 1`, `currentSirens: ["1"]`
+- Pupitre à l'IP `192.168.1.42` → `cb4techID: 2`, `currentSirens: ["2"]`
+- etc.
+
+Vous pouvez le faire via SSH ou en utilisant le panneau admin de chaque pupitre.
+
+**Note sur le reboot** :
+Le redémarrage prend environ 1-2 minutes. Les pupitres seront automatiquement opérationnels au démarrage grâce au script `start-raspberry.sh` configuré dans crontab.
+
+**Configuration sudo sans mot de passe** (si nécessaire) :
+Si l'utilisateur `sirenateur` ne peut pas exécuter `sudo reboot` sans mot de passe, configurez sudo sur chaque pupitre :
+```bash
+# Sur chaque pupitre
+sudo visudo
+# Ajoutez la ligne suivante :
+sirenateur ALL=(ALL) NOPASSWD: /sbin/reboot
+```
+
+**Mode interactif** :
+Le mode `--interactive` affiche un menu numéroté des pupitres disponibles :
+```
+📋 Pupitres disponibles :
+
+  [1] 192.168.1.41
+  [2] 192.168.1.42
+  [3] 192.168.1.43
+  ...
+
+Sélectionnez les pupitres (exemples: 1,2,5 ou 1-3 ou 'all' pour tous):
+```
+
+Exemples de sélection :
+- `1,2,5` : Pupitres 1, 2 et 5
+- `1-3` : Pupitres 1 à 3 (plage)
+- `1,3-5,7` : Pupitres 1, de 3 à 5, et 7 (combinaison)
+- `all` ou `Entrée` : Tous les pupitres
+
+**Gestion des problèmes Git** :
+Le script gère automatiquement :
+- **Authentification SSH GitHub** : Utilise la clé `~/.ssh/id_ed25519` sans avoir besoin de ssh-agent
+- **Branches sans tracking** : Essaie d'abord `git pull`, puis fallback sur `git pull origin <branch_actuelle>`
+- Les deux problèmes les plus courants lors de mises à jour distantes sont ainsi résolus
+
+### `restore-pupitres-config.sh` - Restauration du config.json
+
+Restaure `config.json` depuis Git sur les pupitres (utile en cas de corruption).
+
+```bash
+# Restaurer tous les pupitres
+./scripts/restore-pupitres-config.sh --all
+
+# Restaurer des pupitres spécifiques
+./scripts/restore-pupitres-config.sh --pupitres "192.168.1.41,192.168.1.43"
+
+# Avec mot de passe personnalisé
+./scripts/restore-pupitres-config.sh --all --password MOTDEPASSE
+```
+
+**Options** :
+- `--all` : Restaure tous les pupitres (IPs 192.168.1.41 à 192.168.1.47)
+- `--pupitres IPS` : Restaure uniquement les IPs spécifiées
+- `--password PASSWORD` : Mot de passe SSH personnalisé (défaut: SIRENS)
+
+**Ce qu'il fait** :
+- Exécute `git checkout config.json` sur chaque pupitre pour restaurer depuis Git
+- Affiche un rapport avec réussites/échecs
+
+**Quand l'utiliser** :
+- Après une corruption de `config.json` sur les pupitres
+- Pour réinitialiser la configuration à l'état du dépôt Git
+- Avant de relancer `update-all-pupitres.sh` après correction d'un bug
+
 ### Scripts PowerShell (Windows)
 
 Les scripts `.ps1` ci-dessous fonctionnent sur Windows avec PowerShell 5.1+.
@@ -122,6 +257,7 @@ Configuration rapide du projet avec CMake.
 | `./scripts/configure.sh` | `.\scripts\configure.ps1` | Configuration CMake |
 | `./scripts/build-all.sh` | ❌ (utiliser CMake) | Build tous les projets |
 | `./scripts/dev.sh` | ❌ (utiliser CMake) | Mode développement |
+| `./scripts/update-all-pupitres.sh` | ❌ (SSH Unix uniquement) | Mise à jour des pupitres |
 
 **Recommandation Windows** : Utiliser CMake directement plutôt que les scripts bash.
 

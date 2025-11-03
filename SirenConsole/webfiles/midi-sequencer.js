@@ -441,16 +441,41 @@ class MidiSequencer {
     }
     
     /**
-     * Met à jour l'état de lecture pour l'UI (sans envoyer 0x01 aux pupitres)
+     * Broadcaster la position aux pupitres (format 0x01 - 10 bytes)
      */
     broadcastPosition() {
-        if (this.pureDataProxy) {
-            this.pureDataProxy.updatePlaybackFromSequencer({
-                playing: this.playing,
-                bar: this.currentBar,
-                beatInBar: this.currentBeatInBar,
-                beat: this.currentBeat,
-            });
+        if (!this.pureDataProxy) return;
+        
+        console.log('📍 Broadcast position:', this.playing ? '▶' : '⏸', 'bar:', this.currentBar, 'beat:', this.currentBeat.toFixed(2));
+        
+        // Mettre à jour l'état interne pour l'UI
+        this.pureDataProxy.updatePlaybackFromSequencer({
+            playing: this.playing,
+            bar: this.currentBar,
+            beatInBar: this.currentBeatInBar,
+            beat: this.currentBeat,
+        });
+        
+        // Envoyer aussi le message binaire 0x01 aux pupitres natifs
+        // Format: [0x01, flags, bar_l, bar_h, beatInBar_l, beatInBar_h, beat_f32LE]
+        const buffer = Buffer.allocUnsafe(10);
+        
+        buffer.writeUInt8(0x01, 0);                          // messageType (POSITION)
+        buffer.writeUInt8(this.playing ? 0x01 : 0x00, 1);    // flags (bit0=playing)
+        buffer.writeUInt16LE(this.currentBar, 2);            // bar (uint16 LE)
+        buffer.writeUInt16LE(this.currentBeatInBar, 4);      // beatInBar (uint16 LE)
+        buffer.writeFloatLE(this.currentBeat, 6);            // beat (float32 LE)
+        
+        // Broadcaster aux pupitres natifs (Raspberry Pi)
+        this.pureDataProxy.broadcastBinaryToClients(buffer);
+        
+        // Broadcaster aussi aux clients UI (SirenePupitre WebAssembly) - format binaire identique
+        console.log('📡 Tentative broadcast aux clients UI, fonction existe:', !!this.pureDataProxy.broadcastBinaryToUIClients);
+        if (this.pureDataProxy.broadcastBinaryToUIClients) {
+            console.log('📡 Appel broadcastBinaryToUIClients...');
+            this.pureDataProxy.broadcastBinaryToUIClients(buffer);
+        } else {
+            console.log('❌ broadcastBinaryToUIClients non disponible');
         }
     }
     

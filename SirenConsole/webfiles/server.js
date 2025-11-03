@@ -275,6 +275,24 @@ function broadcastToClients(message) {
     });
 }
 
+// Fonction pour broadcaster des buffers binaires aux clients UI
+function broadcastBinaryToUIClients(buffer) {
+    console.log('📡 broadcastBinaryToUIClients appelé, clients connectés:', connectedClients.size, 'buffer[0]=0x' + buffer[0].toString(16).padStart(2, '0'));
+    let sentCount = 0;
+    connectedClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            try {
+                client.send(buffer);
+                sentCount++;
+            } catch (error) {
+                console.error('❌ Erreur envoi binaire WebSocket client:', error);
+                connectedClients.delete(client);
+            }
+        }
+    });
+    console.log('📡 Message binaire envoyé à', sentCount, 'clients UI');
+}
+
 // Convertir note MIDI + pitchbend → fréquence (Hz)
 function midiToFrequency(note, pitchbend, transposition = 0) {
     // Appliquer la transposition (octaves)
@@ -987,7 +1005,7 @@ const server = http.createServer(function (request, response) {
                     }
                     
                 } else if (command.type === 'MIDI_TRANSPORT') {
-                    // console.log('🎵 MIDI_TRANSPORT:', command.action);
+                    console.log('🎵 MIDI_TRANSPORT reçu:', command.action, 'de', command.source || 'unknown');
                     
                     switch (command.action) {
                         case 'play':
@@ -999,8 +1017,10 @@ const server = http.createServer(function (request, response) {
                             message = 'Pause';
                             break;
                         case 'stop':
+                            console.log('⏹ Appel midiSequencer.stop()...');
                             success = midiSequencer.stop();
                             message = 'Stop';
+                            console.log('⏹ Stop terminé, success:', success);
                             break;
                         default:
                             message = 'Action inconnue: ' + command.action;
@@ -1012,6 +1032,15 @@ const server = http.createServer(function (request, response) {
                         command.position = Math.floor(state.beat * midiSequencer.ppq);
                         pureDataProxy.sendCommand(command);
                     }
+                    
+                } else if (command.type === 'GAME_MODE') {
+                    console.log('🎮 GAME_MODE reçu:', command.enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ', 'de', command.source || 'unknown');
+                    
+                    // Relayer à PureData pour qu'il adapte son comportement
+                    pureDataProxy.sendCommand(command);
+                    
+                    success = true;
+                    message = command.enabled ? 'Mode jeu activé' : 'Mode jeu désactivé';
                     
                 } else if (command.type === 'MIDI_SEEK' && command.position !== undefined) {
                     // console.log('⏩ MIDI_SEEK:', command.position, 'ms');
@@ -1298,7 +1327,7 @@ async function handleParamChangedFromPupitre(pupitreId, paramPath, value) {
 // Initialiser l'API des presets et démarrer le serveur
 presetAPI.initializePresetAPI().then(() => {
     // Initialiser le proxy PureData avec la configuration SirenConsole et les handlers
-    pureDataProxy = new PureDataProxy(sirenConsoleConfig, this, broadcastToClients, handleParamChangedFromPupitre, handlePupitreConfigFromPupitre);
+    pureDataProxy = new PureDataProxy(sirenConsoleConfig, this, broadcastToClients, handleParamChangedFromPupitre, handlePupitreConfigFromPupitre, broadcastBinaryToUIClients);
     
     // Initialiser le séquenceur MIDI
     midiSequencer = new MidiSequencer(pureDataProxy);

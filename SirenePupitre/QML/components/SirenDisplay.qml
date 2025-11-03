@@ -375,95 +375,6 @@ Item {
                 }
             }
             
-            // Indicateur du mode fretté
-            Rectangle {
-                width: 120
-                height: 35
-                radius: 15
-                color: {
-                    if (!configController) return "#666666"
-                    var dummy = configController.updateCounter // Force la réévaluation
-                    var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
-                    var currentSirenId = ids.length > 0 ? ids[0] : "1"
-                    var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
-                        return siren.id === currentSirenId
-                    })?.frettedMode?.enabled || false
-                    return frettedModeEnabled ? "#FFD700" : "#666666"
-                }
-                border.color: {
-                    if (!configController) return "#888888"
-                    var dummy = configController.updateCounter // Force la réévaluation
-                    var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
-                    var currentSirenId = ids.length > 0 ? ids[0] : "1"
-                    var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
-                        return siren.id === currentSirenId
-                    })?.frettedMode?.enabled || false
-                    return frettedModeEnabled ? "#FFA500" : "#888888"
-                }
-                border.width: 2
-                anchors.left: parent.left
-                anchors.leftMargin: 30
-                anchors.top: parent.top
-                anchors.topMargin: 150
-                visible: {
-                    if (!configController) return true
-                    var dummy = configController.updateCounter
-                    return configController.isComponentVisible("sirenCircle")
-                }
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: "FRETTÉ"
-                    font.pixelSize: 14
-                    font.bold: true
-                    color: {
-                        if (!configController) return "#CCCCCC"
-                        var dummy = configController.updateCounter // Force la réévaluation
-                        var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
-                        var currentSirenId = ids.length > 0 ? ids[0] : "1"
-                        var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
-                            return siren.id === currentSirenId
-                        })?.frettedMode?.enabled || false
-                        return frettedModeEnabled ? "#000000" : "#CCCCCC"
-                    }
-                }
-                
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (configController) {
-                            var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
-                            var currentSirenId = ids.length > 0 ? ids[0] : "1"
-                            var sirens = configController.getValueAtPath(["sirenConfig", "sirens"], [])
-                            var currentSiren = sirens.find(function(siren) {
-                                return siren.id === currentSirenId
-                            })
-                            
-                            if (currentSiren) {
-                                var currentValue = currentSiren.frettedMode?.enabled || false
-                                
-                                // Trouver l'index de la sirène dans le tableau
-                                var sirenIndex = sirens.findIndex(function(siren) {
-                                    return siren.id === currentSirenId
-                                })
-                                
-                                if (sirenIndex >= 0) {
-                                    var newValue = !currentValue
-                                    var success = configController.setValueAtPath(["sirenConfig", "sirens", sirenIndex, "frettedMode", "enabled"], newValue)
-                                    
-                                    // Vérifier immédiatement si la valeur a changé
-                                    var updatedSirens = configController.getValueAtPath(["sirenConfig", "sirens"], [])
-                                    var updatedSiren = updatedSirens[sirenIndex]
-                                }
-                            } else {
-                            }
-                        } else {
-                        }
-                    }
-                }
-            }
-            
             // Encadré avec détails de la note (tout en haut au centre)
             Rectangle {
                 width: 120
@@ -548,6 +459,8 @@ Item {
             onLoaded: {
                 if (item) {
                     item.configController = root.configController;
+                    // Connecter le panneau au mode jeu pour la réinitialisation lors du stop
+                    item.gameMode = root.gameModeComponent;
                 }
             }
         }

@@ -8,11 +8,29 @@ Item {
     property string currentSongTitle: ""  // Titre du morceau en cours
     property bool isPlaying: false  // État de la lecture
     
+    // Propriétés pour détecter le stop
+    property real previousBeat: -1
+    property var gameMode: null  // Référence à GameMode (définie par le parent)
+    
     // Connexion au signal de position de lecture pour suivre l'état
     Component.onCompleted: {
         if (root.configController && root.configController.webSocketController) {
             root.configController.webSocketController.playbackPositionReceived.connect(function(playing, bar, beatInBar, beat) {
-                root.isPlaying = playing;
+                // Détecter un stop (passage à beat = 0)
+                var wasPlaying = root.isPlaying
+                var isStopped = (!playing && beat === 0.0 && bar === 1 && beatInBar === 1)
+                
+                // Si on détecte un stop, réinitialiser le mode jeu
+                if (isStopped && (root.previousBeat > 0 || wasPlaying)) {
+                    console.log("⏹ Stop détecté - Réinitialisation du mode jeu")
+                    if (root.gameMode) {
+                        root.gameMode.resetGame()
+                    }
+                }
+                
+                // Mettre à jour l'état
+                root.isPlaying = playing
+                root.previousBeat = beat
             });
         }
     }
@@ -88,110 +106,6 @@ Item {
                     // Charger la liste des fichiers depuis l'API HTTP
                     root.loadMidiFilesList();
                     songSelectorDialog.open();
-                }
-            }
-        }
-        
-        // ▶ Play
-        Rectangle {
-            width: 44
-            height: 44
-            radius: 8
-            color: root.isPlaying ? "#1a5a3a" : "#2a2a2a"  // Vert foncé quand en lecture
-            border.color: root.isPlaying ? "#4ade80" : "#6bb6ff"  // Bordure verte quand en lecture
-            border.width: root.isPlaying ? 2 : 1
-            
-            // Animation de pulsation quand en lecture
-            SequentialAnimation on opacity {
-                running: root.isPlaying
-                loops: Animation.Infinite
-                NumberAnimation { from: 1.0; to: 0.7; duration: 800 }
-                NumberAnimation { from: 0.7; to: 1.0; duration: 800 }
-            }
-            
-            Text {
-                anchors.centerIn: parent
-                text: "▶︎"
-                color: root.isPlaying ? "#4ade80" : "#fff"  // Texte vert quand en lecture
-                font.pixelSize: 18
-            }
-            
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    if (root.configController && root.configController.webSocketController) {
-                        root.configController.webSocketController.sendBinaryMessage({
-                            type: "MIDI_TRANSPORT",
-                            action: "play",
-                            source: "pupitre"
-                        });
-                        // Mettre à jour l'état localement (sera confirmé par le signal)
-                        root.isPlaying = true;
-                    }
-                }
-            }
-        }
-        
-        // ⏸ Pause
-        Rectangle {
-            width: 44
-            height: 44
-            radius: 8
-            color: "#2a2a2a"
-            border.color: "#6bb6ff"
-            border.width: 1
-            
-            Text {
-                anchors.centerIn: parent
-                text: "⏸"
-                color: "#fff"
-                font.pixelSize: 18
-            }
-            
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    if (root.configController && root.configController.webSocketController) {
-                        root.configController.webSocketController.sendBinaryMessage({
-                            type: "MIDI_TRANSPORT",
-                            action: "pause",
-                            source: "pupitre"
-                        });
-                        // Mettre à jour l'état localement
-                        root.isPlaying = false;
-                    }
-                }
-            }
-        }
-        
-        // ⏹ Stop
-        Rectangle {
-            width: 44
-            height: 44
-            radius: 8
-            color: "#2a2a2a"
-            border.color: "#6bb6ff"
-            border.width: 1
-            
-            Text {
-                anchors.centerIn: parent
-                text: "⏹"
-                color: "#fff"
-                font.pixelSize: 18
-            }
-            
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    if (root.configController && root.configController.webSocketController) {
-                        root.configController.webSocketController.sendBinaryMessage({
-                            type: "MIDI_TRANSPORT",
-                            action: "stop",
-                            source: "pupitre"
-                        });
-                        // Mettre à jour l'état localement
-                        root.isPlaying = false;
-                    }
                 }
             }
         }

@@ -177,14 +177,24 @@ Node {
         gameActive = true
     }
     
-    // Fonction pour arrêter le jeu
-    function stopGame() {
+    // Fonction pour réinitialiser le mode jeu (appelée lors d'un stop)
+    function resetGame() {
+        // Vider les événements MIDI
+        midiEvents = []
+        lineSegmentsData = []
         gameActive = false
+        gameStartTime = 0
+        
+        // Effacer toutes les notes en vol
+        if (melodicLine) {
+            melodicLine.clearAllNotes()
+        }
+        
+        console.log("🔄 Mode jeu réinitialisé (stop)")
     }
     
-    // Fonction pour réinitialiser
-    function resetGame() {
-        midiEvents = []
+    // Fonction pour arrêter le jeu
+    function stopGame() {
         gameActive = false
     }
     

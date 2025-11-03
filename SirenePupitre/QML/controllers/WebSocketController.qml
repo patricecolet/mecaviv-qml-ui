@@ -25,6 +25,7 @@ Item {
     signal controlChangeReceived(int ccNumber, int ccValue)  // Signal pour les CC MIDI
     signal playbackPositionReceived(bool playing, int bar, int beatInBar, real beat)  // Position lecture
     signal filesListReceived(var categories)  // Liste fichiers MIDI
+    signal gameModeReceived(bool enabled)  // Mode jeu activé/désactivé par le serveur
     property var configController: null
     
     // Propriétés pour la réception binaire
@@ -136,6 +137,8 @@ Item {
                     // Décoder float32 little-endian pour beat
                     var f0 = bytes[6], f1 = bytes[7], f2 = bytes[8], f3 = bytes[9];
                     var beat = new DataView(Uint8Array.of(f0, f1, f2, f3).buffer).getFloat32(0, true);
+                    
+                    console.log("📍 Position reçue:", playing ? "▶" : "⏸", "bar:", bar, "beat:", beatInBar, "total:", beat.toFixed(2));
                     
                     // Émettre le signal
                     controller.playbackPositionReceived(playing, bar, beatInBar, beat);
@@ -359,6 +362,14 @@ Item {
                 // MIDI_FILES_LIST - Liste des fichiers MIDI disponibles
                 if (data.type === "MIDI_FILES_LIST") {
                     controller.filesListReceived(data.categories || []);
+                    return;
+                }
+                
+                // GAME_MODE - Changement de mode jeu/normal depuis le serveur (PureData)
+                if (data.type === "GAME_MODE") {
+                    var enabled = data.enabled || false;
+                    console.log("🎮 Mode jeu reçu du serveur:", enabled ? "ACTIVÉ" : "DÉSACTIVÉ");
+                    controller.gameModeReceived(enabled);
                     return;
                 }
                 
