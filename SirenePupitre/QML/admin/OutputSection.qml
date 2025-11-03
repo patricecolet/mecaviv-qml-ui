@@ -149,7 +149,7 @@ Item {
                     CheckBox {
                         id: composeSirenCheckbox
                         text: "ComposeSirene via midi interne"
-                        checked: root.configController ? root.configController.getValueAtPath(["outputConfig", "composeSirenEnabled"], true) : true
+                        checked: root.configController ? root.configController.getValueAtPath(["composeSiren", "enabled"], true) : true
                         
                         contentItem: Text {
                             text: parent.text
@@ -182,7 +182,7 @@ Item {
                         
                         onClicked: {
                             if (root.configController) {
-                                root.configController.setValueAtPath(["outputConfig", "composeSirenEnabled"], checked)
+                                root.configController.setValueAtPath(["composeSiren", "enabled"], checked)
                             }
                         }
                     }
@@ -232,7 +232,7 @@ Item {
                         Layout.fillWidth: true
                         from: 0
                         to: 127
-                        value: root.configController ? root.configController.getValueAtPath(["outputConfig", "composeSirenVolume"], 100) : 100
+                        value: root.configController ? root.configController.getValueAtPath(["composeSiren", "controllers", "masterVolume", "value"], 100) : 100
                         stepSize: 1
                         
                         background: Rectangle {
@@ -272,7 +272,7 @@ Item {
                         
                         onPressedChanged: {
                             if (!pressed && root.configController) {
-                                root.configController.setValueAtPath(["outputConfig", "composeSirenVolume"], Math.round(value))
+                                root.configController.setValueAtPath(["composeSiren", "controllers", "masterVolume", "value"], Math.round(value))
                             }
                         }
                     }
@@ -307,6 +307,478 @@ Item {
                 }
             }
             
+            // Section Reverb
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: reverbColumn.implicitHeight + 40
+                color: "#1a1a1a"
+                border.color: "#333"
+                border.width: 1
+                radius: 5
+                
+                ColumnLayout {
+                    id: reverbColumn
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 15
+                    
+                    // Titre et activation
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        
+                        Text {
+                            text: "Reverb"
+                            color: "#CCC"
+                            font.pixelSize: 18
+                            font.bold: true
+                            Layout.fillWidth: true
+                        }
+                        
+                        CheckBox {
+                            id: reverbEnableCheckbox
+                            checked: root.configController ? root.configController.getValueAtPath(["composeSiren", "controllers", "reverbEnable", "value"], 127) >= 64 : true
+                            
+                            contentItem: Text {
+                                text: "Activé"
+                                color: parent.checked ? "#00FF00" : "#AAA"
+                                font.pixelSize: 14
+                                leftPadding: parent.indicator.width + parent.spacing
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            
+                            indicator: Rectangle {
+                                implicitWidth: 20
+                                implicitHeight: 20
+                                x: reverbEnableCheckbox.leftPadding
+                                y: parent.height / 2 - height / 2
+                                radius: 3
+                                border.color: reverbEnableCheckbox.checked ? "#00FF00" : "#666"
+                                border.width: 2
+                                color: "transparent"
+                                
+                                Rectangle {
+                                    width: 12
+                                    height: 12
+                                    x: 4
+                                    y: 4
+                                    radius: 2
+                                    color: "#00FF00"
+                                    visible: reverbEnableCheckbox.checked
+                                }
+                            }
+                            
+                            onClicked: {
+                                if (root.configController) {
+                                    root.configController.setValueAtPath(["composeSiren", "controllers", "reverbEnable", "value"], checked ? 127 : 0)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Room Size
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        
+                        Text {
+                            text: "Room Size"
+                            color: "#AAA"
+                            font.pixelSize: 14
+                            Layout.preferredWidth: 120
+                        }
+                        
+                        Slider {
+                            id: roomSizeSlider
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 127
+                            value: root.configController ? root.configController.getValueAtPath(["composeSiren", "controllers", "roomSize", "value"], 64) : 64
+                            stepSize: 1
+                            
+                            background: Rectangle {
+                                x: roomSizeSlider.leftPadding
+                                y: roomSizeSlider.topPadding + roomSizeSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 200
+                                implicitHeight: 4
+                                width: roomSizeSlider.availableWidth
+                                height: implicitHeight
+                                radius: 2
+                                color: "#333"
+                                
+                                Rectangle {
+                                    width: roomSizeSlider.visualPosition * parent.width
+                                    height: parent.height
+                                    color: "#4CAF50"
+                                    radius: 2
+                                }
+                            }
+                            
+                            handle: Rectangle {
+                                x: roomSizeSlider.leftPadding + roomSizeSlider.visualPosition * (roomSizeSlider.availableWidth - width)
+                                y: roomSizeSlider.topPadding + roomSizeSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 16
+                                implicitHeight: 16
+                                radius: 8
+                                color: roomSizeSlider.pressed ? "#4CAF50" : "#FFF"
+                                border.color: "#4CAF50"
+                                border.width: 2
+                            }
+                            
+                            onPressedChanged: {
+                                if (!pressed && root.configController) {
+                                    root.configController.setValueAtPath(["composeSiren", "controllers", "roomSize", "value"], Math.round(value))
+                                }
+                            }
+                        }
+                        
+                        Text {
+                            text: Math.round(roomSizeSlider.value)
+                            color: "#4CAF50"
+                            font.pixelSize: 14
+                            font.bold: true
+                            Layout.preferredWidth: 40
+                            horizontalAlignment: Text.AlignRight
+                        }
+                    }
+                    
+                    // Dry/Wet
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        
+                        Text {
+                            text: "Dry/Wet"
+                            color: "#AAA"
+                            font.pixelSize: 14
+                            Layout.preferredWidth: 120
+                        }
+                        
+                        Slider {
+                            id: dryWetSlider
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 127
+                            value: root.configController ? root.configController.getValueAtPath(["composeSiren", "controllers", "dryWet", "value"], 38) : 38
+                            stepSize: 1
+                            
+                            background: Rectangle {
+                                x: dryWetSlider.leftPadding
+                                y: dryWetSlider.topPadding + dryWetSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 200
+                                implicitHeight: 4
+                                width: dryWetSlider.availableWidth
+                                height: implicitHeight
+                                radius: 2
+                                color: "#333"
+                                
+                                Rectangle {
+                                    width: dryWetSlider.visualPosition * parent.width
+                                    height: parent.height
+                                    color: "#2196F3"
+                                    radius: 2
+                                }
+                            }
+                            
+                            handle: Rectangle {
+                                x: dryWetSlider.leftPadding + dryWetSlider.visualPosition * (dryWetSlider.availableWidth - width)
+                                y: dryWetSlider.topPadding + dryWetSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 16
+                                implicitHeight: 16
+                                radius: 8
+                                color: dryWetSlider.pressed ? "#2196F3" : "#FFF"
+                                border.color: "#2196F3"
+                                border.width: 2
+                            }
+                            
+                            onPressedChanged: {
+                                if (!pressed && root.configController) {
+                                    root.configController.setValueAtPath(["composeSiren", "controllers", "dryWet", "value"], Math.round(value))
+                                }
+                            }
+                        }
+                        
+                        Text {
+                            text: Math.round(dryWetSlider.value)
+                            color: "#2196F3"
+                            font.pixelSize: 14
+                            font.bold: true
+                            Layout.preferredWidth: 40
+                            horizontalAlignment: Text.AlignRight
+                        }
+                    }
+                    
+                    // Damp
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        
+                        Text {
+                            text: "Damping"
+                            color: "#AAA"
+                            font.pixelSize: 14
+                            Layout.preferredWidth: 120
+                        }
+                        
+                        Slider {
+                            id: dampSlider
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 127
+                            value: root.configController ? root.configController.getValueAtPath(["composeSiren", "controllers", "damp", "value"], 64) : 64
+                            stepSize: 1
+                            
+                            background: Rectangle {
+                                x: dampSlider.leftPadding
+                                y: dampSlider.topPadding + dampSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 200
+                                implicitHeight: 4
+                                width: dampSlider.availableWidth
+                                height: implicitHeight
+                                radius: 2
+                                color: "#333"
+                                
+                                Rectangle {
+                                    width: dampSlider.visualPosition * parent.width
+                                    height: parent.height
+                                    color: "#FF9800"
+                                    radius: 2
+                                }
+                            }
+                            
+                            handle: Rectangle {
+                                x: dampSlider.leftPadding + dampSlider.visualPosition * (dampSlider.availableWidth - width)
+                                y: dampSlider.topPadding + dampSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 16
+                                implicitHeight: 16
+                                radius: 8
+                                color: dampSlider.pressed ? "#FF9800" : "#FFF"
+                                border.color: "#FF9800"
+                                border.width: 2
+                            }
+                            
+                            onPressedChanged: {
+                                if (!pressed && root.configController) {
+                                    root.configController.setValueAtPath(["composeSiren", "controllers", "damp", "value"], Math.round(value))
+                                }
+                            }
+                        }
+                        
+                        Text {
+                            text: Math.round(dampSlider.value)
+                            color: "#FF9800"
+                            font.pixelSize: 14
+                            font.bold: true
+                            Layout.preferredWidth: 40
+                            horizontalAlignment: Text.AlignRight
+                        }
+                    }
+                    
+                    // Width
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        
+                        Text {
+                            text: "Stereo Width"
+                            color: "#AAA"
+                            font.pixelSize: 14
+                            Layout.preferredWidth: 120
+                        }
+                        
+                        Slider {
+                            id: reverbWidthSlider
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 127
+                            value: root.configController ? root.configController.getValueAtPath(["composeSiren", "controllers", "reverbWidth", "value"], 64) : 64
+                            stepSize: 1
+                            
+                            background: Rectangle {
+                                x: reverbWidthSlider.leftPadding
+                                y: reverbWidthSlider.topPadding + reverbWidthSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 200
+                                implicitHeight: 4
+                                width: reverbWidthSlider.availableWidth
+                                height: implicitHeight
+                                radius: 2
+                                color: "#333"
+                                
+                                Rectangle {
+                                    width: reverbWidthSlider.visualPosition * parent.width
+                                    height: parent.height
+                                    color: "#9C27B0"
+                                    radius: 2
+                                }
+                            }
+                            
+                            handle: Rectangle {
+                                x: reverbWidthSlider.leftPadding + reverbWidthSlider.visualPosition * (reverbWidthSlider.availableWidth - width)
+                                y: reverbWidthSlider.topPadding + reverbWidthSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 16
+                                implicitHeight: 16
+                                radius: 8
+                                color: reverbWidthSlider.pressed ? "#9C27B0" : "#FFF"
+                                border.color: "#9C27B0"
+                                border.width: 2
+                            }
+                            
+                            onPressedChanged: {
+                                if (!pressed && root.configController) {
+                                    root.configController.setValueAtPath(["composeSiren", "controllers", "reverbWidth", "value"], Math.round(value))
+                                }
+                            }
+                        }
+                        
+                        Text {
+                            text: Math.round(reverbWidthSlider.value)
+                            color: "#9C27B0"
+                            font.pixelSize: 14
+                            font.bold: true
+                            Layout.preferredWidth: 40
+                            horizontalAlignment: Text.AlignRight
+                        }
+                    }
+                }
+            }
+            
+            // Section Limiter
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: limiterColumn.implicitHeight + 40
+                color: "#1a1a1a"
+                border.color: "#333"
+                border.width: 1
+                radius: 5
+                
+                ColumnLayout {
+                    id: limiterColumn
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 15
+                    
+                    // Titre et activation
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        
+                        Text {
+                            text: "Limiter"
+                            color: "#CCC"
+                            font.pixelSize: 18
+                            font.bold: true
+                            Layout.fillWidth: true
+                        }
+                        
+                        CheckBox {
+                            id: limiterEnableCheckbox
+                            checked: root.configController ? root.configController.getValueAtPath(["composeSiren", "controllers", "limiterEnable", "value"], 127) >= 64 : true
+                            
+                            contentItem: Text {
+                                text: "Activé"
+                                color: parent.checked ? "#FF5722" : "#AAA"
+                                font.pixelSize: 14
+                                leftPadding: parent.indicator.width + parent.spacing
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            
+                            indicator: Rectangle {
+                                implicitWidth: 20
+                                implicitHeight: 20
+                                x: limiterEnableCheckbox.leftPadding
+                                y: parent.height / 2 - height / 2
+                                radius: 3
+                                border.color: limiterEnableCheckbox.checked ? "#FF5722" : "#666"
+                                border.width: 2
+                                color: "transparent"
+                                
+                                Rectangle {
+                                    width: 12
+                                    height: 12
+                                    x: 4
+                                    y: 4
+                                    radius: 2
+                                    color: "#FF5722"
+                                    visible: limiterEnableCheckbox.checked
+                                }
+                            }
+                            
+                            onClicked: {
+                                if (root.configController) {
+                                    root.configController.setValueAtPath(["composeSiren", "controllers", "limiterEnable", "value"], checked ? 127 : 0)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Threshold
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        
+                        Text {
+                            text: "Threshold"
+                            color: "#AAA"
+                            font.pixelSize: 14
+                            Layout.preferredWidth: 120
+                        }
+                        
+                        Slider {
+                            id: limiterThresholdSlider
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 127
+                            value: root.configController ? root.configController.getValueAtPath(["composeSiren", "controllers", "limiterThreshold", "value"], 100) : 100
+                            stepSize: 1
+                            
+                            background: Rectangle {
+                                x: limiterThresholdSlider.leftPadding
+                                y: limiterThresholdSlider.topPadding + limiterThresholdSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 200
+                                implicitHeight: 4
+                                width: limiterThresholdSlider.availableWidth
+                                height: implicitHeight
+                                radius: 2
+                                color: "#333"
+                                
+                                Rectangle {
+                                    width: limiterThresholdSlider.visualPosition * parent.width
+                                    height: parent.height
+                                    color: "#FF5722"
+                                    radius: 2
+                                }
+                            }
+                            
+                            handle: Rectangle {
+                                x: limiterThresholdSlider.leftPadding + limiterThresholdSlider.visualPosition * (limiterThresholdSlider.availableWidth - width)
+                                y: limiterThresholdSlider.topPadding + limiterThresholdSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 16
+                                implicitHeight: 16
+                                radius: 8
+                                color: limiterThresholdSlider.pressed ? "#FF5722" : "#FFF"
+                                border.color: "#FF5722"
+                                border.width: 2
+                            }
+                            
+                            onPressedChanged: {
+                                if (!pressed && root.configController) {
+                                    root.configController.setValueAtPath(["composeSiren", "controllers", "limiterThreshold", "value"], Math.round(value))
+                                }
+                            }
+                        }
+                        
+                        Text {
+                            text: Math.round(limiterThresholdSlider.value)
+                            color: "#FF5722"
+                            font.pixelSize: 14
+                            font.bold: true
+                            Layout.preferredWidth: 40
+                            horizontalAlignment: Text.AlignRight
+                        }
+                    }
+                }
+            }
+            
             Item { Layout.fillHeight: true }
         }
     }
@@ -320,12 +792,41 @@ Item {
             udpRadio.checked = (currentSirenMode === "udp")
             rtpmidiRadio.checked = (currentSirenMode === "rtpmidi")
             
-            var composeSirenEnabled = root.configController.getValueAtPath(["outputConfig", "composeSirenEnabled"], true)
+            // ComposeSiren Enable
+            var composeSirenEnabled = root.configController.getValueAtPath(["composeSiren", "enabled"], true)
             composeSirenCheckbox.checked = composeSirenEnabled
             
-            var currentVolume = root.configController.getValueAtPath(["outputConfig", "composeSirenVolume"], 100)
+            // Master Volume
+            var currentVolume = root.configController.getValueAtPath(["composeSiren", "controllers", "masterVolume", "value"], 100)
             if (!volumeSlider.pressed) {
                 volumeSlider.value = currentVolume
+            }
+            
+            // Reverb Enable
+            var reverbEnabled = root.configController.getValueAtPath(["composeSiren", "controllers", "reverbEnable", "value"], 127)
+            reverbEnableCheckbox.checked = (reverbEnabled >= 64)
+            
+            // Reverb Parameters
+            if (!roomSizeSlider.pressed) {
+                roomSizeSlider.value = root.configController.getValueAtPath(["composeSiren", "controllers", "roomSize", "value"], 64)
+            }
+            if (!dryWetSlider.pressed) {
+                dryWetSlider.value = root.configController.getValueAtPath(["composeSiren", "controllers", "dryWet", "value"], 38)
+            }
+            if (!dampSlider.pressed) {
+                dampSlider.value = root.configController.getValueAtPath(["composeSiren", "controllers", "damp", "value"], 64)
+            }
+            if (!reverbWidthSlider.pressed) {
+                reverbWidthSlider.value = root.configController.getValueAtPath(["composeSiren", "controllers", "reverbWidth", "value"], 64)
+            }
+            
+            // Limiter Enable
+            var limiterEnabled = root.configController.getValueAtPath(["composeSiren", "controllers", "limiterEnable", "value"], 127)
+            limiterEnableCheckbox.checked = (limiterEnabled >= 64)
+            
+            // Limiter Threshold
+            if (!limiterThresholdSlider.pressed) {
+                limiterThresholdSlider.value = root.configController.getValueAtPath(["composeSiren", "controllers", "limiterThreshold", "value"], 100)
             }
         }
     }

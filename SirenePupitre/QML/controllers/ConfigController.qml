@@ -54,9 +54,13 @@ QtObject {
         },
         "reverbConfig": { "enabled": true },
         "outputConfig": {
-            "sirenMode": "udp",
-            "composeSirenEnabled": true,
-            "composeSirenVolume": 100
+            "sirenMode": "udp"
+        },
+        "composeSiren": {
+            "enabled": true,
+            "controllers": {
+                "masterVolume": { "cc": 7, "value": 100 }
+            }
         }
     })
     property var currentSirens: []
@@ -165,6 +169,7 @@ QtObject {
         
         // Envoyer à PureData seulement si ce n'est pas la console qui a initié
         if (webSocketController && webSocketController.connected && (source === undefined || source !== "console")) {
+            // Envoyer le changement de paramètre individuel
             webSocketController.sendMessage({
                 type: "PARAM_CHANGED",
                 source: "pupitre",
@@ -172,21 +177,19 @@ QtObject {
                 value: finalValue
             })
             
-            // Message spécifique pour les changements de configuration de sortie
-            if (path.join(".") === "outputConfig.sirenMode" || 
-                path.join(".") === "outputConfig.composeSirenEnabled" ||
-                path.join(".") === "outputConfig.composeSirenVolume") {
+            // Pour les contrôleurs composeSiren, envoyer aussi un message spécifique avec le CC
+            if (path.join(".").startsWith("composeSiren.controllers.") && path.length === 4 && path[3] === "value") {
+                var controllerName = path[2] // Ex: "masterVolume", "reverbEnable", etc.
+                var controllerConfig = getValueAtPath(["composeSiren", "controllers", controllerName], null)
                 
-                var sirenMode = getValueAtPath(["outputConfig", "sirenMode"], "udp")
-                var composeSirenEnabled = getValueAtPath(["outputConfig", "composeSirenEnabled"], true)
-                var composeSirenVolume = getValueAtPath(["outputConfig", "composeSirenVolume"], 100)
-                
-                webSocketController.sendMessage({
-                    type: "OUTPUT_CONFIG_CHANGED",
-                    sirenMode: sirenMode,
-                    composeSirenEnabled: composeSirenEnabled,
-                    composeSirenVolume: composeSirenVolume
-                })
+                if (controllerConfig && controllerConfig.cc !== undefined) {
+                    webSocketController.sendMessage({
+                        type: "COMPOSESIREN_CC_CHANGED",
+                        controllerName: controllerName,
+                        cc: controllerConfig.cc,
+                        value: finalValue
+                    })
+                }
             }
         }
         

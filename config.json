@@ -203,13 +203,80 @@
     "enabled": true,
     "roomSize": 0.5,
     "dryWet": 0.3,
-    "damp": 0.5
+    "damp": 0.5,
+    "hp": 300,
+    "lp": 20000,
+    "width": 0.5
   },
   
   "outputConfig": {
-    "sirenMode": "udp",
-    "composeSirenEnabled": true,
-    "composeSirenVolume": 100
+    "sirenMode": "udp"
+  },
+
+  "composeSiren": {
+    "enabled": true,
+    "controllers": {
+      "masterVolume": {
+        "cc": 7,
+        "value": 100,
+        "range": "0-127",
+        "description": "Volume principal global"
+      },
+      "reverbEnable": {
+        "cc": 64,
+        "value": 127,
+        "values": "0-63=OFF, 64-127=ON",
+        "description": "Activation reverb"
+      },
+      "roomSize": {
+        "cc": 65,
+        "value": 64,
+        "range": "0-127",
+        "description": "Taille de la pièce"
+      },
+      "dryWet": {
+        "cc": 66,
+        "value": 38,
+        "range": "0-127",
+        "description": "Mélange dry/wet"
+      },
+      "damp": {
+        "cc": 67,
+        "value": 64,
+        "range": "0-127",
+        "description": "Amortissement HF"
+      },
+      "reverbHPF": {
+        "cc": 68,
+        "value": 15,
+        "range": "0-127 (20Hz-2kHz)",
+        "description": "Highpass filter"
+      },
+      "reverbLPF": {
+        "cc": 69,
+        "value": 127,
+        "range": "0-127 (2kHz-20kHz)",
+        "description": "Lowpass filter"
+      },
+      "reverbWidth": {
+        "cc": 70,
+        "value": 64,
+        "range": "0-127",
+        "description": "Largeur stéréo"
+      },
+      "limiterEnable": {
+        "cc": 72,
+        "value": 127,
+        "values": "0-63=OFF, 64-127=ON",
+        "description": "Activation limiteur"
+      },
+      "limiterThreshold": {
+        "cc": 73,
+        "value": 100,
+        "range": "0-127",
+        "description": "Seuil du limiteur"
+      }
+    }
   }
 }
 
