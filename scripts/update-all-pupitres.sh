@@ -11,6 +11,10 @@ REBOOT_AFTER_UPDATE=false
 SELECTED_PUPITRES=""
 EXCLUDED_PUPITRES=""
 INTERACTIVE_MODE=false
+BUILD_COMPOSESIREN=false
+BUILD_ONLY=false
+COMPOSESIREN_DEB=""
+BUILDER_IP=""
 
 # Fonction d'aide
 show_help() {
@@ -24,6 +28,9 @@ show_help() {
     echo "  --exclude IPS             Exclut les IPs spécifiées"
     echo "                            Exemple: --exclude \"192.168.1.47\""
     echo "  --interactive, -i         Mode interactif pour sélectionner les pupitres"
+    echo "  --build-composesiren      Compile et package ComposeSiren sur un Raspberry sélectionné"
+    echo "  --build-only              Compile uniquement ComposeSiren (implique --build-composesiren)"
+    echo "  --composesiren-deb PATH   Utilise ce package .deb pour l'installation (dpkg -i)"
     echo "  --help, -h                Affiche cette aide"
     echo ""
     echo "Exemples:"
@@ -55,6 +62,19 @@ while [[ $# -gt 0 ]]; do
     --interactive|-i)
       INTERACTIVE_MODE=true
       shift
+      ;;
+    --build-composesiren)
+      BUILD_COMPOSESIREN=true
+      shift
+      ;;
+    --build-only)
+      BUILD_COMPOSESIREN=true
+      BUILD_ONLY=true
+      shift
+      ;;
+    --composesiren-deb)
+      COMPOSESIREN_DEB="$2"
+      shift 2
       ;;
     --help|-h)
       show_help
@@ -98,6 +118,77 @@ print_error() {
 # Fonction pour afficher l'info
 print_info() {
     echo -e "${CYAN}ℹ️  $1${NC}"
+}
+
+# Normaliser le chemin du package ComposeSiren si fourni
+if [ -n "$COMPOSESIREN_DEB" ]; then
+    if [ ! -f "$COMPOSESIREN_DEB" ]; then
+        print_error "Package ComposeSiren introuvable: $COMPOSESIREN_DEB"
+        exit 1
+    fi
+    COMPOSESIREN_DEB="$(cd "$(dirname "$COMPOSESIREN_DEB")" && pwd)/$(basename "$COMPOSESIREN_DEB")"
+    print_info "Package ComposeSiren : $COMPOSESIREN_DEB"
+fi
+
+# Fonction pour sélectionner un builder (utilisé avec --build-composesiren)
+select_builder() {
+    echo -e "${BLUE}🛠️ Sélection du Raspberry builder :${NC}"
+    echo ""
+    local i=1
+    for ip in "${PUPITRE_IPS[@]}"; do
+        echo -e "  ${CYAN}[$i]${NC} $ip"
+        ((i++))
+    done
+    echo ""
+    echo -e "${YELLOW}Choisissez le builder (1 par défaut, Entrée pour continuer) :${NC}"
+    read -r selection
+    if [ -z "$selection" ]; then
+        selection=1
+    fi
+    if ! [[ "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt ${#PUPITRE_IPS[@]} ]; then
+        print_info "Sélection invalide, utilisation du premier pupitre de la liste."
+        selection=1
+    fi
+    BUILDER_IP=${PUPITRE_IPS[$((selection-1))]}
+    echo ""
+    print_info "Builder sélectionné : ${BUILDER_IP}"
+}
+
+# Fonction pour lancer la compilation/package ComposeSiren sur un Raspberry dédié
+build_composesiren_on() {
+    local host=$1
+    
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}🛠️ Build ComposeSiren sur: ${host}${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    
+    print_status "Test de connexion à ${host}..."
+    if ! test_ssh_connection ${host}; then
+        print_error "Impossible de se connecter à ${host} (timeout ou refus)"
+        return 1
+    fi
+    print_success "Connexion builder établie"
+    
+    print_status "Mise à jour de ~/dev/src/ComposeSiren..."
+    if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "cd ~/dev/src/ComposeSiren && \
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+        print_error "Échec du git pull ComposeSiren sur ${host}"
+        return 1
+    fi
+    print_success "Repository ComposeSiren mis à jour"
+    
+    print_status "Compilation et packaging ComposeSiren..."
+    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "cd ~/dev/src/ComposeSiren && ./scripts/deploy-raspberry.sh"; then
+        print_success "Build ComposeSiren terminé"
+    else
+        print_error "Échec du déploiement/packaging ComposeSiren sur ${host}"
+        return 1
+    fi
+    
+    return 0
 }
 
 # Charger les IPs depuis SirenConsole/config.js
@@ -254,6 +345,29 @@ for ip in "${PUPITRE_IPS[@]}"; do
 done
 echo ""
 
+# Étape optionnelle de build ComposeSiren
+if [ "$BUILD_COMPOSESIREN" = true ]; then
+    if [ ${#PUPITRE_IPS[@]} -eq 0 ]; then
+        print_error "Aucun pupitre disponible pour sélectionner un builder"
+        exit 1
+    fi
+    
+    select_builder
+    if ! build_composesiren_on "$BUILDER_IP"; then
+        print_error "Échec de la phase build ComposeSiren"
+        exit 1
+    fi
+    
+    echo ""
+    print_success "Phase build ComposeSiren terminée avec succès"
+    echo ""
+    
+    if [ "$BUILD_ONLY" = true ]; then
+        print_info "Mode build-only demandé : fin du script après la compilation."
+        exit 0
+    fi
+fi
+
 # Fonction pour tester la connexion SSH
 test_ssh_connection() {
     local host=$1
@@ -301,14 +415,36 @@ update_pupitre() {
         return 1
     fi
     
-    # 3. Déploiement ComposeSiren
-    print_status "Déploiement de ComposeSiren sur ${host}..."
-    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-        "cd ~/dev/src/ComposeSiren && ./scripts/deploy-raspberry.sh"; then
-        print_success "ComposeSiren déployé"
+    # 3. Installation ComposeSiren via package
+    if [ -n "$COMPOSESIREN_DEB" ]; then
+        local remote_deb="/tmp/$(basename "$COMPOSESIREN_DEB")"
+        
+        print_status "Transfert du package ComposeSiren..."
+        if ! sshpass -p"${SSH_PASSWORD}" scp -o StrictHostKeyChecking=no "$COMPOSESIREN_DEB" ${SERVER_USER}@${host}:"$remote_deb"; then
+            print_error "Échec du transfert du package ComposeSiren sur ${host}"
+            return 1
+        fi
+        print_success "Package transféré"
+        
+        print_status "Installation de ComposeSiren depuis le package..."
+        local install_cmd="sudo dpkg -i '$remote_deb' || (sudo apt-get install -f -y && sudo dpkg -i '$remote_deb')"
+        if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} "$install_cmd"; then
+            print_error "Échec de l'installation ComposeSiren sur ${host}"
+            return 1
+        fi
+        print_success "ComposeSiren installé via dpkg"
+        
+        print_status "Nettoyage du package temporaire..."
+        sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} "rm -f '$remote_deb'" &>/dev/null || true
     else
-        print_error "Échec du déploiement ComposeSiren sur ${host}"
-        return 1
+        print_status "Déploiement de ComposeSiren sur ${host}..."
+        if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+            "cd ~/dev/src/ComposeSiren && ./scripts/deploy-raspberry.sh"; then
+            print_success "ComposeSiren déployé"
+        else
+            print_error "Échec du déploiement ComposeSiren sur ${host}"
+            return 1
+        fi
     fi
     
     # 4. Git pull mecaviv-qml-ui (commenté - non utilisé)
