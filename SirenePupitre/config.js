@@ -196,7 +196,7 @@ var configData = {
                 },
                 "gearShiftIndicator": {
                     "visible": true,
-                    "positions": [1, 2, 4, 12, 24]
+                    "positions": [0, 1, 12, 24, 48]
                 }
       }
     },

@@ -12,7 +12,7 @@ Item {
     }
     
     // Propriétés configurables
-    property var positions: [1, 2, 4, 12, 24]  // Valeurs par défaut (demi-tons)
+    property var positions: [0, 1, 12, 24, 48]  // Valeurs par défaut (demi-tons)
     
     // Mise à jour des positions depuis la config
     onConfigControllerChanged: {
@@ -24,7 +24,7 @@ Item {
     function updatePositions() {
         if (!configController) return
         
-        var gearShiftConfig = configController.getConfigValue("displayConfig.components.musicalStaff.gearShiftIndicator.positions", [1, 2, 4, 12, 24])
+        var gearShiftConfig = configController.getConfigValue("displayConfig.components.musicalStaff.gearShiftIndicator.positions", [0, 1, 12, 24, 48])
         if (Array.isArray(gearShiftConfig)) {
             positions = gearShiftConfig
         }
@@ -53,7 +53,7 @@ Item {
             height: 120
             anchors.horizontalCenter: parent.horizontalCenter
             
-            // Position 0: Centre (1)
+            // Position 0: Centre (0)
             Rectangle {
                 id: centerPos
                 width: 30
@@ -66,14 +66,14 @@ Item {
                 
                 Text {
                     anchors.centerIn: parent
-                    text: root.positions[0] ? root.positions[0].toString() : "1"
+                    text: root.positions[0] !== undefined ? root.positions[0].toString() : "0"
                     font.pixelSize: 10
                     font.bold: true
                     color: root.currentPosition === 0 ? "#FFFFFF" : "#CCCCCC"
                 }
             }
             
-            // Position 1: Gauche (2)
+            // Position 1: Gauche (1)
             Rectangle {
                 id: leftPos
                 width: 30
@@ -88,14 +88,14 @@ Item {
                 
                 Text {
                     anchors.centerIn: parent
-                    text: root.positions[1] ? root.positions[1].toString() : "2"
+                    text: root.positions[1] !== undefined ? root.positions[1].toString() : "1"
                     font.pixelSize: 10
                     font.bold: true
                     color: root.currentPosition === 1 ? "#FFFFFF" : "#CCCCCC"
                 }
             }
             
-            // Position 2: Bas (4)
+            // Position 2: Bas (12)
             Rectangle {
                 id: bottomPos
                 width: 30
@@ -110,14 +110,14 @@ Item {
                 
                 Text {
                     anchors.centerIn: parent
-                    text: root.positions[2] ? root.positions[2].toString() : "4"
+                    text: root.positions[2] !== undefined ? root.positions[2].toString() : "12"
                     font.pixelSize: 10
                     font.bold: true
                     color: root.currentPosition === 2 ? "#FFFFFF" : "#CCCCCC"
                 }
             }
             
-            // Position 3: Droite (12)
+            // Position 3: Droite (24)
             Rectangle {
                 id: rightPos
                 width: 30
@@ -132,14 +132,14 @@ Item {
                 
                 Text {
                     anchors.centerIn: parent
-                    text: root.positions[3] ? root.positions[3].toString() : "12"
+                    text: root.positions[3] !== undefined ? root.positions[3].toString() : "24"
                     font.pixelSize: 10
                     font.bold: true
                     color: root.currentPosition === 3 ? "#FFFFFF" : "#CCCCCC"
                 }
             }
             
-            // Position 4: Haut (24)
+            // Position 4: Haut (48)
             Rectangle {
                 id: topPos
                 width: 30
@@ -154,7 +154,7 @@ Item {
                 
                 Text {
                     anchors.centerIn: parent
-                    text: root.positions[4] ? root.positions[4].toString() : "24"
+                    text: root.positions[4] !== undefined ? root.positions[4].toString() : "48"
                     font.pixelSize: 10
                     font.bold: true
                     color: root.currentPosition === 4 ? "#FFFFFF" : "#CCCCCC"

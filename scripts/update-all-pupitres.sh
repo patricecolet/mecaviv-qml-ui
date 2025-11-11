@@ -290,7 +290,28 @@ update_pupitre() {
         return 1
     fi
     
-    # 2. Git pull mecaviv-qml-ui (commenté - non utilisé)
+    # 2. Git pull ComposeSiren
+    print_status "Mise à jour de ~/dev/src/ComposeSiren..."
+    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "cd ~/dev/src/ComposeSiren && \
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+        print_success "ComposeSiren mis à jour"
+    else
+        print_error "Échec du git pull ComposeSiren sur ${host}"
+        return 1
+    fi
+    
+    # 3. Déploiement ComposeSiren
+    print_status "Déploiement de ComposeSiren sur ${host}..."
+    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "cd ~/dev/src/ComposeSiren && ./scripts/deploy-raspberry.sh"; then
+        print_success "ComposeSiren déployé"
+    else
+        print_error "Échec du déploiement ComposeSiren sur ${host}"
+        return 1
+    fi
+    
+    # 4. Git pull mecaviv-qml-ui (commenté - non utilisé)
 #    print_status "Mise à jour de ~/dev/src/mecaviv-qml-ui..."
 #    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
 #        "cd ~/dev/src/mecaviv-qml-ui && \
@@ -302,7 +323,7 @@ update_pupitre() {
 #        return 1
 #    fi
     
-    # 3. Mise à jour et compilation des externals critapec si nécessaire
+    # 5. Mise à jour et compilation des externals critapec si nécessaire
     print_status "Vérification des externals critapec..."
     
     # Git pull critapec-pd-externals
@@ -364,7 +385,7 @@ update_pupitre() {
         print_success "Externals critapec déjà à jour"
     fi
     
-    # 4. Rsync webfiles
+    # 6. Rsync webfiles
     print_status "Rsync de SirenePupitre/webfiles..."
     if sshpass -p"${SSH_PASSWORD}" rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
         SirenePupitre/webfiles/ ${SERVER_USER}@${host}:~/dev/src/mecaviv-qml-ui/SirenePupitre/webfiles/; then
@@ -374,7 +395,7 @@ update_pupitre() {
         return 1
     fi
     
-    # 5. Reboot si demandé
+    # 7. Reboot si demandé
     if [ "$REBOOT_AFTER_UPDATE" = true ]; then
         print_status "Redémarrage du pupitre ${host}..."
         if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
