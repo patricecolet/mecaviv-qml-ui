@@ -116,7 +116,6 @@ QtObject {
 
         // Bloquer les écritures locales si la console est connectée
         if (consoleConnected && (source === undefined || source !== "console")) {
-            console.warn("⚠️ Écriture bloquée: console en contrôle");
             return false;  // Important: refuser l'écriture
         }
         

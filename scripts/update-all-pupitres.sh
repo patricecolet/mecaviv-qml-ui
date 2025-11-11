@@ -279,31 +279,92 @@ update_pupitre() {
     fi
     print_success "Connexion établie"
     
-    # 1. Git pull puredata-abstractions (avec reset --hard pour écraser les modifications locales)
+    # 1. Git pull puredata-abstractions
     print_status "Mise à jour de ~/dev/src/mecaviv/puredata-abstractions..."
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
         "cd ~/dev/src/mecaviv/puredata-abstractions && \
-         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git fetch origin && \
-         git reset --hard origin/\$(git rev-parse --abbrev-ref HEAD)"; then
-        print_success "puredata-abstractions mis à jour (reset --hard)"
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+        print_success "puredata-abstractions mis à jour"
     else
-        print_error "Échec de la mise à jour puredata-abstractions sur ${host}"
+        print_error "Échec du git pull puredata-abstractions sur ${host}"
         return 1
     fi
     
-    # 2. Git pull mecaviv-qml-ui (avec reset --hard pour écraser les modifications locales)
-    print_status "Mise à jour de ~/dev/src/mecaviv-qml-ui..."
+    # 2. Git pull mecaviv-qml-ui (commenté - non utilisé)
+#    print_status "Mise à jour de ~/dev/src/mecaviv-qml-ui..."
+#    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+#        "cd ~/dev/src/mecaviv-qml-ui && \
+#         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull || \
+#         (git checkout -- SirenePupitre/webfiles/* && git pull)"; then
+#        print_success "mecaviv-qml-ui mis à jour"
+#    else
+#        print_error "Échec du git pull mecaviv-qml-ui sur ${host}"
+#        return 1
+#    fi
+    
+    # 3. Mise à jour et compilation des externals critapec si nécessaire
+    print_status "Vérification des externals critapec..."
+    
+    # Git pull critapec-pd-externals
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-        "cd ~/dev/src/mecaviv-qml-ui && \
-         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git fetch origin && \
-         git reset --hard origin/\$(git rev-parse --abbrev-ref HEAD)"; then
-        print_success "mecaviv-qml-ui mis à jour (reset --hard)"
+        "cd ~/dev/src/critapec-pd-externals && \
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+        print_success "critapec-pd-externals mis à jour"
     else
-        print_error "Échec de la mise à jour mecaviv-qml-ui sur ${host}"
+        print_error "Échec du git pull critapec-pd-externals sur ${host}"
         return 1
     fi
     
-    # 3. Rsync webfiles
+    # Vérifier si une recompilation est nécessaire
+    print_status "Vérification de la synchronisation des externals..."
+    NEEDS_BUILD=$(sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        'cd ~/dev/src/critapec-pd-externals && \
+         src_time=$(find . -name "*.c" -o -name "*.cpp" 2>/dev/null | xargs -r stat -c "%Y" 2>/dev/null | sort -n | tail -1) && \
+         if [ -d ~/pd-externals/critapec ]; then \
+             bin_time=$(find ~/pd-externals/critapec -name "*.pd_linux" -o -name "*.so" 2>/dev/null | xargs -r stat -c "%Y" 2>/dev/null | sort -n | tail -1); \
+         else \
+             bin_time=0; \
+         fi && \
+         if [ -z "$src_time" ]; then src_time=0; fi && \
+         if [ -z "$bin_time" ]; then bin_time=0; fi && \
+         if [ "$src_time" -gt "$bin_time" ]; then \
+             echo "REBUILD"; \
+         else \
+             echo "OK"; \
+         fi')
+    
+    if [ "$NEEDS_BUILD" = "REBUILD" ]; then
+        print_status "Compilation des externals critapec..."
+        if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+            "cd ~/dev/src/critapec-pd-externals && \
+             for dir in */; do \
+                 if [ -f \"\${dir}Makefile\" ]; then \
+                     echo \"Building \$dir...\" && \
+                     cd \"\$dir\" && make && cd .. || exit 1; \
+                 fi; \
+             done"; then
+            print_success "Externals compilés"
+        else
+            print_error "Échec de la compilation des externals sur ${host}"
+            return 1
+        fi
+        
+        print_status "Installation des externals et help patches..."
+        if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+            "mkdir -p ~/pd-externals/critapec && \
+             cd ~/dev/src/critapec-pd-externals && \
+             find . \( -name '*.pd_linux' -o -name '*.so' \) -exec cp {} ~/pd-externals/critapec/ \; && \
+             find . -name '*-help.pd' -exec cp {} ~/pd-externals/critapec/ \;"; then
+            print_success "Externals et help patches installés"
+        else
+            print_error "Échec de l'installation des externals sur ${host}"
+            return 1
+        fi
+    else
+        print_success "Externals critapec déjà à jour"
+    fi
+    
+    # 4. Rsync webfiles
     print_status "Rsync de SirenePupitre/webfiles..."
     if sshpass -p"${SSH_PASSWORD}" rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
         SirenePupitre/webfiles/ ${SERVER_USER}@${host}:~/dev/src/mecaviv-qml-ui/SirenePupitre/webfiles/; then
@@ -313,7 +374,7 @@ update_pupitre() {
         return 1
     fi
     
-    # 4. Reboot si demandé
+    # 5. Reboot si demandé
     if [ "$REBOOT_AFTER_UPDATE" = true ]; then
         print_status "Redémarrage du pupitre ${host}..."
         if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \

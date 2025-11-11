@@ -111,9 +111,6 @@ function noteToX(note) {
             var deltaY = newNoteBottom - currentNote.currentY
             var localClip = deltaY / currentNote.scale.y
             
-            console.log("TRUNCATE: newNoteBottom=" + newNoteBottom + " currentY=" + currentNote.currentY + 
-                       " deltaY=" + deltaY + " scale.y=" + currentNote.scale.y + " localClip=" + localClip +
-                       " totalDurationHeight=" + newNote.totalDurationHeight + " releaseHeight=" + newNote.releaseHeight)
             currentNote.truncateNote(localClip)
         }
         
@@ -142,6 +139,5 @@ function noteToX(note) {
         }
         // Réinitialiser la référence
         currentNote = null
-        console.log("✨ Notes effacées (stop)")
     }
 }

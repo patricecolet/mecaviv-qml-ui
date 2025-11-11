@@ -59,7 +59,7 @@ configure_ip() {
     echo "$(date): 🔧 Configuration IP fixe..."
     
     # Attendre que les services réseau soient prêts
-    sleep 10
+    sleep 3
     
     # Détecter le gestionnaire de réseau
     if systemctl is-active --quiet NetworkManager; then
@@ -104,7 +104,7 @@ EOF
     fi
     
     # Attendre que la configuration soit appliquée
-    sleep 10
+    sleep 3
     
     # Vérifier si l'IP est correcte
     local new_ip=$(check_current_ip)

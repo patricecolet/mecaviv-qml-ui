@@ -19,6 +19,33 @@ Item {
     property int messageCount: 0
     property string lastMessageTime: ""
     
+    // 📊 STATISTIQUES DE PERFORMANCE (Solution 4)
+    property int messagesPerSecond: 0
+    property int messageCountThisSecond: 0
+    property int droppedMessagesCount: 0
+    property int controllersMessagesPerSecond: 0
+    property int controllersMessageCountThisSecond: 0
+    
+    // 🎛️ THROTTLING DES CONTRÔLEURS (Solution 1)
+    property int controllersThrottleMs: 50  // Limiter à 20 messages/sec max
+    property var pendingControllersData: null
+    
+    // 🔍 FILTRAGE DES CHANGEMENTS (Solution 2)
+    property var lastControllerValues: ({
+        "wheelPos": -1,
+        "joyX": 0,
+        "joyY": 0,
+        "joyZ": 0,
+        "fader": -1,
+        "pedal": -1,
+        "selector": -1
+    })
+    
+    // Seuils de changement minimum (réglables)
+    property int wheelThreshold: 2        // ±2 degrés pour le volant
+    property int joystickThreshold: 5     // ±5 unités pour le joystick
+    property int faderThreshold: 3        // ±3 valeurs pour fader/pédale
+    
     // Signal émis quand on reçoit des données
     signal dataReceived(var data)
     signal configReceived(var config)
@@ -33,6 +60,96 @@ Item {
     property int expectedSize: 0         // Taille totale attendue
     property int receivedBytes: 0        // Nombre de bytes déjà reçus
     
+    // ⏱️ TIMER POUR THROTTLING DES CONTRÔLEURS (Solution 1)
+    Timer {
+        id: controllersUpdateTimer
+        interval: controller.controllersThrottleMs
+        repeat: false
+        onTriggered: {
+            if (controller.pendingControllersData) {
+                // Traiter le dernier message accumulé
+                controller.dataReceived(controller.pendingControllersData)
+                controller.pendingControllersData = null
+            }
+        }
+    }
+    
+    // 📊 TIMER POUR STATISTIQUES (Solution 4)
+    Timer {
+        id: statsTimer
+        interval: 1000  // Toutes les secondes
+        repeat: true
+        running: true
+        onTriggered: {
+            controller.messagesPerSecond = controller.messageCountThisSecond
+            controller.controllersMessagesPerSecond = controller.controllersMessageCountThisSecond
+            
+            // Logger uniquement si debugMode activé ou si trafic élevé
+            if (controller.debugMode || controller.messagesPerSecond > 50) {
+                // Stats tracking (logs removed)
+            }
+            
+            // Réinitialiser les compteurs
+            controller.messageCountThisSecond = 0
+            controller.controllersMessageCountThisSecond = 0
+        }
+    }
+    
+    // 🔍 FONCTION DE FILTRAGE (Solution 2)
+    function hasSignificantChange(controllers) {
+        var changed = false
+        var lastVals = controller.lastControllerValues
+        
+        // Vérifier volant (changement de position significatif)
+        if (Math.abs(controllers.wheel.position - lastVals.wheelPos) > controller.wheelThreshold) {
+            changed = true
+        }
+        
+        // Vérifier joystick (au moins un axe a bougé significativement)
+        if (Math.abs(controllers.joystick.x - lastVals.joyX) > controller.joystickThreshold ||
+            Math.abs(controllers.joystick.y - lastVals.joyY) > controller.joystickThreshold ||
+            Math.abs(controllers.joystick.z - lastVals.joyZ) > controller.joystickThreshold) {
+            changed = true
+        }
+        
+        // Vérifier fader
+        if (Math.abs(controllers.fader.value - lastVals.fader) > controller.faderThreshold) {
+            changed = true
+        }
+        
+        // Vérifier pédale
+        if (Math.abs(controllers.modPedal.value - lastVals.pedal) > controller.faderThreshold) {
+            changed = true
+        }
+        
+        // Vérifier sélecteur (changement de vitesse)
+        if (controllers.gearShift.position !== lastVals.selector) {
+            changed = true
+        }
+        
+        // Pads et boutons: toujours traiter (changements discrets importants)
+        if (controllers.pad1.active || controllers.pad2.active || 
+            controllers.buttons.button1 || controllers.buttons.button2 ||
+            controllers.joystick.button) {
+            changed = true
+        }
+        
+        return changed
+    }
+    
+    // 💾 FONCTION DE MISE À JOUR DU CACHE (Solution 2)
+    function updateControllerCache(controllers) {
+        controller.lastControllerValues = {
+            "wheelPos": controllers.wheel.position,
+            "joyX": controllers.joystick.x,
+            "joyY": controllers.joystick.y,
+            "joyZ": controllers.joystick.z,
+            "fader": controllers.fader.value,
+            "pedal": controllers.modPedal.value,
+            "selector": controllers.gearShift.position
+        }
+    }
+    
     WebSocket {
         id: socket
         url: controller.serverUrl
@@ -42,8 +159,14 @@ Item {
             try {
                 var bytes = new Uint8Array(message);
                 
+                // 📊 Incrémenter compteur total de messages
+                controller.messageCountThisSecond++
+                
                 // Format binaire pour CONTROLLERS (type 0x02, 16 bytes) - CONTRÔLEURS PHYSIQUES
                 if (bytes.length === 16 && bytes[0] === 0x02) {
+                    // 📊 Incrémenter compteur de messages contrôleurs
+                    controller.controllersMessageCountThisSecond++
+                    
                     // Décoder les données
                     // Volant position (uint16, déjà en degrés 0-360)
                     var wheelPos = bytes[1] | (bytes[2] << 8);
@@ -116,12 +239,30 @@ Item {
                         }
                     };
                     
-                    // Émettre via dataReceived avec un flag
-                    controller.dataReceived({
+                    // 🔍 FILTRAGE: Vérifier si le changement est significatif (Solution 2)
+                    if (!controller.hasSignificantChange(controllers)) {
+                        // Changement insignifiant, ignorer ce message
+                        controller.droppedMessagesCount++
+                        return;
+                    }
+                    
+                    // ⏱️ THROTTLING: Accumuler et traiter avec délai (Solution 1)
+                    var data = {
                         controllers: controllers,
                         isControllersOnly: true,  // Flag pour identifier ce type de message
                         timestamp: Date.now()
-                    });
+                    };
+                    
+                    // Mise à jour du cache pour le prochain filtrage
+                    controller.updateControllerCache(controllers)
+                    
+                    // Accumuler le message (le dernier sera traité)
+                    controller.pendingControllersData = data
+                    
+                    // Démarrer le timer s'il n'est pas déjà en cours
+                    if (!controllersUpdateTimer.running) {
+                        controllersUpdateTimer.start()
+                    }
                     
                     return;
                 }
@@ -137,8 +278,6 @@ Item {
                     // Décoder float32 little-endian pour beat
                     var f0 = bytes[6], f1 = bytes[7], f2 = bytes[8], f3 = bytes[9];
                     var beat = new DataView(Uint8Array.of(f0, f1, f2, f3).buffer).getFloat32(0, true);
-                    
-                    console.log("📍 Position reçue:", playing ? "▶" : "⏸", "bar:", bar, "beat:", beatInBar, "total:", beat.toFixed(2));
                     
                     // Émettre le signal
                     controller.playbackPositionReceived(playing, bar, beatInBar, beat);
@@ -368,7 +507,6 @@ Item {
                 // GAME_MODE - Changement de mode jeu/normal depuis le serveur (PureData)
                 if (data.type === "GAME_MODE") {
                     var enabled = data.enabled || false;
-                    console.log("🎮 Mode jeu reçu du serveur:", enabled ? "ACTIVÉ" : "DÉSACTIVÉ");
                     controller.gameModeReceived(enabled);
                     return;
                 }

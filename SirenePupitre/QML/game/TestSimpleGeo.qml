@@ -26,9 +26,5 @@ Model {
             lighting: PrincipledMaterial.NoLighting  // Pas d'éclairage pour debug
         }
     ]
-    
-    Component.onCompleted: {
-        console.log("TestSimpleGeo - position:", position, "scale:", scale, "geometry:", geometry)
-    }
 }
 

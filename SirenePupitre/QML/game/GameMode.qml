@@ -189,8 +189,6 @@ Node {
         if (melodicLine) {
             melodicLine.clearAllNotes()
         }
-        
-        console.log("🔄 Mode jeu réinitialisé (stop)")
     }
     
     // Fonction pour arrêter le jeu

@@ -80,7 +80,6 @@ Window {
         onGameModeReceived: function(enabled) {
             // Changer le mode jeu depuis le serveur (PureData)
             display.gameMode = enabled
-            console.log("🎮 Mode jeu mis à jour depuis le serveur:", enabled ? "ACTIVÉ" : "DÉSACTIVÉ")
         }
         
         onDataReceived: function(data) {
@@ -408,7 +407,6 @@ Window {
                         enabled: newGameMode,
                         source: "pupitre"
                     })
-                    console.log("🎮 Mode jeu:", newGameMode ? "ACTIVÉ" : "DÉSACTIVÉ")
                 }
             }
         }

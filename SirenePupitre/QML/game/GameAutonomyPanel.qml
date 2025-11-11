@@ -22,7 +22,6 @@ Item {
                 
                 // Si on détecte un stop, réinitialiser le mode jeu
                 if (isStopped && (root.previousBeat > 0 || wasPlaying)) {
-                    console.log("⏹ Stop détecté - Réinitialisation du mode jeu")
                     if (root.gameMode) {
                         root.gameMode.resetGame()
                     }
@@ -48,13 +47,12 @@ Item {
                             if (response.categories.length > 0) {
                                 songSelectorDialog.selectedCategory = response.categories[0].name;
                             }
-                            console.log("✅ Chargé", response.categories.length, "catégories de morceaux MIDI");
                         }
                     } catch (e) {
-                        console.error("❌ Erreur parsing réponse MIDI files:", e);
+                        // Error parsing response
                     }
                 } else {
-                    console.error("❌ Erreur chargement MIDI files:", xhr.status);
+                    // Error loading MIDI files
                 }
             }
         };
@@ -65,7 +63,6 @@ Item {
             // Fallback: construire manuellement l'URL avec le protocole et l'hôte
             apiUrl = "http://" + (typeof window !== 'undefined' ? window.location.host : "localhost:8000") + "/api/midi/files";
         }
-        console.log("🔍 Chargement MIDI files depuis:", apiUrl);
         xhr.open("GET", apiUrl);
         xhr.send();
     }
@@ -126,7 +123,6 @@ Item {
                     path: file.path,
                     source: "pupitre"
                 });
-                console.log("✅ Morceau chargé:", file.title, "- Appuyez sur Play pour lancer");
             }
         }
     }
