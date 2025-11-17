@@ -460,6 +460,28 @@ Item {
                 // AJOUTER : Traiter PARAM_UPDATE
                 if (data.type === "PARAM_UPDATE") {
                     
+                    // Log début de chaîne pour frettedMode
+                    if (data.path && Array.isArray(data.path) && data.path.length >= 4 && 
+                        data.path[0] === "sirenConfig" && data.path[1] === "sirens" && 
+                        data.path[3] === "frettedMode" && data.path[4] === "enabled") {
+                        var sirenIdentifier = data.path[2];
+                        // Vérifier si c'est un index ou un id
+                        var isIndex = typeof sirenIdentifier === "number";
+                        var sirenId = isIndex ? null : sirenIdentifier;
+                        var sirenIndex = isIndex ? sirenIdentifier : null;
+                        
+                        // Si c'est un index, essayer de trouver l'id correspondant
+                        if (controller.configController && isIndex) {
+                            var sirens = controller.configController.getValueAtPath(["sirenConfig", "sirens"], []);
+                            if (sirens[sirenIndex]) {
+                                sirenId = sirens[sirenIndex].id;
+                            }
+                        }
+                        
+                        console.log("🎯 [WebSocket] Début chaîne - PARAM_UPDATE frettedMode reçu:", 
+                            "index:", sirenIndex, "id:", sirenId, "enabled:", data.value);
+                    }
+                    
                     if (!controller.configController) {
                         return;
                     }
@@ -507,6 +529,7 @@ Item {
                 // GAME_MODE - Changement de mode jeu/normal depuis le serveur (PureData)
                 if (data.type === "GAME_MODE") {
                     var enabled = data.enabled || false;
+                    console.log("🎮 [WebSocket] Début chaîne - GAME_MODE reçu:", "enabled:", enabled);
                     controller.gameModeReceived(enabled);
                     return;
                 }

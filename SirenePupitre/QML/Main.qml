@@ -79,7 +79,9 @@ Window {
         
         onGameModeReceived: function(enabled) {
             // Changer le mode jeu depuis le serveur (PureData)
+            console.log("🎮 [Main] Fin chaîne - GAME_MODE appliqué:", "enabled:", enabled, "display.gameMode:", display.gameMode);
             display.gameMode = enabled
+            console.log("🎮 [Main] Fin chaîne - GAME_MODE après assignation:", "display.gameMode:", display.gameMode);
         }
         
         onDataReceived: function(data) {
@@ -219,9 +221,16 @@ Window {
             var dummy = configController.updateCounter // Force la réévaluation
             var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
             var currentSirenId = ids.length > 0 ? ids[0] : "1"
-            var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
+            var sirens = configController.getValueAtPath(["sirenConfig", "sirens"], [])
+            var currentSiren = sirens.find(function(siren) {
                 return siren.id === currentSirenId
-            })?.frettedMode?.enabled || false
+            })
+            var frettedModeEnabled = currentSiren?.frettedMode?.enabled || false
+            // Log pour debug
+            if (dummy % 100 === 0) { // Log seulement occasionnellement pour éviter le spam
+                console.log("🎯 [Main] Bouton frettedMode - currentSirenId:", currentSirenId, 
+                    "trouvée:", currentSiren ? "oui" : "non", "frettedModeEnabled:", frettedModeEnabled);
+            }
             return frettedModeEnabled ? "#FFD700" : "#2a2a2a"
         }
         border.color: {
@@ -240,6 +249,8 @@ Window {
             if (display.gameMode) return false
             if (!configController) return true
             var dummy = configController.updateCounter
+            // Masquer si les contrôleurs sont affichés
+            if (configController.getValueAtPath(["controllersPanel", "visible"], false)) return false
             return configController.isComponentVisible("studioButton")
         }
         
@@ -391,6 +402,8 @@ Window {
         visible: {
             if (!configController) return true
             var dummy = configController.updateCounter
+            // Masquer si les contrôleurs sont affichés
+            if (configController.getValueAtPath(["controllersPanel", "visible"], false)) return false
             return configController.isComponentVisible("studioButton")
         }
         

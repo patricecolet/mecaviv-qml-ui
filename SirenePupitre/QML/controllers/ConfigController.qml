@@ -129,10 +129,60 @@ QtObject {
         
         // Naviguer jusqu'à l'avant-dernière clé
         for (var i = 0; i < path.length - 1; i++) {
-            if (!current[path[i]]) {
-                current[path[i]] = {}
+            var pathKey = path[i]
+            
+            // Conversion spéciale : si on accède au tableau "sirens", convertir l'id en index
+            // Les ids commencent à "1" (S1, S2, S3...) mais les index du tableau commencent à 0
+            if (i === 1 && path[0] === "sirenConfig" && pathKey === "sirens" && i + 1 < path.length) {
+                var nextKey = path[i + 1]
+                // Accéder à config directement pour avoir les sirens
+                var sirens = config.sirenConfig ? config.sirenConfig.sirens : []
+                
+                // Si nextKey est un nombre, TOUJOURS essayer de le traiter comme un id d'abord
+                // Les ids commencent à 1 (S1=1, S2=2, S3=3...), les index à 0
+                if (typeof nextKey === "number") {
+                    // TOUJOURS chercher d'abord comme un id (même si c'est un index valide)
+                    var foundIndex = -1
+                    var targetId = nextKey.toString()
+                    for (var j = 0; j < sirens.length; j++) {
+                        if (sirens[j].id === targetId) {
+                            foundIndex = j
+                            break
+                        }
+                    }
+                    if (foundIndex >= 0) {
+                        // C'est un id, convertir en index
+                        console.log("🎯 [ConfigController] Conversion id→index:", "id", targetId, "→ index", foundIndex);
+                        path[i + 1] = foundIndex
+                    } else {
+                        // Pas trouvé comme id, utiliser comme index (pour rétrocompatibilité)
+                        if (nextKey >= 0 && nextKey < sirens.length) {
+                            console.log("🎯 [ConfigController] Utilisation comme index:", nextKey, "(id non trouvé)");
+                        } else {
+                            console.log("🎯 [ConfigController] Avertissement: id", nextKey, "non trouvé et index invalide");
+                        }
+                    }
+                } else if (typeof nextKey === "string" && !isNaN(parseInt(nextKey))) {
+                    // Si c'est une string numérique, chercher l'index correspondant à cet id
+                    var foundIndex = -1
+                    for (var j = 0; j < sirens.length; j++) {
+                        if (sirens[j].id === nextKey) {
+                            foundIndex = j
+                            break
+                        }
+                    }
+                    if (foundIndex >= 0) {
+                        // Remplacer l'id par l'index dans le path
+                        console.log("🎯 [ConfigController] Conversion id→index:", "id", nextKey, "→ index", foundIndex);
+                        path[i + 1] = foundIndex
+                    }
+                }
             }
-            current = current[path[i]]
+            
+            if (!current[pathKey]) {
+                current[pathKey] = {}
+            }
+            current = current[pathKey]
         }
         
         var key = path[path.length - 1]
@@ -154,11 +204,28 @@ QtObject {
                 finalValue = [ (typeof value === "number") ? value.toString() : value ]
             }
         }
+        
+        // Log fin de chaîne pour frettedMode
+        if (path.length >= 4 && path[0] === "sirenConfig" && path[1] === "sirens" && 
+            path[3] === "frettedMode" && path[4] === "enabled") {
+            var sirenIndex = path[2];
+            var modifiedSiren = config.sirenConfig.sirens[sirenIndex];
+            var currentSirenIds = config.sirenConfig.currentSirens || ["1"];
+            var currentSirenId = currentSirenIds.length > 0 ? currentSirenIds[0] : "1";
+            var isCurrentSiren = modifiedSiren && modifiedSiren.id === currentSirenId;
+            console.log("🎯 [ConfigController] Fin chaîne - frettedMode modifié:", 
+                "sirène index", sirenIndex, "id", modifiedSiren ? modifiedSiren.id : "?", 
+                "ancienne valeur:", oldValue, "nouvelle valeur:", finalValue,
+                "sirène actuelle:", currentSirenId, "est la même:", isCurrentSiren);
+        }
+        
         // Définir la valeur
         current[key] = finalValue
         
         // Si on modifie un élément d'un tableau (sirens), forcer une copie pour déclencher les bindings
         if (path[0] === "sirenConfig" && path[1] === "sirens" && typeof path[2] === "number") {
+            // La copie doit être faite APRÈS la modification de current[key]
+            // pour que la nouvelle valeur soit incluse dans la copie
             var sirensCopy = JSON.parse(JSON.stringify(config.sirenConfig.sirens))
             config.sirenConfig.sirens = sirensCopy
         }
