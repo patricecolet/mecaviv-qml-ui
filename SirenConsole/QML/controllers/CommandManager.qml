@@ -1,7 +1,19 @@
 import QtQuick 2.15
+import "../utils" as Utils
 
 QtObject {
     id: commandManager
+    
+    // Instance de NetworkUtils créée dynamiquement
+    property var networkUtils: null
+    
+    // Fonction helper pour obtenir l'URL de base
+    function getApiBaseUrl() {
+        if (!networkUtils) {
+            networkUtils = Qt.createQmlObject('import "../utils" as Utils; Utils.NetworkUtils {}', commandManager)
+        }
+        return networkUtils.getApiBaseUrl()
+    }
     
     // Propriétés
     property var pupitreManager: null
@@ -47,7 +59,8 @@ QtObject {
             }
         }
         
-        xhr.open("POST", "http://localhost:8001/api/puredata/command")
+        var apiUrl = getApiBaseUrl()
+        xhr.open("POST", apiUrl + "/api/puredata/command")
         xhr.setRequestHeader("Content-Type", "application/json")
         xhr.send(JSON.stringify(command))
         
@@ -99,44 +112,68 @@ QtObject {
     
     // Exécuter une commande sur un pupitre
     function executeCommand(pupitreId, command, parameters) {
-        if (!pupitreManager) {
+        // Pour les commandes qui passent par PureData, on ne vérifie pas la connexion
+        // car PureData gère le routage même si le pupitre n'est pas encore marqué comme connecté
+        var skipConnectionCheck = (command === "set_ui_controls_enabled" || command === "autonomy_mode")
+        
+        if (!pupitreManager && !skipConnectionCheck) {
             commandError(command, "PupitreManager non disponible")
             return false
         }
         
-        var pupitre = pupitreManager.getPupitreById(pupitreId)
-        if (!pupitre) {
-            commandError(command, "Pupitre non trouvé: " + pupitreId)
-            return false
-        }
-        
-        if (!pupitre.connected) {
-            commandError(command, "Pupitre non connecté: " + pupitreId)
-            return false
-        }
-        
-        // Exécution commande
-        
-        var message = {
-            type: "command",
-            command: command,
-            parameters: parameters || {},
-            timestamp: Date.now()
-        }
-        
-        if (webSocketManager) {
-            var success = webSocketManager.sendMessage(pupitreId, JSON.stringify(message))
-            if (success) {
-                commandExecuted(command, { pupitreId: pupitreId, parameters: parameters })
-                return true
-            } else {
-                commandError(command, "Erreur envoi message WebSocket")
+        if (!skipConnectionCheck) {
+            var pupitre = pupitreManager.getPupitreById(pupitreId)
+            if (!pupitre) {
+                commandError(command, "Pupitre non trouvé: " + pupitreId)
                 return false
             }
-        } else {
-            commandError(command, "WebSocketManager non disponible")
-            return false
+            
+            if (!pupitre.connected) {
+                commandError(command, "Pupitre non connecté: " + pupitreId)
+                return false
+            }
         }
+        
+        var commandData = { pupitreId: pupitreId }
+        if (command === "set_ui_controls_enabled") {
+            commandData.type = "UI_CONTROLS"
+            commandData.enabled = parameters && parameters.enabled !== undefined ? parameters.enabled : true
+        } else if (command === "autonomy_mode") {
+            commandData.type = "AUTONOMY_MODE"
+            commandData.device = parameters ? parameters.device : ""
+            commandData.enabled = parameters && parameters.enabled === true
+        } else {
+            commandData.type = command.toUpperCase()
+            commandData.parameters = parameters || {}
+        }
+        
+        // Envoyer via /api/puredata/command pour que PureData relaie au pupitre
+        var xhr = new XMLHttpRequest()
+        var apiUrl = getApiBaseUrl()
+        xhr.open("POST", apiUrl + "/api/puredata/command")
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText)
+                        if (response.success) {
+                            commandExecuted(command, { pupitreId: pupitreId, parameters: parameters })
+                        } else {
+                            commandError(command, response.message || response.error || "Erreur inconnue")
+                        }
+                    } catch (e) {
+                        commandError(command, "Erreur parsing réponse: " + e)
+                    }
+                } else {
+                    commandError(command, "Erreur HTTP: " + xhr.status)
+                }
+            }
+        }
+        
+        xhr.send(JSON.stringify(commandData))
+        
+        return true
     }
     
     // Commandes de contrôle des sirènes
@@ -169,6 +206,18 @@ QtObject {
     
     function setFrettedMode(pupitreId, enabled) {
         return executeCommand(pupitreId, "set_fretted_mode", { enabled: enabled })
+    }
+    
+    // Commandes de configuration UI du pupitre
+    function setUiControlsEnabled(pupitreId, enabled) {
+        return executeCommand(pupitreId, "set_ui_controls_enabled", { enabled: enabled })
+    }
+    
+    function setAutonomyMode(pupitreId, device, enabled) {
+        return executeCommand(pupitreId, "autonomy_mode", {
+            device: device,
+            enabled: enabled
+        })
     }
     
     function setMotorSpeed(pupitreId, speed) {
@@ -447,7 +496,8 @@ QtObject {
             "joystick_position", "fader_value", "selector_value", "pedal_value",
             "save_config", "load_config", "factory_reset",
             "update_firmware", "backup_data", "restore_data",
-            "start_monitoring", "stop_monitoring", "get_monitoring_data"
+            "start_monitoring", "stop_monitoring", "get_monitoring_data",
+            "set_ui_controls_enabled"
         ]
         
         return validCommands.indexOf(command.command) !== -1

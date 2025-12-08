@@ -27,6 +27,11 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 10
         
+        ScrollBar.horizontal: ScrollBar {
+            policy: ScrollBar.AsNeeded
+            visible: true
+        }
+        
         RowLayout {
             width: parent.width
             spacing: 10
@@ -109,7 +114,14 @@ Rectangle {
                                 if (pupitreSelector.consoleController) {
                                     var pupitreId = "P" + (index + 1)
                                     var propName = "pupitre" + (index + 1) + "Synced"
-                                    var isSynced = pupitreSelector.consoleController[propName] || false
+                                    var isSynced = false
+                                    try {
+                                        if (pupitreSelector.consoleController) {
+                                            isSynced = pupitreSelector.consoleController[propName] || false
+                                        }
+                                    } catch (e) {
+                                        // Ignorer les erreurs d'accès aux propriétés
+                                    }
                                     return isSynced ? "#00ff00" : "#666666"
                                 }
                                 return "#666666" // non synchronisé par défaut

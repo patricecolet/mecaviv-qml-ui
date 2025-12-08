@@ -1,9 +1,15 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import "../../../utils" as Utils
 
 Item {
     id: outputsTab
+    
+    // Instance de NetworkUtils pour obtenir l'URL de base de l'API
+    Utils.NetworkUtils {
+        id: networkUtils
+    }
     
     property var pupitre: null
     // Snapshot du preset courant, injecté par ConfigPage si présent
@@ -54,8 +60,9 @@ Item {
                 return false
             }
             onCheckedChanged: if (pupitre) {
+                var apiUrl = networkUtils.getApiBaseUrl()
                 patchAndApply(
-                    "http://localhost:8001/api/presets/current/outputs",
+                    apiUrl + "/api/presets/current/outputs",
                     { pupitreId: pupitre.id, changes: { vstEnabled: !!checked } },
                     function() { updateSnapshotOutputs(pupitre.id, { vstEnabled: !!checked }) }
                 )
@@ -71,8 +78,9 @@ Item {
                 return false
             }
             onCheckedChanged: if (pupitre) {
+                var apiUrl = networkUtils.getApiBaseUrl()
                 patchAndApply(
-                    "http://localhost:8001/api/presets/current/outputs",
+                    apiUrl + "/api/presets/current/outputs",
                     { pupitreId: pupitre.id, changes: { udpEnabled: !!checked } },
                     function() { updateSnapshotOutputs(pupitre.id, { udpEnabled: !!checked }) }
                 )
@@ -88,8 +96,9 @@ Item {
                 return false
             }
             onCheckedChanged: if (pupitre) {
+                var apiUrl = networkUtils.getApiBaseUrl()
                 patchAndApply(
-                    "http://localhost:8001/api/presets/current/outputs",
+                    apiUrl + "/api/presets/current/outputs",
                     { pupitreId: pupitre.id, changes: { rtpMidiEnabled: !!checked } },
                     function() { updateSnapshotOutputs(pupitre.id, { rtpMidiEnabled: !!checked }) }
                 )

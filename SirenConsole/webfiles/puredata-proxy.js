@@ -17,6 +17,8 @@ class PureDataProxy {
         this.reconnectTimers = new Map(); // Timers de reconnexion par pupitre
         this.sequencerPlayback = null; // État global fourni par le séquenceur Node (pour l'UI)
         this.binaryChunkStates = new Map(); // Accumulation binaire (format SirenePupitre) par pupitre
+        this.errorThrottle = new Map(); // Throttling des erreurs par pupitre: { lastError: timestamp, count: number }
+        this.messageQueues = new Map(); // File d'attente de messages par pupitre (pour messages critiques)
         
         // console.log('🎛️ PureDataProxy initialisé pour connexions multiples');
         
@@ -27,6 +29,11 @@ class PureDataProxy {
         setInterval(() => {
             this.checkConnectionsHealth();
         }, 2000); // Vérifier toutes les 2 secondes
+        
+        // Retry périodique pour les messages en file d'attente
+        setInterval(() => {
+            this.retryQueuedMessages();
+        }, 1000); // Essayer toutes les secondes
     }
 
     // Mettre à jour l'état de lecture depuis le séquenceur (sans envoyer aux pupitres)
@@ -101,14 +108,11 @@ class PureDataProxy {
     // Envoyer REQUEST_PUPITRE_CONFIG à PureData via sendCommand (routage via pupitre)
     // PureData doit intercepter ce message et répondre avec CONFIG_FULL
     requestPupitreConfig(pupitreId) {
-        console.log(`📤 requestPupitreConfig appelé pour ${pupitreId}`);
-        // Envoyer via sendCommand - PureData fera le routage
         const result = this.sendCommand({
             type: "REQUEST_CONFIG",
             pupitreId: pupitreId,
             source: "console"
         }, pupitreId);
-        console.log(`📤 requestPupitreConfig résultat pour ${pupitreId}:`, result);
         return result;
     }
     
@@ -118,8 +122,6 @@ class PureDataProxy {
             console.error('❌ Configuration pupitres manquante');
             return;
         }
-        
-        // console.log('🔌 Initialisation des connexions vers', this.config.pupitres.length, 'pupitres');
         
         this.config.pupitres.forEach(pupitre => {
             if (pupitre.enabled) {
@@ -135,15 +137,11 @@ class PureDataProxy {
         const port = pupitre.websocketPort || 10002;
         const url = `ws://${host}:${port}`;
         
-        // console.log(`🔌 Connexion à ${pupitre.name} (${pupitreId}): ${url}`);
-        
         try {
-            // Options pour compatibilité avec PureData
             const options = {
                 perMessageDeflate: false,
                 handshakeTimeout: 5000,
-                protocolVersion: 13,
-                origin: 'http://localhost:8001'
+                protocolVersion: 13
             };
             
             const ws = new WebSocket(url, options);
@@ -159,12 +157,31 @@ class PureDataProxy {
             
             // Gestionnaires d'événements
             ws.on('open', () => {
-                // console.log(`✅ Connecté à ${pupitre.name} (${pupitreId})`);
-                
                 const connection = this.connections.get(pupitreId);
                 if (connection) {
                     connection.connected = true;
                     connection.lastSeen = new Date();
+                    
+                    // Informer l'interface de la connexion
+                    if (this.broadcastToClients) {
+                        this.broadcastToClients({
+                            type: 'PUPITRE_CONNECTED',
+                            pupitreId: pupitreId,
+                            pupitreName: pupitre.name,
+                            connected: true,
+                            timestamp: Date.now()
+                        });
+                    }
+                    
+                    // Traiter la file d'attente de messages
+                    setTimeout(() => {
+                        this.flushMessageQueue(pupitreId);
+                    }, 50);
+                    
+                    // Envoyer automatiquement REQUEST_CONFIG après la connexion
+                    setTimeout(() => {
+                        this.requestPupitreConfig(pupitreId);
+                    }, 100);
                 }
                 
                 // Nettoyer le timer de reconnexion
@@ -175,13 +192,21 @@ class PureDataProxy {
             });
             
             ws.on('close', (code, reason) => {
-                // console.log(`❌ Déconnecté de ${pupitre.name} (${pupitreId}) - Code: ${code}, Raison: ${reason}`);
-                
                 const connection = this.connections.get(pupitreId);
                 if (connection) {
                     connection.connected = false;
                     connection.lastSeen = null;
-                    // console.log(`📊 Statut mis à jour: ${pupitreId} = disconnected`);
+                    
+                    // Informer l'interface de la déconnexion
+                    if (this.broadcastToClients) {
+                        this.broadcastToClients({
+                            type: 'PUPITRE_DISCONNECTED',
+                            pupitreId: pupitreId,
+                            pupitreName: pupitre.name,
+                            connected: false,
+                            timestamp: Date.now()
+                        });
+                    }
                 }
                 
                 // Reconnexion immédiate pour les déconnexions inattendues
@@ -189,17 +214,14 @@ class PureDataProxy {
             });
             
             ws.on('error', (error) => {
-                console.error(`❌ Erreur WebSocket ${pupitre.name} (${pupitreId}):`, error.message);
-                
                 const connection = this.connections.get(pupitreId);
                 if (connection) {
                     connection.connected = false;
                     connection.lastSeen = null;
-                    // console.log(`📊 Statut mis à jour: ${pupitreId} = disconnected (erreur)`);
                 }
             });
             
-            ws.on('message', (data) => {
+            ws.on('message', (data, isBinary) => {
                 this.handleMessage(pupitreId, data);
             });
             
@@ -216,25 +238,10 @@ class PureDataProxy {
         
         // Détecter si binaire (Buffer) ou texte (string)
         if (Buffer.isBuffer(message)) {
-            /*try {
-                console.log(`📦 Binaire reçu de ${connection.pupitre.name} (${pupitreId}), taille=${message.length} bytes`);
-            } catch (_) {} */
             this.handleBinaryMessage(pupitreId, message);
         } else {
-            // console.log(`📥 Message JSON de ${connection.pupitre.name} (${pupitreId}):`, message.substring(0, 100));
-            
             try {
                 const data = JSON.parse(message);
-                
-                // Log tous les messages reçus pour debug (limité aux types importants)
-                if (data.type === 'CONFIG_FULL' || data.type === 'PUPITRE_STATUS' || data.type === 'REQUEST_PUPITRE_CONFIG') {
-                    console.log(`📥 Message reçu de ${connection.pupitre.name} (${pupitreId}):`, {
-                        type: data.type,
-                        hasConfig: !!data.config,
-                        hasData: !!data.data,
-                        pupitreId: data.pupitreId || pupitreId
-                    });
-                }
                 
                 // Traiter PARAM_CHANGED depuis pupitres (source: "pupitre")
                 if (data.type === 'PARAM_CHANGED' && data.source === 'pupitre' && this.handleParamChanged) {
@@ -242,22 +249,15 @@ class PureDataProxy {
                 }
                 
                 // Traiter CONFIG_FULL depuis PureData (réponse à REQUEST_PUPITRE_CONFIG)
-                // PureData envoie CONFIG_FULL via la connexion pupitre avec pupitreId
                 if (data.type === 'CONFIG_FULL') {
-                    console.log(`📥 CONFIG_FULL reçu depuis PureData pour ${pupitreId}, config:`, !!data.config, 'pupitreId dans message:', data.pupitreId);
                     if (data.config && this.handlePupitreConfig) {
-                        // Convertir format PureData vers format attendu
                         const configData = this.convertPureDataConfigToPupitreConfig(data.config, data.pupitreId || pupitreId);
-                        this.handlePupitreConfig(data.pupitreId || pupitreId, configData, true); // Toujours traiter comme demandé
-                    } else {
-                        console.warn(`⚠️ CONFIG_FULL reçu mais config manquant ou handlePupitreConfig non défini`);
+                        this.handlePupitreConfig(data.pupitreId || pupitreId, configData, true);
                     }
                 }
                 
                 // Traiter PUPITRE_STATUS qui contient la configuration complète du pupitre
-                // Seulement si c'est une réponse à une demande (flag isRequested)
                 if (data.type === 'PUPITRE_STATUS' && data.data && this.handlePupitreConfig) {
-                    // isRequested = true si c'est une réponse explicite, false si c'est juste un heartbeat
                     const isRequested = data.isRequested || false;
                     this.handlePupitreConfig(pupitreId, data.data, isRequested);
                 }
@@ -265,13 +265,10 @@ class PureDataProxy {
                 // Traiter les messages d'état de lecture MIDI
                 if (data.type === 'MIDI_PLAYBACK_STATE') {
                     this.playbackStates.set(pupitreId, data);
-                    // console.log(`🎵 État lecture MIDI ${connection.pupitre.name}:`, data.playing ? 'PLAY' : 'STOP', '- Position:', data.position, 'ms');
                 }
                 
                 // Traiter les messages GAME_MODE de PureData et les broadcaster à tous les pupitres
                 if (data.type === 'GAME_MODE' && this.broadcastToClients) {
-                    console.log(`🎮 GAME_MODE reçu de PureData (${pupitreId}):`, data.enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ');
-                    // Broadcaster à tous les pupitres
                     this.broadcastToClients({
                         type: 'GAME_MODE',
                         enabled: data.enabled || false,
@@ -302,6 +299,16 @@ class PureDataProxy {
     handleBinaryMessage(pupitreId, buffer) {
         const connection = this.connections.get(pupitreId);
         if (!connection) return;
+        
+        // Ignorer les buffers vides ou trop petits (probablement des heartbeats ou messages corrompus)
+        if (!buffer || buffer.length === 0) {
+            return;
+        }
+        
+        // Ignorer les messages de 2 bytes qui sont juste des zéros (probablement des heartbeats)
+        if (buffer.length === 2 && buffer[0] === 0x00 && buffer[1] === 0x00) {
+            return;
+        }
         
         // Vérifier si c'est un message VOLANT_STATE (7 bytes avec magic "SS")
         if (buffer.length === 7) {
@@ -335,11 +342,10 @@ class PureDataProxy {
             try {
                 const jsonStr = buffer.toString('utf8');
                 const json = JSON.parse(jsonStr);
-                // Accepter soit un wrapper CONFIG_FULL, soit la config directe
+                
                 const hasWrapper = json && (json.type === 'CONFIG_FULL' || json.config);
                 const configPayload = hasWrapper ? (json.config || {}) : json;
                 if (this.handlePupitreConfig && configPayload) {
-                    console.log(`📥 CONFIG (binaire JSON brut) reçu pour ${connection.pupitre.name} (${pupitreId})`);
                     const configData = this.convertPureDataConfigToPupitreConfig(configPayload, pupitreId);
                     this.handlePupitreConfig(pupitreId, configData, true);
                     return;
@@ -354,6 +360,11 @@ class PureDataProxy {
             const totalSize = buffer.readUInt32LE(0);
             const position  = buffer.readUInt32LE(4);
             const payload   = buffer.slice(8);
+            
+            // Ignorer les messages avec totalSize = 0 (probablement des heartbeats ou messages vides)
+            if (totalSize === 0) {
+                return;
+            }
             if (totalSize > 0 && totalSize <= 10 * 1024 * 1024 && position >= 0 && position < totalSize) {
                 let state = this.binaryChunkStates.get(pupitreId);
                 if (!state || state.expectedSize !== totalSize) {
@@ -362,11 +373,48 @@ class PureDataProxy {
                 }
                 payload.copy(state.buffer, position);
                 state.receivedBytes += payload.length;
-                try { console.log(`🔹 Chunk SP ${connection.pupitre.name} (${pupitreId}): +${payload.length} @${position}, total=${state.receivedBytes}/${state.expectedSize}`); } catch (_) {}
+                
                 if (state.receivedBytes >= state.expectedSize) {
                     try {
+                        // Vérifier que le buffer n'est pas juste des zéros avant de le parser
+                        let allZeros = true;
+                        for (let i = 0; i < Math.min(state.buffer.length, 100); i++) {
+                            if (state.buffer[i] !== 0) {
+                                allZeros = false;
+                                break;
+                            }
+                        }
+                        if (allZeros && state.buffer.length > 0) {
+                            return;
+                        }
+                        
                         const jsonString = state.buffer.toString('utf8');
-                        const jsonData = JSON.parse(jsonString);
+                        const trimmed = jsonString.trim();
+                        if (jsonString.includes('\uFFFD') || !trimmed || trimmed === '""' || trimmed === "''") {
+                            throw new Error(`Buffer invalide: ${trimmed.length > 50 ? trimmed.substring(0, 50) + '...' : trimmed}`);
+                        }
+                        
+                        let jsonData;
+                        try {
+                            jsonData = JSON.parse(jsonString);
+                        } catch (parseError) {
+                            const now = Date.now();
+                            const throttle = this.errorThrottle.get(pupitreId) || { lastError: 0, count: 0 };
+                            if (now - throttle.lastError > 10000) {
+                                throttle.lastError = now;
+                                throttle.count = 0;
+                            } else {
+                                throttle.count++;
+                            }
+                            this.errorThrottle.set(pupitreId, throttle);
+                            throw parseError;
+                        }
+                        
+                        // Vérifier que le résultat est un objet ou un tableau
+                        if (typeof jsonData !== 'object' || jsonData === null) {
+                            throw new Error(`JSON valide mais pas un objet/tableau: type=${typeof jsonData}, value=${JSON.stringify(jsonData).substring(0, 100)}`);
+                        }
+                        
                         const hasWrapper = jsonData && (jsonData.type === 'CONFIG_FULL' || jsonData.config);
                         const configPayload = hasWrapper ? (jsonData.config || {}) : jsonData;
                         if (this.handlePupitreConfig && configPayload) {
@@ -374,7 +422,23 @@ class PureDataProxy {
                             this.handlePupitreConfig(pupitreId, configData, true);
                         }
                     } catch (e) {
-                        console.error(`❌ Erreur parsing CONFIG_FULL (SP) ${connection.pupitre.name} (${pupitreId}):`, e);
+                        // Throttling: logger seulement une fois toutes les 10 secondes par pupitre
+                        const now = Date.now();
+                        const throttle = this.errorThrottle.get(pupitreId) || { lastError: 0, count: 0 };
+                        
+                        if (now - throttle.lastError > 10000) {
+                            console.error(`❌ Erreur parsing CONFIG_FULL (SP) ${connection.pupitre.name} (${pupitreId})${throttle.count > 0 ? ` (${throttle.count} erreurs ignorées)` : ''}:`, e.message);
+                            // Logger aussi les détails du buffer pour le débogage
+                            if (state && state.buffer) {
+                                const preview = state.buffer.toString('utf8').substring(0, 200);
+                                console.error(`   Buffer preview (${state.buffer.length} bytes):`, preview);
+                            }
+                            throttle.lastError = now;
+                            throttle.count = 0;
+                        } else {
+                            throttle.count++;
+                        }
+                        this.errorThrottle.set(pupitreId, throttle);
                     } finally {
                         this.binaryChunkStates.delete(pupitreId);
                     }
@@ -385,6 +449,27 @@ class PureDataProxy {
         }
 
         const messageType = buffer.readUInt8(0);
+        
+        // Si le message est plus grand que les messages standards, c'est peut-être un CONFIG_FULL
+        if (buffer.length > 100 && messageType === 0x02) {
+            // Essayer de parser comme JSON si ça commence par '{' après le type
+            if (buffer.length > 1 && buffer[1] === 0x7B) {
+                try {
+                    const jsonStr = buffer.slice(1).toString('utf8');
+                    const json = JSON.parse(jsonStr);
+                    if (json.type === 'CONFIG_FULL' || json.config) {
+                        const configPayload = json.config || json;
+                        if (this.handlePupitreConfig && configPayload) {
+                            const configData = this.convertPureDataConfigToPupitreConfig(configPayload, pupitreId);
+                            this.handlePupitreConfig(pupitreId, configData, true);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error(`❌ [BINAIRE TYPE 0x02] Erreur parsing JSON:`, e.message);
+                }
+            }
+        }
         
         // Initialiser playbackState pour ce pupitre si nécessaire
         if (!this.playbackStates.has(pupitreId)) {
@@ -434,14 +519,37 @@ class PureDataProxy {
                 }
                 break;
                 
-            case 0x02: // FILE_INFO (10 bytes, au load)
+            case 0x02: // FILE_INFO (10 bytes, au load) ou CONFIG_FULL (plus grand)
                 if (buffer.length < 10) {
-                    console.error(`❌ FILE_INFO trop court ${connection.pupitre.name}:`, buffer.length, 'bytes (attendu 10)');
+                    // Ignorer silencieusement les messages FILE_INFO incomplets (souvent des messages de heartbeat)
+                    console.log(`📦 [0x02] Message trop court (${buffer.length} bytes), ignoré`);
+                    return;
+                }
+                
+                // Si le message est plus grand que 10 bytes, ce n'est probablement pas un FILE_INFO
+                if (buffer.length > 10) {
+                    console.log(`📦 [0x02] Message 0x02 de ${buffer.length} bytes (attendu 10 pour FILE_INFO), possible CONFIG_FULL`);
+                    console.log(`   - Premiers octets: ${Array.from(buffer.slice(0, Math.min(50, buffer.length))).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
+                    // Ne pas traiter comme FILE_INFO, laisser le code précédent gérer
+                    return;
+                }
+                
+                // Vérifier que le message n'est pas juste des zéros (message vide)
+                let allZeros = true;
+                for (let i = 1; i < Math.min(buffer.length, 10); i++) {
+                    if (buffer[i] !== 0) {
+                        allZeros = false;
+                        break;
+                    }
+                }
+                if (allZeros && buffer.length > 1) {
+                    // Ignorer les messages vides (souvent des heartbeats)
+                    console.log(`📦 [0x02] Message vide (que des zéros), ignoré`);
                     return;
                 }
                 playbackState.duration = buffer.readUInt32LE(2);
                 playbackState.totalBeats = buffer.readUInt32LE(6);
-                // console.log(`📁 FILE_INFO ${connection.pupitre.name} (10B): Durée:`, playbackState.duration, 'ms - Total beats:', playbackState.totalBeats);
+                console.log(`📁 [0x02] FILE_INFO ${connection.pupitre.name} (10B): Durée:`, playbackState.duration, 'ms - Total beats:', playbackState.totalBeats);
                 break;
                 
             case 0x03: // TEMPO (3 bytes, quand change)
@@ -542,17 +650,61 @@ class PureDataProxy {
     
     // Envoyer une commande à un pupitre spécifique
     sendCommand(command, pupitreId = null) {
-        console.log(`📤 sendCommand appelé - type: ${command.type}, pupitreId: ${pupitreId || 'all'}`);
+        // Log d'entrée pour REQUEST_CONFIG
+        if (command.type === 'REQUEST_CONFIG') {
+            console.log(`🔍 [BLOCAGE] sendCommand REQUEST_CONFIG appelé pour pupitreId=${pupitreId}`);
+            console.log(`   Total connexions: ${this.connections.size}`);
+            if (pupitreId) {
+                const testConn = this.connections.get(pupitreId);
+                console.log(`   Connexion pour ${pupitreId}: ${testConn ? 'EXISTE' : 'N\'EXISTE PAS'}`);
+                if (testConn) {
+                    console.log(`     - connected: ${testConn.connected}`);
+                    console.log(`     - websocket: ${testConn.websocket ? 'EXISTE' : 'N\'EXISTE PAS'}`);
+                    if (testConn.websocket) {
+                        console.log(`     - readyState: ${testConn.websocket.readyState} (OPEN=${WebSocket.OPEN})`);
+                    }
+                }
+            }
+        }
         
         // Si pupitreId spécifié, envoyer à ce pupitre uniquement
         if (pupitreId) {
             const connection = this.connections.get(pupitreId);
-            if (!connection || !connection.connected || !connection.websocket) {
+            
+            // 🚫 BLOCAGE 1: Connexion n'existe pas
+            if (!connection) {
+                if (command.type === 'REQUEST_CONFIG') {
+                    console.error(`🚫 [BLOCAGE 1] sendCommand REQUEST_CONFIG - Connexion n'existe pas pour ${pupitreId}`);
+                    console.error(`   Les pupitres disponibles sont: ${Array.from(this.connections.keys()).join(', ') || 'AUCUN'}`);
+                }
                 console.error(`❌ Pupitre ${pupitreId} non connecté - connection: ${!!connection}, connected: ${connection?.connected}, websocket: ${!!connection?.websocket}`);
                 return false;
             }
             
-            console.log(`📤 Envoi via sendToPupitre pour ${pupitreId}`);
+            // 🚫 BLOCAGE 2: Connexion existe mais n'est pas connectée ou websocket manquant
+            if (!connection.connected || !connection.websocket) {
+                if (command.type === 'REQUEST_CONFIG') {
+                    console.error(`🚫 [BLOCAGE 2] sendCommand REQUEST_CONFIG - Connexion pas prête pour ${pupitreId}`);
+                    console.error(`   - connection existe: ${!!connection}`);
+                    console.error(`   - connection.connected: ${connection.connected}`);
+                    console.error(`   - connection.websocket: ${!!connection.websocket}`);
+                    if (connection.websocket) {
+                        console.error(`   - websocket.readyState: ${connection.websocket.readyState} (OPEN=${WebSocket.OPEN})`);
+                    }
+                }
+                console.error(`❌ Pupitre ${pupitreId} non connecté - connection: ${!!connection}, connected: ${connection?.connected}, websocket: ${!!connection?.websocket}`);
+                return false;
+            }
+            
+            // Vérifier readyState avant d'appeler sendToPupitre
+            if (connection.websocket.readyState !== WebSocket.OPEN) {
+                if (command.type === 'REQUEST_CONFIG') {
+                    console.error(`🚫 [BLOCAGE 2.5] sendCommand REQUEST_CONFIG - readyState pas OPEN pour ${pupitreId}`);
+                    console.error(`   - readyState: ${connection.websocket.readyState} (OPEN=${WebSocket.OPEN})`);
+                    console.error(`   - États possibles: CONNECTING=0, OPEN=1, CLOSING=2, CLOSED=3`);
+                }
+            }
+            
             return this.sendToPupitre(pupitreId, command);
         }
         
@@ -569,31 +721,158 @@ class PureDataProxy {
             }
         }
         
-        // console.log(`📤 Commande envoyée à ${successCount}/${totalCount} pupitres`);
+        if (command.type === 'PARAM_UPDATE' && command.path && command.path[0] === 'uiControls') {
+            fs.appendFileSync('/tmp/ui-controls.log', `[${new Date().toISOString()}] sendCommand UI_CONTROLS - envoyé à ${successCount}/${totalCount} pupitres\n`);
+        }
+        
         return successCount > 0;
     }
     
     // Envoyer une commande à un pupitre spécifique
     sendToPupitre(pupitreId, command) {
         const connection = this.connections.get(pupitreId);
-        if (!connection || !connection.connected || !connection.websocket) {
+        
+        // 🚫 BLOCAGE 3: Connexion n'existe pas dans sendToPupitre
+        if (!connection) {
+            if (command.type === 'REQUEST_CONFIG') {
+                console.error(`🚫 [BLOCAGE 3] sendToPupitre REQUEST_CONFIG - Connexion n'existe pas pour ${pupitreId}`);
+                console.error(`   Les pupitres disponibles sont: ${Array.from(this.connections.keys()).join(', ') || 'AUCUN'}`);
+            }
             console.error(`❌ sendToPupitre échoué pour ${pupitreId} - connection: ${!!connection}, connected: ${connection?.connected}, websocket: ${!!connection?.websocket}`);
+            return false;
+        }
+        
+        // 🚫 BLOCAGE 4: Connexion existe mais pas connectée ou websocket manquant
+        if (!connection.connected || !connection.websocket) {
+            if (command.type === 'REQUEST_CONFIG') {
+                console.error(`🚫 [BLOCAGE 4] sendToPupitre REQUEST_CONFIG - Connexion pas prête pour ${pupitreId}`);
+                console.error(`   - connection existe: ${!!connection}`);
+                console.error(`   - connection.connected: ${connection.connected}`);
+                console.error(`   - connection.websocket: ${!!connection.websocket}`);
+                if (connection.websocket) {
+                    console.error(`   - websocket.readyState: ${connection.websocket.readyState} (OPEN=${WebSocket.OPEN})`);
+                }
+            }
+            console.error(`❌ sendToPupitre échoué pour ${pupitreId} - connection: ${!!connection}, connected: ${connection?.connected}, websocket: ${!!connection?.websocket}`);
+            return false;
+        }
+        
+        // 🚫 BLOCAGE 5: readyState pas OPEN
+        if (connection.websocket.readyState !== WebSocket.OPEN) {
+            if (command.type === 'REQUEST_CONFIG') {
+                console.error(`🚫 [BLOCAGE 5] sendToPupitre REQUEST_CONFIG - readyState pas OPEN pour ${pupitreId}`);
+                console.error(`   - readyState: ${connection.websocket.readyState} (OPEN=${WebSocket.OPEN})`);
+                console.error(`   - États possibles: CONNECTING=0, OPEN=1, CLOSING=2, CLOSED=3`);
+                console.error(`   - connection.connected: ${connection.connected}`);
+            }
+            console.error(`❌ sendToPupitre échoué pour ${pupitreId} - readyState: ${connection.websocket.readyState} (OPEN=${WebSocket.OPEN})`);
             return false;
         }
         
         try {
             const message = JSON.stringify(command);
+            if (command.type === 'REQUEST_CONFIG') {
+                console.log(`✅ [ENVOI] sendToPupitre REQUEST_CONFIG - Tentative d'envoi pour ${pupitreId}`);
+                console.log(`   - Message: ${message}`);
+                console.log(`   - readyState: ${connection.websocket.readyState} (OPEN=${WebSocket.OPEN})`);
+            }
             console.log(`📤 Envoi à ${connection.pupitre.name} (${pupitreId}):`, message);
             
             // Envoyer en mode binaire comme SirenePupitre
             const buffer = Buffer.from(message, 'utf8');
             connection.websocket.send(buffer);
             
+            if (command.type === 'REQUEST_CONFIG') {
+                console.log(`✅ [SUCCÈS] sendToPupitre REQUEST_CONFIG - Message envoyé avec succès à ${pupitreId}`);
+            }
             console.log(`✅ Message envoyé avec succès à ${pupitreId}`);
             return true;
         } catch (error) {
+            // 🚫 BLOCAGE 6: Exception lors de l'envoi
+            if (command.type === 'REQUEST_CONFIG') {
+                console.error(`🚫 [BLOCAGE 6] sendToPupitre REQUEST_CONFIG - Exception lors de l'envoi pour ${pupitreId}`);
+                console.error(`   - Erreur: ${error.message}`);
+                console.error(`   - Stack: ${error.stack}`);
+            }
             console.error(`❌ Erreur envoi ${connection.pupitre.name} (${pupitreId}):`, error);
             return false;
+        }
+    }
+    
+    // Mettre un message en file d'attente pour envoi ultérieur
+    queueMessage(pupitreId, command) {
+        if (!this.messageQueues.has(pupitreId)) {
+            this.messageQueues.set(pupitreId, []);
+        }
+        const queue = this.messageQueues.get(pupitreId);
+        
+        // Éviter les doublons pour REQUEST_CONFIG
+        if (command.type === 'REQUEST_CONFIG') {
+            const hasRequestConfig = queue.some(cmd => cmd.type === 'REQUEST_CONFIG');
+            if (hasRequestConfig) {
+                console.log(`⏭️ REQUEST_CONFIG déjà en file d'attente pour ${pupitreId}`);
+                return;
+            }
+        }
+        
+        queue.push(command);
+        const connection = this.connections.get(pupitreId);
+        const status = connection ? 
+            `connected=${connection.connected}, readyState=${connection.websocket ? connection.websocket.readyState : 'N/A'}` : 
+            'pas de connexion';
+        console.log(`📋 Message mis en file d'attente pour ${pupitreId} (${queue.length} messages en attente, ${status})`);
+    }
+    
+    // Traiter la file d'attente de messages pour un pupitre
+    flushMessageQueue(pupitreId) {
+        const queue = this.messageQueues.get(pupitreId);
+        if (!queue || queue.length === 0) {
+            console.log(`📋 File d'attente vide pour ${pupitreId}`);
+            return;
+        }
+        
+        const connection = this.connections.get(pupitreId);
+        const status = connection ? 
+            `connected=${connection.connected}, readyState=${connection.websocket ? connection.websocket.readyState : 'N/A'}` : 
+            'pas de connexion';
+        
+        console.log(`📤 Traitement de la file d'attente pour ${pupitreId} (${queue.length} messages, ${status})`);
+        
+        // Vérifier que la connexion est vraiment prête avant de traiter
+        if (!connection || !connection.websocket || connection.websocket.readyState !== WebSocket.OPEN) {
+            console.warn(`⚠️ Connexion ${pupitreId} pas prête pour traiter la file d'attente (connection=${!!connection}, websocket=${!!(connection && connection.websocket)}, readyState=${connection && connection.websocket ? connection.websocket.readyState : 'N/A'})`);
+            return;
+        }
+        
+        // Envoyer tous les messages en file d'attente
+        const messagesToSend = [...queue];
+        this.messageQueues.set(pupitreId, []); // Vider la file
+        
+        messagesToSend.forEach((command, index) => {
+            // Utiliser un petit délai entre chaque message pour éviter la surcharge
+            setTimeout(() => {
+                console.log(`📤 Tentative envoi message ${index + 1}/${messagesToSend.length} depuis file d'attente pour ${pupitreId}`);
+                const sent = this.sendToPupitre(pupitreId, command);
+                if (!sent && command.type === 'REQUEST_CONFIG') {
+                    // Si l'envoi échoue encore, remettre en file d'attente
+                    console.warn(`⚠️ Échec envoi depuis file d'attente, remise en file pour ${pupitreId}`);
+                    this.queueMessage(pupitreId, command);
+                }
+            }, index * 20); // 20ms entre chaque message
+        });
+    }
+    
+    // Retry périodique pour les messages en file d'attente
+    retryQueuedMessages() {
+        for (const [pupitreId, queue] of this.messageQueues) {
+            if (queue.length === 0) continue;
+            
+            const connection = this.connections.get(pupitreId);
+            if (connection && connection.connected && connection.websocket && 
+                connection.websocket.readyState === WebSocket.OPEN) {
+                // La connexion est prête, traiter la file
+                this.flushMessageQueue(pupitreId);
+            }
         }
     }
     
@@ -729,7 +1008,7 @@ class PureDataProxy {
     
     // Broadcaster un buffer binaire directement
     broadcastBinaryToClients(buffer, pupitreId = null) {
-        console.log('📡 broadcastBinaryToClients appelé, buffer[0]=0x' + buffer[0].toString(16).padStart(2, '0'), 'taille:', buffer.length);
+        // console.log('📡 broadcastBinaryToClients appelé, buffer[0]=0x' + buffer[0].toString(16).padStart(2, '0'), 'taille:', buffer.length);
         if (pupitreId) {
             // Envoyer à un pupitre spécifique
             const connection = this.connections.get(pupitreId);
@@ -745,7 +1024,7 @@ class PureDataProxy {
         } else {
             // Broadcaster à tous les pupitres connectés
             const count = this.connections.size;
-            console.log('📡 Broadcast à', count, 'pupitres natifs');
+            // console.log('📡 Broadcast à', count, 'pupitres natifs');
             for (const [id, connection] of this.connections) {
                 if (connection.connected && connection.websocket) {
                     try {
@@ -882,4 +1161,5 @@ class PureDataProxy {
     }
 }
 
+module.exports = PureDataProxy;
 module.exports = PureDataProxy;

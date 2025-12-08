@@ -1,7 +1,19 @@
 import QtQuick 2.15
+import "../utils" as Utils
 
 QtObject {
     id: root
+    
+    // Instance de NetworkUtils créée dynamiquement
+    property var networkUtils: null
+    
+    // Fonction helper pour obtenir l'URL de base
+    function getApiBaseUrl() {
+        if (!networkUtils) {
+            networkUtils = Qt.createQmlObject('import "../utils" as Utils; Utils.NetworkUtils {}', root)
+        }
+        return networkUtils.getApiBaseUrl()
+    }
     
     // Propriétés
     property var categories: []
@@ -19,19 +31,9 @@ QtObject {
     signal fileSelected(string filePath)
     signal loadError(string errorMessage)
     
-    // Détecter l'URL API selon l'environnement
+    // Détecter l'URL API selon l'environnement (utilise NetworkUtils)
     function getApiUrl() {
-        // Détection automatique : localhost = dev, sinon = prod
-        var currentUrl = Qt.application.arguments.length > 0 ? 
-                         Qt.application.arguments[0] : ""
-        
-        // En WebAssembly, utiliser window.location depuis le contexte global
-        // Fallback intelligent : si on tourne sur localhost, c'est du dev
-        // Sinon, c'est la prod (Raspberry Pi sur réseau local)
-        
-        // Pour dev : http://localhost:8001
-        // Pour prod : utiliser l'URL courante (ex: http://192.168.1.100:8001)
-        return "http://localhost:8001"  // Le serveur tourne toujours localement
+        return getApiBaseUrl()
     }
     
     // Charger la liste des catégories et fichiers depuis l'API REST

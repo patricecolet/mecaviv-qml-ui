@@ -413,8 +413,19 @@ update_pupitre() {
         return 1
     fi
     
+    # 2. Git pull compositions (fichiers MIDI)
+    print_status "Mise à jour de ~/dev/src/mecaviv/compositions..."
+    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "cd ~/dev/src/mecaviv/compositions && \
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+        print_success "compositions mis à jour"
+    else
+        print_error "Échec du git pull compositions sur ${host}"
+        return 1
+    fi
+    
     if [ "$DEPLOY_COMPOSESIREN" = true ]; then
-        # 2. Git pull ComposeSiren
+        # 3. Git pull ComposeSiren
         print_status "Mise à jour de ~/dev/src/ComposeSiren..."
         if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
             "cd ~/dev/src/ComposeSiren && \
@@ -472,7 +483,52 @@ update_pupitre() {
 #        return 1
 #    fi
     
-    # 5. Mise à jour et compilation des externals critapec si nécessaire
+    # 5. Préparation GPIO pour les externals critapec
+    print_status "Vérification de libgpiod..."
+    if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "dpkg -s libgpiod2 >/dev/null 2>&1"; then
+        print_info "libgpiod2 absent, installation en cours..."
+    fi
+    if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "dpkg -s libgpiod-dev >/dev/null 2>&1"; then
+        print_info "libgpiod-dev absent, installation en cours..."
+    fi
+    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "sudo apt-get update && sudo apt-get install -y libgpiod2 libgpiod-dev"; then
+        print_success "libgpiod/libgpiod-dev installés"
+    else
+        print_error "Impossible d'installer libgpiod/libgpiod-dev sur ${host}"
+        return 1
+    fi
+
+    print_status "Ajout de ${SERVER_USER} au groupe gpio..."
+    if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "getent group gpio >/dev/null 2>&1 || sudo groupadd gpio"; then
+        print_error "Impossible de créer/vérifier le groupe gpio sur ${host}"
+        return 1
+    fi
+    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "sudo usermod -aG gpio ${SERVER_USER}"; then
+        print_success "${SERVER_USER} appartient au groupe gpio (reboot nécessaire pour prise en compte)"
+    else
+        print_error "Impossible d'ajouter ${SERVER_USER} au groupe gpio sur ${host}"
+        return 1
+    fi
+
+    print_status "Configuration des pull-ups GPIO (18/23/24)..."
+    if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "command -v pinctrl >/dev/null 2>&1"; then
+        print_error "pinctrl introuvable sur ${host} (Pi 5 requis)."
+        return 1
+    fi
+    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "sudo pinctrl set 23 pu && sudo pinctrl set 24 pu && sudo pinctrl set 18 pu"; then
+        print_success "Pull-ups configurés sur 18/23/24"
+    else
+        print_error "Échec de la configuration pinctrl sur ${host}"
+        return 1
+    fi
+
     print_status "Vérification des externals critapec..."
     
     # Git pull critapec-pd-externals
@@ -505,17 +561,127 @@ update_pupitre() {
     
     if [ "$NEEDS_BUILD" = "REBUILD" ]; then
         print_status "Compilation des externals critapec..."
-        if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        
+        # Fonction pour compiler avec gestion des erreurs de dépendances
+        compile_externals() {
+            local max_attempts=2
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+                if [ $attempt -gt 1 ]; then
+                    print_status "Tentative $attempt/$max_attempts de compilation..."
+                fi
+                
+                # Capturer la sortie de compilation pour analyser les erreurs
+                local build_output=$(sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
             "cd ~/dev/src/critapec-pd-externals && \
              for dir in */; do \
                  if [ -f \"\${dir}Makefile\" ]; then \
                      echo \"Building \$dir...\" && \
-                     cd \"\$dir\" && make && cd .. || exit 1; \
-                 fi; \
-             done"; then
+                             cd \"\$dir\" && make clean >/dev/null 2>&1 && make 2>&1 && cd .. || (cd .. && exit 1); \
+                         fi; \
+                     done" 2>&1)
+                
+                local build_status=$?
+                
+                if [ $build_status -eq 0 ]; then
             print_success "Externals compilés"
-        else
+                    return 0
+                fi
+                
+                # Analyser les erreurs pour détecter les bibliothèques manquantes
+                local missing_libs=""
+                local missing_headers=""
+                
+                # Détecter les erreurs de bibliothèques manquantes (-lxxx)
+                if echo "$build_output" | grep -qE "cannot find -l[a-zA-Z0-9_-]+"; then
+                    missing_libs=$(echo "$build_output" | grep -oE "cannot find -l[a-zA-Z0-9_-]+" | \
+                        sed 's/cannot find -l//' | sort -u | tr '\n' ' ')
+                fi
+                
+                # Détecter les erreurs de headers manquants
+                if echo "$build_output" | grep -qE "fatal error: [a-zA-Z0-9_/-]+\.h: No such file or directory"; then
+                    missing_headers=$(echo "$build_output" | grep -oE "fatal error: [a-zA-Z0-9_/-]+\.h" | \
+                        sed 's/fatal error: //' | sed 's/\.h$//' | sort -u | tr '\n' ' ')
+                fi
+                
+                # Si c'est la première tentative et qu'on a détecté des dépendances manquantes
+                if [ $attempt -eq 1 ] && ([ -n "$missing_libs" ] || [ -n "$missing_headers" ]); then
+                    print_info "Dépendances manquantes détectées"
+                    if [ -n "$missing_libs" ]; then
+                        print_status "Bibliothèques manquantes: $missing_libs"
+                    fi
+                    if [ -n "$missing_headers" ]; then
+                        print_status "Headers manquants: $missing_headers"
+                    fi
+                    
+                    # Installer les packages de développement courants
+                    print_status "Installation des dépendances de développement..."
+                    local packages_to_install="build-essential pkg-config"
+                    
+                    # Mapper les bibliothèques courantes aux packages Debian/Ubuntu
+                    for lib in $missing_libs; do
+                        case $lib in
+                            gpiod|gpiod2)
+                                packages_to_install="$packages_to_install libgpiod-dev"
+                                ;;
+                            alsa)
+                                packages_to_install="$packages_to_install libasound2-dev"
+                                ;;
+                            jack)
+                                packages_to_install="$packages_to_install libjack-jackd2-dev"
+                                ;;
+                            *)
+                                # Essayer de deviner le package (libxxx-dev)
+                                packages_to_install="$packages_to_install lib${lib}-dev"
+                                ;;
+                        esac
+                    done
+                    
+                    # Mapper les headers aux packages
+                    for header in $missing_headers; do
+                        case $header in
+                            gpiod)
+                                packages_to_install="$packages_to_install libgpiod-dev"
+                                ;;
+                            alsa|alsa/asoundlib)
+                                packages_to_install="$packages_to_install libasound2-dev"
+                                ;;
+                            jack/jack)
+                                packages_to_install="$packages_to_install libjack-jackd2-dev"
+                                ;;
+                        esac
+                    done
+                    
+                    # Supprimer les doublons
+                    packages_to_install=$(echo "$packages_to_install" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+                    
+                    print_status "Installation: $packages_to_install"
+                    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+                        "sudo apt-get update && sudo apt-get install -y $packages_to_install"; then
+                        print_success "Dépendances installées"
+                        ((attempt++))
+                        continue
+                    else
+                        print_error "Échec de l'installation des dépendances"
+                        # Afficher l'erreur de compilation pour diagnostic
+                        echo -e "${YELLOW}Sortie de compilation:${NC}"
+                        echo "$build_output" | tail -20
+                        return 1
+                    fi
+                else
+                    # Deuxième tentative échouée ou erreur non liée aux dépendances
             print_error "Échec de la compilation des externals sur ${host}"
+                    echo -e "${YELLOW}Sortie de compilation:${NC}"
+                    echo "$build_output" | tail -30
+                    return 1
+                fi
+            done
+            
+            return 1
+        }
+        
+        if ! compile_externals; then
             return 1
         fi
         
@@ -526,6 +692,11 @@ update_pupitre() {
              find . \( -name '*.pd_linux' -o -name '*.so' \) -exec cp {} ~/pd-externals/critapec/ \; && \
              find . -name '*-help.pd' -exec cp {} ~/pd-externals/critapec/ \;"; then
             print_success "Externals et help patches installés"
+            if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+                "[ -f ~/pd-externals/critapec/rpi_encoder_step.pd_linux ]"; then
+                print_error "rpi_encoder_step.pd_linux introuvable après installation"
+                return 1
+            fi
         else
             print_error "Échec de l'installation des externals sur ${host}"
             return 1

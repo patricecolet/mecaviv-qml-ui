@@ -1,7 +1,19 @@
 import QtQuick 2.15
+import "../utils" as Utils
 
 QtObject {
     id: presetManager
+    
+    // Instance de NetworkUtils créée dynamiquement
+    property var networkUtils: null
+    
+    // Fonction helper pour obtenir l'URL de base
+    function getApiBaseUrl() {
+        if (!networkUtils) {
+            networkUtils = Qt.createQmlObject('import "../utils" as Utils; Utils.NetworkUtils {}', presetManager)
+        }
+        return networkUtils.getApiBaseUrl()
+    }
     
     // Propriétés
     property var presets: []
@@ -26,7 +38,8 @@ QtObject {
         // Chargement des presets depuis l'API
         
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "http://localhost:8001/api/presets")
+        var apiUrl = getApiBaseUrl()
+        xhr.open("GET", apiUrl + "/api/presets")
         xhr.setRequestHeader("Content-Type", "application/json")
         
         xhr.onreadystatechange = function() {
@@ -55,7 +68,8 @@ QtObject {
         // Sauvegarde preset vers API
         
         var xhr = new XMLHttpRequest()
-        var url = "http://localhost:8001/api/presets"
+        var apiUrl = getApiBaseUrl()
+        var url = apiUrl + "/api/presets"
         var method = presetData.id ? "PUT" : "POST"
         
         if (presetData.id) {
@@ -208,7 +222,8 @@ QtObject {
         }
         
         var xhr = new XMLHttpRequest()
-        xhr.open("DELETE", "http://localhost:8001/api/presets/" + presetToDelete.id)
+        var apiUrl = getApiBaseUrl()
+        xhr.open("DELETE", apiUrl + "/api/presets/" + presetToDelete.id)
         xhr.setRequestHeader("Content-Type", "application/json")
         
         xhr.onreadystatechange = function() {

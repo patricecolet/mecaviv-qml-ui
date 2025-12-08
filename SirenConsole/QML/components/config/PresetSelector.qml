@@ -1,9 +1,15 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import "../../utils" as Utils
 
 Rectangle {
     id: presetSelector
+    
+    // Instance de NetworkUtils pour obtenir l'URL de base de l'API
+    Utils.NetworkUtils {
+        id: networkUtils
+    }
     
     property var consoleController: null
     property var presets: []
@@ -310,7 +316,8 @@ Rectangle {
                 enabled = false
                 
                 var xhr = new XMLHttpRequest()
-                xhr.open("POST", "http://localhost:8001/api/presets/current/upload")
+                var apiUrl = networkUtils.getApiBaseUrl()
+                xhr.open("POST", apiUrl + "/api/presets/current/upload")
                 xhr.setRequestHeader("Content-Type", "application/json")
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState === XMLHttpRequest.DONE) {
@@ -344,7 +351,8 @@ Rectangle {
                 enabled = false
                 
                 var xhr = new XMLHttpRequest()
-                xhr.open("POST", "http://localhost:8001/api/presets/current/download")
+                var apiUrl = networkUtils.getApiBaseUrl()
+                xhr.open("POST", apiUrl + "/api/presets/current/download")
                 xhr.setRequestHeader("Content-Type", "application/json")
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState === XMLHttpRequest.DONE) {

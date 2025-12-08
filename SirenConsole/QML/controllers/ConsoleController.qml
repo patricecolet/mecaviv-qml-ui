@@ -1,7 +1,13 @@
 import QtQuick 2.15
+import "../utils" as Utils
 
 Item {
     id: consoleController
+    
+    // Instance de NetworkUtils pour obtenir l'URL de base de l'API
+    Utils.NetworkUtils {
+        id: networkUtils
+    }
     
     // Fonction pour charger l'état de synchronisation de tous les pupitres
     function loadSyncStatus() {
@@ -9,15 +15,20 @@ Item {
             (function(index) {
                 var pupitreId = "P" + index
                 var xhr = new XMLHttpRequest()
-                xhr.open("GET", "http://localhost:8001/api/pupitres/" + pupitreId + "/sync-status")
+                var apiUrl = networkUtils.getApiBaseUrl()
+                xhr.open("GET", apiUrl + "/api/pupitres/" + pupitreId + "/sync-status")
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                         try {
                             var res = JSON.parse(xhr.responseText)
                             var propName = "pupitre" + index + "Synced"
-                            consoleController[propName] = res.isSynced || false
+                            try {
+                                consoleController[propName] = res.isSynced || false
+                            } catch (propError) {
+                                // Propriété n'existe pas, ignorer silencieusement
+                            }
                         } catch (e) {
-                            console.error("Erreur parsing sync status:", e)
+                            // Ignorer les erreurs de parsing pour éviter le spam
                         }
                     }
                 }
@@ -529,6 +540,21 @@ Item {
     function sendCommand(pupitreId, command, parameters) {
         if (commandManager) {
             return commandManager.executeCommand(pupitreId, command, parameters)
+        }
+        return false
+    }
+    
+    // Commandes de configuration UI du pupitre
+    function setPupitreUiControlsEnabled(pupitreId, enabled) {
+        if (commandManager) {
+            return commandManager.setUiControlsEnabled(pupitreId, enabled)
+        }
+        return false
+    }
+    
+    function setAutonomyMode(pupitreId, device, enabled) {
+        if (commandManager) {
+            return commandManager.setAutonomyMode(pupitreId, device, enabled)
         }
         return false
     }

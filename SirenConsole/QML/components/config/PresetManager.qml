@@ -80,6 +80,11 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 100
                 
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                    visible: true
+                }
+                
                 TextArea {
                     id: presetConfigField
                     placeholderText: "Configuration JSON (optionnel)"
@@ -194,6 +199,12 @@ Rectangle {
             Layout.fillHeight: true
             model: currentPresets
             spacing: 5
+            clip: true
+            
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+                visible: true
+            }
             
             delegate: Rectangle {
                 id: presetItem

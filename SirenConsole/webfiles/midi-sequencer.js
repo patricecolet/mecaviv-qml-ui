@@ -441,14 +441,14 @@ class MidiSequencer {
     }
     
     /**
-     * Broadcaster la position aux pupitres (format 0x01 - 10 bytes)
+     * Broadcaster la position aux pupitres (format 0x06 - 6 bytes avec ticks)
      */
     broadcastPosition() {
         if (!this.pureDataProxy) return;
         
-        console.log('📍 Broadcast position:', this.playing ? '▶' : '⏸', 'bar:', this.currentBar, 'beat:', this.currentBeat.toFixed(2));
+        // console.log('📍 Broadcast position:', this.playing ? '▶' : '⏸', 'tick:', this.currentTick);
         
-        // Mettre à jour l'état interne pour l'UI
+        // Mettre à jour l'état interne pour l'UI (garde le format actuel pour l'UI)
         this.pureDataProxy.updatePlaybackFromSequencer({
             playing: this.playing,
             bar: this.currentBar,
@@ -456,26 +456,25 @@ class MidiSequencer {
             beat: this.currentBeat,
         });
         
-        // Envoyer aussi le message binaire 0x01 aux pupitres natifs
-        // Format: [0x01, flags, bar_l, bar_h, beatInBar_l, beatInBar_h, beat_f32LE]
-        const buffer = Buffer.allocUnsafe(10);
+        // Envoyer le message binaire 0x06 aux pupitres natifs (format ticks)
+        // Format: [0x06, flags, tick_u32_LE]
+        // flags: 0x01 = start/play, 0x00 = stop
+        const buffer = Buffer.allocUnsafe(6);
         
-        buffer.writeUInt8(0x01, 0);                          // messageType (POSITION)
-        buffer.writeUInt8(this.playing ? 0x01 : 0x00, 1);    // flags (bit0=playing)
-        buffer.writeUInt16LE(this.currentBar, 2);            // bar (uint16 LE)
-        buffer.writeUInt16LE(this.currentBeatInBar, 4);      // beatInBar (uint16 LE)
-        buffer.writeFloatLE(this.currentBeat, 6);            // beat (float32 LE)
+        buffer.writeUInt8(0x06, 0);                          // messageType (TICK_POSITION)
+        buffer.writeUInt8(this.playing ? 0x01 : 0x00, 1);    // flags (bit0=playing: 1=start, 0=stop)
+        buffer.writeUInt32LE(this.currentTick, 2);           // tick position (uint32 LE)
         
         // Broadcaster aux pupitres natifs (Raspberry Pi)
         this.pureDataProxy.broadcastBinaryToClients(buffer);
         
         // Broadcaster aussi aux clients UI (SirenePupitre WebAssembly) - format binaire identique
-        console.log('📡 Tentative broadcast aux clients UI, fonction existe:', !!this.pureDataProxy.broadcastBinaryToUIClients);
+        // console.log('📡 Tentative broadcast aux clients UI, fonction existe:', !!this.pureDataProxy.broadcastBinaryToUIClients);
         if (this.pureDataProxy.broadcastBinaryToUIClients) {
-            console.log('📡 Appel broadcastBinaryToUIClients...');
+            // console.log('📡 Appel broadcastBinaryToUIClients...');
             this.pureDataProxy.broadcastBinaryToUIClients(buffer);
         } else {
-            console.log('❌ broadcastBinaryToUIClients non disponible');
+            // console.log('❌ broadcastBinaryToUIClients non disponible');
         }
     }
     

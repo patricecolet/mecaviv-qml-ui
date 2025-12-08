@@ -18,6 +18,11 @@ Rectangle {
     property int ambitusMax: parent && parent.ambitusMax !== undefined ? parent.ambitusMax : 72
     // État de synchronisation
     property bool pupitreSynced: parent ? (parent.pupitreSynced || false) : false
+    property var consoleController: parent ? parent.consoleController : null
+    property bool autoVolantActive: false
+    property bool autoPadActive: false
+    property bool autoSliderActive: false
+    property bool autoJoystickActive: false
     
     
     height: 80
@@ -214,38 +219,43 @@ Rectangle {
             }
         }
         
-        // Rectangle 4: Boutons Config et Vue Locale
+        // Rectangle 4: Boutons Auto*
         Rectangle {
-            Layout.minimumWidth: 80
-            Layout.preferredWidth: 100
-            Layout.maximumWidth: 120
+            Layout.minimumWidth: 140
+            Layout.preferredWidth: 180
+            Layout.maximumWidth: 220
             Layout.fillHeight: true
             color: "#1a1a1a"
             radius: 4
             border.color: "#333333"
             border.width: 1
             
-            Column {
+            Flow {
                 anchors.centerIn: parent
+                width: parent.width - 16
                 spacing: 8
                 
-                Button {
-                    text: "Config"
-                    width: 80
-                    height: 25
-                    font.pixelSize: 10
-                    onClicked: {
-                        // Configuration pupitre
-                    }
-                }
-                
-                Button {
-                    text: "Vue"
-                    width: 80
-                    height: 25
-                    font.pixelSize: 10
-                    onClicked: {
-                        // Vue locale pupitre
+                Repeater {
+                    model: [
+                        { label: "AutoVolant", device: "volant", prop: "autoVolantActive" },
+                        { label: "AutoPad", device: "pad", prop: "autoPadActive" },
+                        { label: "AutoSlider", device: "slider", prop: "autoSliderActive" },
+                        { label: "AutoJoystick", device: "joystick", prop: "autoJoystickActive" }
+                    ]
+                    
+                    delegate: Button {
+                        width: (parent.width / 2) - 10
+                        height: 26
+                        checkable: true
+                        checked: overviewRow[modelData.prop]
+                        text: modelData.label
+                        font.pixelSize: 10
+                        onToggled: {
+                            overviewRow[modelData.prop] = checked
+                            if (overviewRow.consoleController && overviewRow.pupitreId) {
+                                overviewRow.consoleController.setAutonomyMode(overviewRow.pupitreId, modelData.device, checked)
+                            }
+                        }
                     }
                 }
             }

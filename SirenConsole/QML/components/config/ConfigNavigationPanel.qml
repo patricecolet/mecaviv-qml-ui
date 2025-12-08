@@ -100,6 +100,58 @@ Rectangle {
                 font.pixelSize: 14
             }
         }
+        
+        Button {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40
+            text: "Game Mode"
+            highlighted: configNavigationPanel.currentTabIndex === 3
+            onClicked: {
+                configNavigationPanel.currentTabIndex = 3
+                configNavigationPanel.tabSelected(3)
+            }
+            
+            background: Rectangle {
+                color: parent.highlighted ? "#4a90e2" : (parent.hovered ? "#3a3a3a" : "#2a2a2a")
+                border.color: parent.highlighted ? "#6bb6ff" : "#555555"
+                border.width: 1
+                radius: 4
+            }
+            
+            contentItem: Text {
+                text: parent.text
+                color: parent.highlighted ? "#ffffff" : "#cccccc"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 14
+            }
+        }
+        
+        Button {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40
+            text: "Affichage"
+            highlighted: configNavigationPanel.currentTabIndex === 4
+            onClicked: {
+                configNavigationPanel.currentTabIndex = 4
+                configNavigationPanel.tabSelected(4)
+            }
+            
+            background: Rectangle {
+                color: parent.highlighted ? "#4a90e2" : (parent.hovered ? "#3a3a3a" : "#2a2a2a")
+                border.color: parent.highlighted ? "#6bb6ff" : "#555555"
+                border.width: 1
+                radius: 4
+            }
+            
+            contentItem: Text {
+                text: parent.text
+                color: parent.highlighted ? "#ffffff" : "#cccccc"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 14
+            }
+        }
         Item {
             Layout.fillHeight: true
         }

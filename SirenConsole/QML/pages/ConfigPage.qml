@@ -1,11 +1,17 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import "../utils" as Utils
 
 Rectangle {
     id: configPage
     
     color: "#1a1a1a"
+    
+    // Instance de NetworkUtils pour obtenir l'URL de base de l'API
+    Utils.NetworkUtils {
+        id: networkUtils
+    }
     
     property var consoleController: null
     property int currentPupitreIndex: 0
@@ -133,7 +139,7 @@ Rectangle {
                 })
                 
                 item.onAllModeToggled.connect(function(enabled) {
-                    // Propager le mode "All" au SirensTab
+                    // Propager le mode "All" aux tabs (SirensTab, GameModeTab, etc.)
                     if (tabLoader.item && tabLoader.item.hasOwnProperty('isAllMode')) {
                         tabLoader.item.isAllMode = enabled
                         tabLoader.item.allPupitres = configPage.pupitres
@@ -181,6 +187,8 @@ Rectangle {
                             case 0: return "../components/config/tabs/SirensTab.qml"
                             case 1: return "../components/config/tabs/ControllersTab.qml"
                             case 2: return "../components/config/tabs/OutputsTab.qml"
+                            case 3: return "../components/config/tabs/GameModeTab.qml"
+                            case 4: return "../components/config/tabs/DisplayTab.qml"
                             default: return "../components/config/tabs/SirensTab.qml"
                         }
                     }
@@ -221,7 +229,8 @@ Rectangle {
 
     function loadCurrentPresetAndBind() {
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "http://localhost:8001/api/presets/current")
+        var apiUrl = networkUtils.getApiBaseUrl()
+        xhr.open("GET", apiUrl + "/api/presets/current")
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                 try {

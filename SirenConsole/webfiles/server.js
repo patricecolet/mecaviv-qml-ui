@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const WebSocket = require('ws');
@@ -6,6 +7,9 @@ const WebSocket = require('ws');
 // Importer l'API des presets
 const presetAPI = require('./api-presets.js');
 let currentPresetId = null;
+
+// Initialiser le preset courant dès le démarrage si possible
+// (sera exécuté après la définition de getOrCreateCurrentPreset)
 
 // Importer l'API MIDI
 const midiAPI = require('./api-midi.js');
@@ -63,16 +67,8 @@ function convertPresetToParamUpdates(preset, pupitreId) {
     const pupitreConfig = preset.config.pupitres.find(p => p.id === pupitreId);
     if (!pupitreConfig) return updates;
     
-    // assignedSirenes → ["sirenConfig", "assignedSirenes"]
+    // assignedSirenes → ["sirenConfig", "currentSirens"] (convertir en strings pour compatibilité SirenePupitre)
     if (Array.isArray(pupitreConfig.assignedSirenes)) {
-        updates.push({
-            type: "PARAM_UPDATE",
-            path: ["sirenConfig", "assignedSirenes"],
-            value: pupitreConfig.assignedSirenes,
-            source: "console"
-        });
-
-        // NEW: also emit currentSirens (strings) for the pupitre
         updates.push({
             type: "PARAM_UPDATE",
             path: ["sirenConfig", "currentSirens"],
@@ -157,7 +153,97 @@ function convertPresetToParamUpdates(preset, pupitreId) {
         }
     }
     
+    // gameMode → ["gameMode", "enabled"]
+    if (pupitreConfig.gameMode !== undefined) {
+        updates.push({
+            type: "PARAM_UPDATE",
+            path: ["gameMode", "enabled"],
+            value: pupitreConfig.gameMode ? 1 : 0,
+            source: "console"
+        });
+    }
+    
     return updates;
+}
+
+function ensureCurrentPreset(data) {
+    // Si pas de données ou structure invalide, retourner null (sera géré par l'appelant)
+    if (!data || !Array.isArray(data.presets) || data.presets.length === 0) {
+        return null;
+    }
+
+    if (currentPresetId) {
+        const existing = data.presets.find(p => p.id === currentPresetId);
+        if (existing) {
+            return existing;
+        }
+    }
+
+    const fallback = data.presets[0] || null;
+    if (fallback) {
+        currentPresetId = fallback.id || fallback.name || null;
+    } else {
+        currentPresetId = null;
+    }
+    return fallback;
+}
+
+// Fonction helper pour obtenir ou créer un preset courant (async)
+async function getOrCreateCurrentPreset() {
+    try {
+        const data = await presetAPI.readPresets();
+        let preset = ensureCurrentPreset(data);
+        
+        // Si aucun preset, créer un preset par défaut
+        if (!preset) {
+            const defaultPresets = presetAPI.createDefaultPresets();
+            if (defaultPresets.presets && defaultPresets.presets.length > 0) {
+                await presetAPI.writePresets(defaultPresets);
+                preset = ensureCurrentPreset(defaultPresets);
+            }
+        }
+        
+        return preset;
+    } catch (error) {
+        return null;
+    }
+}
+
+// Initialiser le preset courant après la définition de getOrCreateCurrentPreset
+(async () => {
+    try {
+        await getOrCreateCurrentPreset();
+    } catch (err) {
+        // Ignorer les erreurs silencieusement
+    }
+})();
+
+function getOrCreatePupitreEntry(preset, pupitreId) {
+    if (!preset || !pupitreId) {
+        return null;
+    }
+
+    if (!preset.config) {
+        preset.config = {};
+    }
+
+    if (!Array.isArray(preset.config.pupitres)) {
+        preset.config.pupitres = [];
+    }
+
+    let entry = preset.config.pupitres.find(p => p.id === pupitreId);
+    if (!entry) {
+        entry = {
+            id: pupitreId,
+            assignedSirenes: [],
+            controllerMapping: {},
+            sirenes: {},
+            gameMode: false
+        };
+        preset.config.pupitres.push(entry);
+    }
+
+    return entry;
 }
 
 function convertParamUpdateToPreset(path, value, pupitreId, preset) {
@@ -209,6 +295,10 @@ function convertParamUpdateToPreset(path, value, pupitreId, preset) {
         else if (path[1] === "udpEnabled") pupitreConfig.udpEnabled = value ? true : false;
         else if (path[1] === "rtpMidiEnabled") pupitreConfig.rtpMidiEnabled = value ? true : false;
     }
+    // gameMode.enabled
+    else if (path.length === 2 && path[0] === "gameMode" && path[1] === "enabled") {
+        pupitreConfig.gameMode = value ? true : false;
+    }
     // controllerMapping[ctrl].cc/curve
     else if (path.length === 3 && path[0] === "controllerMapping") {
         const ctrl = path[1];
@@ -237,6 +327,11 @@ const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH || config.paths.mid
 // Configuration du serveur
 const PORT = 8001; // Port différent de SirenePupitre (8000)
 const HOST = '0.0.0.0';
+
+// Configuration SSL
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH || path.join(__dirname, 'ssl', 'key.pem');
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH || path.join(__dirname, 'ssl', 'cert.pem');
+const USE_HTTPS = process.env.USE_HTTPS !== 'false'; // Par défaut HTTPS activé
 
 // Initialiser le proxy PureData et le séquenceur
 let pureDataProxy = null;
@@ -277,7 +372,7 @@ function broadcastToClients(message) {
 
 // Fonction pour broadcaster des buffers binaires aux clients UI
 function broadcastBinaryToUIClients(buffer) {
-    console.log('📡 broadcastBinaryToUIClients appelé, clients connectés:', connectedClients.size, 'buffer[0]=0x' + buffer[0].toString(16).padStart(2, '0'));
+    // console.log('📡 broadcastBinaryToUIClients appelé, clients connectés:', connectedClients.size, 'buffer[0]=0x' + buffer[0].toString(16).padStart(2, '0'));
     let sentCount = 0;
     connectedClients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
@@ -290,7 +385,7 @@ function broadcastBinaryToUIClients(buffer) {
             }
         }
     });
-    console.log('📡 Message binaire envoyé à', sentCount, 'clients UI');
+    // console.log('📡 Message binaire envoyé à', sentCount, 'clients UI');
 }
 
 // Convertir note MIDI + pitchbend → fréquence (Hz)
@@ -339,9 +434,20 @@ function handleWebSocketConnection(ws, request) {
                     // Ajouter le client à la liste des clients connectés
                     connectedClients.add(ws);
                     
-                    // Envoyer le statut initial
+                    // Envoyer le statut initial avec informations de synchronisation
                     if (pureDataProxy) {
                         const status = pureDataProxy.getStatus();
+                        // Ajouter les informations de synchronisation à chaque connexion
+                        if (status.connections) {
+                            status.connections = status.connections.map(conn => {
+                                const syncInfo = syncState.get(conn.pupitreId);
+                                return {
+                                    ...conn,
+                                    isSynced: syncInfo?.isSynced || false,
+                                    lastSync: syncInfo?.lastSync || null
+                                };
+                            });
+                        }
                         ws.send(JSON.stringify({
                             type: 'INITIAL_STATUS',
                             data: status
@@ -483,8 +589,8 @@ function handleWebSocketConnection(ws, request) {
     });
 }
 
-// Gestion des requêtes
-const server = http.createServer(function (request, response) {
+// Fonction de gestion des requêtes (utilisée par HTTP et HTTPS)
+function requestHandler(request, response) {
     // Logs uniquement pour les requêtes intéressantes (pas les GET polling)
     if (request.method !== 'GET' || !request.url.includes('/api/puredata/playback')) {
         // Requête reçue
@@ -512,13 +618,7 @@ const server = http.createServer(function (request, response) {
     if (request.url === '/api/presets/current' || (request.url.startsWith('/api/presets/current') && request.method === 'GET')) {
         (async () => {
             try {
-                const data = await presetAPI.readPresets();
-                let preset = null;
-                if (currentPresetId) preset = data.presets.find(p => p.id === currentPresetId) || null;
-                if (!preset) {
-                    preset = data.presets[0] || null;
-                    currentPresetId = preset ? preset.id : null;
-                }
+                const preset = await getOrCreateCurrentPreset();
                 response.writeHead(200, { 'Content-Type': 'application/json' });
                 response.end(JSON.stringify({ preset, currentId: currentPresetId }));
             } catch (e) {
@@ -562,23 +662,20 @@ const server = http.createServer(function (request, response) {
         request.on('end', async () => {
             try {
                 const { pupitreId, assignedSirenes } = JSON.parse(body);
+                if (!pupitreId) throw new Error('Missing pupitreId');
+                const preset = await getOrCreateCurrentPreset();
+                if (!preset) throw new Error('Impossible de créer un preset par défaut');
                 const data = await presetAPI.readPresets();
-                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
-                if (!preset) throw new Error('No current preset');
-                if (!preset.config) preset.config = {};
-                if (!preset.config.pupitres) preset.config.pupitres = [];
-                const list = preset.config.pupitres;
-                const p = list.find(x => x.id === pupitreId);
-                if (!p) throw new Error('Pupitre not found');
+                const p = getOrCreatePupitreEntry(preset, pupitreId);
                 p.assignedSirenes = Array.isArray(assignedSirenes) ? assignedSirenes : [];
                 await presetAPI.writePresets(data);
                 
-                // Envoyer PARAM_UPDATE si synchronisé
+                // Envoyer PARAM_UPDATE si synchronisé (utiliser currentSirens en strings pour compatibilité SirenePupitre)
                 if (isSynced(pupitreId) && pureDataProxy) {
                     const update = {
                         type: "PARAM_UPDATE",
-                        path: ["sirenConfig", "assignedSirenes"],
-                        value: p.assignedSirenes,
+                        path: ["sirenConfig", "currentSirens"],
+                        value: p.assignedSirenes.map(n => String(n)),
                         source: "console"
                     };
                     pureDataProxy.sendToPupitre(pupitreId, update);
@@ -599,14 +696,12 @@ const server = http.createServer(function (request, response) {
         request.on('end', async () => {
             try {
                 const { pupitreId, sireneId, changes } = JSON.parse(body);
+                if (!pupitreId) throw new Error('Missing pupitreId');
+                if (!sireneId) throw new Error('Missing sireneId');
+                const preset = await getOrCreateCurrentPreset();
+                if (!preset) throw new Error('Impossible de créer un preset par défaut');
                 const data = await presetAPI.readPresets();
-                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
-                if (!preset) throw new Error('No current preset');
-                if (!preset.config) preset.config = {};
-                if (!preset.config.pupitres) preset.config.pupitres = [];
-                const list = preset.config.pupitres;
-                const p = list.find(x => x.id === pupitreId);
-                if (!p) throw new Error('Pupitre not found');
+                const p = getOrCreatePupitreEntry(preset, pupitreId);
                 if (!p.sirenes) p.sirenes = {};
                 const key = 'sirene' + (typeof sireneId === 'number' ? sireneId : parseInt(sireneId, 10));
                 if (!p.sirenes[key]) p.sirenes[key] = { ambitusRestricted: false, frettedMode: false };
@@ -651,14 +746,11 @@ const server = http.createServer(function (request, response) {
         request.on('end', async () => {
             try {
                 const { pupitreId, changes } = JSON.parse(body);
+                if (!pupitreId) throw new Error('Missing pupitreId');
+                const preset = await getOrCreateCurrentPreset();
+                if (!preset) throw new Error('Impossible de créer un preset par défaut');
                 const data = await presetAPI.readPresets();
-                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
-                if (!preset) throw new Error('No current preset');
-                if (!preset.config) preset.config = {};
-                if (!preset.config.pupitres) preset.config.pupitres = [];
-                const list = preset.config.pupitres;
-                const p = list.find(x => x.id === pupitreId);
-                if (!p) throw new Error('Pupitre not found');
+                const p = getOrCreatePupitreEntry(preset, pupitreId);
                 const ch = changes || {};
                 ['vstEnabled','udpEnabled','rtpMidiEnabled'].forEach(k => { if (k in ch) p[k] = !!ch[k]; });
                 await presetAPI.writePresets(data);
@@ -706,14 +798,12 @@ const server = http.createServer(function (request, response) {
         request.on('end', async () => {
             try {
                 const { pupitreId, controller, cc, curve } = JSON.parse(body);
+                if (!pupitreId) throw new Error('Missing pupitreId');
+                if (!controller) throw new Error('Missing controller');
+                const preset = await getOrCreateCurrentPreset();
+                if (!preset) throw new Error('Impossible de créer un preset par défaut');
                 const data = await presetAPI.readPresets();
-                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
-                if (!preset) throw new Error('No current preset');
-                if (!preset.config) preset.config = {};
-                if (!preset.config.pupitres) preset.config.pupitres = [];
-                const list = preset.config.pupitres;
-                const p = list.find(x => x.id === pupitreId);
-                if (!p) throw new Error('Pupitre not found');
+                const p = getOrCreatePupitreEntry(preset, pupitreId);
                 if (!p.controllerMapping) p.controllerMapping = {};
                 if (!p.controllerMapping[controller]) p.controllerMapping[controller] = {};
                 if (cc !== undefined) p.controllerMapping[controller].cc = parseInt(cc, 10);
@@ -749,6 +839,39 @@ const server = http.createServer(function (request, response) {
         });
         return;
     }
+    if ((request.url === '/api/presets/current/game-mode' || request.url.startsWith('/api/presets/current/game-mode')) && request.method === 'PATCH') {
+        let body = '';
+        request.on('data', chunk => body += chunk);
+        request.on('end', async () => {
+            try {
+                const { pupitreId, gameMode } = JSON.parse(body);
+                if (!pupitreId) throw new Error('Missing pupitreId');
+                const preset = await getOrCreateCurrentPreset();
+                if (!preset) throw new Error('Impossible de créer un preset par défaut');
+                const data = await presetAPI.readPresets();
+                const p = getOrCreatePupitreEntry(preset, pupitreId);
+                p.gameMode = gameMode !== undefined ? !!gameMode : false;
+                await presetAPI.writePresets(data);
+                
+                // Envoyer PARAM_UPDATE si synchronisé
+                if (isSynced(pupitreId) && pureDataProxy) {
+                    pureDataProxy.sendToPupitre(pupitreId, {
+                        type: "PARAM_UPDATE",
+                        path: ["gameMode", "enabled"],
+                        value: p.gameMode ? 1 : 0,
+                        source: "console"
+                    });
+                }
+                
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: true, presetId: preset.id, pupitreId, gameMode: p.gameMode }));
+            } catch (e) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
     
     // Endpoint GET /api/pupitres/:id/sync-status
     if (request.method === 'GET' && request.url.startsWith('/api/pupitres/') && request.url.endsWith('/sync-status')) {
@@ -763,11 +886,10 @@ const server = http.createServer(function (request, response) {
     if ((request.url === '/api/presets/current/upload' || request.url.startsWith('/api/presets/current/upload')) && request.method === 'POST') {
         (async () => {
             try {
-                const data = await presetAPI.readPresets();
-                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
+                const preset = await getOrCreateCurrentPreset();
                 if (!preset) {
-                    response.writeHead(404, { 'Content-Type': 'application/json' });
-                    response.end(JSON.stringify({ success: false, error: 'No current preset' }));
+                    response.writeHead(500, { 'Content-Type': 'application/json' });
+                    response.end(JSON.stringify({ success: false, error: 'Impossible de créer un preset par défaut' }));
                     return;
                 }
                 
@@ -833,11 +955,10 @@ const server = http.createServer(function (request, response) {
     if ((request.url === '/api/presets/current/download' || request.url.startsWith('/api/presets/current/download')) && request.method === 'POST') {
         (async () => {
             try {
-                const data = await presetAPI.readPresets();
-                let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
+                const preset = await getOrCreateCurrentPreset();
                 if (!preset) {
-                    response.writeHead(404, { 'Content-Type': 'application/json' });
-                    response.end(JSON.stringify({ success: false, error: 'No current preset' }));
+                    response.writeHead(500, { 'Content-Type': 'application/json' });
+                    response.end(JSON.stringify({ success: false, error: 'Impossible de créer un preset par défaut' }));
                     return;
                 }
                 
@@ -845,16 +966,16 @@ const server = http.createServer(function (request, response) {
                 const results = {};
                 const pendingRequests = new Map();
                 
-                console.log('📥 Download demandé - Status:', {
-                    totalConnections: status.totalConnections,
-                    connectedCount: status.connectedCount,
-                    connections: status.connections.map(c => ({ 
-                        pupitreId: c.pupitreId, 
-                        connected: c.connected, 
-                        synced: isSynced(c.pupitreId) 
-                    })),
-                    syncState: Array.from(syncState.entries()).map(([id, state]) => ({ id, state }))
-                });
+                // console.log('📥 Download demandé - Status:', {
+                //     totalConnections: status.totalConnections,
+                //     connectedCount: status.connectedCount,
+                //     connections: status.connections.map(c => ({ 
+                //         pupitreId: c.pupitreId, 
+                //         connected: c.connected, 
+                //         synced: isSynced(c.pupitreId) 
+                //     })),
+                //     syncState: Array.from(syncState.entries()).map(([id, state]) => ({ id, state }))
+                // });
                 
                 // IMPORTANT: Pour le Download, on peut envoyer même si pas synchronisé (c'est une demande de lecture)
                 // Envoyer REQUEST_PUPITRE_CONFIG à PureData (source de vérité) pour tous les pupitres connectés
@@ -863,7 +984,7 @@ const server = http.createServer(function (request, response) {
                     if (conn.connected) {
                         // Activer sync temporairement si pas déjà fait (pour le download)
                         if (!isSynced(conn.pupitreId)) {
-                            console.log(`ℹ️ Activation sync temporaire pour ${conn.pupitreId} (download)`);
+                            // console.log(`ℹ️ Activation sync temporaire pour ${conn.pupitreId} (download)`);
                             setSyncEnabled(conn.pupitreId, true);
                         }
                         
@@ -875,28 +996,20 @@ const server = http.createServer(function (request, response) {
                         pendingConfigRequests.set(pupitreId, { 
                             timestamp: requestTimestamp, 
                             timeout: setTimeout(() => {
-                                console.warn(`⚠️ Timeout demande config pour ${pupitreId}`);
                                 pendingConfigRequests.delete(pupitreId);
                             }, 10000)
                         });
                         
                         // Demander la config à PureData (source de vérité)
-                        console.log(`📤 Envoi REQUEST_PUPITRE_CONFIG pour ${pupitreId}`);
                         const sent = pureDataProxy.requestPupitreConfig(pupitreId);
                         if (sent) {
                             requestsSent++;
-                            console.log(`✅ REQUEST_PUPITRE_CONFIG envoyé pour ${pupitreId}`);
-                        } else {
-                            console.error(`❌ Échec envoi REQUEST_PUPITRE_CONFIG pour ${pupitreId}`);
                         }
                     } else {
-                        console.log(`⏭️ Pupitre ${conn.pupitreId} ignoré - connected: ${conn.connected}, synced: ${isSynced(conn.pupitreId)}`);
+                        // console.log(`⏭️ Pupitre ${conn.pupitreId} ignoré - connected: ${conn.connected}, synced: ${isSynced(conn.pupitreId)}`);
                     }
                 }
                 
-                if (requestsSent === 0) {
-                    console.warn('⚠️ Aucune demande envoyée - vérifier connexions et état de synchronisation');
-                }
                 
                 // Attendre les réponses (timeout 5s)
                 const timeout = 5000;
@@ -1005,7 +1118,7 @@ const server = http.createServer(function (request, response) {
                     }
                     
                 } else if (command.type === 'MIDI_TRANSPORT') {
-                    console.log('🎵 MIDI_TRANSPORT reçu:', command.action, 'de', command.source || 'unknown');
+                    // console.log('🎵 MIDI_TRANSPORT reçu:', command.action, 'de', command.source || 'unknown');
                     
                     switch (command.action) {
                         case 'play':
@@ -1017,10 +1130,10 @@ const server = http.createServer(function (request, response) {
                             message = 'Pause';
                             break;
                         case 'stop':
-                            console.log('⏹ Appel midiSequencer.stop()...');
+                            // console.log('⏹ Appel midiSequencer.stop()...');
                             success = midiSequencer.stop();
                             message = 'Stop';
-                            console.log('⏹ Stop terminé, success:', success);
+                            // console.log('⏹ Stop terminé, success:', success);
                             break;
                         default:
                             message = 'Action inconnue: ' + command.action;
@@ -1034,7 +1147,7 @@ const server = http.createServer(function (request, response) {
                     }
                     
                 } else if (command.type === 'GAME_MODE') {
-                    console.log('🎮 GAME_MODE reçu:', command.enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ', 'de', command.source || 'unknown');
+                    // console.log('🎮 GAME_MODE reçu:', command.enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ', 'de', command.source || 'unknown');
                     
                     // Relayer à PureData pour qu'il adapte son comportement
                     pureDataProxy.sendCommand(command);
@@ -1064,6 +1177,44 @@ const server = http.createServer(function (request, response) {
                     
                     message = 'Tempo changé';
                     
+                } else if (command.type === 'UI_CONTROLS') {
+                    // Commande pour contrôler l'affichage UI d'un pupitre
+                    const pupitreId = command.pupitreId;
+                    const enabled = command.enabled !== undefined ? command.enabled : true;
+                    
+                    // Format PARAM_UPDATE - comme les autres paramètres
+                    const relayCommand = {
+                        type: "PARAM_UPDATE",
+                        path: ["uiControls", "enabled"],
+                        value: enabled ? 1 : 0,
+                        source: "console"
+                    };
+                    
+                    // Log dans un fichier séparé pour éviter le spam
+                    const fs = require('fs');
+                    const logMsg = `[${new Date().toISOString()}] UI_CONTROLS -> PARAM_UPDATE: ${JSON.stringify(relayCommand)}, pupitreId: ${pupitreId || 'all'}\n`;
+                    fs.appendFileSync('/tmp/ui-controls.log', logMsg);
+                    
+                    // Utiliser sendToPupitre() avec pupitreId comme les autres PARAM_UPDATE
+                    if (pupitreId) {
+                        const sendResult = pureDataProxy.sendToPupitre(pupitreId, relayCommand);
+                        fs.appendFileSync('/tmp/ui-controls.log', `[${new Date().toISOString()}] UI_CONTROLS sendToPupitre result: ${sendResult} pour ${pupitreId}\n`);
+                        success = sendResult;
+                    } else {
+                        // Si pas de pupitreId, envoyer à tous via sendCommand()
+                        const sendResult = pureDataProxy.sendCommand(relayCommand);
+                        fs.appendFileSync('/tmp/ui-controls.log', `[${new Date().toISOString()}] UI_CONTROLS sendCommand result: ${sendResult}\n`);
+                        success = sendResult;
+                    }
+                    message = 'Commande UI envoyée';
+                } else if (command.type === 'AUTONOMY_MODE') {
+                    const pupitreId = command.pupitreId;
+                    if (pupitreId) {
+                        success = pureDataProxy.sendToPupitre(pupitreId, command);
+                    } else {
+                        success = pureDataProxy.sendCommand(command);
+                    }
+                    message = success ? 'Commande autonomie envoyée' : 'Pupitre non disponible';
                 } else {
                     // Commande inconnue, envoyer à PureData
                     success = pureDataProxy.sendCommand(command);
@@ -1182,35 +1333,62 @@ const server = http.createServer(function (request, response) {
             response.end(content, 'utf-8');
         }
     });
-});
+}
+
+// Créer le serveur HTTP ou HTTPS selon la configuration
+let server;
+if (USE_HTTPS) {
+    // Vérifier que les certificats existent
+    if (!fs.existsSync(SSL_KEY_PATH) || !fs.existsSync(SSL_CERT_PATH)) {
+        console.error('❌ Certificats SSL introuvables.');
+        console.error(`   Clé: ${SSL_KEY_PATH}`);
+        console.error(`   Cert: ${SSL_CERT_PATH}`);
+        console.error('   Créez-les avec:');
+        console.error('   openssl req -x509 -newkey rsa:4096 -keyout ssl/key.pem -out ssl/cert.pem -days 365 -nodes -subj "/CN=localhost"');
+        process.exit(1);
+    }
+    
+    try {
+        const options = {
+            key: fs.readFileSync(SSL_KEY_PATH),
+            cert: fs.readFileSync(SSL_CERT_PATH)
+        };
+        
+        server = https.createServer(options, requestHandler);
+    } catch (error) {
+        console.error('❌ Erreur chargement certificats SSL:', error.message);
+        process.exit(1);
+    }
+} else {
+    server = http.createServer(requestHandler);
+}
 
 // Handler pour configuration complète depuis pupitres
 async function handlePupitreConfigFromPupitre(pupitreId, configData, isRequested = false) {
-    console.log(`📥 handlePupitreConfigFromPupitre appelé pour ${pupitreId}, isRequested: ${isRequested}, pendingRequest: ${pendingConfigRequests.has(pupitreId)}`);
-    console.log(`📥 ConfigData reçu:`, JSON.stringify(configData).substring(0, 200));
     
     // Seulement si synchronisé
     if (!isSynced(pupitreId)) {
-        console.warn(`⚠️ ${pupitreId} pas synchronisé, activation sync...`);
         setSyncEnabled(pupitreId, true);
     }
     
     // Si c'est un PUPITRE_STATUS périodique (heartbeat), ne traiter que si une demande est en cours
-    if (!isRequested && !pendingConfigRequests.has(pupitreId)) {
-        // C'est juste un heartbeat, ne pas mettre à jour le preset
-        console.log(`⏭️ Ignoré (heartbeat sans demande en cours)`);
+    // MAIS pour CONFIG_FULL, toujours traiter car c'est une réponse explicite à REQUEST_CONFIG
+    if (!isRequested && !pendingConfigRequests.has(pupitreId) && !configData) {
         return;
     }
     
     // Si c'est une réponse à une demande, retirer de la liste des demandes
     if (pendingConfigRequests.has(pupitreId)) {
-        console.log(`✅ Réponse reçue pour ${pupitreId}, suppression de pendingConfigRequests`);
+        const pending = pendingConfigRequests.get(pupitreId);
+        if (pending && pending.timeout) {
+            clearTimeout(pending.timeout);
+        }
         pendingConfigRequests.delete(pupitreId);
     }
     
     try {
         const data = await presetAPI.readPresets();
-        let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
+        let preset = ensureCurrentPreset(data);
         if (!preset) return;
         
         if (!preset.config) preset.config = { pupitres: [] };
@@ -1238,6 +1416,7 @@ async function handlePupitreConfigFromPupitre(pupitreId, configData, isRequested
         if (configData.udpEnabled !== undefined) pupitreConfig.udpEnabled = !!configData.udpEnabled;
         if (configData.rtpMidiEnabled !== undefined) pupitreConfig.rtpMidiEnabled = !!configData.rtpMidiEnabled;
         if (configData.controllerMapping !== undefined) pupitreConfig.controllerMapping = configData.controllerMapping;
+        if (configData.gameMode !== undefined) pupitreConfig.gameMode = !!configData.gameMode;
         
         // Traiter sirens si présent dans configData (format PureData ou format direct)
         if (configData.sirens && Array.isArray(configData.sirens)) {
@@ -1296,7 +1475,7 @@ async function handleParamChangedFromPupitre(pupitreId, paramPath, value) {
     
     try {
         const data = await presetAPI.readPresets();
-        let preset = currentPresetId ? data.presets.find(p => p.id === currentPresetId) : data.presets[0];
+        let preset = ensureCurrentPreset(data);
         if (!preset) return;
         
         // Convertir PARAM_UPDATE en structure preset
@@ -1347,6 +1526,17 @@ presetAPI.initializePresetAPI().then(() => {
         // Écouter les changements de statut des pupitres
            setInterval(() => {
                const status = pureDataProxy.getStatus();
+               // Ajouter les informations de synchronisation à chaque connexion
+               if (status.connections) {
+                   status.connections = status.connections.map(conn => {
+                       const syncInfo = syncState.get(conn.pupitreId);
+                       return {
+                           ...conn,
+                           isSynced: syncInfo?.isSynced || false,
+                           lastSync: syncInfo?.lastSync || null
+                       };
+                   });
+               }
                // console.log("📊 Envoi statut aux clients:", connectedClients.size, "clients connectés");
                broadcastToClients({
                    type: 'PUPITRE_STATUS_UPDATE',
@@ -1410,12 +1600,11 @@ presetAPI.initializePresetAPI().then(() => {
     }
     
     server.listen(PORT, HOST, () => {
-        // console.log(`🚀 Serveur SirenConsole démarré sur http://${HOST}:${PORT}`);
-        // console.log(`🌐 Application principale sur http://localhost:${PORT}/appSirenConsole.html`);
-        // console.log(`🔌 WebSocket serveur sur ws://localhost:${PORT}/ws`);
-        // console.log(`📝 Logs désactivés pour éviter le spam`);
-        // console.log(`🎯 Lancez maintenant SirenConsole Qt6 pour tester WebSocket`);
-        // Tous les autres logs désactivés
+        const protocol = USE_HTTPS ? 'https' : 'http';
+        const wsProtocol = USE_HTTPS ? 'wss' : 'ws';
+        console.log(`🚀 Serveur SirenConsole démarré sur ${protocol}://${HOST}:${PORT}`);
+        console.log(`🌐 Application principale sur ${protocol}://localhost:${PORT}/appSirenConsole.html`);
+        console.log(`🔌 WebSocket serveur sur ${wsProtocol}://localhost:${PORT}/ws`);
     });
 }).catch((error) => {
     console.error('❌ Erreur initialisation:', error);

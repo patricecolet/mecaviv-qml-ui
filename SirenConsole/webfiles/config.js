@@ -9,8 +9,7 @@ const config = {
         {
             id: "P1",
             name: "Pupitre 1",
-            //host: "192.168.1.41",
-            host: "localhost",
+            host: "192.168.1.41",
             port: 8000,
             websocketPort: 10002,
             enabled: true,

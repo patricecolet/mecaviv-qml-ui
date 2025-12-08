@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import "../utils" as Utils
 
 /**
  * MidiPlayer - Lecteur MIDI avec contrôles complets
@@ -8,6 +9,11 @@ import QtQuick.Layouts 1.15
  */
 Rectangle {
     id: root
+    
+    // Instance de NetworkUtils pour obtenir l'URL de base de l'API
+    Utils.NetworkUtils {
+        id: networkUtils
+    }
     
     color: "#2a2a2a"
     radius: 8
@@ -679,7 +685,8 @@ Rectangle {
                     }
                 }
             }
-            xhr.open("GET", "http://localhost:8001/api/puredata/playback")
+            var apiUrl = networkUtils.getApiBaseUrl()
+            xhr.open("GET", apiUrl + "/api/puredata/playback")
             xhr.send()
         }
     }

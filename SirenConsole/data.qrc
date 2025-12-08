@@ -20,6 +20,8 @@
         <file>QML/components/config/tabs/SirensTab.qml</file>
         <file>QML/components/config/tabs/OutputsTab.qml</file>
         <file>QML/components/config/tabs/ControllersTab.qml</file>
+        <file>QML/components/config/tabs/GameModeTab.qml</file>
+        <file>QML/components/config/tabs/DisplayTab.qml</file>
         
         <!-- Components - Logs -->
         <file>QML/components/logs/LogViewer.qml</file>

@@ -54,17 +54,17 @@ cd ..
 # Attendre que le serveur démarre
 sleep 3
 
-# Vérifier que le serveur répond
-if curl -s http://localhost:8001 >/dev/null; then
-    success "Serveur démarré sur http://localhost:8001"
+# Vérifier que le serveur répond (avec -k pour ignorer le certificat auto-signé)
+if curl -s -k https://localhost:8001 >/dev/null; then
+    success "Serveur démarré sur https://localhost:8001"
     
     # 4. Ouvrir Chrome avec les logs
     print "🌐 Ouverture de Chrome avec les logs..."
     if [ -d "/Applications/Google Chrome.app" ]; then
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --auto-open-devtools-for-tabs --disable-web-security --user-data-dir=/tmp/sirenconsole-dev http://localhost:8001 &
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --auto-open-devtools-for-tabs --disable-web-security --user-data-dir=/tmp/sirenconsole-dev https://localhost:8001 &
     else
         warning "Chrome non trouvé, ouverture manuelle requise"
-        print "Ouvrez http://localhost:8001 dans Chrome et appuyez sur F12"
+        print "Ouvrez https://localhost:8001 dans Chrome et appuyez sur F12"
     fi
     
     success "Application ouverte dans Chrome"

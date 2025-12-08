@@ -28,6 +28,11 @@ Rectangle {
         contentWidth: parent.width - 40
         contentHeight: childrenRect.height
         
+        ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+            visible: true
+        }
+        
         Column {
             width: parent.width
             spacing: 8
@@ -36,6 +41,7 @@ Rectangle {
             Loader {
                 source: "../components/overview/OverviewRow.qml"
                 property string pupitreId: "P1"
+                property var consoleController: overviewPage.consoleController
                 property string pupitreStatus: overviewPage.consoleController.pupitre1Status
                 property string pupitreName: "Pupitre 1"
                 property string pupitreHost: "192.168.1.41"
@@ -53,6 +59,7 @@ Rectangle {
             Loader {
                 source: "../components/overview/OverviewRow.qml"
                 property string pupitreId: "P2"
+                property var consoleController: overviewPage.consoleController
                 property string pupitreStatus: overviewPage.consoleController.pupitre2Status
                 property string pupitreName: "Pupitre 2"
                 property string pupitreHost: "192.168.1.42"
@@ -69,6 +76,7 @@ Rectangle {
             Loader {
                 source: "../components/overview/OverviewRow.qml"
                 property string pupitreId: "P3"
+                property var consoleController: overviewPage.consoleController
                 property string pupitreStatus: overviewPage.consoleController.pupitre3Status
                 property string pupitreName: "Pupitre 3"
                 property string pupitreHost: "192.168.1.43"
@@ -85,6 +93,7 @@ Rectangle {
             Loader {
                 source: "../components/overview/OverviewRow.qml"
                 property string pupitreId: "P4"
+                property var consoleController: overviewPage.consoleController
                 property string pupitreStatus: overviewPage.consoleController.pupitre4Status
                 property string pupitreName: "Pupitre 4"
                 property string pupitreHost: "192.168.1.44"
@@ -101,6 +110,7 @@ Rectangle {
             Loader {
                 source: "../components/overview/OverviewRow.qml"
                 property string pupitreId: "P5"
+                property var consoleController: overviewPage.consoleController
                 property string pupitreStatus: overviewPage.consoleController.pupitre5Status
                 property string pupitreName: "Pupitre 5"
                 property string pupitreHost: "192.168.1.45"
@@ -117,6 +127,7 @@ Rectangle {
             Loader {
                 source: "../components/overview/OverviewRow.qml"
                 property string pupitreId: "P6"
+                property var consoleController: overviewPage.consoleController
                 property string pupitreStatus: overviewPage.consoleController.pupitre6Status
                 property string pupitreName: "Pupitre 6"
                 property string pupitreHost: "192.168.1.46"
@@ -133,6 +144,7 @@ Rectangle {
             Loader {
                 source: "../components/overview/OverviewRow.qml"
                 property string pupitreId: "P7"
+                property var consoleController: overviewPage.consoleController
                 property string pupitreStatus: overviewPage.consoleController.pupitre7Status
                 property string pupitreName: "Pupitre 7"
                 property string pupitreHost: "192.168.1.47"

@@ -1,9 +1,15 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import "../../../utils" as Utils
 
 Item {
     id: sirensTab
+    
+    // Instance de NetworkUtils pour obtenir l'URL de base de l'API
+    Utils.NetworkUtils {
+        id: networkUtils
+    }
     
     property var consoleController: null
     property int currentPupitreIndex: 0
@@ -201,6 +207,11 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+                visible: true
+            }
+            
             ColumnLayout {
                 width: parent.width
                 spacing: 15
@@ -329,8 +340,9 @@ Item {
                                     else list.splice(pos, 1)
 
                                     // PATCH + mise à jour snapshot locale
+                                    var apiUrl = networkUtils.getApiBaseUrl()
                                     patchAndApply(
-                                        "http://localhost:8001/api/presets/current/assigned-sirenes",
+                                        apiUrl + "/api/presets/current/assigned-sirenes",
                                         { pupitreId: pupitreId, assignedSirenes: list },
                                         function() { updateSnapshotAssigned(pupitreId, list) }
                                     )
@@ -407,8 +419,9 @@ Item {
                                             
                                             var pupitreId = sirensTab.pupitre.id || "pupitre" + (sirensTab.currentPupitreIndex + 1)
                                             var sirNum = index + 1
+                                            var apiUrl = networkUtils.getApiBaseUrl()
                                             patchAndApply(
-                                                "http://localhost:8001/api/presets/current/sirene-config",
+                                                apiUrl + "/api/presets/current/sirene-config",
                                                 { pupitreId: pupitreId, sireneId: sirNum, changes: { ambitusRestricted: checked } },
                                                 function() { updateSnapshotSireneConfig(pupitreId, sirNum, { ambitusRestricted: checked }) }
                                             )
@@ -489,8 +502,9 @@ Item {
                                         
                                         var pupitreId = sirensTab.pupitre.id || "pupitre" + (sirensTab.currentPupitreIndex + 1)
                                         var sirNum = index + 1
+                                        var apiUrl = networkUtils.getApiBaseUrl()
                                         patchAndApply(
-                                            "http://localhost:8001/api/presets/current/sirene-config",
+                                            apiUrl + "/api/presets/current/sirene-config",
                                             { pupitreId: pupitreId, sireneId: sirNum, changes: { frettedMode: checked } },
                                             function() { updateSnapshotSireneConfig(pupitreId, sirNum, { frettedMode: checked }) }
                                         )

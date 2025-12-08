@@ -186,6 +186,11 @@ Rectangle {
                             Layout.fillHeight: true
                             clip: true
                             
+                            ScrollBar.vertical: ScrollBar {
+                                policy: ScrollBar.AsNeeded
+                                visible: true
+                            }
+                            
                             model: midiFileManager.categories
                             
                             delegate: Rectangle {
@@ -308,6 +313,7 @@ Rectangle {
                             
                             ScrollBar.vertical: ScrollBar {
                                 policy: ScrollBar.AsNeeded
+                                visible: true
                             }
                             
                             delegate: Rectangle {

@@ -1,10 +1,16 @@
 import QtQuick 2.15
 import QtWebSockets 1.0
+import "../utils" as Utils
 
 // WebSocketManager pour SirenConsole
 // Gère les connexions WebSocket vers les pupitres SirenePupitre
 Item {
     id: webSocketManager
+    
+    // Instance de NetworkUtils pour obtenir l'URL de base de l'API
+    Utils.NetworkUtils {
+        id: networkUtils
+    }
     
     // === PROPRIÉTÉS ===
     property var connections: ({})
@@ -14,7 +20,71 @@ Item {
     // WebSocket vers le serveur Node.js
     property var webSocket: null
     property bool connected: false
-    property string serverUrl: "ws://localhost:8001/ws"
+    property string serverUrl: "wss://localhost:8001/ws"  // Valeur par défaut, sera mise à jour dans onCompleted
+    
+    // Fonction pour détecter automatiquement l'URL WebSocket
+    function getWebSocketUrl() {
+        try {
+            var apiUrl = networkUtils.getApiBaseUrl()
+            
+            if (apiUrl && apiUrl !== "") {
+                var wsUrl = apiUrl.replace(/^https?:/, function(match) {
+                    return match === 'https:' ? 'wss:' : 'ws:'
+                }) + "/ws"
+                return wsUrl
+            }
+        } catch (e) {
+            // Ignorer
+        }
+        
+        // Fallback direct : détecter l'origine pour WebSocket
+        try {
+            var origin = null
+            if (typeof self !== 'undefined' && self.location && self.location.origin) {
+                origin = self.location.origin
+            } else if (typeof globalThis !== 'undefined' && globalThis.location && globalThis.location.origin) {
+                origin = globalThis.location.origin
+            } else if (typeof window !== 'undefined' && window.location && window.location.origin) {
+                origin = window.location.origin
+            } else if (typeof document !== 'undefined' && document.location && document.location.origin) {
+                origin = document.location.origin
+            } else if (typeof location !== 'undefined' && location.origin) {
+                origin = location.origin
+            }
+            
+            if (origin) {
+                var wsUrl = origin.replace(/^https?:/, function(match) {
+                    return match === 'https:' ? 'wss:' : 'ws:'
+                }) + "/ws"
+                return wsUrl
+            }
+            
+            var locationObj = null
+            if (typeof window !== 'undefined' && window.location) {
+                locationObj = window.location
+            } else if (typeof document !== 'undefined' && document.location) {
+                locationObj = document.location
+            }
+            
+            if (locationObj) {
+                var protocol = locationObj.protocol
+                var hostname = locationObj.hostname
+                var port = locationObj.port || (protocol === 'https:' ? '443' : '80')
+                
+                if (hostname === '0.0.0.0' || hostname === '') {
+                    hostname = 'localhost'
+                }
+                
+                var wsProtocol = (protocol === 'https:') ? 'wss:' : 'ws:'
+                var wsPort = (port === '443' || port === '80' || !port || port === '') ? '8001' : port
+                return wsProtocol + "//" + hostname + ":" + wsPort + "/ws"
+            }
+        } catch (e) {
+            // Ignorer
+        }
+        
+        return "wss://127.0.0.1:8001/ws"
+    }
     
     // === SIGNAUX ===
     signal connectionOpened(string url)
@@ -63,15 +133,13 @@ Item {
                     if (status === WebSocket.Open) {
                         webSocketManager.connected = true
                         webSocketManager.connectionOpened(url)
-                        // console.log("🔌 WebSocket connecté au serveur Node.js")
                     } else if (status === WebSocket.Closed) {
                         webSocketManager.connected = false
                         webSocketManager.connectionClosed(url)
-                        // console.log("❌ WebSocket déconnecté du serveur Node.js")
                     } else if (status === WebSocket.Error) {
                         webSocketManager.connected = false
-                        webSocketManager.errorOccurred(url, "Erreur connexion WebSocket")
-                        // console.log("❌ Erreur WebSocket:", errorString)
+                        var errorMsg = ws.errorString || "Erreur connexion WebSocket"
+                        webSocketManager.errorOccurred(url, errorMsg)
                     }
                 }
                 
@@ -100,17 +168,76 @@ Item {
                     // Mettre à jour les statuts initiaux des pupitres
                     if (data.data && data.data.connections && consoleController) {
                         for (var i = 0; i < data.data.connections.length; i++) {
-                            var pupitreStatus = data.data.connections[i]
-                            var statusText = pupitreStatus.connected ? "connected" : "disconnected"
-                            consoleController.pupitreStatusChanged(pupitreStatus.pupitreId, statusText)
+                            try {
+                                var pupitreStatus = data.data.connections[i]
+                                var statusText = pupitreStatus.connected ? "connected" : "disconnected"
+                                if (consoleController.pupitreStatusChanged) {
+                                    consoleController.pupitreStatusChanged(pupitreStatus.pupitreId, statusText)
+                                }
+                                
+                                // Mettre à jour aussi l'état de synchronisation si présent
+                                if (pupitreStatus.isSynced !== undefined) {
+                                    var propName = "pupitre" + pupitreStatus.pupitreId.substring(1) + "Synced" // P1 -> pupitre1Synced
+                                    try {
+                                        consoleController[propName] = pupitreStatus.isSynced || false
+                                    } catch (e) {
+                                        // Propriété n'existe pas, ignorer
+                                    }
+                                }
+                            } catch (e) {
+                                // Ignorer les erreurs pour éviter le spam
+                            }
                         }
                     }
                     break
                 case "SYNC_STATUS_CHANGED":
                     // Mettre à jour l'état de synchronisation
                     if (data.pupitreId && consoleController) {
-                        var propName = "pupitre" + data.pupitreId.substring(1) + "Synced" // P1 -> pupitre1Synced
-                        consoleController[propName] = data.isSynced || false
+                        try {
+                            var propName = "pupitre" + data.pupitreId.substring(1) + "Synced" // P1 -> pupitre1Synced
+                            // Vérifier que la propriété existe en testant l'accès
+                            var testValue = consoleController[propName]
+                            if (testValue !== undefined || consoleController[propName] !== undefined) {
+                                consoleController[propName] = data.isSynced || false
+                            }
+                        } catch (e) {
+                            // Ignorer les erreurs d'accès aux propriétés
+                        }
+                    }
+                    break
+                    
+                case "PUPITRE_CONNECTED":
+                    // Mettre à jour immédiatement le statut de connexion
+                    if (data.pupitreId && consoleController) {
+                        try {
+                            if (consoleController.updatePupitreStatus) {
+                                consoleController.updatePupitreStatus(data.pupitreId, "connected")
+                            }
+                            // Mettre à jour aussi la synchronisation si présente
+                            if (data.isSynced !== undefined) {
+                                var propName = "pupitre" + data.pupitreId.substring(1) + "Synced"
+                                try {
+                                    consoleController[propName] = data.isSynced || false
+                                } catch (e) {
+                                    // Propriété n'existe pas, ignorer
+                                }
+                            }
+                        } catch (e) {
+                            // Ignorer les erreurs
+                        }
+                    }
+                    break
+                    
+                case "PUPITRE_DISCONNECTED":
+                    // Mettre à jour immédiatement le statut de déconnexion
+                    if (data.pupitreId && consoleController) {
+                        try {
+                            if (consoleController.updatePupitreStatus) {
+                                consoleController.updatePupitreStatus(data.pupitreId, "disconnected")
+                            }
+                        } catch (e) {
+                            // Ignorer les erreurs
+                        }
                     }
                     break
                     
@@ -122,11 +249,27 @@ Item {
                     if (data.data && data.data.connections && consoleController) {
                         // console.log("🎛️ consoleController trouvé, mise à jour des statuts")
                         for (var i = 0; i < data.data.connections.length; i++) {
-                            var pupitreStatus = data.data.connections[i]
-                            // console.log("🎛️ Pupitre", pupitreStatus.pupitreId, "connected:", pupitreStatus.connected)
-                            var statusText = pupitreStatus.connected ? "connected" : "disconnected"
-                            // console.log("🎛️ Appel updatePupitreStatus pour", pupitreStatus.pupitreId, "avec status:", statusText)
-                            consoleController.updatePupitreStatus(pupitreStatus.pupitreId, statusText)
+                            try {
+                                var pupitreStatus = data.data.connections[i]
+                                // console.log("🎛️ Pupitre", pupitreStatus.pupitreId, "connected:", pupitreStatus.connected)
+                                var statusText = pupitreStatus.connected ? "connected" : "disconnected"
+                                // console.log("🎛️ Appel updatePupitreStatus pour", pupitreStatus.pupitreId, "avec status:", statusText)
+                                if (consoleController.updatePupitreStatus) {
+                                    consoleController.updatePupitreStatus(pupitreStatus.pupitreId, statusText)
+                                }
+                                
+                                // Mettre à jour aussi l'état de synchronisation si présent
+                                if (pupitreStatus.isSynced !== undefined) {
+                                    var propName = "pupitre" + pupitreStatus.pupitreId.substring(1) + "Synced" // P1 -> pupitre1Synced
+                                    try {
+                                        consoleController[propName] = pupitreStatus.isSynced || false
+                                    } catch (e) {
+                                        // Propriété n'existe pas, ignorer
+                                    }
+                                }
+                            } catch (e) {
+                                // Ignorer les erreurs pour éviter le spam
+                            }
                         }
                     } else {
                         // console.log("❌ consoleController non trouvé ou données manquantes")
@@ -180,7 +323,8 @@ Item {
                 }
             }
         }
-        xhr.open("GET", "http://localhost:8001/api/puredata/status")
+        var apiUrl = networkUtils.getApiBaseUrl()
+        xhr.open("GET", apiUrl + "/api/puredata/status")
         xhr.send()
     }
     
@@ -209,7 +353,8 @@ Item {
                 }
             }
         }
-        xhr.open("GET", "http://localhost:8001/api/pupitres/status")
+        var apiUrl = networkUtils.getApiBaseUrl()
+        xhr.open("GET", apiUrl + "/api/pupitres/status")
         xhr.send()
     }
     
@@ -217,7 +362,6 @@ Item {
     
     // Se connecter au serveur Node.js
     function connect() {
-        // console.log("🔌 Connexion au serveur Node.js:", serverUrl)
         createWebSocket()
         return true
     }
@@ -251,12 +395,50 @@ Item {
     function sendPureDataCommand(message) {
         // Envoi commande via proxy HTTP (legacy)
         
-        var xhr = new XMLHttpRequest()
-        xhr.open("POST", "http://localhost:8001/api/puredata/command")
-        xhr.setRequestHeader("Content-Type", "application/json")
-        xhr.send(message)
+        // Valider le message
+        if (!message) {
+            return false
+        }
         
-        return true // Toujours retourner true (async)
+        // Si c'est un objet, le convertir en JSON
+        var messageStr = message
+        if (typeof message === 'object') {
+            try {
+                messageStr = JSON.stringify(message)
+            } catch (e) {
+                return false
+            }
+        }
+        
+        // Vérifier que c'est une string JSON valide
+        if (typeof messageStr !== 'string' || messageStr.trim() === '') {
+            return false
+        }
+        
+        try {
+            var xhr = new XMLHttpRequest()
+            var apiUrl = networkUtils.getApiBaseUrl()
+            xhr.open("POST", apiUrl + "/api/puredata/command")
+            xhr.setRequestHeader("Content-Type", "application/json")
+            
+            // Gérer les erreurs silencieusement pour éviter le spam
+            xhr.onerror = function() {
+                // Erreur réseau, ignorer silencieusement
+            }
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status !== 200) {
+                        // Erreur serveur, ignorer silencieusement pour éviter le spam
+                        // Les erreurs 400 sont normales si PureData n'est pas connecté
+                    }
+                }
+            }
+            
+            xhr.send(messageStr)
+            return true
+        } catch (e) {
+            return false
+        }
     }
     
     // Connexion à un pupitre
@@ -268,6 +450,30 @@ Item {
         
         var xhr = new XMLHttpRequest()
         var self = webSocketManager
+        
+        // Gérer les erreurs silencieusement (Mixed Content, etc.)
+        xhr.onerror = function() {
+            // Requête bloquée par le navigateur (Mixed Content) ou autre erreur
+            // On considère que le pupitre n'est pas accessible directement
+            // Le proxy Node.js gérera la connexion WebSocket
+            try {
+                // Essayer quand même de se connecter via le proxy
+                self.connections[pupitreId] = {
+                    websocket: null,
+                    url: "ws://" + host + ":10002",
+                    host: host,
+                    port: 10002,
+                    connected: true
+                }
+                self.connectionOpened(self.connections[pupitreId].url)
+                if (self.consoleController) {
+                    self.consoleController.pupitreStatusChanged(pupitreId, "connected")
+                }
+            } catch (e) {
+                // Ignorer les erreurs
+            }
+        }
+        
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
@@ -299,8 +505,29 @@ Item {
                 }
             }
         }
-        xhr.open("GET", "http://" + host + ":8000/", true)
-        xhr.send()
+        
+        try {
+            xhr.open("GET", "http://" + host + ":8000/", true)
+            xhr.send()
+        } catch (e) {
+            // Si la requête ne peut pas être envoyée (Mixed Content, etc.)
+            // Essayer quand même de se connecter via le proxy
+            try {
+                self.connections[pupitreId] = {
+                    websocket: null,
+                    url: "ws://" + host + ":10002",
+                    host: host,
+                    port: 10002,
+                    connected: true
+                }
+                self.connectionOpened(self.connections[pupitreId].url)
+                if (self.consoleController) {
+                    self.consoleController.pupitreStatusChanged(pupitreId, "connected")
+                }
+            } catch (e2) {
+                // Ignorer les erreurs
+            }
+        }
         
         return true
     }
@@ -401,12 +628,34 @@ Item {
 
     // === INITIALISATION ===
     Component.onCompleted: {
-        // console.log("🔌 WebSocketManager initialisé")
-        // Se connecter automatiquement au démarrage
-        connect()
+        // Détecter l'URL du serveur automatiquement depuis window.location
+        // Utiliser plusieurs tentatives avec délais pour s'assurer que window.location est disponible
+        function tryDetectUrl(attempt) {
+            var detectedUrl = getWebSocketUrl()
+            
+            // Si on obtient toujours localhost et qu'on a fait moins de 5 tentatives, réessayer
+            if (detectedUrl.indexOf("localhost") >= 0 && attempt < 5) {
+                Qt.callLater(function() {
+                    tryDetectUrl(attempt + 1)
+                })
+                return
+            }
+            
+            webSocketManager.serverUrl = detectedUrl
+            
+            // Se connecter automatiquement au démarrage
+            webSocketManager.connect()
+            
+            // Démarrer le timer d'identification (vérifier qu'il existe)
+            if (webSocketManager.identificationTimer) {
+                webSocketManager.identificationTimer.start()
+            }
+        }
         
-        // Démarrer le timer d'identification
-        identificationTimer.start()
+        // Première tentative immédiate
+        Qt.callLater(function() {
+            tryDetectUrl(0)
+        })
     }
     
     Component.onDestruction: {

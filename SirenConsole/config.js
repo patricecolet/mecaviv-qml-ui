@@ -10,16 +10,15 @@ const config = {
             id: "P1",
             name: "Pupitre 1",
             host: "192.168.1.41",
-            //host: "localhost",
             port: 8000,
             websocketPort: 10002,
             enabled: true,
             status: "disconnected"
         },
         {
-            id: "P2", 
+            id: "P2",
             name: "Pupitre 2",
-            host: "192.168.1.42",
+            host: "localhost",
             port: 8000,
             websocketPort: 10002,
             enabled: true,

@@ -4,8 +4,8 @@
       "id": "preset_001",
       "name": "Configuration Théâtre",
       "description": "Setup pour spectacle théâtral",
-      "created": "2025-12-05T14:41:45.136Z",
-      "modified": "2025-12-05T14:41:45.136Z",
+      "created": "2025-11-25T16:05:09.107Z",
+      "modified": "2025-11-25T16:05:09.107Z",
       "version": "1.0",
       "pupitres": [
         {
@@ -43,43 +43,107 @@
       "config": {
         "pupitres": [
           {
-            "id": "P3",
-            "assignedSirenes": [],
+            "id": "P7",
+            "assignedSirenes": [
+              7
+            ],
             "vstEnabled": false,
             "udpEnabled": false,
             "rtpMidiEnabled": false,
             "controllerMapping": {},
-            "sirenes": {}
+            "sirenes": {
+              "sirene1": {
+                "frettedMode": true
+              },
+              "sirene2": {
+                "frettedMode": false
+              },
+              "sirene3": {
+                "frettedMode": false
+              },
+              "sirene4": {
+                "frettedMode": false
+              },
+              "sirene5": {
+                "frettedMode": false
+              },
+              "sirene6": {
+                "frettedMode": false
+              },
+              "sirene7": {
+                "frettedMode": true
+              }
+            },
+            "gameMode": true
+          },
+          {
+            "id": "P6",
+            "assignedSirenes": [],
+            "controllerMapping": {},
+            "sirenes": {
+              "sirene1": {
+                "frettedMode": true
+              },
+              "sirene2": {
+                "frettedMode": true
+              },
+              "sirene3": {
+                "frettedMode": true
+              },
+              "sirene4": {
+                "frettedMode": true
+              },
+              "sirene5": {
+                "frettedMode": true
+              },
+              "sirene6": {
+                "frettedMode": true
+              },
+              "sirene7": {
+                "frettedMode": true
+              }
+            },
+            "gameMode": true,
+            "vstEnabled": false,
+            "udpEnabled": false,
+            "rtpMidiEnabled": false
           },
           {
             "id": "P5",
-            "assignedSirenes": [],
+            "assignedSirenes": [
+              5
+            ],
             "vstEnabled": false,
             "udpEnabled": false,
             "rtpMidiEnabled": false,
             "controllerMapping": {},
-            "sirenes": {}
+            "sirenes": {
+              "sirene1": {
+                "frettedMode": true
+              },
+              "sirene2": {
+                "frettedMode": false
+              },
+              "sirene3": {
+                "frettedMode": false
+              },
+              "sirene4": {
+                "frettedMode": false
+              },
+              "sirene5": {
+                "frettedMode": false
+              },
+              "sirene6": {
+                "frettedMode": false
+              },
+              "sirene7": {
+                "frettedMode": false
+              }
+            },
+            "gameMode": false
           },
           {
-            "id": "P7",
-            "assignedSirenes": [],
-            "vstEnabled": false,
-            "udpEnabled": false,
-            "rtpMidiEnabled": false,
-            "controllerMapping": {},
-            "sirenes": {}
-          },
-          {
-            "id": "P1",
-            "assignedSirenes": [],
-            "vstEnabled": false,
-            "udpEnabled": false,
-            "rtpMidiEnabled": false,
-            "controllerMapping": {},
-            "sirenes": {}
-          },
-          {
-            "id": "P2",
+            "id": "P3",
             "assignedSirenes": [
               3
             ],
@@ -112,10 +176,17 @@
             }
           },
           {
-            "id": "P4",
-            "assignedSirenes": [
-              4
-            ],
+            "id": "P2",
+            "assignedSirenes": [],
+            "vstEnabled": false,
+            "udpEnabled": false,
+            "rtpMidiEnabled": false,
+            "controllerMapping": {},
+            "sirenes": {}
+          },
+          {
+            "id": "P1",
+            "assignedSirenes": [],
             "vstEnabled": false,
             "udpEnabled": false,
             "rtpMidiEnabled": false,
@@ -142,16 +213,8 @@
               "sirene7": {
                 "frettedMode": false
               }
-            }
-          },
-          {
-            "id": "P6",
-            "assignedSirenes": [],
-            "vstEnabled": false,
-            "udpEnabled": false,
-            "rtpMidiEnabled": false,
-            "controllerMapping": {},
-            "sirenes": {}
+            },
+            "gameMode": true
           }
         ]
       }
@@ -160,8 +223,8 @@
       "id": "preset_002",
       "name": "Configuration Studio",
       "description": "Setup pour enregistrement studio",
-      "created": "2025-12-05T14:41:45.136Z",
-      "modified": "2025-12-05T14:41:45.136Z",
+      "created": "2025-11-25T16:05:09.107Z",
+      "modified": "2025-11-25T16:05:09.107Z",
       "version": "1.0",
       "pupitres": [
         {
@@ -189,6 +252,16 @@
               "cc": 13,
               "curve": "s curve"
             },
+            "pedalId": {
+              "cc": 14,
+              "curve": "linear"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}        },
             "pedalId": {
               "cc": 14,
               "curve": "linear"

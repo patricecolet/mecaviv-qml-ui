@@ -1,7 +1,11 @@
 import QtQuick 2.15
+import "../utils" as Utils
 
 QtObject {
     id: configManager
+    
+    // Instance de NetworkUtils créée dynamiquement
+    property var networkUtils: null
     
     // Propriétés
     property var config: null
@@ -12,6 +16,14 @@ QtObject {
     signal configLoaded(var config)
     signal configError(string error)
     signal assignedSirenesChanged(string pupitreId, var sirenes)
+    
+    // Fonction helper pour obtenir l'URL de base
+    function getApiBaseUrl() {
+        if (!networkUtils) {
+            networkUtils = Qt.createQmlObject('import "../utils" as Utils; Utils.NetworkUtils {}', configManager)
+        }
+        return networkUtils.getApiBaseUrl()
+    }
     
     // Initialisation
     Component.onCompleted: {
@@ -24,14 +36,15 @@ QtObject {
         
         // Essayer de charger depuis webfiles/config.js via HTTP d'abord
         // Tentative de chargement depuis webfiles/config.js
-        if (loadConfigFromFile("http://localhost:8001/webfiles/config.js")) {
+        var apiUrl = getApiBaseUrl()
+        if (loadConfigFromFile(apiUrl + "/webfiles/config.js")) {
             // Configuration chargée depuis HTTP
             return
         }
         
         // Essayer aussi depuis config.js via HTTP (fallback)
         // Tentative de chargement depuis config.js
-        if (loadConfigFromFile("http://localhost:8001/config.js")) {
+        if (loadConfigFromFile(apiUrl + "/config.js")) {
             // Configuration chargée depuis HTTP
             return
         }
