@@ -5,6 +5,7 @@ import "."
 Item {
     id: root
     property var configController: null
+    property var rootWindow: null  // Référence à mainWindow pour uiControlsEnabled
     property string currentSongTitle: ""  // Titre du morceau en cours
     property bool isPlaying: false  // État de la lecture
     
@@ -84,6 +85,7 @@ Item {
             color: "#2a2a2a"
             border.color: "#6bb6ff"
             border.width: 1
+            visible: root.rootWindow ? root.rootWindow.uiControlsEnabled : true
             
             Text {
                 id: songTitleText

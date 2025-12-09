@@ -12,6 +12,7 @@ project(MecavivQmlUI
 option(BUILD_SIRENEPUPITRE "Build SirenePupitre (Visualiseur musical)" ON)
 option(BUILD_SIRENCONSOLE "Build SirenConsole (Console de contrôle)" ON)
 option(BUILD_PEDALIER "Build pedalierSirenium (Interface pédalier 3D)" ON)
+option(BUILD_SIRENMANAGER "Build SirenManager (Contrôle des sirènes)" ON)
 option(BUILD_FOR_WASM "Build for WebAssembly" OFF)
 option(INSTALL_NODE_DEPS "Install Node.js dependencies for sirenRouter" ON)
 option(COPY_TO_WEBFILES "Copy built files to webfiles/ directories" ON)
@@ -34,6 +35,7 @@ message(STATUS "WebAssembly: ${BUILD_FOR_WASM}")
 message(STATUS "SirenePupitre: ${BUILD_SIRENEPUPITRE}")
 message(STATUS "SirenConsole: ${BUILD_SIRENCONSOLE}")
 message(STATUS "pedalierSirenium: ${BUILD_PEDALIER}")
+message(STATUS "SirenManager: ${BUILD_SIRENMANAGER}")
 message(STATUS "sirenRouter (Node.js): ${INSTALL_NODE_DEPS}")
 message(STATUS "============================================")
 
@@ -64,6 +66,11 @@ endif()
 if(BUILD_PEDALIER)
     message(STATUS "Configuring pedalierSirenium...")
     add_subdirectory(pedalierSirenium/QtFiles)
+endif()
+
+if(BUILD_SIRENMANAGER)
+    message(STATUS "Configuring SirenManager...")
+    add_subdirectory(SirenManager)
 endif()
 
 # ============================================================================
@@ -97,6 +104,7 @@ add_custom_target(clean_all
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/SirenePupitre/build
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/SirenConsole/build
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/pedalierSirenium/QtFiles/build
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/SirenManager/build
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/sirenRouter/node_modules
     COMMENT "Cleaning all build directories..."
 )

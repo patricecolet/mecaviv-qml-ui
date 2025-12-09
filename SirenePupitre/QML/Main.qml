@@ -8,6 +8,7 @@ import "admin"
 
 Window {
     id: mainWindow
+    objectName: "mainWindow"
     width: 1280
     height: 800
     visible: true
@@ -28,6 +29,9 @@ Window {
     property bool debugMode: true  // Mettre à true pour activer les logs
     property bool isAdminMode: false  // État admin persistant
     property bool isGamePlaying: false  // État de lecture du mode jeu
+
+    // ➜ NOUVELLE PROPRIÉTÉ GLOBALE POUR LES BOUTONS UI
+    property bool uiControlsEnabled: true
     
     // Synchroniser isAdminMode avec le mode global
     onIsAdminModeChanged: {
@@ -71,6 +75,7 @@ Window {
         serverUrl: (configController.config && configController.config.serverUrl) ? configController.config.serverUrl : "ws://127.0.0.1:10002"
         debugMode: mainWindow.debugMode
         configController: configController
+        rootWindow: mainWindow
         
         onPlaybackPositionReceived: function(playing, bar, beatInBar, beat) {
             // Mettre à jour l'état de lecture du mode jeu
@@ -79,9 +84,7 @@ Window {
         
         onGameModeReceived: function(enabled) {
             // Changer le mode jeu depuis le serveur (PureData)
-            console.log("🎮 [Main] Fin chaîne - GAME_MODE appliqué:", "enabled:", enabled, "display.gameMode:", display.gameMode);
             display.gameMode = enabled
-            console.log("🎮 [Main] Fin chaîne - GAME_MODE après assignation:", "display.gameMode:", display.gameMode);
         }
         
         onDataReceived: function(data) {
@@ -144,6 +147,8 @@ Window {
         sirenController: sirenController
         sirenInfo: configController.currentSirenInfo
         configController: configController
+        rootWindow: mainWindow
+        webSocketController: webSocketController
     }
     
     // Mode Studio pour debug/présentation
@@ -186,9 +191,10 @@ Window {
         visible: {
             if (isAdminMode) return false
             if (display.gameMode) return false
-            if (!configController) return true
+            if (!configController) return mainWindow.uiControlsEnabled
             var dummy = configController.updateCounter
-            return configController.isComponentVisible("studioButton")
+            return mainWindow.uiControlsEnabled
+                   && configController.isComponentVisible("studioButton")
         }
         
         MouseArea {
@@ -221,16 +227,9 @@ Window {
             var dummy = configController.updateCounter // Force la réévaluation
             var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
             var currentSirenId = ids.length > 0 ? ids[0] : "1"
-            var sirens = configController.getValueAtPath(["sirenConfig", "sirens"], [])
-            var currentSiren = sirens.find(function(siren) {
+            var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
                 return siren.id === currentSirenId
-            })
-            var frettedModeEnabled = currentSiren?.frettedMode?.enabled || false
-            // Log pour debug
-            if (dummy % 100 === 0) { // Log seulement occasionnellement pour éviter le spam
-                console.log("🎯 [Main] Bouton frettedMode - currentSirenId:", currentSirenId, 
-                    "trouvée:", currentSiren ? "oui" : "non", "frettedModeEnabled:", frettedModeEnabled);
-            }
+            })?.frettedMode?.enabled || false
             return frettedModeEnabled ? "#FFD700" : "#2a2a2a"
         }
         border.color: {
@@ -247,11 +246,10 @@ Window {
         radius: 5
         visible: {
             if (display.gameMode) return false
-            if (!configController) return true
-            var dummy = configController.updateCounter
-            // Masquer si les contrôleurs sont affichés
+            if (!configController) return mainWindow.uiControlsEnabled
             if (configController.getValueAtPath(["controllersPanel", "visible"], false)) return false
-            return configController.isComponentVisible("studioButton")
+            return mainWindow.uiControlsEnabled
+                   && configController.isComponentVisible("studioButton")
         }
         
         MouseArea {
@@ -342,7 +340,7 @@ Window {
         border.color: isGamePlaying ? "#4ade80" : "#6bb6ff"  // Bordure verte quand en lecture
         border.width: 2
         radius: 5
-        visible: display.gameMode
+        visible: display.gameMode && mainWindow.uiControlsEnabled
         
         // Animation de pulsation quand en lecture
         SequentialAnimation on opacity {
@@ -400,11 +398,11 @@ Window {
         border.width: 2
         radius: 5
         visible: {
-            if (!configController) return true
+            if (!configController) return mainWindow.uiControlsEnabled
             var dummy = configController.updateCounter
-            // Masquer si les contrôleurs sont affichés
             if (configController.getValueAtPath(["controllersPanel", "visible"], false)) return false
-            return configController.isComponentVisible("studioButton")
+            return mainWindow.uiControlsEnabled
+                   && configController.isComponentVisible("studioButton")
         }
         
         MouseArea {
@@ -455,7 +453,9 @@ Window {
         color: mouseAreaAdmin.containsMouse ? "#3a3a3a" : "#2a2a2a"
         border.color: "#666"
         radius: 5
-        visible: !studioMode && configController.getValueAtPath(["admin", "enabled"], true)
+        visible: !studioMode
+                 && mainWindow.uiControlsEnabled
+                 && configController.getValueAtPath(["admin", "enabled"], true)
         
         MouseArea {
             id: mouseAreaAdmin
@@ -500,6 +500,79 @@ Window {
             font.pixelSize: 14
             font.bold: true
             anchors.centerIn: parent
+        }
+    }
+    
+    // Overlay d'attente de la configuration
+    Rectangle {
+        id: waitingConfigOverlay
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.7)  // Fond semi-transparent
+        visible: configController && configController.waitingForConfig
+        z: 10000  // Au-dessus de tout
+        
+        MouseArea {
+            anchors.fill: parent
+            // Empêcher les clics de passer à travers
+            onClicked: function(mouse) {
+                mouse.accepted = true
+            }
+        }
+        
+        // Contenu centré
+        Column {
+            anchors.centerIn: parent
+            spacing: 20
+            
+            // Indicateur de chargement (spinner)
+            Item {
+                width: 60
+                height: 60
+                anchors.horizontalCenter: parent.horizontalCenter
+                
+                RotationAnimation on rotation {
+                    from: 0
+                    to: 360
+                    duration: 1000
+                    loops: Animation.Infinite
+                    running: waitingConfigOverlay.visible
+                }
+                
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 60
+                    height: 60
+                    radius: 30
+                    color: "transparent"
+                    border.color: "#00ff00"
+                    border.width: 4
+                    
+                    Rectangle {
+                        anchors.top: parent.top
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 8
+                        height: 20
+                        color: "#00ff00"
+                        radius: 4
+                    }
+                }
+            }
+            
+            // Message
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "⏳ Attente de la configuration..."
+                color: "#FFFFFF"
+                font.pixelSize: 18
+                font.bold: true
+            }
+            
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Connexion à PureData en cours"
+                color: "#CCCCCC"
+                font.pixelSize: 14
+            }
         }
     }
 }

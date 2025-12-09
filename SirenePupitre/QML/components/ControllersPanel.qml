@@ -28,15 +28,38 @@ Rectangle {
     // Boutons supplémentaires
     property bool button1: false
     property bool button2: false
+    // Encodeur
+    property int encoderValue: 0
+    property bool encoderPressed: false
     
     // Propriétés visuelles
     property color backgroundColor: "#0a0a0a"
     property color borderColor: "#2a2a2a"
     property int headerHeight: 5
     property var configController: null
+    property var webSocketController: null
+    property bool faderTestActive: false  // État du toggle de test
     
     function showControllerValues() {
         return configController ? configController.isComponentVisible("controllerValues") : true
+    }
+    
+    // Fonction pour envoyer un message de test du fader (1 ou 0)
+    function testFader(active) {
+        if (!webSocketController || !webSocketController.connected) {
+            console.log("❌ WebSocket non connecté, impossible d'envoyer le test du fader")
+            return
+        }
+        
+        // Envoyer un message JSON simple pour tester le fader (1 = activé, 0 = désactivé)
+        var message = {
+            type: "FADER_TEST",
+            value: active ? 1 : 0
+        }
+        
+        // Envoyer via sendBinaryMessage (qui convertit JSON en binaire)
+        webSocketController.sendBinaryMessage(message)
+        console.log("✅ Message de test fader envoyé:", JSON.stringify(message))
     }
     
     color: backgroundColor
@@ -121,7 +144,7 @@ Rectangle {
             
             // Position 1/6 - Wheel
             Node {
-                x: -parent.itemSpacing * 2.5
+                x: -parent.itemSpacing * 3
                 y: 0
                 z: 0
                 visible: {
@@ -140,7 +163,7 @@ Rectangle {
             
             // Position 3/6 - GearShift
             Node {
-                x: -parent.itemSpacing * 1.5 - 50
+                x: -parent.itemSpacing * 2.2
                 y: 0
                 z: -150
                 visible: {
@@ -159,7 +182,7 @@ Rectangle {
             
             // Position 2/6 - Joystick
             Node {
-                x: -parent.itemSpacing * 0.5
+                x: -parent.itemSpacing * 0.8
                 y: 0
                 z: 0
                 visible: {
@@ -180,7 +203,7 @@ Rectangle {
             
             // Position 4/6 - Fader
             Node {
-                x: parent.itemSpacing * 0.5
+                x: parent.itemSpacing * 0.0
                 y: 0
                 z: 0
                 visible: {
@@ -191,6 +214,25 @@ Rectangle {
                 
                 FaderIndicator {
                     value: root.faderValue
+                    scale: Qt.vector3d(1.5, 1.5, 1.5)
+                    showValues: showControllerValues()
+                }
+            }
+            
+            // Position 4.5/6 - Encoder
+            Node {
+                x: parent.itemSpacing * 0.6
+                y: 0
+                z: 0
+                visible: {
+                    if (!configController) return true
+                    configController.updateCounter
+                    return configController.isSubComponentVisible("controllers", "encoder")
+                }
+                
+                EncoderIndicator {
+                    value: root.encoderValue
+                    pressed: root.encoderPressed
                     scale: Qt.vector3d(1.5, 1.5, 1.5)
                     showValues: showControllerValues()
                 }
@@ -229,6 +271,7 @@ Rectangle {
                 
                 PadIndicator {
                     aftertouch: root.pad1Aftertouch
+                    velocity: root.pad1Velocity
                     scale: Qt.vector3d(1.3, 1.3, 1.3)
                     orientation: Qt.vector3d(-90, 90, 90)
                     showValues: showControllerValues()
@@ -248,6 +291,7 @@ Rectangle {
                 
                 PadIndicator {
                     aftertouch: root.pad2Aftertouch
+                    velocity: root.pad2Velocity
                     scale: Qt.vector3d(1.3, 1.3, 1.3)
                     orientation: Qt.vector3d(-90, 90, 90)
                     showValues: showControllerValues()
@@ -273,7 +317,7 @@ Rectangle {
     Row {
         visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "pad")
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.horizontalCenterOffset: parent.width * 0.36
+        anchors.horizontalCenterOffset: parent.width * 0.33
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 30
         spacing: 50
@@ -290,6 +334,60 @@ Rectangle {
             font.pixelSize: 12
             font.bold: root.pad2Active
             color: root.pad2Active ? "#00ff00" : "#666666"
+        }
+    }
+    
+    // Bouton de test pour le fader (toggle 1/0)
+    Rectangle {
+        id: testFaderButton
+        visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "fader")
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: parent.width * 0.0  // Aligné avec le fader (position 0.0)
+        anchors.top: parent.top
+        anchors.topMargin: 5
+        width: 80
+        height: 30
+        radius: 4
+        z: 1000  // S'assurer que le bouton est au-dessus des autres éléments
+        color: root.faderTestActive ? "#00aa00" : (testFaderButtonMouseArea.containsMouse ? "#3a3a3a" : "#2a2a2a")
+        border.color: "#00ff00"
+        border.width: root.faderTestActive ? 3 : 2
+        
+        MouseArea {
+            id: testFaderButtonMouseArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            propagateComposedEvents: false
+            preventStealing: true  // Empêcher le vol du clic par d'autres MouseArea
+            z: 1001  // Au-dessus du Rectangle parent
+            
+            onClicked: function(mouse) {
+                // Empêcher la propagation du clic
+                mouse.accepted = true
+                // Toggle l'état et envoyer 1 ou 0
+                root.faderTestActive = !root.faderTestActive
+                root.testFader(root.faderTestActive)
+            }
+            
+            onPressed: function(mouse) {
+                // Empêcher la propagation même au press
+                mouse.accepted = true
+            }
+            
+            onReleased: function(mouse) {
+                // Empêcher la propagation au release aussi
+                mouse.accepted = true
+            }
+        }
+        
+        Text {
+            text: root.faderTestActive ? "TEST ON" : "TEST FADER"
+            anchors.centerIn: parent
+            color: root.faderTestActive ? "#000000" : "#00ff00"
+            font.pixelSize: 10
+            font.bold: true
+            z: 1002  // Au-dessus du MouseArea
         }
     }
     
@@ -392,6 +490,12 @@ Rectangle {
         if (controllersData.buttons) {
             button1 = controllersData.buttons.button1 || false
             button2 = controllersData.buttons.button2 || false
+        }
+        
+        // Encodeur
+        if (controllersData.encoder) {
+            encoderValue = controllersData.encoder.value || 0
+            encoderPressed = controllersData.encoder.pressed || false
         }
         
     }

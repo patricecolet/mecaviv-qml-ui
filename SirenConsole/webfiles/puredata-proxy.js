@@ -30,6 +30,11 @@ class PureDataProxy {
             this.checkConnectionsHealth();
         }, 2000); // Vérifier toutes les 2 secondes
         
+        // Afficher l'état initial des connexions après un court délai
+        setTimeout(() => {
+            this.logConnectionStatus();
+        }, 2000);
+        
         // Retry périodique pour les messages en file d'attente
         setInterval(() => {
             this.retryQueuedMessages();
@@ -162,6 +167,8 @@ class PureDataProxy {
                     connection.connected = true;
                     connection.lastSeen = new Date();
                     
+                    console.log(`✅ Pupitre ${pupitreId} (${pupitre.name}) connecté sur ${url}`);
+                    
                     // Informer l'interface de la connexion
                     if (this.broadcastToClients) {
                         this.broadcastToClients({
@@ -196,6 +203,8 @@ class PureDataProxy {
                 if (connection) {
                     connection.connected = false;
                     connection.lastSeen = null;
+                    
+                    console.log(`❌ Pupitre ${pupitreId} (${pupitre.name}) déconnecté (code: ${code})`);
                     
                     // Informer l'interface de la déconnexion
                     if (this.broadcastToClients) {
@@ -921,6 +930,23 @@ class PureDataProxy {
         }
         
         return status;
+    }
+    
+    // Afficher l'état des connexions dans les logs
+    logConnectionStatus() {
+        const status = this.getStatus();
+        if (status.totalConnections === 0) {
+            console.log(`📊 Aucun pupitre configuré`);
+            return;
+        }
+        console.log(`📊 État des connexions: ${status.connectedCount}/${status.totalConnections} pupitres connectés`);
+        for (const conn of status.connections) {
+            if (conn.connected) {
+                console.log(`   ✅ ${conn.pupitreId} (${conn.pupitreName}) - ${conn.url}`);
+            } else {
+                console.log(`   ❌ ${conn.pupitreId} (${conn.pupitreName}) - ${conn.url} - Non connecté`);
+            }
+        }
     }
     
     // Obtenir l'état de lecture MIDI pour un pupitre ou global

@@ -1,0 +1,39 @@
+<RCC>
+    <qresource prefix="/SirenManager">
+        <file>QML/Main.qml</file>
+        
+        <!-- Views -->
+        <file>QML/views/PlayerView.qml</file>
+        <file>QML/views/MixerView.qml</file>
+        <file>QML/views/SireniumView.qml</file>
+        <file>QML/views/MaintenanceView.qml</file>
+        <file>QML/views/ControleurView.qml</file>
+        <file>QML/views/PianoView.qml</file>
+        <file>QML/views/VoitureView.qml</file>
+        <file>QML/views/PavillonView.qml</file>
+        <file>QML/views/SystemMaintenanceView.qml</file>
+        <file>QML/views/PlaylistComposerView.qml</file>
+        
+        <!-- Components -->
+        <file>QML/components/SirenButton.qml</file>
+        <file>QML/components/PlaylistSlot.qml</file>
+        <file>QML/components/ClockDisplay.qml</file>
+        <file>QML/components/MidiController.qml</file>
+        <file>QML/components/MachineSelector.qml</file>
+        
+        <!-- Controllers -->
+        <file>QML/controllers/UdpController.qml</file>
+        <file>QML/controllers/PlaylistController.qml</file>
+        <file>QML/controllers/SystemMaintenanceController.qml</file>
+    </qresource>
+    
+    <!-- Resources - Images will be added later -->
+    <!--
+    <qresource prefix="/resources">
+        <file>resources/images/icons/fret_on.png</file>
+        <file>resources/images/icons/fret_off.png</file>
+        <file>resources/images/icons/iconesirene.png</file>
+    </qresource>
+    -->
+</RCC>
+

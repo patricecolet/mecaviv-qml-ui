@@ -38,7 +38,8 @@ Item {
         "joyZ": 0,
         "fader": -1,
         "pedal": -1,
-        "selector": -1
+        "selector": -1,
+        "encoder": -1
     })
     
     // Seuils de changement minimum (réglables)
@@ -54,6 +55,7 @@ Item {
     signal filesListReceived(var categories)  // Liste fichiers MIDI
     signal gameModeReceived(bool enabled)  // Mode jeu activé/désactivé par le serveur
     property var configController: null
+    property var rootWindow: null  // Référence vers la fenêtre racine (Main.qml)
     
     // Propriétés pour la réception binaire
     property var binaryBuffer: null      // Buffer pour stocker les bytes
@@ -134,6 +136,16 @@ Item {
             changed = true
         }
         
+        // Vérifier encodeur (pas de seuil, toujours traiter les changements)
+        if (controllers.encoder) {
+            if (controllers.encoder.pressed) {
+                changed = true
+            }
+            if (Math.abs(controllers.encoder.value - (lastVals.encoder || -1)) > 0) {
+                changed = true
+            }
+        }
+        
         return changed
     }
     
@@ -146,7 +158,8 @@ Item {
             "joyZ": controllers.joystick.z,
             "fader": controllers.fader.value,
             "pedal": controllers.modPedal.value,
-            "selector": controllers.gearShift.position
+            "selector": controllers.gearShift.position,
+            "encoder": controllers.encoder ? controllers.encoder.value : -1
         }
     }
     
@@ -162,8 +175,8 @@ Item {
                 // 📊 Incrémenter compteur total de messages
                 controller.messageCountThisSecond++
                 
-                // Format binaire pour CONTROLLERS (type 0x02, 16 bytes) - CONTRÔLEURS PHYSIQUES
-                if (bytes.length === 16 && bytes[0] === 0x02) {
+                // Format binaire pour CONTROLLERS (type 0x02, 18 bytes) - CONTRÔLEURS PHYSIQUES
+                if (bytes.length === 18 && bytes[0] === 0x02) {
                     // 📊 Incrémenter compteur de messages contrôleurs
                     controller.controllersMessageCountThisSecond++
                     
@@ -195,6 +208,10 @@ Item {
                     // Boutons supplémentaires
                     var btn1 = bytes[14] > 0 ? 1 : 0;
                     var btn2 = bytes[15] > 0 ? 1 : 0;
+                    
+                    // Encoder (nouveau, bytes 16-17)
+                    var encoderValue = bytes[16];
+                    var encoderPressed = bytes[17] > 0 ? true : false;
                     
                     // Mapper le mode GearShift (5 positions)
                     var gearModeNames = ["SEMITONE", "THIRD", "MINOR_SIXTH", "OCTAVE", "DOUBLE_OCTAVE"];
@@ -236,6 +253,10 @@ Item {
                         buttons: {
                             button1: btn1 === 1,
                             button2: btn2 === 1
+                        },
+                        encoder: {
+                            value: encoderValue,
+                            pressed: encoderPressed
                         }
                     };
                     
@@ -436,6 +457,13 @@ Item {
                 }
                 
                 var data = JSON.parse(message);
+                
+                // Log spécifique pour PARAM_UPDATE avec uiControls (pour debug)
+                if (data.type === "PARAM_UPDATE" && data.path && Array.isArray(data.path) && 
+                    data.path.length === 2 && data.path[0] === "uiControls" && data.path[1] === "enabled") {
+                    console.log("🎨🎨🎨 UI_CONTROLS - Message reçu dans onTextMessageReceived - type:", data.type, "path:", JSON.stringify(data.path), "value:", data.value)
+                }
+                
                 // Logs désactivés pour performance
                 
                 // Mettre à jour les statistiques
@@ -459,6 +487,21 @@ Item {
 
                 // AJOUTER : Traiter PARAM_UPDATE
                 if (data.type === "PARAM_UPDATE") {
+                    // Log spécifique pour uiControls (préfixe unique pour filtrage)
+                    if (data.path && Array.isArray(data.path) && data.path.length === 2 &&
+                        data.path[0] === "uiControls" && data.path[1] === "enabled") {
+                        console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE reçu - path:", JSON.stringify(data.path), "value:", data.value)
+                        var enabled = data.value !== undefined ? (data.value !== 0) : true
+                        console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE - enabled calculé:", enabled, "rootWindow:", !!controller.rootWindow)
+                        if (controller.rootWindow && controller.rootWindow.uiControlsEnabled !== undefined) {
+                            console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE - mise à jour uiControlsEnabled à:", enabled)
+                            controller.rootWindow.uiControlsEnabled = enabled
+                            console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE - uiControlsEnabled mis à jour, nouvelle valeur:", controller.rootWindow.uiControlsEnabled)
+                        } else {
+                            console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE - ERREUR: rootWindow ou uiControlsEnabled manquant")
+                        }
+                        return
+                    }
                     
                     // Log début de chaîne pour frettedMode
                     if (data.path && Array.isArray(data.path) && data.path.length >= 4 && 
@@ -559,6 +602,10 @@ Item {
                     case WebSocket.Error:
                         break;
                     case WebSocket.Open:
+                        // Marquer qu'on attend la config
+                        if (controller.configController) {
+                            controller.configController.waitingForConfig = true;
+                        }
                         // Demander la configuration complète à PureData
                         controller.sendBinaryMessage({
                             type: "REQUEST_CONFIG"
@@ -598,6 +645,15 @@ Item {
             var jsonString = JSON.stringify(message);
             socket.sendBinaryMessage(jsonString);
         }
+    }
+    
+    // Fonction pour envoyer un vrai message binaire (ArrayBuffer)
+    function sendRawBinaryMessage(buffer) {
+        if (socket.status === WebSocket.Open) {
+            socket.sendBinaryMessage(buffer);
+            return true;
+        }
+        return false;
     }
 
     // Garder sendMessage pour compatibilité si besoin

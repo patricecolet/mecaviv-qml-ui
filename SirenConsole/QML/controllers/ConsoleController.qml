@@ -103,13 +103,43 @@ Item {
     property var sirenRouterManager: sirenRouterManager
     
     // Propriétés calculées réactives pour l'UI (P1-P7)
-    property string pupitre1Status: pupitres.length > 0 ? pupitres[0].status : "disconnected"
-    property string pupitre2Status: pupitres.length > 1 ? pupitres[1].status : "disconnected"
-    property string pupitre3Status: pupitres.length > 2 ? pupitres[2].status : "disconnected"
-    property string pupitre4Status: pupitres.length > 3 ? pupitres[3].status : "disconnected"
-    property string pupitre5Status: pupitres.length > 4 ? pupitres[4].status : "disconnected"
-    property string pupitre6Status: pupitres.length > 5 ? pupitres[5].status : "disconnected"
-    property string pupitre7Status: pupitres.length > 6 ? pupitres[6].status : "disconnected"
+    // Utiliser une propriété trigger pour forcer la mise à jour
+    property int pupitresUpdateTrigger: 0
+    property string pupitre1Status: {
+        var _ = pupitresUpdateTrigger
+        var p = getPupitreById("P1")
+        return p ? p.status : "disconnected"
+    }
+    property string pupitre2Status: {
+        var _ = pupitresUpdateTrigger
+        var p = getPupitreById("P2")
+        return p ? p.status : "disconnected"
+    }
+    property string pupitre3Status: {
+        var _ = pupitresUpdateTrigger
+        var p = getPupitreById("P3")
+        return p ? p.status : "disconnected"
+    }
+    property string pupitre4Status: {
+        var _ = pupitresUpdateTrigger
+        var p = getPupitreById("P4")
+        return p ? p.status : "disconnected"
+    }
+    property string pupitre5Status: {
+        var _ = pupitresUpdateTrigger
+        var p = getPupitreById("P5")
+        return p ? p.status : "disconnected"
+    }
+    property string pupitre6Status: {
+        var _ = pupitresUpdateTrigger
+        var p = getPupitreById("P6")
+        return p ? p.status : "disconnected"
+    }
+    property string pupitre7Status: {
+        var _ = pupitresUpdateTrigger
+        var p = getPupitreById("P7")
+        return p ? p.status : "disconnected"
+    }
     
     property real pupitre1CurrentNote: pupitres.length > 0 && pupitres[0].currentNote !== undefined ? pupitres[0].currentNote : 60
     property real pupitre1CurrentHz: pupitres.length > 0 && pupitres[0].currentHz !== undefined ? pupitres[0].currentHz : 440
@@ -619,9 +649,11 @@ Item {
         
         // Créer un nouveau tableau pour forcer QML à détecter le changement
         var updated = []
+        var found = false
         for (var i = 0; i < pupitres.length; i++) {
             var p = pupitres[i]
             if (p.id === pupitreId) {
+                found = true
                 updated.push({
                     id: p.id,
                     status: status,
@@ -636,7 +668,15 @@ Item {
                 updated.push(p)
             }
         }
+        
+        if (!found) {
+            return
+        }
+        
         pupitres = updated
+        
+        // Forcer la mise à jour des propriétés calculées
+        pupitresUpdateTrigger++
         
         // Émettre le signal pour compatibilité
         pupitreStatusChanged(pupitreId, status)

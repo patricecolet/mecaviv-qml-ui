@@ -94,6 +94,18 @@ Rectangle {
                             height: 8
                             radius: 4
                             color: {
+                                // Lire directement depuis consoleController.pupitres pour avoir une mise à jour réactive
+                                if (pupitreSelector.consoleController && pupitreSelector.consoleController.pupitres) {
+                                    var pupitre = pupitreSelector.consoleController.pupitres[index]
+                                    if (pupitre && pupitre.status) {
+                                        switch(pupitre.status) {
+                                            case "connected": return "#00CC66"   // vert
+                                            case "error":     return "#FF3333"   // rouge
+                                            default:           return "#666666"   // déconnecté
+                                        }
+                                    }
+                                }
+                                // Fallback: utiliser pupitreSelector.pupitres si consoleController n'est pas disponible
                                 var pupitre = pupitreSelector.pupitres[index]
                                 if (!pupitre) return "#666666" // déconnecté
                                 switch(pupitre.status) {

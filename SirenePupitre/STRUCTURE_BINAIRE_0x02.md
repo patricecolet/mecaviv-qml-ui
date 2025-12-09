@@ -1,13 +1,13 @@
 # Structure Binaire 0x02 - Contrôleurs Physiques
 
-## Format (16 bytes)
+## Format (18 bytes)
 
 ```
-┌────┬─────────┬─────────┬─────────┬─────────┬────────┬────────┬────────┬────────┬────────┬────┬────┬────────┬────────┬──────┬──────┐
-│0x02│ Volant  │ Volant  │  Pad1   │  Pad1   │  Pad2  │  Pad2  │  Joy   │  Joy   │  Joy   │Joy │Sel │ Fader  │ Pedal  │ Btn1 │ Btn2 │
-│Type│ Pos LSB │ Pos MSB │ After   │   Vel   │ After  │  Vel   │   X    │   Y    │   Z    │Btn │    │        │        │      │      │
-└────┴─────────┴─────────┴─────────┴─────────┴────────┴────────┴────────┴────────┴────────┴────┴────┴────────┴────────┴──────┴──────┘
-  0      1         2         3         4         5        6        7        8        9       10   11     12       13      14     15
+┌────┬─────────┬─────────┬─────────┬─────────┬────────┬────────┬────────┬────────┬────────┬────┬────┬────────┬────────┬──────┬──────┬─────────┬─────────┐
+│0x02│ Volant  │ Volant  │  Pad1   │  Pad1   │  Pad2  │  Pad2  │  Joy   │  Joy   │  Joy   │Joy │Sel │ Fader  │ Pedal  │ Btn1 │ Btn2 │ Encoder │Encoder │
+│Type│ Pos LSB │ Pos MSB │ After   │   Vel   │ After  │  Vel   │   X    │   Y    │   Z    │Btn │    │        │        │      │      │  Value  │Pressed │
+└────┴─────────┴─────────┴─────────┴─────────┴────────┴────────┴────────┴────────┴────────┴────┴────┴────────┴────────┴──────┴──────┴─────────┴─────────┘
+  0      1         2         3         4         5        6        7        8        9       10   11     12       13      14     15       16       17
 ```
 
 ## Détails des champs
@@ -29,6 +29,8 @@
 | 13 | **Pédale** | uint8 | 0-127 | Position de la pédale |
 | 14 | **Bouton 1** | uint8 | 0 ou 1 | Bouton supplémentaire 1 (>0 = appuyé) |
 | 15 | **Bouton 2** | uint8 | 0 ou 1 | Bouton supplémentaire 2 (>0 = appuyé) |
+| 16 | **Encoder Value** | uint8 | 0-127 | Valeur de rotation de l'encodeur |
+| 17 | **Encoder Pressed** | uint8 | 0 ou 1 | État du poussoir de l'encodeur (>0 = appuyé) |
 
 ## Mapping Sélecteur (5 vitesses)
 
@@ -54,7 +56,7 @@
 
 ### Paquet hexadécimal
 ```
-0x02 0xB4 0x00 0x32 0x64 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x40 0x30 0x00 0x00
+0x02 0xB4 0x00 0x32 0x64 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x40 0x30 0x00 0x00 0x3F 0x00
 ```
 
 ### Décodage
@@ -75,6 +77,8 @@ Byte 12: 0x40 = 64 (fader)
 Byte 13: 0x30 = 48 (pédale)
 Byte 14: 0x00 = 0 (bouton 1)
 Byte 15: 0x00 = 0 (bouton 2)
+Byte 16: 0x3F = 63 (encoder value)
+Byte 17: 0x00 = 0 (encoder pressed)
 ```
 
 ## Génération du paquet (PureData)
@@ -82,7 +86,7 @@ Byte 15: 0x00 = 0 (bouton 2)
 ### Exemple de code pour PureData
 ```
 # Préparer les bytes
-[pack 0x02 f f f f f f f f f f f f f f f f]
+[pack 0x02 f f f f f f f f f f f f f f f f f f]
 │
 ├─ 0x02 (type)
 ├─ $volant_pos % 256 (LSB)
@@ -99,7 +103,9 @@ Byte 15: 0x00 = 0 (bouton 2)
 ├─ $fader
 ├─ $pedal
 ├─ $btn1
-└─ $btn2
+├─ $btn2
+├─ $encoder_value
+└─ $encoder_pressed
 ```
 
 ### Conversion joystick (mapping PureData)
@@ -124,7 +130,7 @@ Exemples :
 
 | Métrique | Format JSON | Format 0x02 | Gain |
 |----------|-------------|-------------|------|
-| Taille | ~600 bytes | 16 bytes | **37.5x plus compact** |
+| Taille | ~600 bytes | 18 bytes | **33.3x plus compact** |
 | Parsing | JSON.parse() | Accès direct | **~100x plus rapide** |
 | CPU | Élevé | Minimal | **~95% de réduction** |
 | Fréquence max | ~10 Hz | 100+ Hz | **10x plus rapide** |
@@ -132,13 +138,13 @@ Exemples :
 ## Notes d'implémentation
 
 ### PureData → QML
-1. Créer un tableau de 16 bytes
+1. Créer un tableau de 18 bytes
 2. Remplir les valeurs selon la structure
 3. Envoyer via WebSocket en binaire
 
 ### QML
 1. Réception : `onBinaryMessageReceived`
-2. Vérification : `bytes[0] === 0x02 && bytes.length === 16`
+2. Vérification : `bytes[0] === 0x02 && bytes.length === 18`
 3. Décodage : Accès direct par index
 4. Application : Mise à jour des indicateurs
 
@@ -150,7 +156,7 @@ Exemples :
 
 ## Avantages clés
 
-✅ **Ultra-compact** : 16 bytes seulement  
+✅ **Ultra-compact** : 18 bytes seulement  
 ✅ **Ultra-rapide** : Pas de parsing JSON  
 ✅ **Fréquence élevée** : 60-100 Hz sans problème  
 ✅ **Séparation claire** : Contrôleurs ≠ Séquence  
@@ -159,7 +165,7 @@ Exemples :
 
 ---
 
-**Version** : 1.0  
-**Date** : 19 octobre 2025  
-**Statut** : Implémenté côté QML, en attente implémentation PureData
+**Version** : 1.1  
+**Date** : 27 novembre 2025  
+**Statut** : Implémenté côté QML avec encodeur rotatif (bytes 16-17)
 

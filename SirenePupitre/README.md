@@ -68,7 +68,8 @@ SirenePupitre/
     │       ├── PedalIndicator.qml       ✅
     │       ├── PadIndicator.qml         ✅
     │       ├── JoystickIndicator.qml    ✅
-    │       └── WheelIndicator.qml       ✅
+    │       ├── WheelIndicator.qml       ✅
+    │       └── EncoderIndicator.qml     ✅
     ├── controllers/                # Contrôleurs logiques
     │   ├── ConfigController.qml    ✅
     │   ├── SirenController.qml     ✅
@@ -429,9 +430,9 @@ Note 60 (Do4) :
 - **Parfait pour le mode jeu** avec beaucoup de notes
 - **Durée précise** pour la hauteur des cubes
 
-**Contrôleurs physiques (type 0x02) - 16 BYTES** :
+**Contrôleurs physiques (type 0x02) - 18 BYTES** :
 ```
-[0x02][Volant_L][Volant_H][Pad1_A][Pad1_V][Pad2_A][Pad2_V][Joy_X][Joy_Y][Joy_Z][Joy_B][Sel][Fader][Pedal][Btn1][Btn2]
+[0x02][Volant_L][Volant_H][Pad1_A][Pad1_V][Pad2_A][Pad2_V][Joy_X][Joy_Y][Joy_Z][Joy_B][Sel][Fader][Pedal][Btn1][Btn2][Enc_V][Enc_P]
 ```
 
 | Byte | Champ | Type | Plage | Description |
@@ -451,6 +452,8 @@ Note 60 (Do4) :
 | 13 | Pedal | uint8 | 0-127 | Pédale de modulation |
 | 14 | Button1 | uint8 | 0/1 | Bouton 1 (>0 = 1) |
 | 15 | Button2 | uint8 | 0/1 | Bouton 2 (>0 = 1) |
+| 16 | Encoder Value | uint8 | 0-127 | Valeur de rotation de l'encodeur |
+| 17 | Encoder Pressed | uint8 | 0/1 | État du poussoir de l'encodeur (>0 = 1) |
 
 **Mapping Sélecteur/GearShift** :
 - Position 0 : SEMITONE (demi-ton)
@@ -459,10 +462,10 @@ Note 60 (Do4) :
 - Position 3 : OCTAVE (octave)
 - Position 4 : DOUBLE_OCTAVE (double octave)
 
-**Exemple** : Volant à 180°, Pad1 actif (vel=100, after=50), Joystick centré, Sélecteur en position 2
+**Exemple** : Volant à 180°, Pad1 actif (vel=100, after=50), Joystick centré, Sélecteur en position 2, Encoder à 63
 ```
-[0x02, 0xB4, 0x00, 0x32, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x30, 0x00, 0x00]
-  │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │
+[0x02, 0xB4, 0x00, 0x32, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x30, 0x00, 0x00, 0x3F, 0x00]
+  │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │
   │     └─────┴─ 0x00B4 = 180 degrés
   │           └─────┴─ Pad1: after=50, vel=100
   │                 └─────┴─ Pad2: after=0, vel=0
@@ -470,6 +473,7 @@ Note 60 (Do4) :
   │                                         └─ Sélecteur: 2 (MINOR_SIXTH)
   │                                           └─────┴─ Fader=64, Pedal=48
   │                                                 └─────┴─ Btn1=0, Btn2=0
+  │                                                       └─────┴─ Encoder: value=63, pressed=0
   └─ Type: CONTROLLERS
 ```
 
@@ -644,6 +648,10 @@ webSocketController.sendBinaryMessage({
 #### Boutons supplémentaires
 - **button1** : booléen (0 ou 1)
 - **button2** : booléen (0 ou 1)
+
+#### Encodeur rotatif (Encoder)
+- **value** : entier (0-127)
+- **pressed** : booléen (0 ou 1)
 
 ## Flux de données
 
@@ -852,6 +860,7 @@ Les notes altérées **partagent la même position Y** que leur note naturelle v
 - [X] Composant FaderIndicator
 - [X] Composant PedalIndicator
 - [X] Composant PadIndicator (vélocité + aftertouch)
+- [X] Composant EncoderIndicator (encodeur rotatif + poussoir)
 
 **Note Phase 3** : L'esthétique des composants doit être validée avant de passer à la phase suivante
 

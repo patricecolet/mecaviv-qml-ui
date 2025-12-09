@@ -5,8 +5,9 @@ import "../../utils"
 Node {
     id: root
     
-    // Propriété publique
+    // Propriétés publiques
     property int aftertouch: 0  // 0-127
+    property int velocity: 0    // 0-127 (frappe)
     
     // Propriété d'orientation configurable
     property vector3d orientation: Qt.vector3d(0, 0, 0)
@@ -24,6 +25,8 @@ Node {
         
         // Base du pad (support noir)
         Model {
+
+            visible: true
             source: "#Cube"
             scale: Qt.vector3d(
                 root.padSize / 100,
@@ -39,6 +42,7 @@ Node {
         
         // Surface sensible 
         Model {
+            visible: true
             source: "#Cube"
             scale: Qt.vector3d(
                 root.padSize * 0.9 / 100,
@@ -69,16 +73,76 @@ Node {
             }
         }
         
-        // Affichage des chiffres
+        // Affichage des chiffres - Ligne 1: Velocity (en haut)
         Node {
             visible: root.showValues
-            position: Qt.vector3d(0, 0, -70)
+            position: Qt.vector3d(0, 0, -70)  // Position Z de base
             eulerRotation: Qt.vector3d(-90, 0, 180)
-            scale: Qt.vector3d(0.4, 0.4, 0.4)
+            scale: Qt.vector3d(0.35, 0.35, 0.35)
+            
+            // Label "V:" pour Velocity
+            LEDText3D {
+                position: Qt.vector3d(-50, 400, 0)  // X positif pour apparaître en haut
+                text: "V:"
+                textColor: "#FF6B35"  // Orange/rouge pour différencier
+                letterHeight: 12
+                letterSpacing: 8
+                segmentWidth: 2
+                segmentDepth: 0.5
+            }
             
             // Centaines
             DigitLED3D {
-                position: Qt.vector3d(-30, 0, 0)
+                position: Qt.vector3d(-30, 400, 0)  // X négatif, espacement augmenté
+                value: Math.floor(root.velocity / 100)
+                // Actif seulement si velocity >= 100 (pas un zéro de tête)
+                active: root.velocity >= 100
+                activeColor: "#FF6B35"    // Orange/rouge
+                inactiveColor: "#331100"  // Orange foncé
+            }
+            
+            // Dizaines
+            DigitLED3D {
+                position: Qt.vector3d(0, 400, 0)  // Centre
+                value: Math.floor((root.velocity % 100) / 10)
+                // Actif seulement si velocity >= 10 (pas un zéro de tête)
+                active: root.velocity >= 10
+                activeColor: "#FF6B35"    // Orange/rouge
+                inactiveColor: "#331100"  // Orange foncé
+            }
+            
+            // Unités
+            DigitLED3D {
+                position: Qt.vector3d(30, 400, 0)  // X positif, espacement augmenté
+                value: root.velocity % 10
+                // Actif seulement si velocity > 0
+                active: root.velocity > 0
+                activeColor: "#FF6B35"    // Orange/rouge
+                inactiveColor: "#331100"  // Orange foncé
+            }
+        }
+        
+        // Affichage des chiffres - Ligne 2: Aftertouch (en bas)
+        Node {
+            visible: root.showValues
+            position: Qt.vector3d(0, 0, -70)  // Position Z de base
+            eulerRotation: Qt.vector3d(-90, 0, 180)
+            scale: Qt.vector3d(0.35, 0.35, 0.35)
+            
+            // Label "A:" pour Aftertouch
+            LEDText3D {
+                position: Qt.vector3d(-50, 30, 0)  // Y remis à la valeur d'origine
+                text: "A:"
+                textColor: "#00CED1"
+                letterHeight: 12
+                letterSpacing: 8
+                segmentWidth: 2
+                segmentDepth: 0.5
+            }
+            
+            // Centaines
+            DigitLED3D {
+                position: Qt.vector3d(-30, 30, 0)  // Y remis à la valeur d'origine
                 value: Math.floor(root.aftertouch / 100)
                 // Actif seulement si aftertouch >= 100 (pas un zéro de tête)
                 active: root.aftertouch >= 100
@@ -88,7 +152,7 @@ Node {
             
             // Dizaines
             DigitLED3D {
-                position: Qt.vector3d(0, 0, 0)
+                position: Qt.vector3d(0, 30, 0)  // Y remis à la valeur d'origine
                 value: Math.floor((root.aftertouch % 100) / 10)
                 // Actif seulement si aftertouch >= 10 (pas un zéro de tête)
                 active: root.aftertouch >= 10
@@ -98,7 +162,7 @@ Node {
             
             // Unités
             DigitLED3D {
-                position: Qt.vector3d(30, 0, 0)
+                position: Qt.vector3d(30, 30, 0)  // Y remis à la valeur d'origine
                 value: root.aftertouch % 10
                 // Actif seulement si aftertouch > 0
                 active: root.aftertouch > 0

@@ -1,0 +1,14 @@
+{
+  "name": "sirenmanager-webfiles-server",
+  "version": "1.0.0",
+  "description": "Development server for SirenManager WebAssembly",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+}
+
+

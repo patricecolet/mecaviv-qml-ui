@@ -13,6 +13,8 @@ Item {
     property var sirenController: null
     property var sirenInfo: null
     property var configController: null
+    property var rootWindow: null
+    property var webSocketController: null
     
     // Propriété pour le mode jeu
     property bool gameMode: false
@@ -441,6 +443,7 @@ Item {
             anchors.right: parent.right
             height: parent.height * 0.35
             configController: root.configController
+            webSocketController: root.webSocketController
             visible: {
                 if (!configController) return false
                 configController.updateCounter // Force la réévaluation
@@ -461,6 +464,16 @@ Item {
                     item.configController = root.configController;
                     // Connecter le panneau au mode jeu pour la réinitialisation lors du stop
                     item.gameMode = root.gameModeComponent;
+                    // Passer rootWindow pour uiControlsEnabled
+                    var mainWin = root
+                    while (mainWin && mainWin.objectName !== "mainWindow") {
+                        mainWin = mainWin.parent
+                    }
+                    if (root.rootWindow) {
+                        item.rootWindow = root.rootWindow
+                    } else if (mainWin) {
+                        item.rootWindow = mainWin
+                    }
                 }
             }
         }

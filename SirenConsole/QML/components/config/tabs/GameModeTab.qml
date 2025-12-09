@@ -17,6 +17,7 @@ Item {
     property bool isAllMode: false
     property var allPupitres: []
     property var currentPresetSnapshot: null
+    property var consoleController: null
     
     function forceRefresh() {
         updateTrigger++
@@ -106,6 +107,58 @@ Item {
         }
         
         updateTrigger++
+    }
+    
+    // Fonctions pour les modes autonomes
+    function applyAutonomy(pupitreId, device, enabled) {
+        if (!consoleController) return false
+        return consoleController.setAutonomyMode(pupitreId, device, enabled)
+    }
+    
+    function applyAutonomyToAll(device, enabled) {
+        if (!isAllMode || !allPupitres || allPupitres.length === 0) return
+        if (!consoleController) return
+        
+        for (var i = 0; i < allPupitres.length; i++) {
+            var pupitre = allPupitres[i]
+            if (!pupitre || !pupitre.id) continue
+            applyAutonomy(pupitre.id, device, enabled)
+        }
+        
+        forceRefresh()
+    }
+    
+    function getAutonomyValue(pupitreId, device) {
+        if (!currentPresetSnapshot || !currentPresetSnapshot.config) return false
+        var list = currentPresetSnapshot.config.pupitres || []
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === pupitreId) {
+                var autonomy = list[i].autonomy || {}
+                return autonomy[device] !== undefined ? !!autonomy[device] : false
+            }
+        }
+        return false
+    }
+    
+    function areAllAutonomyEqual(device) {
+        if (!isAllMode || !allPupitres || allPupitres.length <= 1) return true
+        if (!currentPresetSnapshot || !currentPresetSnapshot.config) return true
+        var list = currentPresetSnapshot.config.pupitres || []
+        if (list.length === 0) return true
+        
+        var firstValue = getAutonomyValue(allPupitres[0].id, device)
+        for (var i = 1; i < allPupitres.length; i++) {
+            var val = getAutonomyValue(allPupitres[i].id, device)
+            if (val !== firstValue) {
+                return false
+            }
+        }
+        return true
+    }
+    
+    function getFirstAutonomyValue(device) {
+        if (!allPupitres || allPupitres.length === 0) return false
+        return getAutonomyValue(allPupitres[0].id, device)
     }
     
     ColumnLayout {
@@ -202,6 +255,159 @@ Item {
                         { pupitreId: pupitreId, gameMode: checked },
                         function() { updateSnapshotGameMode(pupitreId, checked) }
                     )
+                }
+            }
+        }
+        
+        // Modes autonomes PureData
+        GroupBox {
+            title: "Modes autonomes"
+            Layout.fillWidth: true
+            
+            background: Rectangle {
+                color: "#2a2a2a"
+                border.color: "#666666"
+                border.width: 1
+                radius: 6
+            }
+            
+            label: Text {
+                text: parent.title
+                color: "#ffffff"
+                font.pixelSize: 14
+                font.bold: true
+                leftPadding: 10
+                topPadding: 8
+            }
+            
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 10
+                
+                Text {
+                    text: "Active les moteurs autonomes contrôlés par PureData."
+                    color: "#cccccc"
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+                
+                Flow {
+                    width: parent.width
+                    spacing: 12
+                    
+                    Button {
+                        id: autoVolantButton
+                        checkable: true
+                        text: checked ? "AutoVolant activé" : "Activer AutoVolant"
+                        Layout.preferredWidth: parent.width / 2 - 6
+                        
+                        property bool autonomyValue: {
+                            var _ = gameModeTab.updateTrigger
+                            if (gameModeTab.isAllMode) {
+                                return gameModeTab.getFirstAutonomyValue("volant")
+                            } else {
+                                if (!gameModeTab.pupitre || !gameModeTab.pupitre.id) return false
+                                return gameModeTab.getAutonomyValue(gameModeTab.pupitre.id, "volant")
+                            }
+                        }
+                        
+                        checked: autonomyValue
+                        
+                        onClicked: {
+                            var newState = checked
+                            if (gameModeTab.isAllMode) {
+                                gameModeTab.applyAutonomyToAll("volant", newState)
+                            } else if (gameModeTab.pupitre && gameModeTab.pupitre.id) {
+                                gameModeTab.applyAutonomy(gameModeTab.pupitre.id, "volant", newState)
+                            }
+                        }
+                    }
+                    
+                    Button {
+                        id: autoPadButton
+                        checkable: true
+                        text: checked ? "AutoPad activé" : "Activer AutoPad"
+                        Layout.preferredWidth: parent.width / 2 - 6
+                        
+                        property bool autonomyValue: {
+                            var _ = gameModeTab.updateTrigger
+                            if (gameModeTab.isAllMode) {
+                                return gameModeTab.getFirstAutonomyValue("pad")
+                            } else {
+                                if (!gameModeTab.pupitre || !gameModeTab.pupitre.id) return false
+                                return gameModeTab.getAutonomyValue(gameModeTab.pupitre.id, "pad")
+                            }
+                        }
+                        
+                        checked: autonomyValue
+                        
+                        onClicked: {
+                            var newState = checked
+                            if (gameModeTab.isAllMode) {
+                                gameModeTab.applyAutonomyToAll("pad", newState)
+                            } else if (gameModeTab.pupitre && gameModeTab.pupitre.id) {
+                                gameModeTab.applyAutonomy(gameModeTab.pupitre.id, "pad", newState)
+                            }
+                        }
+                    }
+                    
+                    Button {
+                        id: autoSliderButton
+                        checkable: true
+                        text: checked ? "AutoSlider activé" : "Activer AutoSlider"
+                        Layout.preferredWidth: parent.width / 2 - 6
+                        
+                        property bool autonomyValue: {
+                            var _ = gameModeTab.updateTrigger
+                            if (gameModeTab.isAllMode) {
+                                return gameModeTab.getFirstAutonomyValue("slider")
+                            } else {
+                                if (!gameModeTab.pupitre || !gameModeTab.pupitre.id) return false
+                                return gameModeTab.getAutonomyValue(gameModeTab.pupitre.id, "slider")
+                            }
+                        }
+                        
+                        checked: autonomyValue
+                        
+                        onClicked: {
+                            var newState = checked
+                            if (gameModeTab.isAllMode) {
+                                gameModeTab.applyAutonomyToAll("slider", newState)
+                            } else if (gameModeTab.pupitre && gameModeTab.pupitre.id) {
+                                gameModeTab.applyAutonomy(gameModeTab.pupitre.id, "slider", newState)
+                            }
+                        }
+                    }
+                    
+                    Button {
+                        id: autoJoystickButton
+                        checkable: true
+                        text: checked ? "AutoJoystick activé" : "Activer AutoJoystick"
+                        Layout.preferredWidth: parent.width / 2 - 6
+                        
+                        property bool autonomyValue: {
+                            var _ = gameModeTab.updateTrigger
+                            if (gameModeTab.isAllMode) {
+                                return gameModeTab.getFirstAutonomyValue("joystick")
+                            } else {
+                                if (!gameModeTab.pupitre || !gameModeTab.pupitre.id) return false
+                                return gameModeTab.getAutonomyValue(gameModeTab.pupitre.id, "joystick")
+                            }
+                        }
+                        
+                        checked: autonomyValue
+                        
+                        onClicked: {
+                            var newState = checked
+                            if (gameModeTab.isAllMode) {
+                                gameModeTab.applyAutonomyToAll("joystick", newState)
+                            } else if (gameModeTab.pupitre && gameModeTab.pupitre.id) {
+                                gameModeTab.applyAutonomy(gameModeTab.pupitre.id, "joystick", newState)
+                            }
+                        }
+                    }
                 }
             }
         }

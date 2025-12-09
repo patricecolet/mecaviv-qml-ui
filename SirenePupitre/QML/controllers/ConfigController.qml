@@ -71,6 +71,8 @@ QtObject {
     property int gearShiftPosition: 0
     // État de priorité console
     property bool consoleConnected: false
+    // État d'attente de la configuration
+    property bool waitingForConfig: false
     
     // Propriété calculée qui se met à jour automatiquement
     property var currentSirenInfo: {
@@ -433,17 +435,19 @@ QtObject {
         
         // Remplacer toute la configuration
         config = newConfig;
-        
+
         // Réinitialiser l'état local depuis la nouvelle config
         mode = newConfig.mode || "restricted";
         if (newConfig.sirenConfig) {
             var ids = newConfig.sirenConfig.currentSirens || ["1"]
             selectSirens(ids);
         }
-        
+
         // Forcer la mise à jour de tous les bindings
         updateCounter++;
         settingsUpdated();
         
-    }   
+        // La config est reçue, on n'attend plus
+        waitingForConfig = false;
+    }
 }

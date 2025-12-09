@@ -92,6 +92,17 @@ Item {
     signal messageReceived(string url, string message)
     signal errorOccurred(string url, string error)
     
+    onConnectionOpened: function(url) {
+        // Envoyer immédiatement l'identification
+        if (webSocket && connected) {
+            webSocket.sendTextMessage(JSON.stringify({
+                type: "SIRENCONSOLE_IDENTIFICATION",
+                source: "SIRENCONSOLE_QML",
+                timestamp: Date.now()
+            }));
+        }
+    }
+    
     // === TIMER DE VÉRIFICATION (statut pupitres + ping) ===
     Timer {
         id: statusTimer
@@ -152,11 +163,8 @@ Item {
     
     // Gérer les messages WebSocket reçus
     function handleWebSocketMessage(message) {
-        // console.log("📥 Message WebSocket reçu:", message.substring(0, 100))
-        
         try {
             var data = JSON.parse(message)
-            // console.log("📥 Type de message:", data.type)
             
             // Traiter les messages du serveur
             switch (data.type) {
@@ -164,13 +172,17 @@ Item {
                     // Pong reçu (log supprimé pour éviter le spam)
                     break
                 case "INITIAL_STATUS":
-                    // console.log("📊 Statut initial reçu:", data.data)
                     // Mettre à jour les statuts initiaux des pupitres
                     if (data.data && data.data.connections && consoleController) {
                         for (var i = 0; i < data.data.connections.length; i++) {
                             try {
                                 var pupitreStatus = data.data.connections[i]
                                 var statusText = pupitreStatus.connected ? "connected" : "disconnected"
+                                // Mettre à jour le statut via updatePupitreStatus
+                                if (consoleController.updatePupitreStatus) {
+                                    consoleController.updatePupitreStatus(pupitreStatus.pupitreId, statusText)
+                                }
+                                // Émettre aussi le signal pour compatibilité
                                 if (consoleController.pupitreStatusChanged) {
                                     consoleController.pupitreStatusChanged(pupitreStatus.pupitreId, statusText)
                                 }
@@ -211,7 +223,7 @@ Item {
                     if (data.pupitreId && consoleController) {
                         try {
                             if (consoleController.updatePupitreStatus) {
-                                consoleController.updatePupitreStatus(data.pupitreId, "connected")
+                                consoleController.updatePupitreStatus(data.pupitreId, "connected");
                             }
                             // Mettre à jour aussi la synchronisation si présente
                             if (data.isSynced !== undefined) {
@@ -242,9 +254,6 @@ Item {
                     break
                     
                 case "PUPITRE_STATUS_UPDATE":
-                    // console.log("🎛️ Mise à jour pupitres:", data.data)
-                    // console.log("📊 Connected count:", data.data.connectedCount)
-                    // console.log("📊 Total connections:", data.data.totalConnections)
                     // Mettre à jour les statuts des pupitres dans l'interface
                     if (data.data && data.data.connections && consoleController) {
                         // console.log("🎛️ consoleController trouvé, mise à jour des statuts")
@@ -443,90 +452,28 @@ Item {
     
     // Connexion à un pupitre
     function connectToPupitre(host, port, pupitreId) {
-        // Connexion pupitre
+        // Connexion pupitre via proxy Node.js uniquement
+        // Pas de vérification HTTP directe pour éviter les erreurs Mixed Content
+        // Le proxy Node.js gère toutes les connexions WebSocket vers les pupitres
         
-        // 1. D'abord vérifier que SirenePupitre répond sur le port 8000
-        // Vérification SirenePupitre
-        
-        var xhr = new XMLHttpRequest()
         var self = webSocketManager
-        
-        // Gérer les erreurs silencieusement (Mixed Content, etc.)
-        xhr.onerror = function() {
-            // Requête bloquée par le navigateur (Mixed Content) ou autre erreur
-            // On considère que le pupitre n'est pas accessible directement
-            // Le proxy Node.js gérera la connexion WebSocket
-            try {
-                // Essayer quand même de se connecter via le proxy
-                self.connections[pupitreId] = {
-                    websocket: null,
-                    url: "ws://" + host + ":10002",
-                    host: host,
-                    port: 10002,
-                    connected: true
-                }
-                self.connectionOpened(self.connections[pupitreId].url)
-                if (self.consoleController) {
-                    self.consoleController.pupitreStatusChanged(pupitreId, "connected")
-                }
-            } catch (e) {
-                // Ignorer les erreurs
-            }
-        }
-        
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    // SirenePupitre répond
-                    
-                    // 2. Utiliser le proxy Node.js pour la connexion WebSocket
-                    // Connexion via proxy Node.js
-                    
-                    // Stocker la connexion simulée (le proxy Node.js gère le vrai WebSocket)
-                    self.connections[pupitreId] = {
-                        websocket: null, // Pas de WebSocket direct
-                        url: "ws://" + host + ":10002",
-                        host: host,
-                        port: 10002,
-                        connected: true // Le proxy Node.js gère la connexion
-                    }
-                    
-                    // Connexion simulée via proxy
-                    self.connectionOpened(self.connections[pupitreId].url)
-                    if (self.consoleController) {
-                        self.consoleController.pupitreStatusChanged(pupitreId, "connected")
-                    }
-                    
-                } else {
-                    // SirenePupitre ne répond pas
-                    if (self.consoleController) {
-                        self.consoleController.pupitreStatusChanged(pupitreId, "disconnected")
-                    }
-                }
-            }
-        }
-        
         try {
-            xhr.open("GET", "http://" + host + ":8000/", true)
-            xhr.send()
-        } catch (e) {
-            // Si la requête ne peut pas être envoyée (Mixed Content, etc.)
-            // Essayer quand même de se connecter via le proxy
-            try {
-                self.connections[pupitreId] = {
-                    websocket: null,
-                    url: "ws://" + host + ":10002",
-                    host: host,
-                    port: 10002,
-                    connected: true
-                }
-                self.connectionOpened(self.connections[pupitreId].url)
-                if (self.consoleController) {
-                    self.consoleController.pupitreStatusChanged(pupitreId, "connected")
-                }
-            } catch (e2) {
-                // Ignorer les erreurs
+            // Stocker la connexion simulée (le proxy Node.js gère le vrai WebSocket)
+            self.connections[pupitreId] = {
+                websocket: null, // Pas de WebSocket direct depuis le client
+                url: "ws://" + host + ":10002",
+                host: host,
+                port: 10002,
+                connected: true // Le proxy Node.js gère la connexion
             }
+            
+            // Connexion simulée via proxy
+            self.connectionOpened(self.connections[pupitreId].url)
+            if (self.consoleController) {
+                self.consoleController.pupitreStatusChanged(pupitreId, "connected")
+            }
+        } catch (e) {
+            // Ignorer les erreurs silencieusement
         }
         
         return true

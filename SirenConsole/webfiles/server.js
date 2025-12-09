@@ -430,7 +430,6 @@ function handleWebSocketConnection(ws, request) {
                         timestamp: Date.now() 
                     }))
                 } else if (data.type === 'SIRENCONSOLE_IDENTIFICATION') {
-                    // console.log('🔑 Client SirenConsole QML identifié');
                     // Ajouter le client à la liste des clients connectés
                     connectedClients.add(ws);
                     
@@ -1255,6 +1254,38 @@ function requestHandler(request, response) {
         return;
     }
     
+    // Endpoint de test temporaire pour simuler PUPITRE_CONNECTED
+    if (request.url === '/api/test/pupitre-connected' && request.method === 'POST') {
+        console.log('[TEST] Endpoint /api/test/pupitre-connected appelé');
+        let body = '';
+        request.on('data', chunk => body += chunk);
+        request.on('end', () => {
+            try {
+                const { pupitreId } = JSON.parse(body);
+                console.log(`[TEST] Envoi PUPITRE_CONNECTED pour ${pupitreId}, clients connectés: ${connectedClients.size}`);
+                if (pupitreId) {
+                    broadcastToClients({
+                        type: 'PUPITRE_CONNECTED',
+                        pupitreId: pupitreId,
+                        pupitreName: `Pupitre ${pupitreId}`,
+                        connected: true,
+                        timestamp: Date.now()
+                    });
+                    response.writeHead(200, { 'Content-Type': 'application/json' });
+                    response.end(JSON.stringify({ success: true, message: `PUPITRE_CONNECTED envoyé pour ${pupitreId}`, clients: connectedClients.size }));
+                } else {
+                    response.writeHead(400, { 'Content-Type': 'application/json' });
+                    response.end(JSON.stringify({ success: false, error: 'Missing pupitreId' }));
+                }
+            } catch (e) {
+                console.error('[TEST] Erreur:', e.message);
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+    
     // API pour obtenir le statut des pupitres (pour les LEDs)
     if (request.url === '/api/pupitres/status') {
         const status = pureDataProxy.getStatus();
@@ -1537,7 +1568,6 @@ presetAPI.initializePresetAPI().then(() => {
                        };
                    });
                }
-               // console.log("📊 Envoi statut aux clients:", connectedClients.size, "clients connectés");
                broadcastToClients({
                    type: 'PUPITRE_STATUS_UPDATE',
                    data: status,

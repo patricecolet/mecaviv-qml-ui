@@ -12,10 +12,6 @@ Item {
     property var allPupitres: []
     property var currentPresetSnapshot: null
     property var consoleController: null
-    property bool autoVolantActive: false
-    property bool autoPadActive: false
-    property bool autoSliderActive: false
-    property bool autoJoystickActive: false
     
     function forceRefresh() {
         updateTrigger++
@@ -44,24 +40,6 @@ Item {
         
         forceRefresh()
         return successCount > 0
-    }
-    
-    function applyAutonomy(pupitreId, device, enabled) {
-        if (!consoleController) return false
-        return consoleController.setAutonomyMode(pupitreId, device, enabled)
-    }
-    
-    function applyAutonomyToAll(device, enabled) {
-        if (!isAllMode || !allPupitres || allPupitres.length === 0) return
-        if (!consoleController) return
-        
-        for (var i = 0; i < allPupitres.length; i++) {
-            var pupitre = allPupitres[i]
-            if (!pupitre || !pupitre.id) continue
-            applyAutonomy(pupitre.id, device, enabled)
-        }
-        
-        forceRefresh()
     }
     
     ColumnLayout {
@@ -180,111 +158,6 @@ Item {
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
-                }
-            }
-        }
-        
-        // Modes autonomes PureData
-        GroupBox {
-            title: "Modes autonomes"
-            Layout.fillWidth: true
-            
-            background: Rectangle {
-                color: "#2a2a2a"
-                border.color: "#666666"
-                border.width: 1
-                radius: 6
-            }
-            
-            label: Text {
-                text: parent.title
-                color: "#ffffff"
-                font.pixelSize: 14
-                font.bold: true
-                leftPadding: 10
-                topPadding: 8
-            }
-            
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 10
-                spacing: 10
-                
-                Text {
-                    text: "Active les moteurs autonomes contrôlés par PureData."
-                    color: "#cccccc"
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                }
-                
-                Flow {
-                    width: parent.width
-                    spacing: 12
-                    
-                    Button {
-                        checkable: true
-                        checked: displayTab.autoVolantActive
-                        text: checked ? "AutoVolant activé" : "Activer AutoVolant"
-                        Layout.preferredWidth: parent.width / 2 - 6
-                        onClicked: {
-                            var newState = checked
-                            displayTab.autoVolantActive = newState
-                            if (displayTab.isAllMode) {
-                                displayTab.applyAutonomyToAll("volant", newState)
-                            } else if (pupitre && pupitre.id) {
-                                displayTab.applyAutonomy(pupitre.id, "volant", newState)
-                            }
-                        }
-                    }
-                    
-                    Button {
-                        checkable: true
-                        checked: displayTab.autoPadActive
-                        text: checked ? "AutoPad activé" : "Activer AutoPad"
-                        Layout.preferredWidth: parent.width / 2 - 6
-                        onClicked: {
-                            var newState = checked
-                            displayTab.autoPadActive = newState
-                            if (displayTab.isAllMode) {
-                                displayTab.applyAutonomyToAll("pad", newState)
-                            } else if (pupitre && pupitre.id) {
-                                displayTab.applyAutonomy(pupitre.id, "pad", newState)
-                            }
-                        }
-                    }
-                    
-                    Button {
-                        checkable: true
-                        checked: displayTab.autoSliderActive
-                        text: checked ? "AutoSlider activé" : "Activer AutoSlider"
-                        Layout.preferredWidth: parent.width / 2 - 6
-                        onClicked: {
-                            var newState = checked
-                            displayTab.autoSliderActive = newState
-                            if (displayTab.isAllMode) {
-                                displayTab.applyAutonomyToAll("slider", newState)
-                            } else if (pupitre && pupitre.id) {
-                                displayTab.applyAutonomy(pupitre.id, "slider", newState)
-                            }
-                        }
-                    }
-                    
-                    Button {
-                        checkable: true
-                        checked: displayTab.autoJoystickActive
-                        text: checked ? "AutoJoystick activé" : "Activer AutoJoystick"
-                        Layout.preferredWidth: parent.width / 2 - 6
-                        onClicked: {
-                            var newState = checked
-                            displayTab.autoJoystickActive = newState
-                            if (displayTab.isAllMode) {
-                                displayTab.applyAutonomyToAll("joystick", newState)
-                            } else if (pupitre && pupitre.id) {
-                                displayTab.applyAutonomy(pupitre.id, "joystick", newState)
-                            }
-                        }
-                    }
                 }
             }
         }

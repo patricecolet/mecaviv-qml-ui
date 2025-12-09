@@ -44,6 +44,7 @@
         <file>QML/components/indicators/PadIndicator.qml</file>
         <file>QML/components/indicators/PedalIndicator.qml</file>
         <file>QML/components/indicators/WheelIndicator.qml</file>
+        <file>QML/components/indicators/EncoderIndicator.qml</file>
         <file>QML/components/ambitus/AmbitusDisplay3D.qml</file>
         <file>QML/admin/advanced/AdvancedAnimations.qml</file>
         <file>QML/admin/advanced/AdvancedColors.qml</file>
