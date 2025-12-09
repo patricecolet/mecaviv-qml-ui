@@ -47,97 +47,11 @@ Rectangle {
         MidiPlayer {
             id: midiPlayer
             Layout.fillWidth: true
-            Layout.preferredHeight: 200
+            Layout.preferredHeight: 240
+            Layout.maximumHeight: 240
+            clip: true
             
             commandManager: consoleController ? consoleController.commandManager : null
-        }
-        
-        // Séparateur
-        Rectangle {
-            Layout.fillWidth: true
-            height: 2
-            color: "#00ff00"
-            opacity: 0.3
-        }
-        
-        // En-tête
-        Rectangle {
-            Layout.fillWidth: true
-            height: 60
-            color: "#2a2a2a"
-            radius: 8
-            border.color: "#555555"
-            border.width: 1
-            
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 20
-                spacing: 20
-                
-                Text {
-                    text: "🎵 Bibliothèque MIDI"
-                    color: "#ffffff"
-                    font.pixelSize: 18
-                    font.bold: true
-                }
-                
-                Item { Layout.fillWidth: true }
-                
-                // Bouton rafraîchir
-                Button {
-                    text: "🔄 Rafraîchir"
-                    onClicked: midiFileManager.loadMidiFiles()
-                    enabled: !midiFileManager.loading
-                }
-                
-                // Indicateur de chargement
-                Text {
-                    text: "⏳ Chargement..."
-                    color: "#ffaa00"
-                    font.pixelSize: 14
-                    visible: midiFileManager.loading
-                }
-            }
-        }
-        
-        // Message d'erreur
-        Rectangle {
-            id: errorText
-            Layout.fillWidth: true
-            height: 40
-            color: "#4a1a1a"
-            radius: 4
-            border.color: "#ff0000"
-            border.width: 1
-            visible: false
-            
-            property alias text: errorLabel.text
-            
-            Text {
-                id: errorLabel
-                anchors.centerIn: parent
-                color: "#ff6666"
-                font.pixelSize: 14
-            }
-        }
-        
-        // Barre de statut
-        Rectangle {
-            id: statusText
-            Layout.fillWidth: true
-            height: 35
-            color: "#2a2a2a"
-            radius: 4
-            visible: text !== ""
-            
-            property alias text: statusLabel.text
-            property alias color: statusLabel.color
-            
-            Text {
-                id: statusLabel
-                anchors.centerIn: parent
-                font.pixelSize: 13
-            }
         }
         
         // Contenu principal (Catégories + Fichiers)
@@ -164,18 +78,47 @@ Rectangle {
                         anchors.fill: parent
                         spacing: 0
                         
-                        // En-tête catégories
+                        // En-tête catégories avec bouton rafraîchir
                         Rectangle {
                             Layout.fillWidth: true
                             height: 50
                             color: "#2a2a2a"
                             
-                            Text {
-                                anchors.centerIn: parent
-                                text: "📂 Catégories"
-                                color: "#ffffff"
-                                font.pixelSize: 16
-                                font.bold: true
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 15
+                                anchors.rightMargin: 10
+                                spacing: 5
+                                
+                                Text {
+                                    text: "📂 Catégories"
+                                    color: "#ffffff"
+                                    font.pixelSize: 16
+                                    font.bold: true
+                                }
+                                
+                                Item { Layout.fillWidth: true }
+                                
+                                // Indicateur de chargement
+                                Text {
+                                    text: "⏳"
+                                    color: "#ffaa00"
+                                    font.pixelSize: 14
+                                    visible: midiFileManager.loading
+                                }
+                                
+                                // Bouton rafraîchir compact
+                                Button {
+                                    text: "🔄"
+                                    implicitWidth: 35
+                                    implicitHeight: 30
+                                    onClicked: midiFileManager.loadMidiFiles()
+                                    enabled: !midiFileManager.loading
+                                    
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Rafraîchir la bibliothèque"
+                                    ToolTip.delay: 500
+                                }
                             }
                         }
                         
@@ -387,20 +330,6 @@ Rectangle {
             }
         }
         
-        // Pied de page avec instructions
-        Rectangle {
-            Layout.fillWidth: true
-            height: 40
-            color: "#2a2a2a"
-            radius: 4
-            
-            Text {
-                anchors.centerIn: parent
-                text: "💡 Double-cliquez sur un fichier ou utilisez le bouton 'Charger' pour envoyer à PureData"
-                color: "#888888"
-                font.pixelSize: 12
-            }
-        }
     }
 }
 

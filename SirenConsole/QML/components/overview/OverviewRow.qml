@@ -19,10 +19,31 @@ Rectangle {
     // État de synchronisation
     property bool pupitreSynced: parent ? (parent.pupitreSynced || false) : false
     property var consoleController: parent ? parent.consoleController : null
-    property bool autoVolantActive: false
-    property bool autoPadActive: false
-    property bool autoSliderActive: false
-    property bool autoJoystickActive: false
+    
+    // Trigger pour forcer la mise à jour des propriétés d'autonomie
+    property int autonomyUpdateTrigger: consoleController ? consoleController.pupitresUpdateTrigger : 0
+    
+    // État d'autonomie lu depuis le consoleController (source de vérité unique)
+    property bool autoVolantActive: {
+        var _ = autonomyUpdateTrigger  // Force réévaluation
+        if (!consoleController || !pupitreId) return false
+        return consoleController.getAutonomyState(pupitreId, "volant")
+    }
+    property bool autoPadActive: {
+        var _ = autonomyUpdateTrigger  // Force réévaluation
+        if (!consoleController || !pupitreId) return false
+        return consoleController.getAutonomyState(pupitreId, "pad")
+    }
+    property bool autoSliderActive: {
+        var _ = autonomyUpdateTrigger  // Force réévaluation
+        if (!consoleController || !pupitreId) return false
+        return consoleController.getAutonomyState(pupitreId, "slider")
+    }
+    property bool autoJoystickActive: {
+        var _ = autonomyUpdateTrigger  // Force réévaluation
+        if (!consoleController || !pupitreId) return false
+        return consoleController.getAutonomyState(pupitreId, "joystick")
+    }
     
     
     height: 80
@@ -251,7 +272,8 @@ Rectangle {
                         text: modelData.label
                         font.pixelSize: 10
                         onToggled: {
-                            overviewRow[modelData.prop] = checked
+                            // L'état est maintenant centralisé dans consoleController
+                            // setAutonomyMode met à jour l'état ET envoie la commande
                             if (overviewRow.consoleController && overviewRow.pupitreId) {
                                 overviewRow.consoleController.setAutonomyMode(overviewRow.pupitreId, modelData.device, checked)
                             }

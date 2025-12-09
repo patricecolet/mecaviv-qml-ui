@@ -54,44 +54,25 @@ Rectangle {
         anchors.margins: 15
         spacing: 10
         
-        // En-tête avec titre et fichier en cours
+        // En-tête avec titre et nom du fichier
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
             
             Label {
-                text: "🎵 Lecteur MIDI"
+                text: "🎵"
                 font.family: emojiFont
-                font.pixelSize: 18
-                font.bold: true
+                font.pixelSize: 16
                 color: "#00ff00"
             }
             
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: "#444444"
-            }
-        }
-        
-        // Fichier en cours (plus visible)
-        Rectangle {
-            Layout.fillWidth: true
-            height: 40
-            color: "#1a1a1a"
-            radius: 4
-            border.color: currentFile ? "#00ff00" : "#444444"
-            border.width: 1
-            
             Label {
-                anchors.fill: parent
-                anchors.margins: 10
-                text: currentFile ? "▶ " + currentFile : "⏹ Aucun fichier chargé"
-                color: currentFile ? "#00ff00" : "#666666"
-                font.pixelSize: 13
+                text: currentFile ? currentFile : "Aucun fichier"
+                font.pixelSize: 14
                 font.bold: currentFile !== ""
-                verticalAlignment: Text.AlignVCenter
+                color: currentFile ? "#00ff00" : "#666666"
                 elide: Text.ElideMiddle
+                Layout.fillWidth: true
             }
         }
         
@@ -268,6 +249,49 @@ Rectangle {
                                     focus = false
                                 }
                             }
+                        }
+                    }
+                }
+                
+                // Séparateur vertical
+                Rectangle {
+                    width: 1
+                    height: 50
+                    color: "#444444"
+                }
+                
+                // Temps (MM:SS)
+                Rectangle {
+                    width: 80
+                    height: 50
+                    color: "#1a1a1a"
+                    radius: 3
+                    border.color: "#00ff00"
+                    border.width: 1
+                    
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 0
+                        
+                        Label {
+                            text: "TEMPS"
+                            color: "#666666"
+                            font.pixelSize: 8
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.fillWidth: true
+                            Layout.topMargin: 3
+                        }
+                        
+                        Label {
+                            text: formatTime(position)
+                            color: "#00ff00"
+                            font.pixelSize: 18
+                            font.bold: true
+                            font.family: "monospace"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
                         }
                     }
                 }
@@ -525,70 +549,66 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 5
             
-            // Slider de position
-            MouseArea {
+            // Slider de position natif Qt
+            Slider {
+                id: progressSlider
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
                 
-                Rectangle {
-                    anchors.fill: parent
-                    color: "#1a1a1a"
-                    radius: 4
-                    border.color: "#444444"
-                    border.width: 1
-                    
-                    // Barre de progression
-                    Rectangle {
-                        x: 0
-                        y: 0
-                        width: duration > 0 ? (position / duration) * parent.width : 0
-                        height: parent.height
-                        color: "#00ff0033"
-                        radius: 4
-                    }
-                    
-                    // Curseur
-                    Rectangle {
-                        x: duration > 0 ? (position / duration) * parent.width - 2 : 0
-                        y: 0
-                        width: 4
-                        height: parent.height
-                        color: "#00ff00"
-                    }
-                    
-                    // Indicateur de position au survol
-                    Label {
-                        visible: parent.parent.containsMouse
-                        x: parent.parent.mouseX
-                        y: -25
-                        text: {
-                            if (duration > 0) {
-                                var seekPos = (parent.parent.mouseX / parent.width) * duration
-                                return formatTime(seekPos)
-                            }
-                            return "00:00"
-                        }
-                        color: "#ffaa00"
-                        font.pixelSize: 10
-                        
-                        background: Rectangle {
-                            color: "#000000"
-                            border.color: "#ffaa00"
-                            border.width: 1
-                            radius: 2
-                            anchors.fill: parent
-                            anchors.margins: -3
-                        }
+                from: 0
+                to: Math.max(1, duration)
+                stepSize: 100
+                
+                // Empêcher la mise à jour automatique pendant le drag
+                property bool userDragging: false
+                
+                onPressedChanged: {
+                    userDragging = pressed
+                }
+                
+                onMoved: {
+                    if (userDragging && duration > 0) {
+                        seek(Math.floor(value))
                     }
                 }
                 
-                hoverEnabled: true
-                
-                onClicked: {
-                    if (duration > 0) {
-                        var newPos = (mouseX / width) * duration
-                        seek(Math.floor(newPos))
+                // Style personnalisé
+                background: Rectangle {
+                    x: progressSlider.leftPadding
+                    y: progressSlider.topPadding + progressSlider.availableHeight / 2 - height / 2
+                    width: progressSlider.availableWidth
+                    height: 20
+                    radius: 4
+                    color: "#1a1a1a"
+                    border.color: "#444444"
+                    border.width: 1
+                    
+                    // Barre de progression remplie
+                    Rectangle {
+                        width: progressSlider.visualPosition * parent.width
+                        height: parent.height
+                        color: "#00ff0044"
+                        radius: 4
                     }
+                }
+                
+                handle: Rectangle {
+                    x: progressSlider.leftPadding + progressSlider.visualPosition * (progressSlider.availableWidth - width)
+                    y: progressSlider.topPadding + progressSlider.availableHeight / 2 - height / 2
+                    width: 8
+                    height: 24
+                    radius: 4
+                    color: progressSlider.pressed ? "#00cc00" : "#00ff00"
+                    border.color: "#ffffff"
+                    border.width: 1
+                }
+                
+                // Binding pour mettre à jour la valeur depuis l'extérieur (sauf pendant le drag)
+                Binding {
+                    target: progressSlider
+                    property: "value"
+                    value: position
+                    when: !progressSlider.userDragging
                 }
             }
             

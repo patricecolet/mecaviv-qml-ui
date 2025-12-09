@@ -37,14 +37,48 @@ Item {
         }
     }
     
+    // Fonction pour charger l'état d'autonomie depuis le preset courant
+    function loadAutonomyFromPreset() {
+        var xhr = new XMLHttpRequest()
+        var apiUrl = networkUtils.getApiBaseUrl()
+        xhr.open("GET", apiUrl + "/api/presets/current")
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var res = JSON.parse(xhr.responseText)
+                    if (res && res.preset && res.preset.config && res.preset.config.pupitres) {
+                        var presetPupitres = res.preset.config.pupitres
+                        for (var i = 0; i < presetPupitres.length; i++) {
+                            var pp = presetPupitres[i]
+                            if (pp.id && pp.autonomy) {
+                                // Mettre à jour l'état d'autonomie pour chaque device
+                                var devices = ["volant", "pad", "slider", "joystick"]
+                                for (var j = 0; j < devices.length; j++) {
+                                    var device = devices[j]
+                                    if (pp.autonomy[device] !== undefined) {
+                                        updateAutonomyState(pp.id, device, !!pp.autonomy[device])
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Ignorer les erreurs de parsing
+                }
+            }
+        }
+        xhr.send()
+    }
+    
     // Test simple pour voir si le fichier se charge
     Component.onCompleted: {
         // ConsoleController initialisé
         initializeManagers()
         
-        // Charger l'état de synchronisation après un délai
+        // Charger l'état de synchronisation et l'état d'autonomie après un délai
         Qt.callLater(function() {
             loadSyncStatus()
+            loadAutonomyFromPreset()
         })
     }
     
@@ -194,14 +228,15 @@ Item {
     property bool pupitre7Synced: false
     
     // Modèle unique des pupitres (remplace les propriétés individuelles)
+    // Inclut maintenant l'état d'autonomie pour chaque device
     property var pupitres: [
-        { id: "P1", status: "disconnected", ambitusMin: 43, ambitusMax: 86, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
-        { id: "P2", status: "disconnected", ambitusMin: 43, ambitusMax: 86, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
-        { id: "P3", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
-        { id: "P4", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
-        { id: "P5", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
-        { id: "P6", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 },
-        { id: "P7", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0 }
+        { id: "P1", status: "disconnected", ambitusMin: 43, ambitusMax: 86, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0, autonomy: { volant: false, pad: false, slider: false, joystick: false } },
+        { id: "P2", status: "disconnected", ambitusMin: 43, ambitusMax: 86, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0, autonomy: { volant: false, pad: false, slider: false, joystick: false } },
+        { id: "P3", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0, autonomy: { volant: false, pad: false, slider: false, joystick: false } },
+        { id: "P4", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0, autonomy: { volant: false, pad: false, slider: false, joystick: false } },
+        { id: "P5", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0, autonomy: { volant: false, pad: false, slider: false, joystick: false } },
+        { id: "P6", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0, autonomy: { volant: false, pad: false, slider: false, joystick: false } },
+        { id: "P7", status: "disconnected", ambitusMin: 36, ambitusMax: 77, currentNote: 60.0, currentHz: 440.0, currentRpm: 0, velocity: 0, autonomy: { volant: false, pad: false, slider: false, joystick: false } }
     ]
 
     // Fonctions utilitaires pour accéder aux pupitres
@@ -244,6 +279,7 @@ Item {
     signal presetLoaded(string presetName)
     signal presetsListChanged(var presetsList)
     signal errorOccurred(string error)
+    signal autonomyStateChanged(string pupitreId, string device, bool enabled)
     
     // === TIMER DE VÉRIFICATION (désactivé) ===
     Timer {
@@ -305,6 +341,7 @@ Item {
                             currentHz: p.currentHz,
                             currentRpm: p.currentRpm,
                             velocity: p.velocity,
+                            autonomy: p.autonomy || { volant: false, pad: false, slider: false, joystick: false },
                             assignedSirenes: sirenes || []
                         })
                     } else {
@@ -325,6 +362,10 @@ Item {
             presetManager.presetLoaded.connect(function(presetName) {
                 currentPreset = presetName
                 presetLoaded(presetName)
+                // Recharger l'état d'autonomie depuis le nouveau preset
+                Qt.callLater(function() {
+                    loadAutonomyFromPreset()
+                })
             })
             
             presetManager.presetError.connect(function(error) {
@@ -398,7 +439,8 @@ Item {
                     currentNote: 60.0,
                     currentHz: 440.0,
                     currentRpm: 0,
-                    velocity: 0
+                    velocity: 0,
+                    autonomy: { volant: false, pad: false, slider: false, joystick: false }
                 })
             }
         }
@@ -584,7 +626,51 @@ Item {
     
     function setAutonomyMode(pupitreId, device, enabled) {
         if (commandManager) {
-            return commandManager.setAutonomyMode(pupitreId, device, enabled)
+            var success = commandManager.setAutonomyMode(pupitreId, device, enabled)
+            if (success) {
+                // Mettre à jour l'état local immédiatement pour synchronisation UI
+                updateAutonomyState(pupitreId, device, enabled)
+            }
+            return success
+        }
+        return false
+    }
+    
+    // Met à jour l'état d'autonomie localement et émet le signal
+    function updateAutonomyState(pupitreId, device, enabled) {
+        if (!pupitres || pupitres.length === 0) return
+        
+        var updated = []
+        for (var i = 0; i < pupitres.length; i++) {
+            var p = pupitres[i]
+            if (p.id === pupitreId) {
+                var newAutonomy = p.autonomy ? JSON.parse(JSON.stringify(p.autonomy)) : { volant: false, pad: false, slider: false, joystick: false }
+                newAutonomy[device] = enabled
+                updated.push({
+                    id: p.id,
+                    status: p.status,
+                    ambitusMin: p.ambitusMin,
+                    ambitusMax: p.ambitusMax,
+                    currentNote: p.currentNote,
+                    currentHz: p.currentHz,
+                    currentRpm: p.currentRpm,
+                    velocity: p.velocity,
+                    autonomy: newAutonomy
+                })
+            } else {
+                updated.push(p)
+            }
+        }
+        pupitres = updated
+        pupitresUpdateTrigger++
+        autonomyStateChanged(pupitreId, device, enabled)
+    }
+    
+    // Retourne l'état d'autonomie d'un device pour un pupitre
+    function getAutonomyState(pupitreId, device) {
+        var p = getPupitreById(pupitreId)
+        if (p && p.autonomy) {
+            return p.autonomy[device] || false
         }
         return false
     }
@@ -623,7 +709,8 @@ Item {
                     currentNote: noteFloat,
                     currentHz: frequency,
                     currentRpm: rpm,
-                    velocity: velocity
+                    velocity: velocity,
+                    autonomy: p.autonomy || { volant: false, pad: false, slider: false, joystick: false }
                 })
             } else {
                 updated.push(p)
@@ -662,7 +749,8 @@ Item {
                     currentNote: p.currentNote,
                     currentHz: p.currentHz,
                     currentRpm: p.currentRpm,
-                    velocity: p.velocity
+                    velocity: p.velocity,
+                    autonomy: p.autonomy || { volant: false, pad: false, slider: false, joystick: false }
                 })
             } else {
                 updated.push(p)

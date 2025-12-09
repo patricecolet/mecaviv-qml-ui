@@ -204,7 +204,7 @@ class PureDataProxy {
                     connection.connected = false;
                     connection.lastSeen = null;
                     
-                    console.log(`❌ Pupitre ${pupitreId} (${pupitre.name}) déconnecté (code: ${code})`);
+                    // console.log(`❌ Pupitre ${pupitreId} (${pupitre.name}) déconnecté (code: ${code})`);
                     
                     // Informer l'interface de la déconnexion
                     if (this.broadcastToClients) {

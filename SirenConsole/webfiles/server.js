@@ -1050,10 +1050,15 @@ function requestHandler(request, response) {
                 bar: state.bar || 0,
                 beatInBar: state.beatInBar || 0,
                 beat: state.beat || 0,
-                position: Math.floor(((state.beat || 0) / (state.tempo || 120)) * 60000),
-                tempo: state.tempo || 120
+                position: state.position || Math.floor(((state.beat || 0) / (state.tempo || 120)) * 60000),
+                tempo: state.tempo || 120,
+                duration: state.duration || 0,
+                totalBeats: state.totalBeats || 0,
+                timeSignature: state.timeSignature || { numerator: 4, denominator: 4 },
+                file: state.file || ""
             } : {
-                playing: false, bar: 0, beatInBar: 0, beat: 0, position: 0, tempo: 120
+                playing: false, bar: 0, beatInBar: 0, beat: 0, position: 0, tempo: 120,
+                duration: 0, totalBeats: 0, timeSignature: { numerator: 4, denominator: 4 }, file: ""
             };
             response.writeHead(200, { 'Content-Type': 'application/json' });
             response.end(JSON.stringify(payload));
@@ -1208,12 +1213,16 @@ function requestHandler(request, response) {
                     message = 'Commande UI envoyée';
                 } else if (command.type === 'AUTONOMY_MODE') {
                     const pupitreId = command.pupitreId;
+                    let sent = false;
                     if (pupitreId) {
-                        success = pureDataProxy.sendToPupitre(pupitreId, command);
+                        sent = pureDataProxy.sendToPupitre(pupitreId, command);
                     } else {
-                        success = pureDataProxy.sendCommand(command);
+                        sent = pureDataProxy.sendCommand(command);
                     }
-                    message = success ? 'Commande autonomie envoyée' : 'Pupitre non disponible';
+                    // Toujours retourner success=true pour permettre la mise à jour de l'état local
+                    // même si le pupitre n'est pas connecté (la commande sera envoyée quand il se connectera)
+                    success = true;
+                    message = sent ? 'Commande autonomie envoyée' : 'État mis à jour (pupitre non connecté)';
                 } else {
                     // Commande inconnue, envoyer à PureData
                     success = pureDataProxy.sendCommand(command);

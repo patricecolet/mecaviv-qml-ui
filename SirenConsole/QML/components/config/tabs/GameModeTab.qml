@@ -19,6 +19,9 @@ Item {
     property var currentPresetSnapshot: null
     property var consoleController: null
     
+    // Trigger pour synchroniser avec le consoleController
+    property int autonomyTrigger: consoleController ? consoleController.pupitresUpdateTrigger : 0
+    
     function forceRefresh() {
         updateTrigger++
     }
@@ -129,22 +132,16 @@ Item {
     }
     
     function getAutonomyValue(pupitreId, device) {
-        if (!currentPresetSnapshot || !currentPresetSnapshot.config) return false
-        var list = currentPresetSnapshot.config.pupitres || []
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].id === pupitreId) {
-                var autonomy = list[i].autonomy || {}
-                return autonomy[device] !== undefined ? !!autonomy[device] : false
-            }
+        // Utiliser l'état centralisé du consoleController
+        if (consoleController) {
+            return consoleController.getAutonomyState(pupitreId, device)
         }
         return false
     }
     
     function areAllAutonomyEqual(device) {
         if (!isAllMode || !allPupitres || allPupitres.length <= 1) return true
-        if (!currentPresetSnapshot || !currentPresetSnapshot.config) return true
-        var list = currentPresetSnapshot.config.pupitres || []
-        if (list.length === 0) return true
+        if (!consoleController) return true
         
         var firstValue = getAutonomyValue(allPupitres[0].id, device)
         for (var i = 1; i < allPupitres.length; i++) {
@@ -305,6 +302,7 @@ Item {
                         
                         property bool autonomyValue: {
                             var _ = gameModeTab.updateTrigger
+                            var __ = gameModeTab.autonomyTrigger  // Force sync avec consoleController
                             if (gameModeTab.isAllMode) {
                                 return gameModeTab.getFirstAutonomyValue("volant")
                             } else {
@@ -333,6 +331,7 @@ Item {
                         
                         property bool autonomyValue: {
                             var _ = gameModeTab.updateTrigger
+                            var __ = gameModeTab.autonomyTrigger  // Force sync avec consoleController
                             if (gameModeTab.isAllMode) {
                                 return gameModeTab.getFirstAutonomyValue("pad")
                             } else {
@@ -361,6 +360,7 @@ Item {
                         
                         property bool autonomyValue: {
                             var _ = gameModeTab.updateTrigger
+                            var __ = gameModeTab.autonomyTrigger  // Force sync avec consoleController
                             if (gameModeTab.isAllMode) {
                                 return gameModeTab.getFirstAutonomyValue("slider")
                             } else {
@@ -389,6 +389,7 @@ Item {
                         
                         property bool autonomyValue: {
                             var _ = gameModeTab.updateTrigger
+                            var __ = gameModeTab.autonomyTrigger  // Force sync avec consoleController
                             if (gameModeTab.isAllMode) {
                                 return gameModeTab.getFirstAutonomyValue("joystick")
                             } else {
