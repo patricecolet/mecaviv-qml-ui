@@ -9,6 +9,7 @@
         <file>QML/utils/LEDText3D.qml</file>
         <file>QML/components/SirenDisplay.qml</file>
         <file>QML/components/NumberDisplay3D.qml</file>
+        <file>QML/components/NumberDisplay2D.qml</file>
         <file>QML/controllers/SirenController.qml</file>
         <file>QML/utils/MusicUtils.qml</file>
         <file>QML/controllers/ConfigController.qml</file>

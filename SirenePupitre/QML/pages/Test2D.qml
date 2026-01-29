@@ -35,6 +35,48 @@ Page {
         anchors.fill: parent
         color: root.backgroundColor
         
+        // Zone supérieure - Afficheurs numériques (comme dans SirenDisplay ligne 175-204)
+        Item {
+            id: topDisplays
+            anchors.top: parent.top
+            anchors.topMargin: 20
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: 600
+            height: 100
+            
+            // Position: y: root.gameMode ? -270 : 270 (en haut en mode normal)
+            // Scale: 1.5 * uiScale
+            property real uiScale: 0.8
+            
+            NumberDisplay2D {
+                x: -100
+                y: 20
+                width: 200
+                height: 80
+                value: root.rpm
+                label: "RPM"
+                digitColor: root.accentColor
+                inactiveColor: "#003333"
+                frameColor: root.accentColor
+                scaleX: 2 * topDisplays.uiScale
+                scaleY: 0.8 * topDisplays.uiScale
+            }
+            
+            NumberDisplay2D {
+                x: 450
+                y: 20
+                width: 200
+                height: 80
+                value: root.frequency
+                label: "Hz"
+                digitColor: root.accentColor
+                inactiveColor: "#003333"
+                frameColor: root.accentColor
+                scaleX: 1.8 * topDisplays.uiScale
+                scaleY: 0.7 * topDisplays.uiScale
+            }
+        }
+        
         // Conteneur pour les éléments 2D (comme dans SirenDisplay)
         Item {
             id: infoContainer
@@ -403,20 +445,7 @@ Page {
                     horizontalAlignment: Text.AlignHCenter
                 }
                 
-                // Les composants 2D seront ajoutés ici au fur et à mesure
-                // Exemple pour NumberDisplay2D :
-                // NumberDisplay2D {
-                //     value: root.rpm
-                //     label: "RPM"
-                // }
-                
-                // Exemple pour NoteDisplay2D :
-                // NoteDisplay2D {
-                //     noteName: root.noteName
-                //     midiNote: root.midiNote
-                //     velocity: 100
-                //     pitchBend: 0
-                // }
+                // Les autres composants 2D seront ajoutés ici au fur et à mesure
             }
         }
     }
