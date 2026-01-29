@@ -210,16 +210,17 @@ Item {
                 }
             }
             
-            // Contenu des onglets
+            // Contenu des onglets (chemins explicites pour fonctionner depuis Main ou Test2D)
             Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 source: {
+                    var base = "qrc:/QML/admin/"
                     switch(tabBar.currentIndex) {
-                        case 0: return "SirenSelectionSection.qml"
-                        case 1: return "VisibilitySection.qml"
-                        case 2: return "AdvancedSection.qml"
-                        case 3: return "OutputSection.qml"
+                        case 0: return base + "SirenSelectionSection.qml"
+                        case 1: return base + "VisibilitySection.qml"
+                        case 2: return base + "AdvancedSection.qml"
+                        case 3: return base + "OutputSection.qml"
                         default: return ""
                     }
                 }

@@ -10,6 +10,10 @@
         <file>QML/components/SirenDisplay.qml</file>
         <file>QML/components/NumberDisplay3D.qml</file>
         <file>QML/components/NumberDisplay2D.qml</file>
+        <file>QML/components/TopDisplays2D.qml</file>
+        <file>QML/components/StaffZone2D.qml</file>
+        <file>QML/components/SirenSelector.qml</file>
+        <file>QML/components/Test2DButtons.qml</file>
         <file>QML/utils/LEDSegment2D.qml</file>
         <file>QML/utils/LEDText2D.qml</file>
         <file>QML/utils/DigitLED2D.qml</file>
@@ -37,6 +41,7 @@
         <file>QML/admin/advanced/AdvancedConfig.qml</file>
         <file>QML/admin/advanced/AdvancedWebSocket.qml</file>
         <file>QML/components/ambitus/LedgerLines3D.qml</file>
+        <file>QML/components/ambitus/MusicalStaff2D.qml</file>
         <file>QML/components/ambitus/MusicalStaff3D.qml</file>
         <file>QML/components/ambitus/NoteCursor3D.qml</file>
         <file>QML/components/ambitus/NotePositionCalculator.qml</file>

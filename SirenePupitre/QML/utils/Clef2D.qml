@@ -25,9 +25,16 @@ Item {
     property color clefColor: "#DADADA"
     // Espacement des lignes de la portée (en px 2D)
     property real lineSpacing: 20
-    // Offsets 2D par rapport au coin gauche de la portée visible
+    // Offsets 2D par rapport au coin gauche de la portée visible (utilisés si useTargetLineY est false)
     property real clefOffsetX: 0
     property real clefOffsetY: -20
+    // Positionnement par ligne : centre du glyphe sur une ligne (y dans le repère parent, y vers le bas).
+    // Si true, targetLineY = ordonnée de la ligne ; la clé est centrée dessus (hauteur réelle du glyphe).
+    property bool useTargetLineY: false
+    property real targetLineY: 0
+    // Décalage vertical pour corriger le centre visuel du glyphe (police). Positif = vers le bas.
+    property real verticalOffsetTreble: -20
+    property real verticalOffsetBass: 12
     // Facteur d'échelle supplémentaire pour la taille de la clé
     property real clefScale: 1.1
     // Police (idéal: "Noto Music" ou "Bravura")
@@ -70,13 +77,15 @@ Item {
     implicitWidth: clefText.implicitWidth
     implicitHeight: clefText.implicitHeight
 
-    // Positionnement relatif: à placer par le parent avec x/y,
-    // ce composant applique juste un petit offset fin.
     x: clefOffsetX
-    y: clefOffsetY
+    y: root.useTargetLineY
+        ? (root.targetLineY - clefText.implicitHeight / 2 + (root.clefType === "treble" ? root.verticalOffsetTreble : root.verticalOffsetBass))
+        : clefOffsetY
 
     Text {
         id: clefText
+        x: 0
+        y: 0
         text: {
             var _ = root.updateTick // force rebind quand la police change d'état
             var useAscii = root.fallbackAscii && !(clefFallback.status === FontLoader.Ready || clefFont.status === FontLoader.Ready)

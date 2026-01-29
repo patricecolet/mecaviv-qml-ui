@@ -77,14 +77,19 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 | NoteCursor3D             | NoteCursor2D              |
 | NoteProgressBar3D        | NoteProgressBar2D          |
 
+### Layout et anticipation mode jeu
+
+- **Zone portée pleine largeur** : Dans `Test2D.qml`, une zone dédiée `staffZone` affiche `MusicalStaff2D` sur presque toute la largeur de la fenêtre (marges gauche/droite 24 px), comme en 3D (`SirenDisplay` avec `staffWidth: 1600`). Les 5 lignes s’étendent donc sur toute cette zone.
+- **Mode jeu** : La même zone `staffZone` servira de conteneur pour l’overlay du mode jeu (notes tombantes type Guitar Hero). On ajoutera plus tard un composant `GameMode2D` en sibling ou enfant de `MusicalStaff2D` dans `staffZone`, visible quand `root.gameMode` est vrai, en réutilisant `staffWidth` / `staffPosX` pour le positionnement des notes.
+
 ### Ordre de migration
 
 **2.1 MusicalStaff2D (squelette)** — Dessiner la portée en premier  
-- Créer `MusicalStaff2D.qml` avec uniquement les **5 lignes** (Repeater + Rectangle), les mêmes propriétés que la 3D (`lineSpacing`, `lineThickness`, `staffWidth`, `lineColor`, etc.).
+- Créer `MusicalStaff2D.qml` avec uniquement les **5 lignes** (5 Rectangle explicites), les mêmes propriétés que la 3D (`lineSpacing`, `lineThickness`, `staffWidth`, `lineColor`, etc.).
 - Reprendre la logique de `MusicalStaff3D` lignes 78-91 en 2D.
 - Ensuite on ajoute les sous-composants un par un, dans l’ordre ci-dessous.
 
-**2.2 Clef2D** — Déjà existant, à intégrer dans `MusicalStaff2D` (comme Clef3D dans MusicalStaff3D).
+**2.2 Clef2D** — **TERMINÉ** — Déjà existant, intégré dans `MusicalStaff2D` (comme Clef3D dans MusicalStaff3D).
 
 **2.3 AmbitusDisplay3D → AmbitusDisplay2D**  
 - Créer `AmbitusDisplay2D.qml` : notes (cercles 2D ou Canvas) + lignes supplémentaires (LedgerLines2D ou équivalent).
