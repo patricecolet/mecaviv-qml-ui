@@ -71,6 +71,7 @@
         <file>QML/game/shaders/tremolo_vibrato_release.vert</file>
         <file>QML/game/shaders/bend.frag</file>
         <file>QML/game/README.md</file>
+        <file>QML/pages/Test2D.qml</file>
     </qresource>
     
     <!-- Polices partagées -->

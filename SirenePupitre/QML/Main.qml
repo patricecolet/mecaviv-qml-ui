@@ -575,4 +575,49 @@ Window {
             }
         }
     }
+    
+    // Loader pour la vue de test 2D (Phase 0)
+    Loader {
+        id: testViewLoader
+        anchors.fill: parent
+        visible: item !== null
+        z: 10001  // Au-dessus de tout sauf l'overlay de config
+    }
+    
+    // Bouton pour ouvrir/fermer la vue de test (mode debug uniquement)
+    Rectangle {
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.margins: 20
+        width: 100
+        height: 50
+        color: mouseAreaTest.containsMouse ? "#3a3a3a" : "#2a2a2a"
+        border.color: testViewLoader.item !== null ? "#ff3333" : "#00ff00"
+        border.width: 2
+        radius: 5
+        visible: debugMode  // Uniquement en mode debug
+        
+        MouseArea {
+            id: mouseAreaTest
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: {
+                if (testViewLoader.item !== null) {
+                    // Fermer la vue de test
+                    testViewLoader.source = ""
+                } else {
+                    // Ouvrir la vue de test
+                    testViewLoader.source = "qrc:/QML/pages/Test2D.qml"
+                }
+            }
+        }
+        
+        Text {
+            text: testViewLoader.item !== null ? "Fermer" : "Test 2D"
+            color: testViewLoader.item !== null ? "#ff6666" : "#00ff00"
+            font.pixelSize: 14
+            font.bold: true
+            anchors.centerIn: parent
+        }
+    }
 }
