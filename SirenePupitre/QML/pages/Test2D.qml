@@ -2,12 +2,13 @@ import QtQuick
 import QtQuick.Controls
 import "../components"
 import "../components/ambitus"
+import "../utils"
 
 Page {
     id: root
     title: "Test Composants 2D"
     
-    property color accentColor: "#00CED1"
+    property color accentColor: '#d1ab00'
     property color backgroundColor: "#1a1a1a"
     property bool uiControlsEnabled: true
     property bool isGamePlaying: false
@@ -443,6 +444,97 @@ Page {
                     font.bold: true
                     color: root.accentColor
                     horizontalAlignment: Text.AlignHCenter
+                }
+                
+                // Test LEDText2D
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    
+                    Text {
+                        text: "LEDText2D - Affichage de texte LED"
+                        font.pixelSize: 16
+                        color: "white"
+                    }
+                    
+                    Item {
+                        width: parent.width
+                        height: 100
+                        
+                        LEDText2D {
+                            anchors.centerIn: parent
+                            text: "TEST"
+                            textColor: "#00ff00"
+                            offColor: "#003300"
+                            letterHeight: 40
+                            letterSpacing: 35
+                            segmentWidth: 4
+                        }
+                    }
+                    
+                    Item {
+                        width: parent.width
+                        height: 100
+                        
+                        LEDText2D {
+                            anchors.centerIn: parent
+                            text: "RPM"
+                            textColor: root.accentColor
+                            offColor: "#330000"
+                            letterHeight: 30
+                            letterSpacing: 25
+                            segmentWidth: 3
+                        }
+                    }
+                }
+                
+                // Test DigitLED2D
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    
+                    Text {
+                        text: "DigitLED2D - Affichage de chiffres LED"
+                        font.pixelSize: 16
+                        color: "white"
+                    }
+                    
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 20
+                        
+                        DigitLED2D {
+                            width: 60
+                            height: 80
+                            value: 1
+                            activeColor: "#00ff00"
+                            inactiveColor: "#003300"
+                        }
+                        
+                        DigitLED2D {
+                            width: 60
+                            height: 80
+                            value: 2
+                            activeColor: "#00ff00"
+                            inactiveColor: "#003300"
+                        }
+                        
+                        DigitLED2D {
+                            width: 60
+                            height: 80
+                            value: 3
+                            activeColor: "#00ff00"
+                            inactiveColor: "#003300"
+                        }
+                        
+                        DigitLED2D {
+                            width: 60
+                            height: 80
+                            value: 4
+                            activeColor: root.accentColor
+                            inactiveColor: "#330000"
+                        }
+                    }
                 }
                 
                 // Les autres composants 2D seront ajoutés ici au fur et à mesure
