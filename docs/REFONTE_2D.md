@@ -43,7 +43,7 @@ Infrastructure de test créée :
 
 **Durée estimée : 2-3 jours**
 
-**Statut : En cours** (1.1, 1.2, 1.3, 1.4 terminés)
+**Statut : En cours** (1.1 terminé)
 
 ### Objectif
 Migrer les composants les plus simples pour obtenir des gains immédiats avec un effort minimal.
@@ -71,25 +71,25 @@ Migrer les composants les plus simples pour obtenir des gains immédiats avec un
 
 ---
 
-#### ✅ 1.2 LEDText3D → LEDText2D
-**Effort : 0.5 jour** - **TERMINÉ**
+#### 1.2 LEDText3D → LEDText2D
+**Effort : 0.5 jour**
 
 **Actuel** :
 - `LEDText3D.qml` : 40+ segments 3D par caractère (`LEDSegment` avec `Repeater3D`)
 - Très coûteux : ~200-400 objets 3D pour un texte court
 
 **Nouveau** :
-- `LEDText2D.qml` : `Rectangle` 2D avec segments rotatifs (`LEDSegment2D`)
-- Même logique de segments 14 segments que la version 3D
+- `LEDText2D.qml` : Police bitmap custom ou `Canvas` avec segments 2D
+- Alternative : Police TrueType avec style LED (ex: `LCD.ttf`)
 
 **Fichiers** :
-- ✅ Créé `QML/utils/LEDText2D.qml`
-- ✅ Ajouté à `Test2D.qml` pour tests
+- Créer `QML/utils/LEDText2D.qml`
+- Remplacer dans `NumberDisplay2D`, `NoteSpeedometer2D`, etc.
 
 ---
 
-#### ✅ 1.3 LEDSegment → LEDSegment2D
-**Effort : 0.25 jour** - **TERMINÉ**
+#### 1.3 LEDSegment → LEDSegment2D
+**Effort : 0.25 jour**
 
 **Actuel** :
 - `LEDSegment.qml` : `Model` 3D avec `#Cube` pour chaque segment
@@ -98,13 +98,13 @@ Migrer les composants les plus simples pour obtenir des gains immédiats avec un
 - `LEDSegment2D.qml` : `Rectangle` avec rotation 2D
 
 **Fichiers** :
-- ✅ Créé `QML/utils/LEDSegment2D.qml`
-- ✅ Utilisé par `LEDText2D`
+- Créer `QML/utils/LEDSegment2D.qml`
+- Utilisé par `LEDText2D`
 
 ---
 
-#### ✅ 1.4 DigitLED3D → DigitLED2D
-**Effort : 0.25 jour** - **TERMINÉ**
+#### 1.4 DigitLED3D → DigitLED2D
+**Effort : 0.25 jour**
 
 **Actuel** :
 - `DigitLED3D.qml` : Utilise `LEDText3D` pour afficher un chiffre
@@ -113,8 +113,8 @@ Migrer les composants les plus simples pour obtenir des gains immédiats avec un
 - `DigitLED2D.qml` : Utilise `LEDText2D` pour afficher un chiffre
 
 **Fichiers** :
-- ✅ Créé `QML/utils/DigitLED2D.qml`
-- ✅ Ajouté à `Test2D.qml` pour tests
+- Créer `QML/utils/DigitLED2D.qml`
+- Utilisé par `NumberDisplay2D`
 
 ---
 

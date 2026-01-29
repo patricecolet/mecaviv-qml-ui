@@ -31,6 +31,8 @@ Page {
     property string noteName: "La4"
     property real rpm: 1200
     property int frequency: 440
+    property int velocity: 100
+    property real bend: 0.0
     
     Rectangle {
         anchors.fill: parent
@@ -61,6 +63,56 @@ Page {
                 frameColor: root.accentColor
                 scaleX: 2 * topDisplays.uiScale
                 scaleY: 0.8 * topDisplays.uiScale
+            }
+            
+            // Affichage de la note MIDI (au centre)
+            Rectangle {
+                x: 150
+                y: 20
+                width: 200
+                height: 80
+                color: "#1a1a1a"
+                border.color: root.accentColor
+                border.width: 2
+                radius: 4
+                
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 4
+                    
+                    // Nom de la note (priorité)
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: root.noteName || "---"
+                        font.pixelSize: 32
+                        font.bold: true
+                        color: root.accentColor
+                    }
+                    
+                    // Informations MIDI
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 12
+                        
+                        Text {
+                            text: "MIDI: " + Math.round(root.midiNote)
+                            font.pixelSize: 12
+                            color: "#CCCCCC"
+                        }
+                        
+                        Text {
+                            text: "Vel: " + (root.velocity || 0)
+                            font.pixelSize: 12
+                            color: "#CCCCCC"
+                        }
+                        
+                        Text {
+                            text: "Bend: " + (root.bend || 0).toFixed(1)
+                            font.pixelSize: 12
+                            color: "#CCCCCC"
+                        }
+                    }
+                }
             }
             
             NumberDisplay2D {
