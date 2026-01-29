@@ -29,13 +29,7 @@ Ce document détaille le plan de migration de l'affichage 3D vers 2D pour améli
 
 **✅ TERMINÉE**
 
-Infrastructure de test créée :
-- Vue de test `Test2D.qml` avec tous les éléments 2D existants reproduits (boutons, ComboBox, GearShiftPositionIndicator, ControllersPanel)
-- Bouton "Test 2D" dans `Main.qml` (mode debug uniquement) pour ouvrir/fermer la vue de test
-- Loader pour charger la vue de test
-- Tous les boutons 2D et éléments UI existants positionnés exactement comme dans l'application principale
-
-**Branche** : `pupitre-2D-test` (commit: Phase 0)
+Infrastructure de test créée avec vue de test `Test2D.qml` et bouton de debug dans `Main.qml`.
 
 ---
 
@@ -43,7 +37,7 @@ Infrastructure de test créée :
 
 **Durée estimée : 2-3 jours**
 
-**Statut : En cours** (1.1 terminé)
+**Statut : En cours** (1.1 et 1.5 terminés)
 
 ### Objectif
 Migrer les composants les plus simples pour obtenir des gains immédiats avec un effort minimal.
@@ -54,76 +48,11 @@ Migrer les composants les plus simples pour obtenir des gains immédiats avec un
 ### Composants à migrer
 
 #### ✅ 1.1 NumberDisplay3D → NumberDisplay2D
-**Effort : 0.5 jour** - **TERMINÉ**
+**TERMINÉ** - Composant créé et ajouté à la vue de test
 
-**Actuel** :
-- `NumberDisplay3D.qml` : 8 digits LED 3D (`DigitLED3D`) avec boîte 3D, cadre, vitre
-- ~15 `Model` 3D avec `PrincipledMaterial`
 
-**Nouveau** :
-- `NumberDisplay2D.qml` : `Text` avec police monospace LCD
-- Fond et cadre avec `Rectangle`
-- Style CSS pour effet LED rétro-éclairé
-
-**Fichiers** :
-- ✅ Créé `QML/components/NumberDisplay2D.qml`
-- ✅ Ajouté à `Test2D.qml` pour tests
-
----
-
-#### 1.2 LEDText3D → LEDText2D
-**Effort : 0.5 jour**
-
-**Actuel** :
-- `LEDText3D.qml` : 40+ segments 3D par caractère (`LEDSegment` avec `Repeater3D`)
-- Très coûteux : ~200-400 objets 3D pour un texte court
-
-**Nouveau** :
-- `LEDText2D.qml` : Police bitmap custom ou `Canvas` avec segments 2D
-- Alternative : Police TrueType avec style LED (ex: `LCD.ttf`)
-
-**Fichiers** :
-- Créer `QML/utils/LEDText2D.qml`
-- Remplacer dans `NumberDisplay2D`, `NoteSpeedometer2D`, etc.
-
----
-
-#### 1.3 LEDSegment → LEDSegment2D
-**Effort : 0.25 jour**
-
-**Actuel** :
-- `LEDSegment.qml` : `Model` 3D avec `#Cube` pour chaque segment
-
-**Nouveau** :
-- `LEDSegment2D.qml` : `Rectangle` avec rotation 2D
-
-**Fichiers** :
-- Créer `QML/utils/LEDSegment2D.qml`
-- Utilisé par `LEDText2D`
-
----
-
-#### 1.4 DigitLED3D → DigitLED2D
-**Effort : 0.25 jour**
-
-**Actuel** :
-- `DigitLED3D.qml` : Utilise `LEDText3D` pour afficher un chiffre
-
-**Nouveau** :
-- `DigitLED2D.qml` : Utilise `LEDText2D` pour afficher un chiffre
-
-**Fichiers** :
-- Créer `QML/utils/DigitLED2D.qml`
-- Utilisé par `NumberDisplay2D`
-
----
-
-#### 1.5 Tests et ajustements
-**Effort : 1 jour** - **EN COURS**
-
-- Vérifier le rendu sur Raspberry Pi
-- Ajuster les couleurs et tailles pour correspondre au style 3D
-- Valider les performances
+#### 1.5 Affichage note MIDI
+**TERMINÉ** - Affichage simple de la note MIDI (nom, numéro, vélocité, bend) entre les deux NumberDisplay
 
 ---
 
@@ -133,87 +62,39 @@ Migrer les composants les plus simples pour obtenir des gains immédiats avec un
 
 ### ⚠️ Note importante
 
-Cette phase migre tous les **sous-composants** de `MusicalStaff3D`. Ces composants doivent être migrés **AVANT** la Phase 3, car `MusicalStaff3D` (puis `MusicalStaff2D`) les orchestre tous ensemble.
+Cette phase migre tous les **sous-composants** de `MusicalStaff3D`. L’organisation 2D doit **refléter celle du 3D** : même hiérarchie de classes, composants en parallèle. On dessine d’abord la portée (les 5 lignes), puis on ajoute les sous-composants dans le même ordre que dans `MusicalStaff3D.qml`.
 
 ### Objectif
-Migrer les composants visuels principaux qui nécessitent plus de réflexion sur l'implémentation 2D.
+Migrer la portée musicale en 2D en gardant la même structure que la version 3D (orchestrateur + sous-composants).
 
-### Composants à migrer
+### Organisation parallèle (3D → 2D)
 
-#### 2.1 NoteSpeedometer3D → NoteDisplay2D
-**Effort : 0.5 jour**
+| MusicalStaff3D.qml        | MusicalStaff2D.qml        |
+|---------------------------|----------------------------|
+| Repeater3D (5 lignes)      | Repeater (5 Rectangle)     |
+| Clef3D                    | Clef2D (existant)          |
+| AmbitusDisplay3D         | AmbitusDisplay2D          |
+| NoteCursor3D             | NoteCursor2D              |
+| NoteProgressBar3D        | NoteProgressBar2D          |
 
-**Actuel** :
-- `NoteSpeedometer3D.qml` : 2 cylindres 3D rotatifs avec texte LED 3D
-- 12 notes + 8 octaves = 20 caractères LED 3D
-- Cadres rouges avec 8 `Model` 3D
-- Complexité élevée pour un affichage simple
+### Ordre de migration
 
-**Nouveau** :
-- `NoteDisplay2D.qml` : Label 2D classique avec `Column` et `Text`
-- **Priorité visuelle** : Nom de la note (grand, accentué)
-- Informations secondaires : Numéro MIDI, vélocité, pitch bend
-- Layout organisé et clair visuellement
+**2.1 MusicalStaff2D (squelette)** — Dessiner la portée en premier  
+- Créer `MusicalStaff2D.qml` avec uniquement les **5 lignes** (Repeater + Rectangle), les mêmes propriétés que la 3D (`lineSpacing`, `lineThickness`, `staffWidth`, `lineColor`, etc.).
+- Reprendre la logique de `MusicalStaff3D` lignes 78-91 en 2D.
+- Ensuite on ajoute les sous-composants un par un, dans l’ordre ci-dessous.
 
-**Structure proposée** :
-```qml
-Rectangle {
-    Column {
-        spacing: 5
-        
-        // Nom de la note (priorité visuelle)
-        Text {
-            text: noteName  // Ex: "La4"
-            font.pixelSize: 48
-            font.bold: true
-            color: accentColor
-        }
-        
-        // Informations secondaires
-        Row {
-            spacing: 15
-            Text { text: "MIDI: " + midiNote }
-            Text { text: "Vel: " + velocity }
-            Text { text: "Bend: " + pitchBend }
-        }
-    }
-}
-```
+**2.2 Clef2D** — Déjà existant, à intégrer dans `MusicalStaff2D` (comme Clef3D dans MusicalStaff3D).
 
-**Fichiers** :
-- Créer `QML/components/NoteDisplay2D.qml`
-- Modifier `SirenDisplay.qml` ligne 237-245
-
-**Avantages** :
-- Beaucoup plus simple que la version 3D
-- Performance optimale (pas de rotation, pas de LED 3D)
-- Lisibilité améliorée
-- Maintenance facilitée
+**2.3 AmbitusDisplay3D → AmbitusDisplay2D**  
+- Créer `AmbitusDisplay2D.qml` : notes (cercles 2D ou Canvas) + lignes supplémentaires (LedgerLines2D ou équivalent).
+- Utilisé par `MusicalStaff2D` au même endroit logique que `AmbitusDisplay3D` dans `MusicalStaff3D`.
+- Maintenir le positionnement selon la clé (treble/bass), en réutilisant `NotePositionCalculator` si besoin.
+- Détail : `AmbitusDisplay3D` = ~40 sphères 3D + `LedgerLines3D` → en 2D : `Repeater` avec cercles (`Rectangle` radius) ou `Canvas`, et `LedgerLines2D` (Repeater + Rectangle horizontal).
 
 ---
 
-#### 2.2 AmbitusDisplay3D → AmbitusDisplay2D
-**Effort : 1 jour**
-
-**Actuel** :
-- `AmbitusDisplay3D.qml` : ~40 sphères 3D (`Model` avec `#Sphere`)
-- `Repeater3D` avec matériaux `PrincipledMaterial`
-- Lignes supplémentaires (`LedgerLines3D`)
-
-**Nouveau** :
-- `AmbitusDisplay2D.qml` : `Repeater` avec cercles 2D (`Rectangle` avec `radius`)
-- Ou `Canvas` pour dessiner toutes les notes en une passe
-- Lignes supplémentaires avec `Rectangle` horizontal
-
-**Fichiers** :
-- Créer `QML/components/ambitus/AmbitusDisplay2D.qml`
-- Modifier `MusicalStaff3D.qml` ligne 106-153 (ou `MusicalStaff2D.qml`)
-
-**Défi** : Maintenir le positionnement précis selon la clé (treble/bass)
-
----
-
-#### 2.3 NoteCursor3D → NoteCursor2D
+#### 2.4 NoteCursor3D → NoteCursor2D
 **Effort : 0.5 jour**
 
 **Actuel** :
@@ -230,7 +111,7 @@ Rectangle {
 
 ---
 
-#### 2.4 NoteProgressBar3D → NoteProgressBar2D
+#### 2.5 NoteProgressBar3D → NoteProgressBar2D
 **Effort : 0.5 jour**
 
 **Actuel** :
@@ -246,33 +127,8 @@ Rectangle {
 
 ---
 
-#### 2.5 LedgerLines3D → LedgerLines2D
-**Effort : 0.25 jour**
-
-**Actuel** :
-- `LedgerLines3D.qml` : Lignes supplémentaires avec `Model` 3D
-
-**Nouveau** :
-- `LedgerLines2D.qml` : `Repeater` avec `Rectangle` horizontal
-
-**Fichiers** :
-- Créer `QML/components/ambitus/LedgerLines2D.qml`
-- Utilisé par `AmbitusDisplay2D`
-
----
-
-#### 2.6 Clef3D → Clef2D (déjà existant)
-**Effort : 0.5 jour**
-
-**Actuel** :
-- `Clef3D.qml` : Modèles `.mesh` importés (TrebleKey.mesh, BassKey.mesh)
-
-**Nouveau** :
-- `Clef2D.qml` : **Déjà implémenté** ! Utilise `Text` avec polices musicales (NotoMusic, MusiSync)
-
-**Fichiers** :
-- Modifier `MusicalStaff3D.qml` ligne 94-103 pour utiliser `Clef2D` au lieu de `Clef3D`
-- Ou créer `MusicalStaff2D.qml` qui utilise directement `Clef2D`
+#### 2.6 LedgerLines3D → LedgerLines2D
+**Effort : 0.25 jour** — Utilisé par `AmbitusDisplay2D` (créer `LedgerLines2D.qml` : Repeater + Rectangle horizontal).
 
 ---
 
@@ -285,68 +141,8 @@ Rectangle {
 
 ---
 
-## Phase 3 : NoteDisplay (remplacement NoteSpeedometer)
 
-**Durée estimée : 0.5 jour**
-
-### Objectif
-Remplacer le tachymètre rotatif 3D par un affichage simple et clair du nom de la note.
-
-### Composant à créer
-
-#### 3.1 NoteSpeedometer3D → NoteDisplay2D
-**Effort : 0.5 jour**
-
-**Actuel** :
-- `NoteSpeedometer3D.qml` : 2 cylindres 3D rotatifs avec texte LED 3D
-- 12 notes + 8 octaves = 20 caractères LED 3D
-- Cadres rouges avec 8 `Model` 3D
-- Complexité élevée pour un affichage simple
-
-**Nouveau** :
-- `NoteDisplay2D.qml` : Label 2D classique avec `Column` et `Text`
-- **Priorité visuelle** : Nom de la note (grand, accentué)
-- Informations secondaires : Numéro MIDI, vélocité, pitch bend
-- Layout organisé et clair visuellement
-
-**Structure proposée** :
-```qml
-Rectangle {
-    Column {
-        spacing: 5
-        
-        // Nom de la note (priorité visuelle)
-        Text {
-            text: noteName  // Ex: "La4"
-            font.pixelSize: 48
-            font.bold: true
-            color: accentColor
-        }
-        
-        // Informations secondaires
-        Row {
-            spacing: 15
-            Text { text: "MIDI: " + midiNote }
-            Text { text: "Vel: " + velocity }
-            Text { text: "Bend: " + pitchBend }
-        }
-    }
-}
-```
-
-**Fichiers** :
-- Créer `QML/components/NoteDisplay2D.qml`
-- Modifier `SirenDisplay.qml` ligne 237-245
-
-**Avantages** :
-- Beaucoup plus simple que la version 3D
-- Performance optimale (pas de rotation, pas de LED 3D)
-- Lisibilité améliorée
-- Maintenance facilitée
-
----
-
-## Phase 4 : Mode Jeu (le plus complexe)
+## Phase 3 : Mode Jeu (le plus complexe)
 
 **Durée estimée : 5-8 jours**
 
@@ -378,7 +174,7 @@ Migrer le mode jeu avec les notes en vol et les effets visuels (vibrato, tremolo
 
 **Fichiers** :
 - Créer `QML/game/FallingNote2D.qml`
-- Supprimer `taperedboxgeometry.cpp/h` (nettoyage Phase 5)
+- Supprimer `taperedboxgeometry.cpp/h` (nettoyage Phase 4)
 
 ---
 
@@ -395,7 +191,7 @@ Migrer le mode jeu avec les notes en vol et les effets visuels (vibrato, tremolo
 
 **Fichiers** :
 - Adapter `FallingNote2D.qml` selon l'option choisie
-- Supprimer `QML/game/shaders/*.vert` et `*.frag` (nettoyage Phase 5)
+- Supprimer `QML/game/shaders/*.vert` et `*.frag` (nettoyage Phase 4)
 
 ---
 
@@ -441,7 +237,7 @@ Migrer le mode jeu avec les notes en vol et les effets visuels (vibrato, tremolo
 
 ---
 
-## Phase 5 : Nettoyage et optimisation
+## Phase 4 : Nettoyage et optimisation
 
 **Durée estimée : 1-2 jours**
 
@@ -484,7 +280,7 @@ Nettoyer le code en supprimant les dépendances 3D et optimiser les performances
 **Effort : 0.25 jour**
 
 **Action** :
-- Supprimer `taperedboxgeometry.cpp/h` (déjà fait en Phase 4)
+- Supprimer `taperedboxgeometry.cpp/h` (déjà fait en Phase 3)
 - Vérifier qu'aucun autre code C++ 3D n'est utilisé
 
 ---
@@ -642,41 +438,6 @@ Page {
 
 ---
 
-#### Vue de test pour NoteDisplay2D (Phase 3)
-
-**Créer** : `QML/pages/TestNoteDisplay2D.qml`
-
-```qml
-import QtQuick
-import QtQuick.Controls
-import "../components"
-
-Page {
-    title: "Test NoteDisplay2D"
-    
-    Column {
-        anchors.centerIn: parent
-        spacing: 30
-        
-        NoteDisplay2D {
-            noteName: "La4"
-            midiNote: 69
-            velocity: 100
-            pitchBend: 0
-        }
-        
-        // Tester avec différentes valeurs
-        NoteDisplay2D {
-            noteName: "Do#5"
-            midiNote: 73
-            velocity: 127
-            pitchBend: 200
-        }
-    }
-}
-```
-
----
 
 ### Workflow de développement
 
@@ -811,17 +572,16 @@ Si des problèmes majeurs apparaissent :
 
 | Scénario | Durée | Priorité |
 |----------|-------|----------|
-| **Mode normal uniquement** (Phases 0-3 + 5) | **9.5-15.5 jours** | Haute |
-| **Refonte complète** (toutes les phases) | **14.5-22.5 jours** | Moyenne |
+| **Mode normal uniquement** (Phases 0-2 + 5) | **9-15 jours** | Haute |
+| **Refonte complète** (toutes les phases) | **14-22 jours** | Moyenne |
 
 **Notes** :
 - **Phase 0 (PRÉREQUIS)** : Infrastructure de test à créer EN PREMIER (0.5 jour)
 - La Phase 2 a été réorganisée : la portée musicale doit être migrée **en une seule fois** (from scratch) car elle ne peut pas cohabiter avec les éléments 3D
-- La Phase 3 est maintenant dédiée uniquement au remplacement de `NoteSpeedometer3D` par `NoteDisplay2D`
 
 ### Recommandation
 
-**Commencer par les Phases 1-3** pour obtenir des gains significatifs rapidement, puis évaluer si la Phase 4 (mode jeu) est nécessaire selon les besoins.
+**Commencer par les Phases 1-2** pour obtenir des gains significatifs rapidement, puis évaluer si la Phase 3 (mode jeu) est nécessaire selon les besoins.
 
 ---
 
@@ -852,20 +612,14 @@ Si des problèmes majeurs apparaissent :
 - [ ] Comparer avec MusicalStaff3D côte à côte
 - [ ] Modifier SirenDisplay.qml pour utiliser MusicalStaff2D (une fois validé)
 
-### Phase 3 (NoteDisplay)
-- [ ] NoteSpeedometer3D → NoteDisplay2D (label simple avec nom de note prioritaire)
-- [ ] Ajouter NoteDisplay2D à la vue de test
-- [ ] Tests visuels et validation
-- [ ] Migrer SirenDisplay.qml pour utiliser NoteDisplay2D (une fois validé)
-
-### Phase 4 (optionnel)
+### Phase 3 (optionnel)
 - [ ] FallingNoteCustomGeo → FallingNote2D
 - [ ] Shaders vibrato/tremolo → 2D
 - [ ] MelodicLine3D → MelodicLine2D
 - [ ] Supprimer TaperedBoxGeometry C++
 - [ ] Tests mode jeu
 
-### Phase 5
+### Phase 4
 - [ ] Supprimer imports QtQuick3D
 - [ ] Supprimer fichiers .mesh et shaders
 - [ ] Supprimer code C++ 3D
