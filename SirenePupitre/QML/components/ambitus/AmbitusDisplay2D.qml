@@ -15,11 +15,12 @@ Item {
     property string clef: "treble"
     property int octaveOffset: 0
 
-    property color noteColor: Qt.rgba(0.9, 0.6, 0.6, 0.9)
+    property color noteColor: Qt.rgba(0.97, 0.96, 0.96, 0.9)
     property real noteScale: 0.15
     property bool showOnlyNaturals: true
     property bool showLedgerLines: true
     property bool showDebugLabels: false
+    property color lineColor: Qt.rgba(0.96, 0.96, 0.96)
 
     // Centre Y de la portée (ligne du milieu) pour positionner les notes
     property real centerY: height / 2
@@ -32,8 +33,13 @@ Item {
         id: musicUtils
     }
 
-    // Rayon des cercles en pixels (équivalent visuel au scale 3D)
-    readonly property real _noteRadius: Math.max(2, lineSpacing * noteScale * 2)
+    // Tête de note en ovale (comme en solfège : ellipse, pas cercle)
+    readonly property real _noteRadius: Math.max(2, lineSpacing * noteScale * 2.1)
+    readonly property real _noteHeadWidth: _noteRadius * 2 * 1.25
+    readonly property real _noteHeadHeight: _noteRadius * 2
+    readonly property real _noteHeadRotation: 12
+    readonly property real _noteHeadOffsetY: -1
+    property color noteBorderColor: Qt.rgba(0.65, 0.4, 0.4, 1)
 
     Repeater {
         model: root.ambitusMax - root.ambitusMin + 1
@@ -49,25 +55,49 @@ Item {
 
             visible: !root.showOnlyNaturals || isNatural
 
-            x: noteX - root._noteRadius
-            y: root.centerY + noteY - root._noteRadius
+            x: noteX - root._noteHeadWidth / 2
+            y: root.centerY + noteY - root._noteHeadHeight / 2 + root._noteHeadOffsetY
+            width: root._noteHeadWidth
+            height: root._noteHeadHeight
 
-            Rectangle {
-                width: root._noteRadius * 2
-                height: root._noteRadius * 2
-                radius: root._noteRadius
-                color: root.noteColor
-                border.width: 0
+            // Lignes supplémentaires : même couleur que la portée, pas de rotation (rester horizontales)
+            LedgerLines2D {
+                width: root._noteHeadWidth
+                visible: root.showLedgerLines && (noteItem.noteY < -2 * root.lineSpacing || noteItem.noteY > 2 * root.lineSpacing)
+                noteY: noteItem.noteY
+                lineSpacing: root.lineSpacing
+                lineThickness: root.lineThickness
+                lineColor: root.lineColor
+                staffCenterLocal: -noteItem.noteY + root._noteHeadHeight / 2 - root._noteHeadOffsetY
             }
 
-            Text {
-                visible: root.showDebugLabels
-                text: noteItem.noteName
-                color: "#FFFF80"
-                font.pixelSize: 10
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: parent.bottom
-                anchors.topMargin: 2
+            // Tête de note (ovale) + label : seuls éléments rotés
+            Item {
+                id: noteHeadItem
+                anchors.centerIn: parent
+                width: root._noteHeadWidth
+                height: root._noteHeadHeight
+                rotation: root._noteHeadRotation
+                transformOrigin: Item.Center
+
+                Rectangle {
+                    width: root._noteHeadWidth
+                    height: root._noteHeadHeight
+                    radius: root._noteRadius
+                    color: root.noteColor
+                    border.width: 1
+                    border.color: root.noteBorderColor
+                }
+
+                Text {
+                    visible: root.showDebugLabels
+                    text: noteItem.noteName
+                    color: "#FFFF80"
+                    font.pixelSize: 10
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.bottom
+                    anchors.topMargin: 2
+                }
             }
         }
     }

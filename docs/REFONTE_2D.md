@@ -99,7 +99,7 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 
 ---
 
-#### 2.4 LedgerLines3D → LedgerLines2D
+#### 2.4 LedgerLines3D → LedgerLines2D — **TERMINÉ**
 **Effort : 0.25 jour** — À faire juste après l’ambitus : les ledger lines s’adaptent à l’ambitus (lignes au-dessus/en-dessous de la portée). Créer `LedgerLines2D.qml` : Repeater + Rectangle horizontal. Utilisé par `AmbitusDisplay2D`.
 
 ---
@@ -610,7 +610,7 @@ Si des problèmes majeurs apparaissent :
 - [ ] Créer AmbitusDisplay2D.qml
 - [ ] Créer NoteCursor2D.qml
 - [ ] Créer NoteProgressBar2D.qml
-- [ ] Créer LedgerLines2D.qml (ou intégrer dans AmbitusDisplay2D)
+- [x] Créer LedgerLines2D.qml (ou intégrer dans AmbitusDisplay2D)
 - [ ] Intégrer Clef2D (déjà existant)
 - [ ] Ajouter MusicalStaff2D à la vue de test
 - [ ] Tests visuels et validation complète sur Raspberry Pi

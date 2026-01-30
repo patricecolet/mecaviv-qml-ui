@@ -21,7 +21,7 @@ Item {
                 return Qt.rgba(color.r, color.g, color.b, color.a)
             }
         }
-        return Qt.rgba(0.8, 0.8, 0.8, 1)
+        return Qt.rgba(1, 1, 1)
     }
 
     required property real currentNoteMidi
@@ -125,6 +125,7 @@ Item {
         ambitusWidth: (root.staffWidth - root.ambitusOffset) - root._ambitusMarginX * 2
         lineSpacing: root.lineSpacing
         lineThickness: root.lineThickness
+        lineColor: root.lineColor
         clef: root.clef
         octaveOffset: root.octaveOffset
         showOnlyNaturals: (ambitusConfig.noteFilter === "natural" || ambitusConfig.noteFilter === undefined)
@@ -134,7 +135,7 @@ Item {
                 var c = Qt.color(ambitusConfig.noteColor)
                 return Qt.rgba(c.r, c.g, c.b, c.a)
             }
-            return Qt.rgba(0.9, 0.6, 0.6, 0.9)
+            return Qt.rgba(1, 1, 1, 0.9)
         }
         showDebugLabels: configController ? configController.getConfigValue("displayConfig.components.musicalStaff.noteName.visible", false) : false
     }

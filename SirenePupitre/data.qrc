@@ -40,6 +40,7 @@
         <file>QML/admin/advanced/AdvancedAbout.qml</file>
         <file>QML/admin/advanced/AdvancedConfig.qml</file>
         <file>QML/admin/advanced/AdvancedWebSocket.qml</file>
+        <file>QML/components/ambitus/LedgerLines2D.qml</file>
         <file>QML/components/ambitus/LedgerLines3D.qml</file>
         <file>QML/components/ambitus/MusicalStaff2D.qml</file>
         <file>QML/components/ambitus/MusicalStaff3D.qml</file>
