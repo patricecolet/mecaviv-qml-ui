@@ -25,13 +25,14 @@ Page {
         restrictedMax: 72,
         displayOctaveOffset: 0
     })
-    property var sirenInfo: configController ? configController.currentSirenInfo : _defaultSirenInfo
+    property var sirenController: null
+    property var sirenInfo: (configController && configController.currentSirenInfo) ? configController.currentSirenInfo : _defaultSirenInfo
     property var configController: null
-    property real midiNote: 69.0
-    property real clampedNote: 69.0
-    property string noteName: "La4"
-    property real rpm: 1200
-    property int frequency: 440
+    property real midiNote: sirenController ? sirenController.midiNote : 69.0
+    property real clampedNote: sirenController ? sirenController.clampedNote : 69.0
+    property string noteName: sirenController ? sirenController.trueNoteName : "La4"
+    property real rpm: sirenController ? sirenController.trueRpm : 1200
+    property int frequency: sirenController ? sirenController.trueFrequency : 440
     property int velocity: 100
     property real bend: 0.0
 
@@ -103,7 +104,7 @@ Page {
                 anchors.rightMargin: 24
                 z: 1
                 accentColor: root.accentColor
-                currentNoteMidi: root.midiNote
+                currentNoteMidi: root.clampedNote
                 sirenInfo: root.sirenInfo
             }
 

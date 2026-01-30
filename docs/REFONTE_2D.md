@@ -121,7 +121,7 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 
 ---
 
-#### 2.6 NoteProgressBar3D → NoteProgressBar2D
+#### 2.6 NoteProgressBar3D → NoteProgressBar2D — **TERMINÉ**
 **Effort : 0.5 jour**
 
 **Actuel** :
@@ -132,8 +132,8 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 - Curseur avec `Rectangle` circulaire
 
 **Fichiers** :
-- Créer `QML/components/ambitus/NoteProgressBar2D.qml`
-- Modifier `MusicalStaff3D.qml` ligne 248-291 (ou `MusicalStaff2D.qml`)
+- Créer `QML/components/ambitus/NoteProgressBar2D.qml` — **fait**
+- Intégration dans `MusicalStaff2D.qml` avec `progressConfig` (couleurs, barHeight, barOffsetY, cursorSize, etc.)
 
 ---
 

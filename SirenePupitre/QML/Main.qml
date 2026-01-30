@@ -582,6 +582,13 @@ Window {
         anchors.fill: parent
         visible: item !== null
         z: 10001  // Au-dessus de tout sauf l'overlay de config
+        onItemChanged: {
+            if (item) {
+                item.configController = configController
+                item.webSocketController = webSocketController
+                item.sirenController = sirenController
+            }
+        }
     }
     
     // Bouton pour ouvrir/fermer la vue de test (mode debug uniquement)

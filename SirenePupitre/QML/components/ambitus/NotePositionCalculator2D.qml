@@ -3,10 +3,8 @@ import "."
 
 /**
  * Calculateur de positions 2D pour l'ambitus.
- * Conventions 2D : zone ambitus = [ambitusStartX, ambitusStartX + ambitusWidth],
- * graves (basses) à gauche, aiguës (hautes) à droite.
- * Y et note naturelle délégués à NotePositionCalculator (logique commune 3D/2D).
- * Root en Item (pas QtObject) pour que le child soit accepté par la default property sous Emscripten.
+ * Une seule convention : X = grave→gauche, aiguë→droite. Y = délégation 3D (inverser ici si sens 2D faux).
+ * Root en Item (pas QtObject) pour Emscripten.
  */
 Item {
     id: root
@@ -15,22 +13,20 @@ Item {
         id: _noteCalc
     }
 
-    /**
-     * Position X 2D : graves à gauche, aiguës à droite.
-     * On utilise (1 - normalized) pour que la note la plus grave soit à gauche (ambitusStartX)
-     * et la plus aiguë à droite (ambitusStartX + ambitusWidth). Robustesse min/max inversés.
-     */
+    /** X 2D : t = 0 (grave) → left, t = 1 (aiguë) → right. Une seule formule, pas de miroir. */
     function calculateNoteX2D(midiNote, ambitusMin, ambitusMax, ambitusStartX, ambitusWidth) {
         var lo = Math.min(ambitusMin, ambitusMax)
         var hi = Math.max(ambitusMin, ambitusMax)
         if (hi <= lo) return ambitusStartX
-        var normalized = (midiNote - lo) / (hi - lo)
-        return ambitusStartX + (1 - normalized) * ambitusWidth
+        var t = (midiNote - lo) / (hi - lo)
+        var left = Math.min(ambitusStartX, ambitusStartX + ambitusWidth)
+        var right = Math.max(ambitusStartX, ambitusStartX + ambitusWidth)
+        return left + t * (right - left)
     }
 
-    /** Délègue au calculateur commun (même portée, clé, etc.). */
+    /** Y 2D : on inverse le Y du calculateur 3D pour que haut écran = notes aiguës (convention 2D). */
     function calculateNoteY(offsetNote, lineSpacing, clef) {
-        return _noteCalc.calculateNoteYPosition(offsetNote, lineSpacing, clef)
+        return -_noteCalc.calculateNoteYPosition(offsetNote, lineSpacing, clef)
     }
 
     /** Délègue au calculateur commun. */
