@@ -77,9 +77,10 @@ Item {
         anchors.fill: parent
         color: "#1a1a1a"
         
-        // Vue 3D unique pour tout
+        // Vue 3D unique pour tout (masquée en mode jeu : on n'affiche que le contenu 2D)
         View3D {
             id: mainView3D
+            visible: !root.gameMode
             anchors.fill: parent
             anchors.topMargin: 20
             anchors.bottomMargin: 20
@@ -171,7 +172,7 @@ Item {
                 castsShadow: false
             }
             
-            // Zone supérieure - Afficheurs numériques
+            // Zone supérieure - Afficheurs numériques (cachés en mode jeu, remplacés par NumberDisplay2D en bas)
             Node {
                 y: root.gameMode ? -270 : 270
                 scale: Qt.vector3d(1.5 * root.uiScale, 1.5 * root.uiScale, 1.5 * root.uiScale)
@@ -179,7 +180,7 @@ Item {
                 NumberDisplay3D {
                     x: -250
                     y: 20
-                    visible: configController ? configController.isComponentVisible("rpm") : true
+                    visible: !root.gameMode && (configController ? configController.isComponentVisible("rpm") : true)
                     scaleX: 2 * root.uiScale
                     scaleY: 0.8 * root.uiScale
                     value: root.rpm
@@ -192,7 +193,7 @@ Item {
                 NumberDisplay3D {
                     x: 250
                     y: 20
-                    visible: configController ? configController.isComponentVisible("frequency") : true
+                    visible: !root.gameMode && (configController ? configController.isComponentVisible("frequency") : true)
                     scaleX: 1.8 * root.uiScale
                     scaleY: 0.7 * root.uiScale
                     value: root.frequency
@@ -215,7 +216,8 @@ Item {
                     configController: root.configController  // AJOUTER pour les sous-composants
                     staffWidth: 1600
                     staffPosX: 0
-                    visible: {  // GARDER pour la visibilité globale
+                    visible: {  // Cachée en mode jeu (on affiche la portée 2D)
+                        if (root.gameMode) return false
                         if (!configController) return true
                         configController.updateCounter
                         return configController.isComponentVisible("musicalStaff")
@@ -433,6 +435,7 @@ Item {
                 configController: root.configController
                 
             }
+
         }
 
         // Zone inférieure - Contrôleurs (peut être affiché/masqué)
@@ -451,28 +454,94 @@ Item {
             }
         }
         
-        // Panneau autonome (mode jeu uniquement)
-        Loader {
-            id: gameAutonomyPanelLoader
-            active: root.gameMode
+        // Overlay mode jeu : fond + portée 2D + NumberDisplay2D + bouton morceaux (au-dessus de tout)
+        Item {
+            id: gameModeOverlay
             visible: root.gameMode
+            z: 100
             anchors.fill: parent
-            source: "../game/GameAutonomyPanel.qml"
             
-            onLoaded: {
-                if (item) {
-                    item.configController = root.configController;
-                    // Connecter le panneau au mode jeu pour la réinitialisation lors du stop
-                    item.gameMode = root.gameModeComponent;
-                    // Passer rootWindow pour uiControlsEnabled
-                    var mainWin = root
-                    while (mainWin && mainWin.objectName !== "mainWindow") {
-                        mainWin = mainWin.parent
-                    }
-                    if (root.rootWindow) {
-                        item.rootWindow = root.rootWindow
-                    } else if (mainWin) {
-                        item.rootWindow = mainWin
+            Rectangle {
+                anchors.fill: parent
+                color: "#1a1a1a"
+            }
+            
+            // Zone portée 2D (partition compacte, descendue pour l'animation)
+            Item {
+                id: gameStaffZone2D
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 24
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: 50
+                height: 95
+
+                StaffZone2D {
+                    anchors.fill: parent
+                    accentColor: root.accentColor
+                    currentNoteMidi: root.clampedNote
+                    sirenInfo: root.sirenInfo
+                    configController: root.configController
+                    lineSpacing: 16
+                    lineThickness: 1.5
+                }
+            }
+
+            // Afficheurs RPM + Hz en bas
+            Row {
+                id: gameModeDisplaysRow
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 70
+                spacing: 80
+
+                NumberDisplay2D {
+                    width: 180
+                    height: 72
+                    value: root.rpm
+                    label: "RPM"
+                    digitColor: root.accentColor
+                    inactiveColor: "#003333"
+                    frameColor: root.accentColor
+                    scaleX: 1.6 * root.uiScale
+                    scaleY: 0.75 * root.uiScale
+                }
+
+                NumberDisplay2D {
+                    width: 180
+                    height: 72
+                    value: root.frequency
+                    label: "Hz"
+                    digitColor: root.accentColor
+                    inactiveColor: "#003333"
+                    frameColor: root.accentColor
+                    scaleX: 1.4 * root.uiScale
+                    scaleY: 0.65 * root.uiScale
+                }
+            }
+
+            // Bouton de sélection du morceau (GameAutonomyPanel)
+            Loader {
+                id: gameAutonomyPanelLoader
+                active: root.gameMode
+                visible: root.gameMode
+                anchors.fill: parent
+                source: "../game/GameAutonomyPanel.qml"
+                
+                onLoaded: {
+                    if (item) {
+                        item.configController = root.configController;
+                        item.gameMode = root.gameModeComponent;
+                        var mainWin = root
+                        while (mainWin && mainWin.objectName !== "mainWindow") {
+                            mainWin = mainWin.parent
+                        }
+                        if (root.rootWindow) {
+                            item.rootWindow = root.rootWindow
+                        } else if (mainWin) {
+                            item.rootWindow = mainWin
+                        }
                     }
                 }
             }

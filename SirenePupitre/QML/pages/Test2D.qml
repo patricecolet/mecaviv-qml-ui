@@ -13,7 +13,9 @@ Page {
     property color backgroundColor: "#1a1a1a"
     property bool uiControlsEnabled: true
     property bool isGamePlaying: false
-    property bool gameMode: false
+    property var rootWindow: null  // Main : pour lire gameMode2D (binding)
+    property var setGameMode2D: null  // Callback Main pour écrire gameMode2D (plus fiable que rootWindow en écriture)
+    property bool gameMode: rootWindow ? rootWindow.gameMode : false  // Mode jeu (seule vue)
     property bool adminPanelVisible: false
     property var webSocketController: null
 
@@ -35,6 +37,17 @@ Page {
     property int frequency: sirenController ? sirenController.trueFrequency : 440
     property int velocity: 100
     property real bend: 0.0
+    property real uiScale: (configController && configController.getValueAtPath(["ui", "scale"], 0.8)) || 0.8
+
+    function updateControllers(controllersData) {
+        if (controllersPanel && controllersPanel.updateControllers) {
+            controllersPanel.updateControllers(controllersData)
+        }
+        if (configController && controllersData && controllersData.gearShift !== undefined) {
+            var pos = controllersData.gearShift.position || 0
+            configController.gearShiftPosition = pos
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -106,6 +119,7 @@ Page {
                 accentColor: root.accentColor
                 currentNoteMidi: root.clampedNote
                 sirenInfo: root.sirenInfo
+                configController: root.configController
             }
 
             GearShiftPositionIndicator {
@@ -142,9 +156,209 @@ Page {
                         controllersPanel.visible = !controllersPanel.visible
                     }
                 }
-                onToggleGameMode: root.gameMode = !root.gameMode
+                onToggleGameMode: {
+                    var newVal = !root.gameMode
+                    if (root.setGameMode2D) {
+                        root.setGameMode2D(newVal)
+                        if (root.webSocketController) {
+                            root.webSocketController.sendBinaryMessage({
+                                type: "GAME_MODE",
+                                enabled: newVal,
+                                source: "pupitre"
+                            })
+                        }
+                    } else if (root.rootWindow) {
+                        root.rootWindow.gameMode = newVal
+                        if (root.webSocketController) {
+                            root.webSocketController.sendBinaryMessage({
+                                type: "GAME_MODE",
+                                enabled: newVal,
+                                source: "pupitre"
+                            })
+                        }
+                    }
+                }
                 onTogglePlayStop: root.isGamePlaying = !root.isGamePlaying
                 onAdminClicked: root.adminPanelVisible = true
+            }
+        }
+
+        // Overlay mode jeu : portée 2D compacte + RPM/Hz + sélection morceau (visible quand gameMode)
+        Item {
+            id: gameModeOverlay
+            z: 100
+            anchors.fill: parent
+            visible: root.gameMode
+
+            Rectangle {
+                anchors.fill: parent
+                color: root.backgroundColor
+            }
+
+            // Play/Stop (en bas à gauche, 1/4)
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 20
+                x: parent.width * 0.25 - width / 2
+                width: 140
+                height: 60
+                z: 10
+                color: (root.rootWindow && root.rootWindow.isGamePlaying) ? "#1a5a3a" : "#2a2a2a"
+                border.color: (root.rootWindow && root.rootWindow.isGamePlaying) ? "#4ade80" : "#6bb6ff"
+                border.width: 2
+                radius: 5
+
+                SequentialAnimation on opacity {
+                    running: root.rootWindow && root.rootWindow.isGamePlaying
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 1.0; to: 0.7; duration: 800 }
+                    NumberAnimation { from: 0.7; to: 1.0; duration: 800 }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (root.webSocketController) {
+                            var playing = root.rootWindow && root.rootWindow.isGamePlaying
+                            root.webSocketController.sendBinaryMessage({
+                                type: "MIDI_TRANSPORT",
+                                action: playing ? "stop" : "play",
+                                source: "pupitre"
+                            })
+                        }
+                    }
+                }
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 5
+                    Text {
+                        text: (root.rootWindow && root.rootWindow.isGamePlaying) ? "⏹ Stop" : "▶︎ Play"
+                        color: (root.rootWindow && root.rootWindow.isGamePlaying) ? "#4ade80" : "#fff"
+                        font.pixelSize: 14
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    Text {
+                        text: "↓ Bouton physique"
+                        color: (root.rootWindow && root.rootWindow.isGamePlaying) ? "#4ade80" : "#888"
+                        font.pixelSize: 10
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                }
+            }
+
+            // Mode Normal (en bas à droite, 3/4 — même position que Mode Jeu en vue normale)
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 20
+                x: parent.width * 0.75 - width / 2
+                width: 140
+                height: 60
+                z: 10
+                color: "#00CED1"
+                border.color: "#00CED1"
+                border.width: 2
+                radius: 5
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "Mode Normal"
+                    color: "#000"
+                    font.pixelSize: 14
+                    font.bold: true
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (root.setGameMode2D) {
+                            root.setGameMode2D(false)
+                            if (root.webSocketController) {
+                                root.webSocketController.sendBinaryMessage({
+                                    type: "GAME_MODE",
+                                    enabled: false,
+                                    source: "pupitre"
+                                })
+                            }
+                        } else if (root.rootWindow) {
+                            root.rootWindow.gameMode = false
+                            if (root.webSocketController) {
+                                root.webSocketController.sendBinaryMessage({
+                                    type: "GAME_MODE",
+                                    enabled: false,
+                                    source: "pupitre"
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 24
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: 50
+                height: 95
+
+                StaffZone2D {
+                    anchors.fill: parent
+                    accentColor: root.accentColor
+                    currentNoteMidi: root.clampedNote
+                    sirenInfo: root.sirenInfo
+                    configController: root.configController
+                    lineSpacing: 16
+                    lineThickness: 1.5
+                }
+            }
+
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 70
+                spacing: 80
+
+                NumberDisplay2D {
+                    width: 180
+                    height: 72
+                    value: root.rpm
+                    label: "RPM"
+                    digitColor: root.accentColor
+                    inactiveColor: "#003333"
+                    frameColor: root.accentColor
+                    scaleX: 1.6 * root.uiScale
+                    scaleY: 0.75 * root.uiScale
+                }
+
+                NumberDisplay2D {
+                    width: 180
+                    height: 72
+                    value: root.frequency
+                    label: "Hz"
+                    digitColor: root.accentColor
+                    inactiveColor: "#003333"
+                    frameColor: root.accentColor
+                    scaleX: 1.4 * root.uiScale
+                    scaleY: 0.65 * root.uiScale
+                }
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: root.gameMode
+                source: "../game/GameAutonomyPanel.qml"
+                onLoaded: {
+                    if (item) {
+                        item.configController = root.configController
+                        item.rootWindow = root.rootWindow
+                        item.gameMode = null
+                    }
+                }
             }
         }
     }

@@ -7,6 +7,7 @@ Item {
     property color accentColor: '#d1ab00'
     property real currentNoteMidi: 0
     property var sirenInfo: null
+    property var configController: null
     property real lineSpacing: 20
     property real lineThickness: 2
     height: 120
@@ -21,5 +22,6 @@ Item {
         lineColor: root.accentColor
         currentNoteMidi: root.currentNoteMidi
         sirenInfo: root.sirenInfo
+        configController: root.configController
     }
 }

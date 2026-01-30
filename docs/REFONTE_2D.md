@@ -25,11 +25,21 @@ Ce document détaille le plan de migration de l'affichage 3D vers 2D pour améli
 
 ---
 
+## État actuel (janvier 2026)
+
+**Vue 3D retirée du flux principal.** L'application n'affiche plus que la **vue 2D** (`Test2D.qml`), chargée par défaut dans `Main.qml`. Plus de bascule 2D/3D ni de `SirenDisplay` dans le flux.
+
+- **Main** : une seule propriété `gameMode` ; un seul `Loader` qui charge `Test2D.qml` (vue principale).
+- **Mode jeu** : entièrement dans Test2D. Quand `gameMode` est actif, un overlay affiche portée 2D compacte, NumberDisplay2D (RPM/Hz avec scale), Play/Stop et Mode Normal en bas, et `GameAutonomyPanel` (sélection morceau).
+- **Boutons** : en vue normale, Test2DButtons (Contrôleurs, Fretté, Mode Jeu, Play quand en mode jeu, Admin). En mode jeu (overlay), Play/Stop (1/4 bas) et Mode Normal (3/4 bas).
+
+---
+
 ## Phase 0 : Infrastructure de test (PRÉREQUIS)
 
 **✅ TERMINÉE**
 
-Infrastructure de test créée avec vue de test `Test2D.qml` et bouton de debug dans `Main.qml`.
+Infrastructure de test devenue **vue principale** : `Test2D.qml` est la seule vue affichée au démarrage (plus de bouton debug pour ouvrir/fermer).
 
 ---
 
@@ -58,7 +68,9 @@ Migrer les composants les plus simples pour obtenir des gains immédiats avec un
 
 ## Phase 2 : Composants de la portée musicale
 
-**Durée estimée : 3-4 jours** 
+**Durée estimée : 3-4 jours**
+
+**✅ TERMINÉE** — MusicalStaff2D complet (lignes, Clef2D, AmbitusDisplay2D, LedgerLines2D, NoteCursor2D, NoteProgressBar2D).
 
 ### ⚠️ Note importante
 
@@ -77,10 +89,10 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 | NoteCursor3D             | NoteCursor2D              |
 | NoteProgressBar3D        | NoteProgressBar2D          |
 
-### Layout et anticipation mode jeu
+### Layout et mode jeu
 
 - **Zone portée pleine largeur** : Dans `Test2D.qml`, une zone dédiée `staffZone` affiche `MusicalStaff2D` sur presque toute la largeur de la fenêtre (marges gauche/droite 24 px), comme en 3D (`SirenDisplay` avec `staffWidth: 1600`). Les 5 lignes s’étendent donc sur toute cette zone.
-- **Mode jeu** : La même zone `staffZone` servira de conteneur pour l’overlay du mode jeu (notes tombantes type Guitar Hero). On ajoutera plus tard un composant `GameMode2D` en sibling ou enfant de `MusicalStaff2D` dans `staffZone`, visible quand `root.gameMode` est vrai, en réutilisant `staffWidth` / `staffPosX` pour le positionnement des notes.
+- **Mode jeu** : accessible via le **bouton Mode Jeu** en bas à droite (3/4). Quand actif, un **overlay** recouvre la vue et affiche : portée 2D compacte, NumberDisplay2D RPM/Hz (avec scale), Play/Stop en bas à gauche, Mode Normal en bas à droite, et GameAutonomyPanel. La migration 2D des notes en chute (FallingNote2D, MelodicLine2D) s'intégrera dans cet overlay.
 
 ### Ordre de migration
 
@@ -104,7 +116,7 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 
 ---
 
-#### 2.5 NoteCursor3D → NoteCursor2D
+#### 2.5 NoteCursor3D → NoteCursor2D — **TERMINÉ**
 **Effort : 0.5 jour**
 
 **Actuel** :
@@ -116,8 +128,8 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 - Même logique de positionnement que la version 3D
 
 **Fichiers** :
-- Créer `QML/components/ambitus/NoteCursor2D.qml`
-- Modifier `MusicalStaff3D.qml` ligne 156-245 (ou `MusicalStaff2D.qml`)
+- Créer `QML/components/ambitus/NoteCursor2D.qml` — **fait**
+- Intégration dans `MusicalStaff2D.qml`
 
 ---
 
@@ -137,7 +149,7 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 
 ---
 
-#### 2.7 Tests et intégration
+#### 2.7 Tests et intégration — **TERMINÉ**
 **Effort : 1 jour**
 
 - Tester chaque composant individuellement
@@ -151,18 +163,37 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 
 **Durée estimée : 5-8 jours**
 
+**Statut : En cours** — Prochaine étape : 3.1 FallingNoteCustomGeo → FallingNote2D.
+
+**Contexte** : Le mode jeu est une **vue différente**, accessible via le **bouton de droite** (en bas de l'écran). Les composants 2D (FallingNote2D, MelodicLine2D) seront intégrés dans cette vue, pas dans la vue de test 2D.
+
+**Layout actuel (mode jeu dans Test2D)** :
+- Dans `Test2D.qml`, overlay `gameModeOverlay` visible quand `gameMode` est actif : fond, portée 2D compacte (StaffZone2D, lineSpacing 16, lineThickness 1.5), NumberDisplay2D RPM/Hz en bas avec `scaleX`/`scaleY` (1.6×uiScale, 0.75×uiScale pour RPM ; 1.4×uiScale, 0.65×uiScale pour Hz), boutons Play/Stop (1/4 bas) et Mode Normal (3/4 bas), et GameAutonomyPanel (Loader).
+- `StaffZone2D` reçoit `configController` et le transmet à `MusicalStaff2D`.
+- Lors de l'étape 3.3 (MelodicLine2D), ajouter `MelodicLine2D` en sibling de la zone portée dans l'overlay, avec les mêmes coordonnées pour les notes en chute.
+
+### ⚠️ Approche esthétique (validation par étape)
+
+Le **comportement** reste le même : tremolo, vibrato, vélocité, attack et release continuent de piloter l’animation. En revanche, leur **représentation visuelle** en 2D ne reprend pas telle quelle l’esthétique 3D : on définit une **nouvelle esthétique** au fur et à mesure de l’implémentation.
+
+- Chaque notion (chute, tremolo, vibrato, vélocité, attack, release) est traduite en un rendu 2D à définir.
+- Chaque étape est **validée** lorsque l’esthétique retenue convient ; on ne passe à la suivante qu’après validation.
+- Le principe (données, timing, paramètres) reste inchangé ; seul le rendu visuel évolue.
+
 ### Objectif
-Migrer le mode jeu avec les notes en vol et les effets visuels (vibrato, tremolo).
+Migrer le mode jeu avec les notes en vol ; les effets (vibrato, tremolo, vélocité, attack, release) sont représentés par une esthétique 2D à définir et valider à chaque étape.
 
 ### Composants à migrer
 
-#### 4.1 FallingNoteCustomGeo → FallingNote2D
+#### 3.1 FallingNoteCustomGeo → FallingNote2D
 **Effort : 2-3 jours**
 
 **Actuel** :
 - `FallingNoteCustomGeo.qml` : Géométrie C++ custom (`TaperedBoxGeometry`)
 - Shaders GLSL (`tremolo_vibrato.vert`, `bend.frag`)
 - Animation de chute avec `NumberAnimation`
+
+**Approche** : L’animation de chute et les paramètres (vélocité, attack, release, tremolo, vibrato) sont conservés ; l’**esthétique 2D** (forme, couleur, mouvement visuel) est à définir puis valider avant de poursuivre.
 
 **Options pour le nouveau** :
 
@@ -183,12 +214,14 @@ Migrer le mode jeu avec les notes en vol et les effets visuels (vibrato, tremolo
 
 ---
 
-#### 4.2 Shaders vibrato/tremolo → 2D
+#### 3.2 Shaders vibrato/tremolo → 2D
 **Effort : 1-2 jours**
 
 **Actuel** :
 - Shaders GLSL 3D : `tremolo_vibrato.vert`, `bend.frag`
 - Modulations en temps réel avec `time` animé
+
+**Approche** : Tremolo et vibrato restent des paramètres d’animation ; leur **représentation visuelle** en 2D (oscillation, taille, opacité, etc.) est à définir et valider étape par étape.
 
 **Nouveau** :
 - Si Option A (Canvas) : Calculer les modulations en JavaScript
@@ -200,7 +233,7 @@ Migrer le mode jeu avec les notes en vol et les effets visuels (vibrato, tremolo
 
 ---
 
-#### 4.3 MelodicLine3D → MelodicLine2D
+#### 3.3 MelodicLine3D → MelodicLine2D
 **Effort : 1 jour**
 
 **Actuel** :
@@ -216,7 +249,7 @@ Migrer le mode jeu avec les notes en vol et les effets visuels (vibrato, tremolo
 
 ---
 
-#### 4.4 Supprimer TaperedBoxGeometry C++
+#### 3.4 Supprimer TaperedBoxGeometry C++
 **Effort : 0.5 jour**
 
 **Action** :
@@ -232,11 +265,11 @@ Migrer le mode jeu avec les notes en vol et les effets visuels (vibrato, tremolo
 
 ---
 
-#### 4.5 Tests mode jeu
+#### 3.5 Tests mode jeu
 **Effort : 1-2 jours**
 
 - Tester le timing des notes en vol
-- Valider les animations (chute, vibrato, tremolo)
+- Valider les animations et l’esthétique (chute, vibrato, tremolo, vélocité, attack, release)
 - Vérifier les performances avec plusieurs notes simultanées
 - Tester le mode monophonique (troncature des notes)
 
@@ -668,5 +701,5 @@ Options pour remplacer `LEDText3D` :
 ---
 
 **Document créé le :** 2026-01-27  
-**Dernière mise à jour :** 2026-01-27  
-**Statut :** Planification
+**Dernière mise à jour :** 2026-01-30  
+**Statut :** Vue 2D seule (3D retirée du flux). Mode jeu dans Test2D. Phase 3 (notes en chute 2D) à venir.
