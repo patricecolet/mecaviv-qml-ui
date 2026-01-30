@@ -235,37 +235,36 @@ QtObject {
         // Mise à jour des propriétés locales si nécessaire
         updateLocalState(path, finalValue)
         
-        // Envoyer à PureData seulement si ce n'est pas la console qui a initié
-        if (webSocketController && webSocketController.connected && (source === undefined || source !== "console")) {
-            // Envoyer le changement de paramètre individuel
-            webSocketController.sendMessage({
-                type: "PARAM_CHANGED",
-                source: "pupitre",
-                path: path,
-                value: finalValue
-            })
-            
-            // Pour les contrôleurs composeSiren, envoyer aussi un message spécifique avec le CC
-            if (path.join(".").startsWith("composeSiren.controllers.") && path.length === 4 && path[3] === "value") {
-                var controllerName = path[2] // Ex: "masterVolume", "reverbEnable", etc.
-                var controllerConfig = getValueAtPath(["composeSiren", "controllers", controllerName], null)
+        var isCurrentSirensChange = (path.join(".") === "sirenConfig.currentSirens")
+        // Pour currentSirens, selectSirens (dans updateLocalState) a déjà fait updateCounter++, settingsUpdated() et envoyé SIRENS_SELECTED → pas de doublon
+        if (!isCurrentSirensChange) {
+            // Envoyer à PureData seulement si ce n'est pas la console qui a initié
+            if (webSocketController && webSocketController.connected && (source === undefined || source !== "console")) {
+                webSocketController.sendMessage({
+                    type: "PARAM_CHANGED",
+                    source: "pupitre",
+                    path: path,
+                    value: finalValue
+                })
                 
-                if (controllerConfig && controllerConfig.cc !== undefined) {
-                    webSocketController.sendMessage({
-                        type: "COMPOSESIREN_CC_CHANGED",
-                        controllerName: controllerName,
-                        cc: controllerConfig.cc,
-                        value: finalValue
-                    })
+                if (path.join(".").startsWith("composeSiren.controllers.") && path.length === 4 && path[3] === "value") {
+                    var controllerName = path[2]
+                    var controllerConfig = getValueAtPath(["composeSiren", "controllers", controllerName], null)
+                    if (controllerConfig && controllerConfig.cc !== undefined) {
+                        webSocketController.sendMessage({
+                            type: "COMPOSESIREN_CC_CHANGED",
+                            controllerName: controllerName,
+                            cc: controllerConfig.cc,
+                            value: finalValue
+                        })
+                    }
                 }
             }
+            updateCounter++
+            settingsUpdated()
         }
         
-        // Forcer la mise à jour
-        updateCounter++
-        settingsUpdated()
-        
-        return true;  // IMPORTANT: Ajouter cette ligne
+        return true
     }
     
     // FONCTION GÉNÉRIQUE DE LECTURE
@@ -389,9 +388,8 @@ QtObject {
         currentSirens = selectedObjs
         config.sirenConfig.currentSirens = list
 
-        updateCounter++
+        // Pas de updateCounter++ ni settingsUpdated() : primarySiren change → les bindings qui en dépendent se mettent à jour sans cascade globale
         currentSirenInfoChanged()
-        settingsUpdated()
 
         // Envoi WS (liste)
         if (webSocketController && webSocketController.connected) {

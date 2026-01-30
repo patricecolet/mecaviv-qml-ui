@@ -45,6 +45,7 @@
         <file>QML/components/ambitus/MusicalStaff3D.qml</file>
         <file>QML/components/ambitus/NoteCursor3D.qml</file>
         <file>QML/components/ambitus/NotePositionCalculator.qml</file>
+        <file>QML/components/ambitus/NotePositionCalculator2D.qml</file>
         <file>QML/components/ambitus/NoteProgressBar3D.qml</file>
         <file>QML/components/ambitus/GearShiftPositionIndicator.qml</file>
         <file>QML/components/indicators/FaderIndicator.qml</file>
@@ -54,6 +55,7 @@
         <file>QML/components/indicators/PedalIndicator.qml</file>
         <file>QML/components/indicators/WheelIndicator.qml</file>
         <file>QML/components/indicators/EncoderIndicator.qml</file>
+        <file>QML/components/ambitus/AmbitusDisplay2D.qml</file>
         <file>QML/components/ambitus/AmbitusDisplay3D.qml</file>
         <file>QML/admin/advanced/AdvancedAnimations.qml</file>
         <file>QML/admin/advanced/AdvancedColors.qml</file>

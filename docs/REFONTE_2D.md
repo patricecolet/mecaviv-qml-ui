@@ -92,14 +92,19 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 **2.2 Clef2D** — **TERMINÉ** — Déjà existant, intégré dans `MusicalStaff2D` (comme Clef3D dans MusicalStaff3D).
 
 **2.3 AmbitusDisplay3D → AmbitusDisplay2D**  
-- Créer `AmbitusDisplay2D.qml` : notes (cercles 2D ou Canvas) + lignes supplémentaires (LedgerLines2D ou équivalent).
+- Créer `AmbitusDisplay2D.qml` : notes (cercles 2D ou Canvas). Les lignes supplémentaires (ledger) sont gérées en 2.4.
 - Utilisé par `MusicalStaff2D` au même endroit logique que `AmbitusDisplay3D` dans `MusicalStaff3D`.
 - Maintenir le positionnement selon la clé (treble/bass), en réutilisant `NotePositionCalculator` si besoin.
-- Détail : `AmbitusDisplay3D` = ~40 sphères 3D + `LedgerLines3D` → en 2D : `Repeater` avec cercles (`Rectangle` radius) ou `Canvas`, et `LedgerLines2D` (Repeater + Rectangle horizontal).
+- Détail : `AmbitusDisplay3D` = ~40 sphères 3D + `LedgerLines3D` → en 2D : `Repeater` avec cercles (`Rectangle` radius) ou `Canvas` ; `LedgerLines2D` est ajouté à l’étape 2.4.
 
 ---
 
-#### 2.4 NoteCursor3D → NoteCursor2D
+#### 2.4 LedgerLines3D → LedgerLines2D
+**Effort : 0.25 jour** — À faire juste après l’ambitus : les ledger lines s’adaptent à l’ambitus (lignes au-dessus/en-dessous de la portée). Créer `LedgerLines2D.qml` : Repeater + Rectangle horizontal. Utilisé par `AmbitusDisplay2D`.
+
+---
+
+#### 2.5 NoteCursor3D → NoteCursor2D
 **Effort : 0.5 jour**
 
 **Actuel** :
@@ -116,7 +121,7 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 
 ---
 
-#### 2.5 NoteProgressBar3D → NoteProgressBar2D
+#### 2.6 NoteProgressBar3D → NoteProgressBar2D
 **Effort : 0.5 jour**
 
 **Actuel** :
@@ -129,11 +134,6 @@ Migrer la portée musicale en 2D en gardant la même structure que la version 3D
 **Fichiers** :
 - Créer `QML/components/ambitus/NoteProgressBar2D.qml`
 - Modifier `MusicalStaff3D.qml` ligne 248-291 (ou `MusicalStaff2D.qml`)
-
----
-
-#### 2.6 LedgerLines3D → LedgerLines2D
-**Effort : 0.25 jour** — Utilisé par `AmbitusDisplay2D` (créer `LedgerLines2D.qml` : Repeater + Rectangle horizontal).
 
 ---
 

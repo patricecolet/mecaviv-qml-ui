@@ -1,5 +1,6 @@
 import QtQuick
 import "../../utils"
+import "."
 
 Item {
     id: root
@@ -38,6 +39,7 @@ Item {
         var d = configController.updateCounter
         return configController.getConfigValue("displayConfig.components.musicalStaff", {})
     }
+    property var ambitusConfig: staffConfig.ambitus || {}
     readonly property real _clefSizeScale: 0.7
     readonly property real _clefDisplayWidth: lineSpacing * 5.2 * 0.5 * _clefSizeScale
     property real clefWidth: showClef ? ((staffConfig.clef && staffConfig.clef.width) || _clefDisplayWidth) : 0
@@ -105,5 +107,35 @@ Item {
         width: staffWidth
         height: lineThickness
         color: root.lineColor
+    }
+
+    // Ambitus 2D (Phase 2.3) — cercles pour chaque note de l'ambitus (resserré avec marges)
+    readonly property real _ambitusMarginX: lineSpacing * 2
+    AmbitusDisplay2D {
+        id: ambitusDisplay2D
+        x: 0
+        y: 0
+        width: root.staffWidth
+        height: root.height
+        centerY: root._centerY
+        visible: root.showAmbitus && (configController ? configController.getConfigValue("displayConfig.components.musicalStaff.ambitus.visible", true) : true)
+        ambitusMin: Math.floor(root.ambitusMin)
+        ambitusMax: Math.ceil(root.ambitusMax)
+        ambitusStartX: root.staffPosX + root.ambitusOffset + root._ambitusMarginX
+        ambitusWidth: (root.staffWidth - root.ambitusOffset) - root._ambitusMarginX * 2
+        lineSpacing: root.lineSpacing
+        lineThickness: root.lineThickness
+        clef: root.clef
+        octaveOffset: root.octaveOffset
+        showOnlyNaturals: (ambitusConfig.noteFilter === "natural" || ambitusConfig.noteFilter === undefined)
+        noteScale: configController ? configController.getValueAtPath(["displayConfig", "components", "musicalStaff", "ambitus", "noteSize"], 0.15) : 0.15
+        noteColor: {
+            if (ambitusConfig.noteColor) {
+                var c = Qt.color(ambitusConfig.noteColor)
+                return Qt.rgba(c.r, c.g, c.b, c.a)
+            }
+            return Qt.rgba(0.9, 0.6, 0.6, 0.9)
+        }
+        showDebugLabels: configController ? configController.getConfigValue("displayConfig.components.musicalStaff.noteName.visible", false) : false
     }
 }

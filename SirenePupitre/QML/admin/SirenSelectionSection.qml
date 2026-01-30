@@ -42,12 +42,10 @@ Item {
                 spacing: 10
                 
                 Repeater {
-                    model: {
-                        if (!root.configController || !root.configController.config) return []
-                        // IMPORTANT: Forcer la reconstruction du modèle
-                        var dummy = root.configController.updateCounter
-                        return root.configController.config.sirenConfig.sirens
-                    }
+                    // Liste des sirènes (ne change qu'au chargement config). La sélection (isSelected) dépend de primarySiren.
+                    model: root.configController && root.configController.config
+                        ? root.configController.config.sirenConfig.sirens
+                        : []
                     
                     delegate: Button {
                         id: sirenButton

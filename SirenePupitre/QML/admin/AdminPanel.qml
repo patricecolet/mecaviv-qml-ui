@@ -31,9 +31,22 @@ Item {
         radius: 10
         
         ColumnLayout {
+            id: mainLayout
             anchors.fill: parent
             anchors.margins: 20
             spacing: 15
+            
+            // URL du contenu d'onglet (réévalué quand on change d'onglet)
+            readonly property string tabSource: {
+                var base = "qrc:/QML/admin/"
+                switch(tabBar.currentIndex) {
+                    case 0: return base + "SirenSelectionSection.qml"
+                    case 1: return base + "VisibilitySection.qml"
+                    case 2: return base + "AdvancedSection.qml"
+                    case 3: return base + "OutputSection.qml"
+                    default: return ""
+                }
+            }
             
             // En-tête avec switch mode et bouton fermer
             RowLayout {
@@ -210,27 +223,17 @@ Item {
                 }
             }
             
-            // Contenu des onglets (chemins explicites pour fonctionner depuis Main ou Test2D)
+            // Contenu des onglets (chemins explicites pour fonctionner depuis Main ou Test2D).
+            // Ne charger que quand le panneau est visible pour que le 1er onglet s'affiche tout de suite.
             Loader {
+                id: tabContentLoader
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                source: {
-                    var base = "qrc:/QML/admin/"
-                    switch(tabBar.currentIndex) {
-                        case 0: return base + "SirenSelectionSection.qml"
-                        case 1: return base + "VisibilitySection.qml"
-                        case 2: return base + "AdvancedSection.qml"
-                        case 3: return base + "OutputSection.qml"
-                        default: return ""
-                    }
-                }
+                source: root.visible ? mainLayout.tabSource : ""
                 
                 onLoaded: {
-                    
                     if (item) {
-                        // Assigner configController en premier
                         item.configController = root.configController
-                        
                         if (item.hasOwnProperty("webSocketController")) {
                             item.webSocketController = root.webSocketController
                         }
