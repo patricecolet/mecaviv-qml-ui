@@ -1,10 +1,8 @@
 import QtQuick
-import QtQuick3D
-import "../components"
-import "../components/ambitus"
 import "."
+import "GameSequencer.js" as GameSequencer
 
-Node {
+Item {
     id: root
     
     // Propriétés de configuration
@@ -17,12 +15,62 @@ Node {
     property real gameStartTime: 0
     property bool gameActive: false
     
-    // Propriété pour savoir si le mode jeu est actif (liée depuis SirenDisplay)
+    // Séquenceur partagé (optionnel) : si fourni, mesure/temps/tempo viennent de lui
+    property var sequencer: null
+
     property bool isGameModeActive: false
-    
-    // Propriété calculée pour les segments de ligne
     property var lineSegmentsData: []
-    
+
+    // État local (utilisé quand sequencer est null)
+    property real _localTimeMs: 0
+    property int _localBar: 1
+    property int _localBeatInBar: 1
+    property real _localBeat: 1.0
+    property int _localTotalBars: 1
+    property real _localTempoBpm: 120
+
+    // Position / transport : depuis sequencer si fourni, sinon état local
+    readonly property real currentTimeMs: root.sequencer ? root.sequencer.currentTimeMs : root._localTimeMs
+    readonly property int currentBar: root.sequencer ? root.sequencer.currentBar : root._localBar
+    readonly property int currentBeatInBar: root.sequencer ? root.sequencer.currentBeatInBar : root._localBeatInBar
+    readonly property real currentBeat: root.sequencer ? root.sequencer.currentBeat : root._localBeat
+    readonly property int totalBars: root.sequencer ? root.sequencer.totalBars : root._localTotalBars
+    readonly property real currentTempoBpm: root.sequencer ? root.sequencer.currentTempoBpm : root._localTempoBpm
+    // Chaîne formatée pour l’affichage (évite les bindings imbriqués foireux côté Test2D)
+    readonly property string positionDisplayText: {
+        var b = currentBar
+        var t = currentBeat
+        if (typeof b !== "number" || typeof t !== "number" || !isFinite(b) || !isFinite(t))
+            return "—"
+        var bar = Math.max(1, Math.min(9999, Math.floor(b)))
+        var beat = Math.max(1, Math.min(17, t))
+        return bar + " · " + beat.toFixed(1)
+    }
+    // Temps écoulé formaté mm:ss (ex. "1:23")
+    readonly property string currentTimeDisplay: {
+        var ms = currentTimeMs
+        if (typeof ms !== "number" || !isFinite(ms) || ms < 0) return "0:00"
+        var sec = Math.floor(ms / 1000)
+        var min = Math.floor(sec / 60)
+        sec = sec % 60
+        return min + ":" + (sec < 10 ? "0" : "") + sec
+    }
+    // Quand true, lineSegmentsData est fourni par le séquenceur (getSegmentsInWindowFromMs)
+    property bool useSequencerData: false
+
+    function updateLineSegmentsFromSequencer() {
+        if (!root.sequencer || !root.useSequencerData) return
+        if (!root.sequencer.isPlaying) {
+            root.lineSegmentsData = []
+            return
+        }
+        var notes = root.sequencer.sequencerNotes || []
+        var t = root.sequencer.currentTimeMs
+        var look = root.sequencer.lookaheadMs || 8000
+        var segs = GameSequencer.getSegmentsInWindowFromMs(notes, t, look)
+        root.lineSegmentsData = segs
+    }
+
     // Signal pour recevoir les événements MIDI
     signal midiEventReceived(var event)
     
@@ -34,8 +82,8 @@ Node {
     property real attackTime: 0         // CC73 (0-127 → 0ms-38.1s, formule: 38100/(128-cc))
     property real releaseTime: 0        // CC72 (0-127 → 0ms-38.1s, formule: 38100/(128-cc))
     
-    // Propriétés de la portée
-    property real staffWidth: 1600
+    // Propriétés de la portée (staffWidth suit la largeur du conteneur en 2D)
+    property real staffWidth: root.width || 1600
     property real staffPosX: 0
     property real lineSpacing: 20
     
@@ -92,38 +140,23 @@ Node {
     property real keySignatureWidth: showKeySignature ? (keySignatureConfig.width || 80) : 0
     property real ambitusOffset: clefWidth + keySignatureWidth
     
-    // Portée musicale (cachée en mode normal)
-    MusicalStaff3D {
-        id: musicalStaff
-        visible: false  // Toujours cachée - on utilise celle du mode normal
+    // Ligne mélodique 2D (notes en chute) — même coordonnées que la portée 2D de l'overlay
+    MelodicLine2D {
+        id: melodicLine
+        anchors.fill: parent
         
-        configController: root.configController
-        sirenInfo: root.sirenInfo
-        currentNoteMidi: root.currentNoteMidi
-        
-        staffWidth: root.staffWidth
+        fixedFallTime: root.sequencer ? root.sequencer.animationFallDurationMs : 5000
+        lineSegments: root.lineSegmentsData
+        currentTimeMs: root.currentTimeMs
         lineSpacing: root.lineSpacing
         clef: root.clef
         ambitusMin: root.ambitusMin
         ambitusMax: root.ambitusMax
-    }
-    
-    // Ligne mélodique (visible seulement en mode jeu)
-    MelodicLine3D {
-        id: melodicLine
-        visible: root.isGameModeActive  // Visible seulement quand le mode jeu est actif
-        
-        lineSegments: lineSegmentsData
-        lineSpacing: root.lineSpacing
-        clef: root.clef  // IMPORTANT : passer la clé depuis sirenInfo
-        ambitusMin: root.ambitusMin
-        ambitusMax: root.ambitusMax
         staffWidth: root.staffWidth
-        staffPosX: root.staffPosX  // Utiliser la valeur reçue de SirenDisplay
+        staffPosX: root.staffPosX
         ambitusOffset: root.ambitusOffset
-        octaveOffset: root.octaveOffset  // Utiliser root.octaveOffset
+        octaveOffset: root.octaveOffset
         
-        // Paramètres MIDI CC pour les modulations et l'enveloppe
         vibratoAmount: root.vibratoAmount
         vibratoRate: root.vibratoRate
         tremoloAmount: root.tremoloAmount
@@ -179,16 +212,20 @@ Node {
     
     // Fonction pour réinitialiser le mode jeu (appelée lors d'un stop)
     function resetGame() {
-        // Vider les événements MIDI
         midiEvents = []
         lineSegmentsData = []
+        _localTimeMs = 0
+        _localBar = 1
+        _localBeatInBar = 1
+        _localBeat = 1.0
+        _localTotalBars = 1
+        _localTempoBpm = 120
+        if (!root.sequencer)
+            useSequencerData = false
         gameActive = false
         gameStartTime = 0
-        
-        // Effacer toutes les notes en vol
-        if (melodicLine) {
+        if (melodicLine)
             melodicLine.clearAllNotes()
-        }
     }
     
     // Fonction pour arrêter le jeu
@@ -237,9 +274,42 @@ Node {
         }
     }
     
-    // Mettre à jour les segments quand les événements changent
+    // Mettre à jour les segments quand les événements changent (sauf si séquenceur actif)
     onMidiEventsChanged: {
-        lineSegmentsData = processMidiEvents()
+        if (!useSequencerData)
+            lineSegmentsData = processMidiEvents()
+    }
+
+    onSequencerChanged: {
+        root.useSequencerData = !!root.sequencer
+        if (root.sequencer) {
+            if (root.sequencer.isPlaying)
+                root.updateLineSegmentsFromSequencer()
+            else
+                root.lineSegmentsData = []
+        } else {
+            root.lineSegmentsData = []
+        }
+    }
+
+    Connections {
+        target: root.sequencer
+        enabled: !!root.sequencer
+        function onCurrentTimeMsChanged() {
+            if (root.useSequencerData)
+                root.updateLineSegmentsFromSequencer()
+        }
+        function onIsPlayingChanged() {
+            if (!root.sequencer || !root.useSequencerData) return
+            if (root.sequencer.isPlaying)
+                root.updateLineSegmentsFromSequencer()
+            else
+                root.lineSegmentsData = []
+        }
+        function onSequencerNotesChanged() {
+            if (root.useSequencerData)
+                root.updateLineSegmentsFromSequencer()
+        }
     }
 }
 

@@ -28,6 +28,7 @@ Window {
     property bool debugMode: true  // Mettre à true pour activer les logs
     property bool isAdminMode: false  // État admin persistant
     property bool isGamePlaying: false  // État de lecture du mode jeu
+    property bool userRequestedStop: false  // Clic Stop : ne pas laisser 0x01(playing=true) réécraser isGamePlaying
 
     // Mode jeu (une seule vue 2D)
     property bool gameMode: false
@@ -80,8 +81,20 @@ Window {
         rootWindow: mainWindow
         
         onPlaybackPositionReceived: function(playing, bar, beatInBar, beat) {
-            // Mettre à jour l'état de lecture du mode jeu
-            mainWindow.isGamePlaying = playing
+            if (!playing) {
+                mainWindow.userRequestedStop = false
+                mainWindow.isGamePlaying = false
+            } else if (!mainWindow.userRequestedStop) {
+                mainWindow.isGamePlaying = true
+            }
+        }
+        onPlaybackTickReceived: function(playing, tick) {
+            if (!playing) {
+                mainWindow.userRequestedStop = false
+                mainWindow.isGamePlaying = false
+            } else if (!mainWindow.userRequestedStop) {
+                mainWindow.isGamePlaying = true
+            }
         }
         
         onGameModeReceived: function(enabled) {
@@ -89,8 +102,11 @@ Window {
         }
         
         onDataReceived: function(data) {
-            // Format 0x04 : Note de séquence MIDI -> mode jeu (à traiter dans la vue 2D si besoin)
+            // Format 0x04 : Note de séquence MIDI -> mode jeu (vue 2D)
             if (data.isSequence) {
+                if (mainWindow.gameMode && testViewLoader.item && testViewLoader.item.gameModeItem) {
+                    testViewLoader.item.gameModeItem.midiEventReceived(data)
+                }
                 return
             }
             
@@ -118,7 +134,9 @@ Window {
         }
         
         onControlChangeReceived: function(ccNumber, ccValue) {
-            // À traiter dans la vue 2D si besoin (mode jeu)
+            if (mainWindow.gameMode && testViewLoader.item && testViewLoader.item.gameModeItem) {
+                testViewLoader.item.gameModeItem.handleControlChange(ccNumber, ccValue)
+            }
         }
         
         onConfigReceived: function(config) {

@@ -4,6 +4,7 @@ import "../components"
 import "../components/ambitus"
 import "../utils"
 import "../admin"
+import "../game"
 
 Page {
     id: root
@@ -38,6 +39,29 @@ Page {
     property int velocity: 100
     property real bend: 0.0
     property real uiScale: (configController && configController.getValueAtPath(["ui", "scale"], 0.8)) || 0.8
+
+    // Référence au GameMode (overlay) pour que Main puisse envoyer les événements MIDI séquence
+    property var _gameModeItem: null
+    property var gameModeItem: _gameModeItem
+
+    // Affichage mesure/temps : n’afficher les valeurs qu’une fois Pd lancé (après fallingTime), pas avant
+    property bool transportDisplayActive: false
+
+    onGameModeChanged: {
+        if (root.gameMode) {
+            // Entrée en mode jeu : état propre (bouton Play gris, séquenceur arrêté)
+            if (root.rootWindow) {
+                root.rootWindow.userRequestedStop = false
+                root.rootWindow.isGamePlaying = false
+            }
+            if (sequencerController)
+                sequencerController.reset()
+            root.transportDisplayActive = false
+        } else {
+            root._gameModeItem = null
+            root.transportDisplayActive = false
+        }
+    }
 
     function updateControllers(controllersData) {
         if (controllersPanel && controllersPanel.updateControllers) {
@@ -183,7 +207,7 @@ Page {
             }
         }
 
-        // Overlay mode jeu : portée 2D compacte + RPM/Hz + sélection morceau (visible quand gameMode)
+        // Overlay mode jeu : séquenceur partagé + portée 2D + transport (visible quand gameMode)
         Item {
             id: gameModeOverlay
             z: 100
@@ -193,6 +217,67 @@ Page {
             Rectangle {
                 anchors.fill: parent
                 color: root.backgroundColor
+            }
+
+            // Séquenceur indépendant du jeu (mesure, temps, tempo, MIDI) — consommé par transport et jeux
+            SequencerController {
+                id: sequencerController
+                configController: root.configController
+                rootWindow: root.rootWindow
+            }
+
+            // Transport : mesure, temps, tempo (à gauche du Play) — encadré large pour mesure complète et durée totale
+            Rectangle {
+                id: positionInSongFrame
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 20
+                x: parent.width * 0.25 - 140 / 2 - 12 - width
+                width: 220
+                height: 88
+                z: 10
+                color: "#2a2a2a"
+                border.color: "#6bb6ff"
+                border.width: 2
+                radius: 5
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Row {
+                        spacing: 8
+                        Text { text: "Mesure"; color: "#888"; font.pixelSize: 9; width: 44 }
+                        Text {
+                            text: root.transportDisplayActive && sequencerController
+                                ? (sequencerController.positionDisplayText + " / " + sequencerController.totalBars)
+                                : "— / —"
+                            color: "#fff"
+                            font.pixelSize: 12
+                            font.bold: true
+                        }
+                    }
+                    Row {
+                        spacing: 8
+                        Text { text: "Temps"; color: "#888"; font.pixelSize: 9; width: 44 }
+                        Text {
+                            text: root.transportDisplayActive && sequencerController
+                                ? (sequencerController.currentTimeDisplay + " / " + sequencerController.totalTimeDisplay)
+                                : "0:00 / 0:00"
+                            color: "#fff"
+                            font.pixelSize: 12
+                        }
+                    }
+                    Row {
+                        spacing: 8
+                        Text { text: "Tempo"; color: "#888"; font.pixelSize: 9; width: 44 }
+                        Text {
+                            text: root.transportDisplayActive && sequencerController
+                                ? (Math.round(sequencerController.currentTempoBpm) + " BPM")
+                                : "—"
+                            color: "#fff"
+                            font.pixelSize: 12
+                        }
+                    }
+                }
             }
 
             // Play/Stop (en bas à gauche, 1/4)
@@ -221,12 +306,47 @@ Page {
                     onClicked: {
                         if (root.webSocketController) {
                             var playing = root.rootWindow && root.rootWindow.isGamePlaying
+                            var newPlaying = !playing
+                            if (newPlaying) {
+                                if (root.rootWindow) {
+                                    root.rootWindow.userRequestedStop = false
+                                    root.rootWindow.isGamePlaying = true
+                                }
+                                if (sequencerController)
+                                    sequencerController.startFromZero()
+                                var fallMs = (sequencerController && sequencerController.animationFallDurationMs > 0)
+                                    ? sequencerController.animationFallDurationMs
+                                    : (root._gameModeItem && root._gameModeItem.melodicLine ? root._gameModeItem.melodicLine.fixedFallTime : 5000)
+                                playPdDelayTimer.interval = Math.max(0, Math.round(fallMs))
+                                playPdDelayTimer.start()
+                            } else {
+                                playPdDelayTimer.stop()
+                                root.transportDisplayActive = false
+                                root.webSocketController.sendBinaryMessage({
+                                    type: "MIDI_TRANSPORT",
+                                    action: "stop",
+                                    source: "pupitre"
+                                })
+                                if (root.rootWindow) {
+                                    root.rootWindow.userRequestedStop = true
+                                    root.rootWindow.isGamePlaying = false
+                                }
+                            }
+                        }
+                    }
+                }
+                Timer {
+                    id: playPdDelayTimer
+                    interval: sequencerController ? sequencerController.animationFallDurationMs : 5000
+                    repeat: false
+                    onTriggered: {
+                        root.transportDisplayActive = true
+                        if (root.webSocketController)
                             root.webSocketController.sendBinaryMessage({
                                 type: "MIDI_TRANSPORT",
-                                action: playing ? "stop" : "play",
+                                action: "play",
                                 source: "pupitre"
                             })
-                        }
                     }
                 }
 
@@ -298,6 +418,7 @@ Page {
             }
 
             Item {
+                id: gameOverlayStaffZone
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.leftMargin: 24
@@ -314,6 +435,29 @@ Page {
                     configController: root.configController
                     lineSpacing: 16
                     lineThickness: 1.5
+                }
+
+                Loader {
+                    id: gameModeLoader
+                    anchors.fill: parent
+                    z: 1
+                    active: root.gameMode
+                    source: "../game/GameMode.qml"
+                    onLoaded: {
+                        if (item) {
+                            item.configController = root.configController
+                            item.sirenInfo = root.sirenInfo
+                            item.sequencer = sequencerController
+                            item.lineSpacing = 16
+                            item.staffWidth = gameOverlayStaffZone.width
+                            item.staffPosX = 0
+                            root._gameModeItem = item
+                        }
+                    }
+                    onStatusChanged: {
+                        if (status === Loader.Null || status === Loader.Error)
+                            root._gameModeItem = null
+                    }
                 }
             }
 
@@ -349,6 +493,7 @@ Page {
             }
 
             Loader {
+                id: gameAutonomyLoader
                 anchors.fill: parent
                 active: root.gameMode
                 source: "../game/GameAutonomyPanel.qml"
@@ -356,7 +501,8 @@ Page {
                     if (item) {
                         item.configController = root.configController
                         item.rootWindow = root.rootWindow
-                        item.gameMode = null
+                        item.sequencer = sequencerController
+                        item.gameMode = Qt.binding(function() { return root.gameModeItem })
                     }
                 }
             }
