@@ -416,7 +416,7 @@ class MidiSequencer {
             this.pureDataProxy.broadcastBinaryToClients(buffer);
         }
         
-        // Notes MIDI - DÉSACTIVÉ : PureData lit le MIDI localement
+        // Notes MIDI - DÉSACTIVÉ : PureData lit le MIDI localement et envoie les notes aux pupitres
         // if (event.type === 'noteOn' && event.velocity > 0) {
         //     this.sendNoteToPlayers(event.noteNumber, event.velocity, event.channel);
         // } else if (event.type === 'noteOff' || (event.type === 'noteOn' && event.velocity === 0)) {
