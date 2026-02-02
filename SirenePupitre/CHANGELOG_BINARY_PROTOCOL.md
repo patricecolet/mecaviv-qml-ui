@@ -15,31 +15,37 @@
 
 ### Nouveaux formats binaires
 
-#### Type 0x01 - POSITION (10 bytes) ⭐ RÉASSIGNÉ (Mode autonome)
-- **Usage** : Position de lecture (bar/beat/beat total)
+#### Type 0x01 - POSITION (4 bytes) ⭐ Mesure seule — resync + extrapolation UI
+- **Usage** : Resync sur le **numéro de mesure**. L’UI a la tempo map et time signature map du fichier ; elle convertit « début de mesure N » en ms et extrapole au tempo entre deux messages. Envoyer à chaque changement de mesure (et play/stop).
+- **Source** : PureData/Séquenceur
+- **Destination** : SirenePupitre (mode jeu)
+- **Fréquence** : 1× par mesure (ou play/stop)
+
+**Structure (4 octets)** :
+| Byte | Champ | Type | Description |
+|------|-------|------|-------------|
+| 0 | Type | uint8 | 1 (0x01) |
+| 1 | Flags | uint8 | bit0=playing (1=lecture, 0=stop) |
+| 2-3 | mesure | uint16 LE | Numéro de mesure (1-based) |
+
+**Exemple décimal** : playing=true, mesure 5 → `1, 1, 5, 0` ; arrêt → `1, 0, 1, 0`
+
+#### Type 0x01 - POSITION (6 bytes) — Tick seul — JS dérive bar/beat
+- **Usage** : Position de lecture = **tick MIDI** uniquement. Le Pupitre a déjà BPM/PPQ du fichier et dérive bar/beat/currentTimeMs côté JS.
 - **Source** : PureData/Séquenceur
 - **Destination** : SirenePupitre (mode jeu)
 - **Fréquence** : 50-100 Hz pendant lecture
 
-**Structure** :
+**Structure (6 octets)** :
 | Byte | Champ | Type | Plage | Description |
 |------|-------|------|-------|-------------|
 | 0 | Type | uint8 | 0x01 | Identifiant POSITION |
 | 1 | Flags | uint8 | 0-255 | bit0=playing, autres réservés |
-| 2-3 | barNumber | uint16 | 0-65535 | Numéro de mesure (LE) |
-| 4-5 | beatInBar | uint16 | 0-65535 | Beat dans la mesure (LE) |
-| 6-9 | beat | float32 | 0.0+ | Beat total décimal (LE) |
+| 2-5 | tick | uint32 | 0-4294967295 | Position en ticks MIDI (LE) |
 
-**Exemple** : Mesure 13, beat 2, beat total 50.5, playing=true
-```
-[0x01, 0x01, 0x0D, 0x00, 0x02, 0x00, 0x00, 0x00, 0x49, 0x42]
-```
+**Exemple décimal** : playing=true, tick=9600 → `1, 1, 128, 37, 0, 0`
 
-**Décodage** :
-- Flags: 0x01 → bit0=1 (playing=true)
-- barNumber: 0x000D = 13
-- beatInBar: 0x0002 = 2
-- beat: float32(50.5) en little-endian
+**Format legacy (9 bytes)** : bar, beatInBar, beat — toujours accepté.
 
 #### Type 0x03 - MIDI_NOTE_VOLANT (5 bytes) ⭐ NOUVEAU (Remplace ancien 0x01)
 - **Usage** : Position du volant convertie en note MIDI

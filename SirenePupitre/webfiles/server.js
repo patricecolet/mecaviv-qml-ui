@@ -4,6 +4,7 @@ const path = require('path');
 
 // Importer l'API MIDI
 const midiAPI = require('./api-midi.js');
+const midiNotesAPI = require('./api-midi-notes.js');
 
 // Configuration du serveur
 const PORT = 8000;
@@ -45,6 +46,10 @@ http.createServer(function (request, response) {
     // Routes API MIDI
     if (request.url === '/api/midi/files') {
         midiAPI.getMidiFilesList(request, response);
+        return;
+    }
+    if (request.url.startsWith('/api/midi/notes')) {
+        midiNotesAPI.getMidiNotes(request, response);
         return;
     }
     

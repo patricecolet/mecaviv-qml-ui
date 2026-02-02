@@ -159,11 +159,11 @@ Item {
                 root.currentBar = bar1
                 root.currentBeatInBar = Math.max(1, Math.min(16, beatInBar || 1))
                 root.currentBeat = Math.max(1, Math.min(17, (typeof beat === "number" && isFinite(beat)) ? beat : 1))
-                var timeMs = GameSequencer.positionToMs(bar1, beatInBar, beat, root.sequencerBpm)
+                var timeMs = GameSequencer.positionToMsWithMaps(bar1, beatInBar, beat, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
                 root.lastPositionMs = timeMs
                 root.currentTimeMs = timeMs
                 root._lastUpdateTimestamp = Date.now()  // resync pour extrapolation
-                root.currentTempoBpm = root.sequencerBpm
+                root.currentTempoBpm = GameSequencer.getBpmAtMs(timeMs, root.sequencerPpq, root.sequencerTempoMap, root.sequencerBpm)
             }
             root.isPlaying = playing
             root.previousBeat = beat

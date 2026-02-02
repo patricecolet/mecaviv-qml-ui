@@ -51,7 +51,8 @@ Item {
     signal dataReceived(var data)
     signal configReceived(var config)
     signal controlChangeReceived(int ccNumber, int ccValue)  // Signal pour les CC MIDI
-    signal playbackPositionReceived(bool playing, int bar, int beatInBar, real beat)  // Position lecture
+    signal playbackPositionReceived(bool playing, int bar, int beatInBar, real beat)  // Position lecture (format 9 octets, legacy)
+    signal playbackTickReceived(bool playing, int tick)  // Position lecture = tick seul (6 octets), JS gère bar/beat
     signal filesListReceived(var categories)  // Liste fichiers MIDI
     signal gameModeReceived(bool enabled)  // Mode jeu activé/désactivé par le serveur
     property var configController: null
@@ -288,19 +289,30 @@ Item {
                     return;
                 }
                 
-                // Format binaire 0x01 - POSITION (10 bytes) - Mode autonome
-                if (bytes.length === 10 && bytes[0] === 0x01) {
-                    // Format: [0x01, flags, bar_l, bar_h, beatInBar_l, beatInBar_h, beat_f32LE]
+                // Format binaire 0x01 - POSITION : mesure seule (4 bytes) — Pd envoie mesure 0-based → passer 1-based au séquenceur
+                if (bytes.length === 4 && bytes[0] === 0x01) {
+                    var flags = bytes[1];
+                    var playing = (flags & 0x01) !== 0;
+                    var measure = bytes[2] | (bytes[3] << 8);
+                    controller.playbackPositionReceived(playing, measure + 1, 1, 1.0);
+                    return;
+                }
+                // Format binaire 0x01 - POSITION : tick seul (6 bytes) — JS dérive bar/beat depuis BPM/PPQ
+                if (bytes.length === 6 && bytes[0] === 0x01) {
+                    var flags = bytes[1];
+                    var playing = (flags & 0x01) !== 0;
+                    var tick = (bytes[2] | (bytes[3] << 8) | (bytes[4] << 16) | (bytes[5] << 24)) >>> 0;
+                    controller.playbackTickReceived(playing, tick);
+                    return;
+                }
+                // Format legacy 0x01 - POSITION (9 bytes) - bar, beatInBar, beat
+                if (bytes.length === 9 && bytes[0] === 0x01) {
                     var flags = bytes[1];
                     var playing = (flags & 0x01) !== 0;
                     var bar = bytes[2] | (bytes[3] << 8);
-                    var beatInBar = bytes[4] | (bytes[5] << 8);
-                    
-                    // Décoder float32 little-endian pour beat
-                    var f0 = bytes[6], f1 = bytes[7], f2 = bytes[8], f3 = bytes[9];
+                    var beatInBar = bytes[4];
+                    var f0 = bytes[5], f1 = bytes[6], f2 = bytes[7], f3 = bytes[8];
                     var beat = new DataView(Uint8Array.of(f0, f1, f2, f3).buffer).getFloat32(0, true);
-                    
-                    // Émettre le signal
                     controller.playbackPositionReceived(playing, bar, beatInBar, beat);
                     return;
                 }

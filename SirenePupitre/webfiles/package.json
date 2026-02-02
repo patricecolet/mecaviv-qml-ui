@@ -1,0 +1,9 @@
+{
+  "name": "sirenepupitre-webfiles",
+  "version": "1.0.0",
+  "description": "Serveur et API du Pupitre Sirene",
+  "main": "server.js",
+  "dependencies": {
+    "midi-file": "^1.2.4"
+  }
+}

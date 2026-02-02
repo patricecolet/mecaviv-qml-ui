@@ -328,7 +328,7 @@ Le **premier byte** de chaque message binaire identifie son type :
 | Type | Hex | Usage | Taille | Source |
 |------|-----|-------|--------|--------|
 | CONFIG | 0x00 | Configuration complète (JSON) | Variable (8 bytes header + données) | PureData |
-| **POSITION** | **0x01** | **Position lecture (bar/beat)** | **10 bytes** | **PureData/Séquenceur** |
+| **POSITION** | **0x01** | **Position lecture (tick seul)** | **6 bytes** | **PureData/Séquenceur** |
 | **CONTROLLERS** | **0x02** | **États contrôleurs physiques** | **16 bytes** | **Contrôleurs physiques** |
 | **MIDI_NOTE_VOLANT** | **0x03** | **Note MIDI du volant (contrôleur)** | **5 bytes** | **Volant physique** |
 | MIDI_NOTE_DURATION | 0x04 | Note MIDI avec durée (séquence) | 5 bytes | Fichier MIDI |
@@ -347,25 +347,24 @@ Le **premier byte** de chaque message binaire identifie son type :
 - `0x04` : Notes de la séquence avec durée → Mode jeu uniquement
 - `0x05` : Control Change (vibrato, tremolo, enveloppe) → Modulations en mode jeu
 
-**Position lecture (type 0x01, 10 bytes)** :
+**Position lecture (type 0x01, 6 bytes) — tick seul, JS dérive bar/beat** :
+
+Tu envoies uniquement le **tick** (position MIDI en pulses). Le Pupitre a déjà BPM et PPQ du fichier (chargé via l’API) et calcule bar/beat/currentTimeMs côté JS.
 
 | Byte | Champ | Type | Plage | Description |
 |------|-------|------|-------|-------------|
 | 0 | Type | uint8 | 0x01 | Identifiant POSITION |
 | 1 | Flags | uint8 | 0-255 | bit0=playing, autres réservés |
-| 2-3 | barNumber | uint16 | 0-65535 | Numéro de mesure (LE) |
-| 4-5 | beatInBar | uint16 | 0-65535 | Beat dans la mesure (LE) |
-| 6-9 | beat | float32 | 0.0+ | Beat total décimal (LE) |
+| 2-5 | tick | uint32 | 0-4294967295 | Position en ticks MIDI (LE) |
 
 **Format** :
 ```
-[0x01][Flags][Bar_L][Bar_H][BeatInBar_L][BeatInBar_H][Beat_f32LE]
+[0x01][Flags][Tick_L][Tick_H][Tick_2][Tick_3]
 ```
 
-**Exemple** : Mesure 13, beat 2, beat total 50.5, playing=true
-```
-[0x01, 0x01, 0x0D, 0x00, 0x02, 0x00, 0x00, 0x00, 0x49, 0x42]
-```
+**Exemple décimal** : playing=true, tick=9600 → `1, 1, 128, 37, 0, 0` (9600 = 0x2580, LE = 0x80, 0x25, 0, 0)
+
+**Format legacy (9 bytes)** : bar, beatInBar, beat — toujours accepté pour rétrocompatibilité.
 
 **Note MIDI volant (type 0x03, 5 bytes)** :
 
