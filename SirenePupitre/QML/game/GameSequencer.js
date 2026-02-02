@@ -208,8 +208,12 @@ function positionToMsWithMaps(bar, beatInBar, beat, ppq, tempoMap, timeSignature
     var pq = ppq || _ppq || 480;
     var tmap = tempoMap && tempoMap.length > 0 ? tempoMap : null;
     var smap = timeSignatureMap && timeSignatureMap.length > 0 ? timeSignatureMap : null;
-    if (!tmap || !smap)
-        return positionToMs(bar, beatInBar, beat, _bpm || 120);
+    if (!tmap || !smap) {
+        var ms = positionToMs(bar, beatInBar, beat, _bpm || 120);
+        if (typeof console !== "undefined" && console.log)
+            console.log("[positionToMsWithMaps] fallback (maps vides) bar=" + bar + " -> timeMs=" + ms);
+        return ms;
+    }
     var tick = positionToTick(bar, beatInBar, beat, pq, smap);
     return tickToMs(tick, pq, tmap);
 }
@@ -243,6 +247,8 @@ function positionFromMs(currentTimeMs, bpm, ppq, tempoMap, timeSignatureMap) {
         var bar = Math.floor(totalBeats / 4) + 1;
         var beatInBar = (Math.floor(totalBeats) % 4) + 1;
         var beat = (totalBeats % 4) + 1;
+        if (typeof console !== "undefined" && console.log && bar <= 1 && currentTimeMs > 2000)
+            console.log("[positionFromMs] fallback (maps vides) ms=" + currentTimeMs + " bpm=" + bpm + " -> bar=" + bar);
         return { bar: bar, beatInBar: beatInBar, beat: beat };
     }
     var tick = msToTick(currentTimeMs, pq, tmap);
