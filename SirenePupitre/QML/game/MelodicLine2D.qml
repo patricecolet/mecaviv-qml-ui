@@ -1,6 +1,7 @@
 import QtQuick
 import "../components/ambitus"
 import "."
+import "GameSequencer.js" as GameSequencer
 
 /**
  * Ligne mélodique 2D : gère les segments et crée les notes en chute (FallingNote2D).
@@ -94,8 +95,13 @@ Item {
             "tremoloAmount": root.tremoloAmount,
             "tremoloRate": root.tremoloRate
         }
-        if (fallDurationMs > 0 && fallDurationMs < 30000)
+        // Toujours définir fallDurationMs si calculateFallDurationMs a retourné une valeur valide
+        if (fallDurationMs > 0 && fallDurationMs < 30000) {
             opts["fallDurationMs"] = fallDurationMs
+        } else if (fallDurationMs === 0) {
+            // Si fallDurationMs est 0, utiliser fixedFallTime pour garantir que l'élément démarre en haut
+            opts["fallDurationMs"] = root.fixedFallTime
+        }
 
         var newNote = noteComponent.createObject(root, opts)
 
@@ -132,7 +138,12 @@ Item {
                 var existing = _segmentNotes[sk]
                 if (!existing) {
                     var t = seg.timestamp || 0
-                    var fallMs = t - currentTimeMs
+                    // Utilise la fonction utilitaire partagée pour calculer fallDurationMs
+                    var fallMs = GameSequencer.calculateFallDurationMs(
+                        t, 
+                        currentTimeMs, 
+                        root.fixedFallTime
+                    )
                     if (fallMs > 0) {
                         var created = createCube(seg, fallMs)
                         if (created && created.targetY !== undefined) {
@@ -148,7 +159,14 @@ Item {
             }
         } else {
             var lastSegment = lineSegments[lineSegments.length - 1]
-            createCube(lastSegment, 0)
+            // Utiliser calculateFallDurationMs même dans ce cas pour garantir que l'élément démarre en haut
+            var t = lastSegment.timestamp || 0
+            var fallMs = GameSequencer.calculateFallDurationMs(
+                t, 
+                currentTimeMs, 
+                root.fixedFallTime
+            )
+            createCube(lastSegment, fallMs)
         }
     }
 

@@ -51,6 +51,7 @@
         <file>QML/components/ambitus/NoteProgressBar2D.qml</file>
         <file>QML/components/ambitus/NoteProgressBar3D.qml</file>
         <file>QML/components/ambitus/GearShiftPositionIndicator.qml</file>
+        <file>QML/components/ambitus/MeasureBar2D.qml</file>
         <file>QML/components/indicators/FaderIndicator.qml</file>
         <file>QML/components/indicators/GearShiftIndicator.qml</file>
         <file>QML/components/indicators/JoystickIndicator.qml</file>
@@ -72,6 +73,7 @@
         <file>QML/game/GameMode.qml</file>
         <file>QML/game/FallingCube.qml</file>
         <file>QML/game/FallingNote2D.qml</file>
+        <file>QML/game/FallingMeasureBar2D.qml</file>
         <file>QML/game/FallingNoteCustomGeo.qml</file>
         <file>QML/game/TestSimpleGeo.qml</file>
         <file>QML/game/GameAutonomyPanel.qml</file>

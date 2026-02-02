@@ -226,6 +226,8 @@ Page {
                 rootWindow: root.rootWindow
             }
 
+            // Les barres de mesure sont maintenant créées dynamiquement dans GameMode
+
             // Transport : mesure, temps, tempo (à gauche du Play) — encadré large pour mesure complète et durée totale
             Rectangle {
                 id: positionInSongFrame
