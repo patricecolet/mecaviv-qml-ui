@@ -202,8 +202,9 @@ Window {
         }
     }
     
-    // Bandeau "Console connectée" (en haut à droite)
+    // Bandeau "Console connectée" (en haut à droite) quand Pd/console est connecté
     Rectangle {
+        z: 5000
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.topMargin: 20
@@ -214,12 +215,36 @@ Window {
         border.color: "#FFA500"
         border.width: 2
         radius: 8
-        visible: configController && configController.consoleConnected // Only visible when console is connected
+        visible: configController && configController.consoleConnected
         
         Text {
             text: "🎛️ CONSOLE CONNECTÉE"
             color: "#000"
             font.pixelSize: 14
+            font.bold: true
+            anchors.centerIn: parent
+        }
+    }
+    
+    // Bandeau "Pure Data non connecté" : visible seulement si pas connecté (ni WebSocket ouvert, ni console)
+    Rectangle {
+        z: 5000
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: 20
+        anchors.rightMargin: 20
+        width: 220
+        height: 35
+        color: "#4a4a4a"
+        border.color: "#888"
+        border.width: 2
+        radius: 8
+        visible: configController && !configController.consoleConnected && !configController.waitingForConfig && !(webSocketController && webSocketController.connected)
+        
+        Text {
+            text: "⚠️ Pure Data non connecté"
+            color: "#ddd"
+            font.pixelSize: 13
             font.bold: true
             anchors.centerIn: parent
         }

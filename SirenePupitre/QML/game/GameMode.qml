@@ -19,7 +19,14 @@ Item {
     property var sequencer: null
 
     property bool isGameModeActive: false
-    property var lineSegmentsData: []
+    property var lineSegmentsData
+
+    Component.onCompleted: {
+        if (lineSegmentsData === undefined)
+            lineSegmentsData = []
+        if (staffWidth === 0)
+            staffWidth = root.width || 1600
+    }
 
     // État local (utilisé quand sequencer est null)
     property real _localTimeMs: 0
@@ -30,7 +37,15 @@ Item {
     property real _localTempoBpm: 120
 
     // Position / transport : depuis sequencer si fourni, sinon état local
-    readonly property real currentTimeMs: root.sequencer ? root.sequencer.currentTimeMs : root._localTimeMs
+    readonly property real currentTimeMs: {
+        if (!root.sequencer) return root._localTimeMs
+        var t = root.sequencer.currentTimeMs
+        // Pendant le preroll, currentTimeMs est négatif puis passe à 0
+        // Pour l'affichage des notes, utiliser max(0, t) pour éviter les valeurs négatives
+        // Cela permet une transition fluide quand Pd prend le contrôle
+        var result = Math.max(0, t)
+        return result
+    }
     readonly property int currentBar: root.sequencer ? root.sequencer.currentBar : root._localBar
     readonly property int currentBeatInBar: root.sequencer ? root.sequencer.currentBeatInBar : root._localBeatInBar
     readonly property real currentBeat: root.sequencer ? root.sequencer.currentBeat : root._localBeat
@@ -42,7 +57,8 @@ Item {
         var t = currentBeat
         if (typeof b !== "number" || typeof t !== "number" || !isFinite(b) || !isFinite(t))
             return "—"
-        var bar = Math.max(1, Math.min(9999, Math.floor(b)))
+        // Permettre les mesures négatives (preroll) ou positives (normal)
+        var bar = b < 0 ? Math.max(-9999, Math.min(-1, Math.floor(b))) : Math.max(1, Math.min(9999, Math.floor(b)))
         var beat = Math.max(1, Math.min(17, t))
         return bar + " · " + beat.toFixed(1)
     }
@@ -64,13 +80,8 @@ Item {
             root.lineSegmentsData = []
             return
         }
-        // Aucune note ne défile tant que Pd n'a pas démarré (pas de position reçue)
-        if (!root.sequencer.receivedPositionSinceStart) {
-            root.lineSegmentsData = []
-            return
-        }
         var notes = root.sequencer.sequencerNotes || []
-        var t = root.sequencer.currentTimeMs
+        var t = root.currentTimeMs  // Utiliser currentTimeMs de GameMode, pas directement du sequencer
         var look = root.sequencer.lookaheadMs || 8000
         var segs = GameSequencer.getSegmentsInWindowFromMs(notes, t, look)
         root.lineSegmentsData = segs
@@ -78,12 +89,9 @@ Item {
     
     // Suivi de la dernière mesure pour créer les barres
     property int _lastBar: 0
-    property int _lastUpdateMeasureBarsLogBar: -1  // pour limiter les logs barres parasites
 
     function createMeasureBar(barNumber) {
         if (!root.sequencer || !root.sequencer.isPlaying) return
-        // Aucune barre ne défile tant que Pd n'a pas démarré
-        if (!root.sequencer.receivedPositionSinceStart) return
 
         // Vérifier si une barre avec ce numéro existe déjà (ignorer les enfants sans measureNumber, ex. Component)
         for (var i = 0; i < measureBarsContainer.children.length; i++) {
@@ -105,7 +113,6 @@ Item {
             }
             if (!found) {
                 delete measureBarsContainer._createdBars[barNumber]
-                console.log("[createMeasureBar] CLEANUP stale bar " + barNumber + " (ref dans _createdBars, plus dans children)")
             } else {
                 return  // Existe déjà dans le conteneur
             }
@@ -146,21 +153,27 @@ Item {
             measureStartMs = (barNumber - 1) * msPerBar
         }
         
-        // Ne jamais créer une barre déjà passée (évite barres parasites : barre détruite puis recréée avec fixedFallTime)
-        if (measureStartMs <= currentTimeMs)
-            return
-
-        // Temps jusqu'à cette mesure (utilise la fonction utilitaire partagée)
         var fixedFallTime = root.sequencer.animationFallDurationMs || 5000
-        var fallDurationMs = GameSequencer.calculateFallDurationMs(
-            measureStartMs,
-            currentTimeMs,
-            fixedFallTime
-        )
-
-        // Ne créer que si la mesure est dans la fenêtre de lookahead
         var lookaheadMs = root.sequencer.lookaheadMs || 8000
-        if (fallDurationMs > 0 && fallDurationMs <= lookaheadMs + fixedFallTime) {
+        var inPreroll = !root.sequencer.receivedPositionSinceStart
+
+        // Barre 1 en preroll : elle part d'en haut et tombe exactement fixedFallTime (5s) pour arriver quand Pd démarre
+        var fallDurationMs = 0
+        if (barNumber === 1 && inPreroll) {
+            fallDurationMs = fixedFallTime
+        } else {
+            // Ne jamais créer une barre déjà passée (sauf barre 1 en preroll ci-dessus)
+            if (measureStartMs <= currentTimeMs)
+                return
+            fallDurationMs = GameSequencer.calculateFallDurationMs(
+                measureStartMs,
+                currentTimeMs,
+                fixedFallTime
+            )
+        }
+
+        // Ne créer que si la mesure est dans la fenêtre (ou barre 1 en preroll)
+        if (fallDurationMs > 0 && (fallDurationMs <= lookaheadMs + fixedFallTime || (barNumber === 1 && inPreroll))) {
             var opts = {
                 "targetY": melodicLine ? melodicLine.cursorBarY : (root.height / 2),
                 "fallSpeed": melodicLine ? melodicLine.fallSpeed : 150,
@@ -170,53 +183,38 @@ Item {
                 "accentColor": "#d1ab00"
             }
             
-            var childrenBefore = measureBarsContainer.children.length
             var newBar = measureBarComponent.createObject(measureBarsContainer, opts)
             if (newBar) {
                 measureBarsContainer._createdBars[barNumber] = newBar
-                console.log("[createMeasureBar] CREATE bar " + barNumber + " childrenBefore=" + childrenBefore + " fallDurationMs=" + fallDurationMs)
-                // Vérifier doublon : combien d'enfants ont ce measureNumber ?
-                var sameNum = 0
-                for (var k = 0; k < measureBarsContainer.children.length; k++) {
-                    var c = measureBarsContainer.children[k]
-                    if (c && typeof c.measureNumber === "number" && c.measureNumber === barNumber) sameNum++
-                }
-                if (sameNum > 1)
-                    console.log("[createMeasureBar] DUPLICATE? bar " + barNumber + " count=" + sameNum)
-                // Note: destroyed.connect non disponible en Qt/WebAssembly ; le nettoyage de _createdBars se fait dans createMeasureBar (barre absente des children)
             }
         }
     }
     
     function updateMeasureBars() {
         if (!root.sequencer || !root.sequencer.isPlaying) return
-        // Aucune barre ne défile tant que Pd n'a pas démarré
-        if (!root.sequencer.receivedPositionSinceStart) {
-            root.clearMeasureBars()
-            return
-        }
 
-        var currentBar = root.sequencer.currentBar || 1
         var lookaheadMs = root.sequencer.lookaheadMs || 8000
         var ppq = root.sequencer.sequencerPpq || 480
         var tempoMap = root.sequencer.sequencerTempoMap || []
         var timeSignatureMap = root.sequencer.sequencerTimeSignatureMap || []
-
-        // Calculer combien de mesures on peut voir dans le lookahead
         var bpm = root.sequencer.sequencerBpm || root.sequencer.currentTempoBpm || 120
         var msPerBeat = 60000 / bpm
         var msPerBar = msPerBeat * 4
         var barsInLookahead = Math.ceil(lookaheadMs / msPerBar)
-        var endBar = currentBar + barsInLookahead
 
-        // Log pour barres parasites : quand currentBar change, tracer la plage créée (hypothèse B : appels avec currentBar différents)
-        if (currentBar !== root._lastUpdateMeasureBarsLogBar) {
-            console.log("[updateMeasureBars] currentBar=" + currentBar + " barsInLookahead=" + barsInLookahead + " range " + currentBar + ".." + endBar + " childrenCount=" + measureBarsContainer.children.length)
-            root._lastUpdateMeasureBarsLogBar = currentBar
+        var startBar = 1
+        var endBar = 0
+        if (root.sequencer.receivedPositionSinceStart) {
+            var currentBar = root.sequencer.currentBar || 1
+            startBar = currentBar
+            endBar = currentBar + barsInLookahead
+        } else {
+            // Preroll : afficher la barre 1 (tombe 5s jusqu'à l'arrivée de Pd) et toutes les barres suivantes dans le lookahead
+            startBar = 1
+            endBar = 1 + barsInLookahead
         }
 
-        // Créer les barres pour les mesures à venir
-        for (var i = currentBar; i <= endBar; i++) {
+        for (var i = startBar; i <= endBar; i++) {
             createMeasureBar(i)
         }
     }
@@ -232,8 +230,8 @@ Item {
     property real attackTime: 0         // CC73 (0-127 → 0ms-38.1s, formule: 38100/(128-cc))
     property real releaseTime: 0        // CC72 (0-127 → 0ms-38.1s, formule: 38100/(128-cc))
     
-    // Propriétés de la portée (staffWidth suit la largeur du conteneur en 2D)
-    property real staffWidth: root.width || 1600
+    // Propriétés de la portée (staffWidth : défaut root.width||1600, peut être surchargé par le parent ex. Test2D)
+    property real staffWidth
     property real staffPosX: 0
     property real lineSpacing: 20
     
@@ -397,18 +395,12 @@ Item {
     }
     
     function clearMeasureBars() {
-        var count = 0
         for (var key in measureBarsContainer._createdBars) {
             var bar = measureBarsContainer._createdBars[key]
-            if (bar && typeof bar.destroy === "function") {
+            if (bar && typeof bar.destroy === "function")
                 bar.destroy()
-                count++
-            }
         }
-        if (count > 0)
-            console.log("[clearMeasureBars] destroyed " + count + " bars")
         measureBarsContainer._createdBars = {}
-        root._lastUpdateMeasureBarsLogBar = -1
     }
     
     // Fonction pour arrêter le jeu
@@ -483,8 +475,12 @@ Item {
         target: root.sequencer
         enabled: !!root.sequencer
         function onCurrentTimeMsChanged() {
-            if (root.useSequencerData)
+            // Toujours recalculer les segments quand currentTimeMs change
+            // Pendant le preroll, currentTimeMs reste à 0 donc les segments restent stables
+            // Après le preroll, currentTimeMs change et les segments sont mis à jour
+            if (root.useSequencerData) {
                 root.updateLineSegmentsFromSequencer()
+            }
             root.updateMeasureBars()
         }
         // Ne pas appeler updateMeasureBars ici : currentBar dérive de currentTimeMs, on évite la double mise à jour

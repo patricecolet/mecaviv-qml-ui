@@ -208,12 +208,8 @@ function positionToMsWithMaps(bar, beatInBar, beat, ppq, tempoMap, timeSignature
     var pq = ppq || _ppq || 480;
     var tmap = tempoMap && tempoMap.length > 0 ? tempoMap : null;
     var smap = timeSignatureMap && timeSignatureMap.length > 0 ? timeSignatureMap : null;
-    if (!tmap || !smap) {
-        var ms = positionToMs(bar, beatInBar, beat, _bpm || 120);
-        if (typeof console !== "undefined" && console.log)
-            console.log("[positionToMsWithMaps] fallback (maps vides) bar=" + bar + " -> timeMs=" + ms);
-        return ms;
-    }
+    if (!tmap || !smap)
+        return positionToMs(bar, beatInBar, beat, _bpm || 120);
     var tick = positionToTick(bar, beatInBar, beat, pq, smap);
     return tickToMs(tick, pq, tmap);
 }
@@ -247,8 +243,6 @@ function positionFromMs(currentTimeMs, bpm, ppq, tempoMap, timeSignatureMap) {
         var bar = Math.floor(totalBeats / 4) + 1;
         var beatInBar = (Math.floor(totalBeats) % 4) + 1;
         var beat = (totalBeats % 4) + 1;
-        if (typeof console !== "undefined" && console.log && bar <= 1 && currentTimeMs > 2000)
-            console.log("[positionFromMs] fallback (maps vides) ms=" + currentTimeMs + " bpm=" + bpm + " -> bar=" + bar);
         return { bar: bar, beatInBar: beatInBar, beat: beat };
     }
     var tick = msToTick(currentTimeMs, pq, tmap);
@@ -277,10 +271,6 @@ function getTotalDurationMs(notes, ppq, tempoMap) {
         }
         if (t > end) end = t;
     }
-    if (typeof console !== "undefined" && console.log && notes.length > 0) {
-        var n0 = notes[0], nL = notes[notes.length - 1];
-        console.log("getTotalDurationMs: totalMs=" + end + ", première note timestampMs=" + n0.timestampMs + " type=" + typeof n0.timestampMs + ", dernière tick=" + nL.tick + " durationTicks=" + nL.durationTicks);
-    }
     return end;
 }
 
@@ -305,16 +295,9 @@ function getTotalBarsFromSignatures(totalDurationMs, ppq, tempoMap, timeSignatur
     var pq = ppq || _ppq || 480;
     var smap = timeSignatureMap && timeSignatureMap.length > 0 ? timeSignatureMap : null;
     var endTick = msToTick(totalDurationMs, pq, tempoMap);
-    if (typeof console !== "undefined" && console.log) {
-        console.log("getTotalBarsFromSignatures: totalDurationMs=" + totalDurationMs + ", endTick=" + endTick + ", ppq=" + pq + ", nb changements signature=" + (smap ? smap.length : 0));
-    }
     if (!smap || smap.length === 0) {
         var beats = (endTick / pq) * 4; // 4 beats par mesure en fallback 4/4
-        var bars = Math.max(1, Math.ceil(beats / 4));
-        if (typeof console !== "undefined" && console.log) {
-            console.log("  (pas de timeSignatureMap) fallback 4/4: beats=" + beats + ", totalBars=" + bars);
-        }
-        return bars;
+        return Math.max(1, Math.ceil(beats / 4));
     }
     var totalBars = 0;
     for (var i = 0; i < smap.length; i++) {
@@ -330,15 +313,8 @@ function getTotalBarsFromSignatures(totalDurationMs, ppq, tempoMap, timeSignatur
         var ticksInSegment = segEnd - segStart;
         var measuresInSegment = ticksInSegment / tpb;
         totalBars += measuresInSegment;
-        if (typeof console !== "undefined" && console.log) {
-            console.log("  segment " + i + ": signature " + num + "/" + den + ", tick " + segStart + " -> " + segEnd + " (fin morceau=" + endTick + "), ticks=" + ticksInSegment + ", ticksPerBar=" + tpb + ", mesures=" + measuresInSegment.toFixed(2) + ", totalBars cumul=" + totalBars.toFixed(2));
-        }
     }
-    var result = Math.max(1, Math.floor(totalBars));
-    if (typeof console !== "undefined" && console.log) {
-        console.log("  -> totalBars final=" + result);
-    }
-    return result;
+    return Math.max(1, Math.floor(totalBars));
 }
 
 /**
@@ -374,16 +350,31 @@ function getSegmentsInWindow(notes, bpm, bar, beatInBar, beat, lookaheadMs) {
 function getSegmentsInWindowFromMs(notes, currentTimeMs, lookaheadMs) {
     if (!notes || notes.length === 0) return [];
     var endMs = currentTimeMs + (lookaheadMs || 8000);
+    var pq = _ppq || 480;
+    var tmap = _tempoMap && _tempoMap.length > 0 ? _tempoMap : null;
     var out = [];
     for (var i = 0; i < notes.length; i++) {
         var n = notes[i];
         var t = n.timestampMs;
+        if (typeof t !== "number" || !isFinite(t)) {
+            if (n.tick != null && typeof n.tick === "number" && pq > 0 && tmap && tmap.length > 0)
+                t = tickToMs(n.tick, pq, tmap);
+            else
+                t = (n.timestamp != null && typeof n.timestamp === "number" && isFinite(n.timestamp)) ? n.timestamp : 0;
+        }
+        var dur = n.durationMs;
+        if (typeof dur !== "number" || !isFinite(dur) || dur <= 0) {
+            if (n.durationTicks != null && typeof n.durationTicks === "number" && n.tick != null && pq > 0 && tmap && tmap.length > 0)
+                dur = tickToMs(n.tick + n.durationTicks, pq, tmap) - tickToMs(n.tick, pq, tmap);
+            else
+                dur = n.duration || 500;
+        }
         if (t >= currentTimeMs && t <= endMs) {
             out.push({
                 timestamp: t,
                 note: n.note,
                 velocity: n.velocity || 100,
-                duration: n.durationMs || 500,
+                duration: dur,
                 x: 0,
                 vibrato: false,
                 tremolo: false,

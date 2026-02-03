@@ -35,10 +35,10 @@ Item {
     property real tremoloAmount: 0.0
     property real tremoloRate: 4.0
 
-    // Hauteurs en pixels (même formules que 3D)
+    // Hauteurs en pixels (même formules que 3D). Minimum 18 px pour que les notes courtes (ex. noires 250 ms) restent visibles.
     readonly property real fixedDistance: fallSpeed * (fixedFallTime / 1000)
-    readonly property real totalDurationHeight: Math.max(0.1, (duration / 1000.0) * fallSpeed)
-    readonly property real releaseHeight: Math.max(0.05, (releaseTime / 1000.0) * fallSpeed)
+    readonly property real totalDurationHeight: Math.max(18, (duration / 1000.0) * fallSpeed)
+    readonly property real releaseHeight: Math.max(4, (releaseTime / 1000.0) * fallSpeed)
     readonly property real totalHeight: totalDurationHeight + releaseHeight
 
     readonly property real spawnY: fallDurationMs > 0
@@ -47,7 +47,9 @@ Item {
     property real currentY: spawnY
 
     // Troncature monophonique : hauteur visible depuis le bas (coordonnée locale comme en 3D)
-    property real clipYTopLocal: totalDurationHeight / 2.0 + releaseHeight + 100
+    property bool _truncated
+    property real _clipYTruncateOverride
+    readonly property real clipYTopLocal: _truncated ? _clipYTruncateOverride : (totalDurationHeight / 2.0 + releaseHeight + 100)
 
     // Largeur visuelle (esthétique à affiner : pour l'instant liée à la vélocité)
     readonly property real noteWidth: 16 + (velocity / 127) * 16
@@ -61,7 +63,11 @@ Item {
     height: _visibleHeight
 
     function truncateNote(atLocalY) {
-        clipYTopLocal = atLocalY
+        // Éviter que clipYTopLocal rende _visibleHeight trop petit (rectangle invisible) — garder au moins 10 px de hauteur visible
+        var minVisibleHeight = 10
+        var minClip = minVisibleHeight - totalHeight / 2
+        _truncated = true
+        _clipYTruncateOverride = Math.max(atLocalY, minClip)
     }
 
     // Chute : durée = fallDurationMs si séquenceur, sinon fixedFallTime + déplacement

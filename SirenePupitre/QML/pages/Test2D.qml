@@ -284,6 +284,7 @@ Page {
 
             // Play/Stop (en bas à gauche, 1/4)
             Rectangle {
+                id: playStopButton
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 20
                 x: parent.width * 0.25 - width / 2
@@ -316,10 +317,12 @@ Page {
                                 }
                                 if (sequencerController)
                                     sequencerController.startFromZero()
+                                // Activer l'affichage dès le début pour voir les mesures preroll
+                                root.transportDisplayActive = true
                                 var fallMs = (sequencerController && sequencerController.animationFallDurationMs > 0)
                                     ? sequencerController.animationFallDurationMs
                                     : (root._gameModeItem && root._gameModeItem.melodicLine ? root._gameModeItem.melodicLine.fixedFallTime : 5000)
-                                playPdDelayTimer.interval = Math.max(0, Math.round(fallMs))
+                                playStopButton._playPdDelayIntervalMs = Math.max(0, Math.round(fallMs))
                                 playPdDelayTimer.start()
                             } else {
                                 playPdDelayTimer.stop()
@@ -337,9 +340,10 @@ Page {
                         }
                     }
                 }
+                property int _playPdDelayIntervalMs
                 Timer {
                     id: playPdDelayTimer
-                    interval: sequencerController ? sequencerController.animationFallDurationMs : 5000
+                    interval: playStopButton._playPdDelayIntervalMs || 5000
                     repeat: false
                     onTriggered: {
                         root.transportDisplayActive = true

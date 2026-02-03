@@ -26,6 +26,8 @@ Item {
     property real ambitusOffset: 0
     property real fallSpeed: 150
     property real fixedFallTime: 5000
+    /** Pendant la pré-mesure (avant premier message Pd), les notes du début doivent partir du haut avec fixedFallTime + timestamp. */
+    property bool isPreRoll: false
 
     property real centerY: height / 2
     property real cursorOffsetY: 30
@@ -50,6 +52,7 @@ Item {
     property var currentNote: null
     // Segments pour lesquels une note en chute existe déjà (clé = "timestamp-note") — on ne détruit jamais une note "sortie" de la fenêtre, elle finit sa chute
     property var _segmentNotes: ({})
+    property int _lastLoggedSegments: 0
 
     Component {
         id: noteComponent
@@ -105,14 +108,13 @@ Item {
 
         var newNote = noteComponent.createObject(root, opts)
 
-        if (currentTimeMs <= 0 && currentNote !== null && newNote !== null) {
+        if (currentTimeMs < 0 && currentNote !== null && newNote !== null) {
             var newNoteBottom = newNote.currentY + newNote.totalDurationHeight / 2
             var deltaY = newNoteBottom - currentNote.currentY
-            var localClip = deltaY
-            currentNote.truncateNote(localClip)
+            currentNote.truncateNote(deltaY)
         }
 
-        if (currentTimeMs <= 0)
+        if (currentTimeMs < 0)
             currentNote = newNote
         return newNote
     }
@@ -138,12 +140,13 @@ Item {
                 var existing = _segmentNotes[sk]
                 if (!existing) {
                     var t = seg.timestamp || 0
-                    // Utilise la fonction utilitaire partagée pour calculer fallDurationMs
-                    var fallMs = GameSequencer.calculateFallDurationMs(
-                        t, 
-                        currentTimeMs, 
-                        root.fixedFallTime
-                    )
+                    // Pré-mesure : notes du début partent du haut (fixedFallTime + timestamp)
+                    // Cas spécial : à currentTimeMs=0, les premières notes doivent partir du haut avec fixedFallTime
+                    var fallMs = root.isPreRoll
+                        ? (root.fixedFallTime + (t || 0))
+                        : (currentTimeMs === 0 && t < root.fixedFallTime)
+                            ? root.fixedFallTime  // Premières notes : partir du haut avec durée fixe
+                            : GameSequencer.calculateFallDurationMs(t, currentTimeMs, root.fixedFallTime)
                     if (fallMs > 0) {
                         var created = createCube(seg, fallMs)
                         if (created && created.targetY !== undefined) {
@@ -154,18 +157,15 @@ Item {
                             }
                             createdCount++
                         }
+                        }
                     }
-                }
             }
         } else {
             var lastSegment = lineSegments[lineSegments.length - 1]
-            // Utiliser calculateFallDurationMs même dans ce cas pour garantir que l'élément démarre en haut
             var t = lastSegment.timestamp || 0
-            var fallMs = GameSequencer.calculateFallDurationMs(
-                t, 
-                currentTimeMs, 
-                root.fixedFallTime
-            )
+            var fallMs = root.isPreRoll
+                ? (root.fixedFallTime + (t || 0))
+                : GameSequencer.calculateFallDurationMs(t, currentTimeMs, root.fixedFallTime)
             createCube(lastSegment, fallMs)
         }
     }
@@ -176,7 +176,8 @@ Item {
             if (child && child.targetY !== undefined)
                 child.destroy()
         }
-        _segmentNotes = {}
+        for (var k in _segmentNotes)
+            delete _segmentNotes[k]
         currentNote = null
     }
 }
