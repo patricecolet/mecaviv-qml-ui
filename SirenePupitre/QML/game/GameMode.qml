@@ -37,14 +37,13 @@ Item {
     property real _localTempoBpm: 120
 
     // Position / transport : depuis sequencer si fourni, sinon état local
+    /** Temps "layout" : temps réel du séquenceur (négatif en preroll). Utilisé pour segments, barres et durée de chute des notes (aligné avec les barres). */
+    readonly property real layoutTimeMs: root.sequencer ? root.sequencer.currentTimeMs : root._localTimeMs
+    /** Temps pour affichage / compat : >= 0 (0 pendant preroll). Utiliser layoutTimeMs pour barres et notes. */
     readonly property real currentTimeMs: {
         if (!root.sequencer) return root._localTimeMs
         var t = root.sequencer.currentTimeMs
-        // Pendant le preroll, currentTimeMs est négatif puis passe à 0
-        // Pour l'affichage des notes, utiliser max(0, t) pour éviter les valeurs négatives
-        // Cela permet une transition fluide quand Pd prend le contrôle
-        var result = Math.max(0, t)
-        return result
+        return Math.max(0, t)
     }
     readonly property int currentBar: root.sequencer ? root.sequencer.currentBar : root._localBar
     readonly property int currentBeatInBar: root.sequencer ? root.sequencer.currentBeatInBar : root._localBeatInBar
@@ -81,7 +80,7 @@ Item {
             return
         }
         var notes = root.sequencer.sequencerNotes || []
-        var t = root.currentTimeMs  // Utiliser currentTimeMs de GameMode, pas directement du sequencer
+        var t = root.layoutTimeMs  // Même référence que les barres (négatif en preroll) pour aligner notes et barres
         var look = root.sequencer.lookaheadMs || 8000
         var segs = GameSequencer.getSegmentsInWindowFromMs(notes, t, look)
         root.lineSegmentsData = segs
@@ -90,129 +89,96 @@ Item {
     // Suivi de la dernière mesure pour créer les barres
     property int _lastBar: 0
 
-    function createMeasureBar(barNumber) {
-        if (!root.sequencer || !root.sequencer.isPlaying) return
-
-        // Vérifier si une barre avec ce numéro existe déjà (ignorer les enfants sans measureNumber, ex. Component)
-        for (var i = 0; i < measureBarsContainer.children.length; i++) {
-            var child = measureBarsContainer.children[i]
-            if (child && typeof child.measureNumber === "number" && child.measureNumber === barNumber) {
-                return  // Déjà créée
-            }
+    /** Retourne true si une barre pour ce numéro existe déjà (source unique : _createdBars + vérif parent). */
+    function _measureBarExists(barNumber) {
+        var bar = measureBarsContainer._createdBars[barNumber]
+        if (!bar) return false
+        // Vérifier que la barre est toujours dans le conteneur (pas encore détruite)
+        // Si parent est null/undefined, la barre est en cours de destruction
+        if (!bar.parent || bar.parent !== measureBarsContainer) {
+            console.log("[GameMode] _measureBarExists: bar=%1 détectée comme détruite (parent=%2), nettoyage"
+                        .arg(barNumber)
+                        .arg(bar.parent ? "autre" : "null"))
+            delete measureBarsContainer._createdBars[barNumber]
+            return false
         }
-        
-        // Nettoyer la map des barres détruites
-        var existingBar = measureBarsContainer._createdBars[barNumber]
-        if (existingBar) {
-            var found = false
-            for (var j = 0; j < measureBarsContainer.children.length; j++) {
-                if (measureBarsContainer.children[j] === existingBar) {
-                    found = true
-                    break
-                }
-            }
-            if (!found) {
-                delete measureBarsContainer._createdBars[barNumber]
-            } else {
-                return  // Existe déjà dans le conteneur
-            }
-        }
+        return true
+    }
 
-        var currentTimeMs = root.sequencer.currentTimeMs || 0
-        var ppq = root.sequencer.sequencerPpq || 480
-        var tempoMap = root.sequencer.sequencerTempoMap || []
-        var timeSignatureMap = root.sequencer.sequencerTimeSignatureMap || []
-        
-        // Calculer le temps en ms du début de cette mesure
-        var measureStartMs = 0
+    /** Temps en ms du début de la mesure (négatif pour preroll). */
+    function _measureStartMsForBar(barNumber) {
+        var seq = root.sequencer
+        var bpm = seq.sequencerBpm || seq.currentTempoBpm || 120
+        var msPerBar = (60000 / bpm) * 4
+        if (barNumber < 0)
+            return barNumber * msPerBar
+        var ppq = seq.sequencerPpq || 480
+        var tempoMap = seq.sequencerTempoMap || []
+        var timeSignatureMap = seq.sequencerTimeSignatureMap || []
         if (tempoMap.length > 0 && timeSignatureMap.length > 0) {
-            measureStartMs = GameSequencer.positionToMsWithMaps(
-                barNumber, 1, 1.0,
-                ppq, tempoMap, timeSignatureMap
-            )
-            // Tenir compte des mesures vides au début : utiliser le timestamp de la première note comme référence
-            var notes = root.sequencer.sequencerNotes || []
+            var measureStartMs = GameSequencer.positionToMsWithMaps(barNumber, 1, 1.0, ppq, tempoMap, timeSignatureMap)
+            var notes = seq.sequencerNotes || []
             if (notes.length > 0) {
                 var firstNoteTimeMs = notes[0].timestampMs
                 for (var ni = 1; ni < notes.length; ni++) {
                     var tn = notes[ni].timestampMs
-                    if (typeof tn === "number" && tn < firstNoteTimeMs)
-                        firstNoteTimeMs = tn
+                    if (typeof tn === "number" && tn < firstNoteTimeMs) firstNoteTimeMs = tn
                 }
                 if (typeof firstNoteTimeMs === "number") {
                     var measure1TimeMs = GameSequencer.positionToMsWithMaps(1, 1, 1.0, ppq, tempoMap, timeSignatureMap)
-                    var offsetMs = firstNoteTimeMs - measure1TimeMs
-                    measureStartMs = measureStartMs + offsetMs
+                    measureStartMs = measureStartMs + (firstNoteTimeMs - measure1TimeMs)
                 }
             }
-        } else {
-            // Fallback : calcul simple avec BPM fixe
-            var bpm = root.sequencer.sequencerBpm || root.sequencer.currentTempoBpm || 120
-            var msPerBeat = 60000 / bpm
-            var msPerBar = msPerBeat * 4
-            measureStartMs = (barNumber - 1) * msPerBar
+            return measureStartMs
         }
-        
+        return (barNumber - 1) * msPerBar
+    }
+
+    /** Durée de chute en ms (0 = ne pas créer, barre déjà passée). */
+    function _fallDurationMsForMeasureBar(measureStartMs, currentTimeMs, fixedFallTime) {
+        return GameSequencer.calculateFallDurationMs(measureStartMs, currentTimeMs, fixedFallTime)
+    }
+
+    function createMeasureBar(barNumber) {
+        if (!root.sequencer || !root.sequencer.isPlaying) return
+        if (_measureBarExists(barNumber)) return
+
+        var currentTimeMs = root.layoutTimeMs || 0
         var fixedFallTime = root.sequencer.animationFallDurationMs || 5000
-        var lookaheadMs = root.sequencer.lookaheadMs || 8000
-        var inPreroll = !root.sequencer.receivedPositionSinceStart
+        var measureStartMs = _measureStartMsForBar(barNumber)
+        var fallDurationMs = _fallDurationMsForMeasureBar(measureStartMs, currentTimeMs, fixedFallTime)
+        
+        // Ne pas créer si la barre est déjà passée
+        if (fallDurationMs <= 0) return
 
-        // Barre 1 en preroll : elle part d'en haut et tombe exactement fixedFallTime (5s) pour arriver quand Pd démarre
-        var fallDurationMs = 0
-        if (barNumber === 1 && inPreroll) {
-            fallDurationMs = fixedFallTime
-        } else {
-            // Ne jamais créer une barre déjà passée (sauf barre 1 en preroll ci-dessus)
-            if (measureStartMs <= currentTimeMs)
-                return
-            fallDurationMs = GameSequencer.calculateFallDurationMs(
-                measureStartMs,
-                currentTimeMs,
-                fixedFallTime
-            )
+        var targetY = melodicLine ? melodicLine.cursorBarY : (root.height / 2)
+        var fallSpeed = melodicLine ? melodicLine.fallSpeed : 150
+
+        var opts = {
+            "targetY": targetY,
+            "fallSpeed": fallSpeed,
+            "fixedFallTime": fixedFallTime,
+            "fallDurationMs": fallDurationMs,
+            "measureNumber": barNumber,
+            "accentColor": "#d1ab00"
         }
 
-        // Ne créer que si la mesure est dans la fenêtre (ou barre 1 en preroll)
-        if (fallDurationMs > 0 && (fallDurationMs <= lookaheadMs + fixedFallTime || (barNumber === 1 && inPreroll))) {
-            var opts = {
-                "targetY": melodicLine ? melodicLine.cursorBarY : (root.height / 2),
-                "fallSpeed": melodicLine ? melodicLine.fallSpeed : 150,
-                "fixedFallTime": fixedFallTime,
-                "fallDurationMs": fallDurationMs,
-                "measureNumber": barNumber,
-                "accentColor": "#d1ab00"
-            }
-            
-            var newBar = measureBarComponent.createObject(measureBarsContainer, opts)
-            if (newBar) {
-                measureBarsContainer._createdBars[barNumber] = newBar
-            }
-        }
+        var newBar = measureBarComponent.createObject(measureBarsContainer, opts)
+        if (newBar)
+            measureBarsContainer._createdBars[barNumber] = newBar
     }
     
     function updateMeasureBars() {
         if (!root.sequencer || !root.sequencer.isPlaying) return
 
         var lookaheadMs = root.sequencer.lookaheadMs || 8000
-        var ppq = root.sequencer.sequencerPpq || 480
-        var tempoMap = root.sequencer.sequencerTempoMap || []
-        var timeSignatureMap = root.sequencer.sequencerTimeSignatureMap || []
         var bpm = root.sequencer.sequencerBpm || root.sequencer.currentTempoBpm || 120
-        var msPerBeat = 60000 / bpm
-        var msPerBar = msPerBeat * 4
+        var msPerBar = (60000 / bpm) * 4
         var barsInLookahead = Math.ceil(lookaheadMs / msPerBar)
 
-        var startBar = 1
-        var endBar = 0
-        if (root.sequencer.receivedPositionSinceStart) {
-            var currentBar = root.sequencer.currentBar || 1
-            startBar = currentBar
-            endBar = currentBar + barsInLookahead
-        } else {
-            // Preroll : afficher la barre 1 (tombe 5s jusqu'à l'arrivée de Pd) et toutes les barres suivantes dans le lookahead
-            startBar = 1
-            endBar = 1 + barsInLookahead
-        }
+        var currentBar = root.sequencer.currentBar || 1
+        var startBar = Math.max(1, currentBar)
+        var endBar = currentBar + barsInLookahead
 
         for (var i = startBar; i <= endBar; i++) {
             createMeasureBar(i)
@@ -294,9 +260,8 @@ Item {
         anchors.fill: parent
         
         fixedFallTime: root.sequencer ? root.sequencer.animationFallDurationMs : 5000
-        isPreRoll: false
         lineSegments: root.lineSegmentsData
-        currentTimeMs: root.currentTimeMs
+        currentTimeMs: root.layoutTimeMs
         lineSpacing: root.lineSpacing
         clef: root.clef
         ambitusMin: root.ambitusMin

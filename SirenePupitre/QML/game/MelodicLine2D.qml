@@ -26,8 +26,6 @@ Item {
     property real ambitusOffset: 0
     property real fallSpeed: 150
     property real fixedFallTime: 5000
-    /** Pendant la pré-mesure (avant premier message Pd), les notes du début doivent partir du haut avec fixedFallTime + timestamp. */
-    property bool isPreRoll: false
 
     property real centerY: height / 2
     property real cursorOffsetY: 30
@@ -81,6 +79,9 @@ Item {
         var vel = segment.velocity
         if (vel === 0 || vel === undefined)
             return null
+        // Ne pas créer si la note est déjà passée
+        if (fallDurationMs <= 0)
+            return null
 
         var opts = {
             "targetY": root.cursorBarY,
@@ -88,6 +89,7 @@ Item {
             "midiNote": segment.note,
             "fallSpeed": root.fallSpeed,
             "fixedFallTime": root.fixedFallTime,
+            "fallDurationMs": fallDurationMs,
             "cubeColor": noteToColor(segment.note),
             "velocity": vel,
             "duration": segment.duration ?? 1000,
@@ -98,24 +100,8 @@ Item {
             "tremoloAmount": root.tremoloAmount,
             "tremoloRate": root.tremoloRate
         }
-        // Toujours définir fallDurationMs si calculateFallDurationMs a retourné une valeur valide
-        if (fallDurationMs > 0 && fallDurationMs < 30000) {
-            opts["fallDurationMs"] = fallDurationMs
-        } else if (fallDurationMs === 0) {
-            // Si fallDurationMs est 0, utiliser fixedFallTime pour garantir que l'élément démarre en haut
-            opts["fallDurationMs"] = root.fixedFallTime
-        }
 
         var newNote = noteComponent.createObject(root, opts)
-
-        if (currentTimeMs < 0 && currentNote !== null && newNote !== null) {
-            var newNoteBottom = newNote.currentY + newNote.totalDurationHeight / 2
-            var deltaY = newNoteBottom - currentNote.currentY
-            currentNote.truncateNote(deltaY)
-        }
-
-        if (currentTimeMs < 0)
-            currentNote = newNote
         return newNote
     }
 
@@ -131,42 +117,23 @@ Item {
             clearAllNotes()
             return
         }
-        // Séquenceur lookahead : on crée uniquement les notes manquantes. On ne détruit jamais une note parce qu'elle a "quitté" la fenêtre — elle finit sa chute et se détruit (onFinished).
-        if (currentTimeMs >= 0 && lineSegments.length > 0) {
-            var createdCount = 0
-            for (var j = 0; j < lineSegments.length; j++) {
-                var seg = lineSegments[j]
-                var sk = segmentKey(seg)
-                var existing = _segmentNotes[sk]
-                if (!existing) {
-                    var t = seg.timestamp || 0
-                    // Pré-mesure : notes du début partent du haut (fixedFallTime + timestamp)
-                    // Cas spécial : à currentTimeMs=0, les premières notes doivent partir du haut avec fixedFallTime
-                    var fallMs = root.isPreRoll
-                        ? (root.fixedFallTime + (t || 0))
-                        : (currentTimeMs === 0 && t < root.fixedFallTime)
-                            ? root.fixedFallTime  // Premières notes : partir du haut avec durée fixe
-                            : GameSequencer.calculateFallDurationMs(t, currentTimeMs, root.fixedFallTime)
-                    if (fallMs > 0) {
-                        var created = createCube(seg, fallMs)
-                        if (created && created.targetY !== undefined) {
-                            var key = sk
-                            _segmentNotes[key] = created
-                            if (typeof created.destroyed !== "undefined" && created.destroyed.connect) {
-                                created.destroyed.connect((function(k) { return function() { delete root._segmentNotes[k] } })(key))
-                            }
-                            createdCount++
-                        }
-                        }
+        // Créer les notes manquantes pour tous les segments dans la fenêtre
+        for (var j = 0; j < lineSegments.length; j++) {
+            var seg = lineSegments[j]
+            var sk = segmentKey(seg)
+            if (_segmentNotes[sk])
+                continue  // Note déjà créée
+            var t = seg.timestamp || 0
+            var fallMs = GameSequencer.calculateFallDurationMs(t, currentTimeMs, root.fixedFallTime)
+            if (fallMs > 0) {
+                var created = createCube(seg, fallMs)
+                if (created) {
+                    _segmentNotes[sk] = created
+                    if (typeof created.destroyed !== "undefined" && created.destroyed.connect) {
+                        created.destroyed.connect((function(k) { return function() { delete root._segmentNotes[k] } })(sk))
                     }
+                }
             }
-        } else {
-            var lastSegment = lineSegments[lineSegments.length - 1]
-            var t = lastSegment.timestamp || 0
-            var fallMs = root.isPreRoll
-                ? (root.fixedFallTime + (t || 0))
-                : GameSequencer.calculateFallDurationMs(t, currentTimeMs, root.fixedFallTime)
-            createCube(lastSegment, fallMs)
         }
     }
 

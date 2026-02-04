@@ -386,23 +386,15 @@ function getSegmentsInWindowFromMs(notes, currentTimeMs, lookaheadMs) {
 }
 
 /**
- * Calcule la durée de chute (fallDurationMs) pour un élément (note ou barre de mesure)
- * en garantissant qu'il apparaît toujours en haut de l'écran, même s'il est dans le passé ou actuel.
+ * Calcule la durée de chute (fallDurationMs) pour un élément (note ou barre de mesure).
+ * Prend en compte le délai MIDI : la note au temps t sera jouée à currentTimeMs = t + midiDelay.
  * 
  * @param {number} targetTimeMs - Temps de début de l'élément (note ou mesure)
  * @param {number} currentTimeMs - Temps actuel du séquenceur
- * @param {number} fixedFallTime - Durée de chute par défaut (ms)
- * @returns {number} Durée de chute calculée (ms)
+ * @param {number} midiDelay - Délai MIDI en ms (= fixedFallTime, typiquement 5000ms)
+ * @returns {number} Durée de chute (ms), 0 si l'élément est déjà passé
  */
-function calculateFallDurationMs(targetTimeMs, currentTimeMs, fixedFallTime) {
-    var fallDurationMs = targetTimeMs - currentTimeMs;
-    
-    // Si l'élément est dans le passé ou actuel (fallDurationMs <= 0),
-    // utiliser fixedFallTime pour qu'il apparaisse à une distance fixe depuis le curseur vers le haut
-    // La référence est toujours le curseur (targetY), pas le haut de l'écran
-    if (fallDurationMs <= 0) {
-        fallDurationMs = fixedFallTime;
-    }
-    
-    return fallDurationMs;
+function calculateFallDurationMs(targetTimeMs, currentTimeMs, midiDelay) {
+    var fallDurationMs = targetTimeMs + midiDelay - currentTimeMs;
+    return fallDurationMs > 0 ? fallDurationMs : 0;
 }

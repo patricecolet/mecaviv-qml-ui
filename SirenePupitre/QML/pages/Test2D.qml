@@ -317,15 +317,18 @@ Page {
                                 }
                                 if (sequencerController)
                                     sequencerController.startFromZero()
-                                // Activer l'affichage dès le début pour voir les mesures preroll
                                 root.transportDisplayActive = true
-                                var fallMs = (sequencerController && sequencerController.animationFallDurationMs > 0)
+                                // Envoyer play immédiatement avec délai MIDI pour que PD retarde la sortie audio
+                                var midiDelayMs = (sequencerController && sequencerController.animationFallDurationMs > 0)
                                     ? sequencerController.animationFallDurationMs
-                                    : (root._gameModeItem && root._gameModeItem.melodicLine ? root._gameModeItem.melodicLine.fixedFallTime : 5000)
-                                playStopButton._playPdDelayIntervalMs = Math.max(0, Math.round(fallMs))
-                                playPdDelayTimer.start()
+                                    : 5000
+                                root.webSocketController.sendBinaryMessage({
+                                    type: "MIDI_TRANSPORT",
+                                    action: "play",
+                                    midiDelayMs: Math.round(midiDelayMs),
+                                    source: "pupitre"
+                                })
                             } else {
-                                playPdDelayTimer.stop()
                                 root.transportDisplayActive = false
                                 root.webSocketController.sendBinaryMessage({
                                     type: "MIDI_TRANSPORT",
@@ -340,22 +343,6 @@ Page {
                         }
                     }
                 }
-                property int _playPdDelayIntervalMs
-                Timer {
-                    id: playPdDelayTimer
-                    interval: playStopButton._playPdDelayIntervalMs || 5000
-                    repeat: false
-                    onTriggered: {
-                        root.transportDisplayActive = true
-                        if (root.webSocketController)
-                            root.webSocketController.sendBinaryMessage({
-                                type: "MIDI_TRANSPORT",
-                                action: "play",
-                                source: "pupitre"
-                            })
-                    }
-                }
-
                 Column {
                     anchors.centerIn: parent
                     spacing: 5
