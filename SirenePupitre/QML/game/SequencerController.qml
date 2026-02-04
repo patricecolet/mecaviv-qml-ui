@@ -160,16 +160,19 @@ Item {
         ws.playbackPositionReceived.connect(function(playing, bar, beatInBar, beat) {
             if (!playing) root.reset()
             if (playing) {
-                // Pd envoie mesure 0 = première mesure → afficher mesure 1 (1-based)
+                // Utiliser bar/beat de Pd uniquement pour recaler le temps (Pd peut être en retard)
                 var bar1 = Math.max(1, bar)
-                root.currentBar = bar1
-                root.currentBeatInBar = Math.max(1, Math.min(16, beatInBar || 1))
-                root.currentBeat = Math.max(1, Math.min(17, (typeof beat === "number" && isFinite(beat)) ? beat : 1))
                 var timeMs = GameSequencer.positionToMsWithMaps(bar1, beatInBar, beat, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
                 root.lastPositionMs = timeMs
                 root.currentTimeMs = timeMs
                 root._lastUpdateTimestamp = Date.now()
                 root.currentTempoBpm = GameSequencer.getBpmAtMs(timeMs, root.sequencerPpq, root.sequencerTempoMap, root.sequencerBpm)
+                // Affichage = mesure à targetY (ce qui est joué), pas à spawn (délai MIDI)
+                var displayTimeMs = timeMs - root.animationFallDurationMs
+                var pos = GameSequencer.positionFromMs(displayTimeMs, root.sequencerBpm, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
+                root.currentBar = Math.max(1, Math.min(9999, Math.floor(pos.bar)))
+                root.currentBeatInBar = Math.max(1, Math.min(16, Math.floor(pos.beatInBar || 1)))
+                root.currentBeat = Math.max(1, Math.min(17, (typeof pos.beat === "number" && isFinite(pos.beat)) ? pos.beat : 1))
             }
             root.isPlaying = playing
             root.previousBeat = beat
@@ -191,8 +194,9 @@ Item {
             var delta = now - root._lastUpdateTimestamp
             root.currentTimeMs = root.lastPositionMs + delta
             
-            // Calculer bar/beat à partir du temps
-            var pos = GameSequencer.positionFromMs(root.currentTimeMs, root.sequencerBpm, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
+            // Affichage = mesure à targetY (ce qui est joué), pas à spawn (délai MIDI)
+            var displayTimeMs = root.currentTimeMs - root.animationFallDurationMs
+            var pos = GameSequencer.positionFromMs(displayTimeMs, root.sequencerBpm, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
             root.currentBar = Math.max(1, Math.min(9999, Math.floor(pos.bar)))
             root.currentBeatInBar = Math.max(1, Math.min(16, Math.floor(pos.beatInBar || 1)))
             root.currentBeat = Math.max(1, Math.min(17, (typeof pos.beat === "number" && isFinite(pos.beat)) ? pos.beat : 1))

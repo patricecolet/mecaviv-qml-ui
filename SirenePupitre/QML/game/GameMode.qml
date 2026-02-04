@@ -171,14 +171,18 @@ Item {
     function updateMeasureBars() {
         if (!root.sequencer || !root.sequencer.isPlaying) return
 
+        var currentTimeMs = root.layoutTimeMs || 0
+        var fixedFallTime = root.sequencer.animationFallDurationMs || 5000
         var lookaheadMs = root.sequencer.lookaheadMs || 8000
         var bpm = root.sequencer.sequencerBpm || root.sequencer.currentTempoBpm || 120
         var msPerBar = (60000 / bpm) * 4
         var barsInLookahead = Math.ceil(lookaheadMs / msPerBar)
 
         var currentBar = root.sequencer.currentBar || 1
-        var startBar = Math.max(1, currentBar)
-        var endBar = currentBar + barsInLookahead
+        // Inclure toutes les barres dont la fenêtre de chute n'est pas encore fermée
+        // (sinon on rate des barres si currentBar saute ou si une barre a été détruite)
+        var startBar = Math.max(1, Math.floor((currentTimeMs - fixedFallTime) / msPerBar) + 1)
+        var endBar = Math.max(currentBar + barsInLookahead, startBar)
 
         for (var i = startBar; i <= endBar; i++) {
             createMeasureBar(i)

@@ -103,7 +103,7 @@ Item {
                 id: songTitleText
                 anchors.centerIn: parent
                 anchors.margins: 10
-                text: root.sequencer ? root.sequencer.currentSongTitle : "Morceau…"
+                text: root.sequencer ? (root.sequencer.currentSongTitle || "Morceaux") : "Morceaux"
                 color: "#fff"
                 font.pixelSize: 14
                 font.bold: true

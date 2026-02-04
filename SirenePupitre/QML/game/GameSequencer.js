@@ -136,6 +136,8 @@ function tickToPosition(tick, ppq, timeSignatureMap) {
         den = map[i].denominator || 4;
     }
     var tpb = ticksPerBar(ppq, num, den);
+    // Nombre de mesures complètes dans le segment courant (cas map.length === 1 ou dernier segment)
+    bar += Math.floor((tick - lastTick) / tpb);
     var ticksInCurrentBar = (tick - lastTick) % tpb;
     var ticksPerBeat = tpb / num;
     var beatInBar = Math.floor(ticksInCurrentBar / ticksPerBeat) + 1;
