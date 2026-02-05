@@ -82,6 +82,10 @@ Item {
         var notes = root.sequencer.sequencerNotes || []
         var t = root.layoutTimeMs  // Même référence que les barres (négatif en preroll) pour aligner notes et barres
         var look = root.sequencer.lookaheadMs || 8000
+        // En fin de morceau : étendre le lookahead jusqu'à la fin du contenu pour que les dernières notes restent visibles
+        var contentEndMs = root.sequencer.endOfPieceMs - (root.sequencer.animationFallDurationMs || 5000)
+        if (contentEndMs > 0 && t < contentEndMs)
+            look = Math.max(look, contentEndMs - t)
         var segs = GameSequencer.getSegmentsInWindowFromMs(notes, t, look)
         root.lineSegmentsData = segs
     }
@@ -152,14 +156,6 @@ Item {
         var fixedFallTime = root.sequencer.animationFallDurationMs || 5000
         var measureStartMs = _measureStartMsForBar(barNumber)
         var fallDurationMs = _fallDurationMsForMeasureBar(measureStartMs, currentTimeMs, fixedFallTime)
-        
-        // Log pour debug mesures 4-10
-        if (barNumber >= 4 && barNumber <= 10) {
-            console.log("[createMeasureBar] bar=" + barNumber + 
-                       " measureStartMs=" + measureStartMs.toFixed(0) +
-                       " currentTimeMs=" + currentTimeMs.toFixed(0) +
-                       " fallDurationMs=" + fallDurationMs.toFixed(0))
-        }
         
         // Ne pas créer si la barre est déjà passée
         if (fallDurationMs <= 0) return

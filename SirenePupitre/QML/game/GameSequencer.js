@@ -11,7 +11,6 @@ var _bpm = 120;
 var _ppq = 480;
 var _tempoMap = [];
 var _timeSignatureMap = [];
-var _lastFallbackLog = 0;  // Pour limiter les logs de fallback
 
 /**
  * Retourne l'URL de base pour l'API (même logique que GameAutonomyPanel).
@@ -44,21 +43,6 @@ function loadNotes(path, channelOrTrack, callback) {
             try {
                 var resp = JSON.parse(xhr.responseText);
                 if (resp.type === "MIDI_NOTES" && resp.notes) {
-                    console.log("[GameSequencer.loadNotes] Réponse API reçue:")
-                    console.log("  resp.tempoMap:", resp.tempoMap ? "[" + resp.tempoMap.length + "]" : "null/undefined")
-                    console.log("  resp.timeSignatureMap:", resp.timeSignatureMap ? "[" + resp.timeSignatureMap.length + "]" : "null/undefined")
-                    if (resp.tempoMap && resp.tempoMap.length > 0) {
-                        console.log("  resp.tempoMap[0]:", JSON.stringify(resp.tempoMap[0]))
-                    }
-                    if (resp.timeSignatureMap && resp.timeSignatureMap.length > 0) {
-                        console.log("  resp.timeSignatureMap[0]:", JSON.stringify(resp.timeSignatureMap[0]))
-                        if (resp.timeSignatureMap.length > 1) {
-                            console.log("  resp.timeSignatureMap[1]:", JSON.stringify(resp.timeSignatureMap[1]))
-                        }
-                        // Afficher toutes les entrées pour voir les ticks
-                        console.log("  resp.timeSignatureMap complète (tous les ticks):", resp.timeSignatureMap.map(function(e) { return e.tick }).join(", "))
-                    }
-                    
                     _notes = resp.notes;
                     _bpm = resp.bpm || 120;
                     _ppq = resp.ppq || 480;
@@ -91,32 +75,30 @@ function loadNotes(path, channelOrTrack, callback) {
                     // Trier par tick croissant (au cas où l'API ne le ferait pas)
                     _timeSignatureMap.sort(function(a, b) { return a.tick - b.tick })
                     
-                    console.log("[GameSequencer.loadNotes] Maps finales (après nettoyage doublons):")
-                    console.log("  _tempoMap:", _tempoMap.length, "éléments")
-                    console.log("  _timeSignatureMap:", _timeSignatureMap.length, "éléments")
-                    if (_timeSignatureMap.length > 0) {
-                        var ticks = _timeSignatureMap.map(function(e) { return e.tick + ":" + e.numerator + "/" + e.denominator })
-                        console.log("  _timeSignatureMap ticks:", ticks.join(", "))
-                    }
+                    // Log des maps au chargement du morceau
+                    var tempoStr = _tempoMap.length ? _tempoMap.map(function(e) { return e.tick + ":" + Math.round(60000000 / (e.microsecondsPerQuarter || 500000)) }).join("bpm ") : "—"
+                    var sigStr = _timeSignatureMap.length ? _timeSignatureMap.map(function(e) { return e.tick + ":" + e.numerator + "/" + e.denominator }).join(", ") : "—"
+                    console.log("[GameSequencer.loadNotes] Morceau chargé — tempoMap(tick:bpm):", tempoStr, "| timeSignatureMap(tick:num/den):", sigStr)
                     
-                    callback(_notes, _bpm, _ppq, _tempoMap, _timeSignatureMap);
+                    var endOfTrackTick = (resp.endOfTrackTick != null && typeof resp.endOfTrackTick === "number" && resp.endOfTrackTick >= 0) ? resp.endOfTrackTick : null;
+                    callback(_notes, _bpm, _ppq, _tempoMap, _timeSignatureMap, endOfTrackTick);
                 } else {
                     _notes = [];
                     _tempoMap = [];
                     _timeSignatureMap = [];
-                    callback(null, 0, 0, [], []);
+                    callback(null, 0, 0, [], [], null);
                 }
             } catch (e) {
                 _notes = [];
                 _tempoMap = [];
                 _timeSignatureMap = [];
-                callback(null, 0, 0, [], []);
+                callback(null, 0, 0, [], [], null);
             }
         } else {
             _notes = [];
             _tempoMap = [];
             _timeSignatureMap = [];
-            callback(null, 0, 0, [], []);
+            callback(null, 0, 0, [], [], null);
         }
     };
     xhr.send();
@@ -179,19 +161,6 @@ function tickToPosition(tick, ppq, timeSignatureMap) {
     var num = map[0].numerator || 4;
     var den = map[0].denominator || 4;
     
-    // Log pour debug lors des changements de signature (seulement près des transitions critiques)
-    var shouldLog = false;
-    if (map.length > 1) {
-        for (var logIdx = 0; logIdx < map.length; logIdx++) {
-            var changeTick = map[logIdx].tick;
-            // Log si on est à moins de 200 ticks d'un changement de signature (pour réduire le spam)
-            if (Math.abs(tick - changeTick) < 200) {
-                shouldLog = true;
-                break;
-            }
-        }
-    }
-    
     // Trouver le segment dans lequel se trouve le tick
     var segmentEndIdx = map.length;
     for (var i = 1; i < map.length; i++) {
@@ -203,13 +172,6 @@ function tickToPosition(tick, ppq, timeSignatureMap) {
         var tpb = ticksPerBar(ppq, num, den);
         var ticksInSegment = map[i].tick - lastTick;
         var barsInSegment = Math.floor(ticksInSegment / tpb);
-        if (shouldLog) {
-            console.log("[tickToPosition] Segment " + (i-1) + "->" + i + ": tick=" + tick + 
-                       " lastTick=" + lastTick + " map[i].tick=" + map[i].tick +
-                       " sig=" + num + "/" + den + " tpb=" + tpb + 
-                       " ticksInSegment=" + ticksInSegment + " barsInSegment=" + barsInSegment +
-                       " bar avant=" + bar + " bar après=" + (bar + barsInSegment))
-        }
         bar += barsInSegment;
         lastTick = map[i].tick;
         num = map[i].numerator || 4;
@@ -237,14 +199,6 @@ function tickToPosition(tick, ppq, timeSignatureMap) {
     
     bar += barsInCurrentSegment;
     
-    if (shouldLog) {
-        console.log("[tickToPosition] Segment final: tick=" + tick + " lastTick=" + lastTick +
-                   " sig=" + num + "/" + den + " tpb=" + tpb +
-                   " ticksFromLastChange=" + ticksFromLastChange +
-                   " barsInCurrentSegment=" + barsInCurrentSegment +
-                   " ticksInCurrentBar=" + ticksInCurrentBar + " bar=" + bar)
-    }
-    
     var ticksPerBeat = tpb / num;
     var beatInBarRaw = Math.floor(ticksInCurrentBar / ticksPerBeat) + 1;
     var beatDecimal = (ticksInCurrentBar / ticksPerBeat) + 1;
@@ -252,10 +206,6 @@ function tickToPosition(tick, ppq, timeSignatureMap) {
     // Protection : beatInBar ne doit pas dépasser num
     var beatInBar = Math.min(beatInBarRaw, num);
     var beat = Math.min(beatDecimal, num + 0.9999);
-    
-    if (shouldLog) {
-        console.log("[tickToPosition] Résultat: bar=" + bar + " beatInBar=" + beatInBar + " beat=" + beat.toFixed(2))
-    }
     
     return { bar: bar, beatInBar: beatInBar, beat: beat };
 }
@@ -380,23 +330,6 @@ function positionFromMs(currentTimeMs, bpm, ppq, tempoMap, timeSignatureMap) {
     var pq = ppq || _ppq || 480;
     var tmap = tempoMap && tempoMap.length > 0 ? tempoMap : null;
     var smap = timeSignatureMap && timeSignatureMap.length > 0 ? timeSignatureMap : null;
-    
-    // Log pour debug changements de signature (une seule fois par seconde max)
-    if (!tmap || !smap) {
-        var now = Date.now()
-        if (!_lastFallbackLog || (now - _lastFallbackLog) > 1000) {
-            _lastFallbackLog = now
-            console.log("[positionFromMs] FALLBACK utilisé - currentTimeMs=" + currentTimeMs + 
-                        " tempoMap=" + (tempoMap ? "[" + tempoMap.length + "]" : "null/undefined") +
-                        " timeSignatureMap=" + (timeSignatureMap ? "[" + timeSignatureMap.length + "]" : "null/undefined"))
-            if (tempoMap && tempoMap.length > 0) {
-                console.log("[positionFromMs] tempoMap contenu:", JSON.stringify(tempoMap.slice(0, 3)))
-            }
-            if (timeSignatureMap && timeSignatureMap.length > 0) {
-                console.log("[positionFromMs] timeSignatureMap contenu:", JSON.stringify(timeSignatureMap.slice(0, 3)))
-            }
-        }
-    }
     
     if (!tmap || !smap) {
         if (!bpm || bpm <= 0) bpm = 120;

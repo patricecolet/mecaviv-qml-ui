@@ -113,10 +113,11 @@ Item {
     }
 
     onLineSegmentsChanged: {
-        if (lineSegments.length === 0) {
-            clearAllNotes()
+        // Ne PAS détruire les notes quand lineSegments est vide :
+        // les notes en chute se détruisent elles-mêmes à la fin de leur animation.
+        // clearAllNotes() n'est appelé que sur un stop explicite.
+        if (lineSegments.length === 0)
             return
-        }
         // Créer les notes manquantes pour tous les segments dans la fenêtre
         for (var j = 0; j < lineSegments.length; j++) {
             var seg = lineSegments[j]

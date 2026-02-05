@@ -28,6 +28,8 @@ Item {
     property real currentTempoBpm: 120
     property int totalBars: 1
     property real totalDurationMs: 0
+    /** Fin du morceau en ms (meta end-of-track ou dernier tick). Utilisé pour envoyer stop quand targetY l’atteint. */
+    property real endOfPieceMs: 0
 
     // Morceau chargé
     property string currentMidiPath: ""
@@ -41,9 +43,6 @@ Item {
     /** Durée de chute (ms) jusqu'au point de jeu — même valeur que l'animation (MelodicLine2D). Délai avant envoi de « play » à Pd. */
     property real animationFallDurationMs: 5000
     
-    // Pour limiter les logs de debug
-    property real _lastPositionLog: 0
-    property real _lastExtrapolationLog: 0
     // Cache pour optimiser les calculs de position
     property real _lastPositionTimeMs: -1
     property var _lastPositionResult: null
@@ -85,6 +84,7 @@ Item {
         root.currentBeat = 1.0
         root.currentTempoBpm = 120
         root.totalDurationMs = 0
+        root.endOfPieceMs = 0
         root.isPlaying = false
         root.previousBeat = -1
         root.lastPositionMs = 0
@@ -120,6 +120,21 @@ Item {
         root.currentTempoBpm = GameSequencer.getBpmAtMs(timeMs, root.sequencerPpq, root.sequencerTempoMap, root.sequencerBpm)
     }
 
+    /** Envoie stop à Pd et met à jour l’UI (fin du morceau atteinte à targetY). */
+    function requestStop() {
+        if (root.configController && root.configController.webSocketController) {
+            root.configController.webSocketController.sendBinaryMessage({
+                type: "MIDI_TRANSPORT",
+                action: "stop",
+                source: "pupitre"
+            })
+        }
+        if (root.rootWindow) {
+            root.rootWindow.userRequestedStop = true
+            root.rootWindow.isGamePlaying = false
+        }
+    }
+
     function getChannelForCurrentSiren() {
         if (!root.configController || !root.configController.primarySiren || !root.configController.config) return 0
         var sirens = root.configController.config.sirenConfig && root.configController.config.sirenConfig.sirens
@@ -139,27 +154,7 @@ Item {
     function reloadNotesForCurrentChannel() {
         if (!root.currentMidiPath || !root.configController) return
         var channelOrTrack = root.getChannelForCurrentSiren()
-        GameSequencer.loadNotes(root.currentMidiPath, channelOrTrack, function(notes, bpm, ppq, tempoMap, timeSignatureMap) {
-            console.log("[SequencerController] reloadNotesForCurrentChannel - Chargement terminé:")
-            console.log("  notes:", notes ? notes.length : 0)
-            console.log("  tempoMap:", tempoMap ? "[" + tempoMap.length + "]" : "null/undefined")
-            console.log("  timeSignatureMap:", timeSignatureMap ? "[" + timeSignatureMap.length + "]" : "null/undefined")
-            if (tempoMap && tempoMap.length > 0) {
-                console.log("  tempoMap[0]:", JSON.stringify(tempoMap[0]))
-            }
-            if (timeSignatureMap && timeSignatureMap.length > 0) {
-                console.log("  timeSignatureMap[0]:", JSON.stringify(timeSignatureMap[0]))
-                if (timeSignatureMap.length > 1) {
-                    console.log("  timeSignatureMap[1]:", JSON.stringify(timeSignatureMap[1]))
-                }
-                // Afficher tous les ticks pour voir les changements
-                var ticks = []
-                for (var ti = 0; ti < timeSignatureMap.length; ti++) {
-                    ticks.push(timeSignatureMap[ti].tick + ":" + timeSignatureMap[ti].numerator + "/" + timeSignatureMap[ti].denominator)
-                }
-                console.log("  timeSignatureMap ticks:", ticks.join(", "))
-            }
-            
+        GameSequencer.loadNotes(root.currentMidiPath, channelOrTrack, function(notes, bpm, ppq, tempoMap, timeSignatureMap, endOfTrackTick) {
             root.sequencerNotes = notes || []
             root.sequencerPpq = ppq || 480
             root.sequencerTempoMap = tempoMap || []
@@ -169,6 +164,13 @@ Item {
             else
                 root.sequencerBpm = (typeof bpm === "number" && bpm > 0) ? bpm : 120
             root.totalDurationMs = GameSequencer.getTotalDurationMs(root.sequencerNotes, ppq, tempoMap)
+            // Fin du morceau : meta end-of-track si fournie, sinon dernier tick (fin dernière note)
+            // + falltime pour que le stop soit envoyé quand la fin a atteint targetY (dernières notes jouées)
+            var endMs = (endOfTrackTick != null && typeof endOfTrackTick === "number" && endOfTrackTick >= 0)
+                ? GameSequencer.tickToMs(endOfTrackTick, ppq, tempoMap)
+                : root.totalDurationMs
+            var fallMs = root.animationFallDurationMs || 5000
+            root.endOfPieceMs = endMs + fallMs
             // Calcul du nombre de mesures via changements de signature (ticks entre changements -> mesures par signature)
             root.totalBars = GameSequencer.getTotalBarsFromSignatures(root.totalDurationMs, ppq, tempoMap, timeSignatureMap)
         })
@@ -183,6 +185,13 @@ Item {
             if (playing) {
                 var timeMs = GameSequencer.tickToMs(tick, root.sequencerPpq, root.sequencerTempoMap)
                 root.applyPositionFromPd(playing, timeMs)
+                if (root.endOfPieceMs > 0 && timeMs >= root.endOfPieceMs) {
+                    root.requestStop()
+                    root.reset()
+                    root.isPlaying = false
+                    root.previousBeat = tick
+                    return
+                }
             }
             root.isPlaying = playing
             root.previousBeat = tick
@@ -196,17 +205,17 @@ Item {
                 root.lastPositionMs = timeMs
                 root.currentTimeMs = timeMs
                 root._lastUpdateTimestamp = Date.now()
+                // Fin du morceau : quand la position (targetY) atteint la fin, envoyer stop
+                if (root.endOfPieceMs > 0 && timeMs >= root.endOfPieceMs) {
+                    root.requestStop()
+                    root.reset()
+                    root.isPlaying = false
+                    root.previousBeat = beat
+                    return
+                }
                 root.currentTempoBpm = GameSequencer.getBpmAtMs(timeMs, root.sequencerPpq, root.sequencerTempoMap, root.sequencerBpm)
                 // Affichage = mesure à targetY (ce qui est joué), pas à spawn (délai MIDI)
                 var displayTimeMs = timeMs - root.animationFallDurationMs
-                // Log seulement toutes les secondes pour éviter le spam
-                var now = Date.now()
-                if (!root._lastPositionLog || (now - root._lastPositionLog) > 1000) {
-                    root._lastPositionLog = now
-                    console.log("[SequencerController] playbackPositionReceived - displayTimeMs=" + displayTimeMs +
-                               " tempoMap=" + (root.sequencerTempoMap ? "[" + root.sequencerTempoMap.length + "]" : "null") +
-                               " timeSignatureMap=" + (root.sequencerTimeSignatureMap ? "[" + root.sequencerTimeSignatureMap.length + "]" : "null"))
-                }
                 var pos = GameSequencer.positionFromMs(displayTimeMs, root.sequencerBpm, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
                 // Mettre à jour le cache
                 root._lastPositionTimeMs = displayTimeMs
@@ -235,6 +244,13 @@ Item {
             var delta = now - root._lastUpdateTimestamp
             root.currentTimeMs = root.lastPositionMs + delta
             
+            // Fin du morceau : quand la position (targetY) atteint la fin, envoyer stop
+            if (root.endOfPieceMs > 0 && root.currentTimeMs >= root.endOfPieceMs) {
+                root.requestStop()
+                root.reset()
+                return
+            }
+            
             // Affichage = mesure à targetY (ce qui est joué), pas à spawn (délai MIDI)
             var displayTimeMs = root.currentTimeMs - root.animationFallDurationMs
             
@@ -243,14 +259,6 @@ Item {
             var pos = GameSequencer.positionFromMs(displayTimeMs, root.sequencerBpm, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
             root._lastPositionTimeMs = displayTimeMs
             root._lastPositionResult = pos
-            
-            // Log seulement toutes les 2 secondes pour éviter le spam
-            if (!root._lastExtrapolationLog || (now - root._lastExtrapolationLog) > 2000) {
-                root._lastExtrapolationLog = now
-                console.log("[SequencerController] extrapolationTimer - displayTimeMs=" + displayTimeMs +
-                           " tempoMap=" + (root.sequencerTempoMap ? "[" + root.sequencerTempoMap.length + "]" : "null") +
-                           " timeSignatureMap=" + (root.sequencerTimeSignatureMap ? "[" + root.sequencerTimeSignatureMap.length + "]" : "null"))
-            }
             
             root.currentBar = Math.max(1, Math.min(9999, Math.floor(pos.bar)))
             root.currentBeatInBar = Math.max(1, Math.min(16, Math.floor(pos.beatInBar || 1)))

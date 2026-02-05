@@ -221,6 +221,23 @@ function extractNotesByMidiChannel(parsed, midiChannel, tempoMap, ppq) {
 }
 
 /**
+ * Retourne le tick de fin du morceau : max des ticks de fin de chaque piste
+ * (somme des deltaTime = position du dernier événement ou meta end-of-track).
+ */
+function getEndOfTrackTick(parsed) {
+    if (!parsed.tracks || parsed.tracks.length === 0) return null;
+    let maxTick = 0;
+    for (const track of parsed.tracks) {
+        let tick = 0;
+        for (const ev of track) {
+            tick += ev.deltaTime;
+        }
+        if (tick > maxTick) maxTick = tick;
+    }
+    return maxTick;
+}
+
+/**
  * GET /api/midi/notes?path=xxx&channel=N&byChannel=0|1
  * byChannel=1 : channel = canal MIDI 0-15 (sirène = canal). Sinon channel = index de piste 0-based.
  */
@@ -256,6 +273,7 @@ async function getMidiNotes(req, res) {
         const firstTempo = tempoMap[0].microsecondsPerQuarter;
         const bpm = Math.round(60000000 / firstTempo);
 
+        const endOfTrackTick = getEndOfTrackTick(parsed);
         const response = {
             type: 'MIDI_NOTES',
             path: pathParam,
@@ -265,7 +283,8 @@ async function getMidiNotes(req, res) {
             ppq,
             tempoMap,
             timeSignatureMap,
-            notes
+            notes,
+            endOfTrackTick: endOfTrackTick != null ? endOfTrackTick : undefined
         };
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
