@@ -121,17 +121,22 @@ Item {
         for (var j = 0; j < lineSegments.length; j++) {
             var seg = lineSegments[j]
             var sk = segmentKey(seg)
-            if (_segmentNotes[sk])
-                continue  // Note déjà créée
+            if (_segmentNotes[sk]) {
+                // Vérifier si la note existe encore (pas détruite)
+                var existingNote = _segmentNotes[sk]
+                if (!existingNote || !existingNote.parent) {
+                    // Note détruite, la retirer du cache pour permettre recreation si nécessaire
+                    delete _segmentNotes[sk]
+                } else {
+                    continue  // Note existe encore
+                }
+            }
             var t = seg.timestamp || 0
             var fallMs = GameSequencer.calculateFallDurationMs(t, currentTimeMs, root.fixedFallTime)
             if (fallMs > 0) {
                 var created = createCube(seg, fallMs)
                 if (created) {
                     _segmentNotes[sk] = created
-                    if (typeof created.destroyed !== "undefined" && created.destroyed.connect) {
-                        created.destroyed.connect((function(k) { return function() { delete root._segmentNotes[k] } })(sk))
-                    }
                 }
             }
         }

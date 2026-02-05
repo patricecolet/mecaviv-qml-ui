@@ -88,17 +88,32 @@ Item {
     
     // Suivi de la dernière mesure pour créer les barres
     property int _lastBar: 0
+    // Cache pour éviter les recalculs trop fréquents
+    property real _lastUpdateMeasureBarsTime: -1
+    property int _lastStartBar: 0
+    property int _lastEndBar: 0
+    // Numéro de la plus grande barre déjà affichée (pour éviter de recréer les barres détruites)
+    property int _highestBarShown: 0
 
-    /** Retourne true si une barre pour ce numéro existe déjà (source unique : _createdBars + vérif parent). */
+    /** Retourne true si une barre pour ce numéro existe déjà ou a déjà été affichée et détruite. */
     function _measureBarExists(barNumber) {
+        // Si cette barre a déjà été affichée et détruite, ne pas la recréer
+        if (barNumber <= root._highestBarShown) {
+            var bar = measureBarsContainer._createdBars[barNumber]
+            // Seulement retourner true si la barre n'existe pas (a été détruite)
+            // ou si elle existe encore
+            if (!bar) return true  // Déjà affichée et détruite
+            if (!bar.parent || bar.parent !== measureBarsContainer) {
+                delete measureBarsContainer._createdBars[barNumber]
+                return true  // Déjà affichée et détruite
+            }
+            return true  // Existe encore
+        }
+        
         var bar = measureBarsContainer._createdBars[barNumber]
         if (!bar) return false
         // Vérifier que la barre est toujours dans le conteneur (pas encore détruite)
-        // Si parent est null/undefined, la barre est en cours de destruction
         if (!bar.parent || bar.parent !== measureBarsContainer) {
-            console.log("[GameMode] _measureBarExists: bar=%1 détectée comme détruite (parent=%2), nettoyage"
-                        .arg(barNumber)
-                        .arg(bar.parent ? "autre" : "null"))
             delete measureBarsContainer._createdBars[barNumber]
             return false
         }
@@ -116,19 +131,9 @@ Item {
         var tempoMap = seq.sequencerTempoMap || []
         var timeSignatureMap = seq.sequencerTimeSignatureMap || []
         if (tempoMap.length > 0 && timeSignatureMap.length > 0) {
+            // Utiliser directement positionToMsWithMaps sans ajustement firstNoteTimeMs
+            // pour éviter les incohérences lors des changements de signature
             var measureStartMs = GameSequencer.positionToMsWithMaps(barNumber, 1, 1.0, ppq, tempoMap, timeSignatureMap)
-            var notes = seq.sequencerNotes || []
-            if (notes.length > 0) {
-                var firstNoteTimeMs = notes[0].timestampMs
-                for (var ni = 1; ni < notes.length; ni++) {
-                    var tn = notes[ni].timestampMs
-                    if (typeof tn === "number" && tn < firstNoteTimeMs) firstNoteTimeMs = tn
-                }
-                if (typeof firstNoteTimeMs === "number") {
-                    var measure1TimeMs = GameSequencer.positionToMsWithMaps(1, 1, 1.0, ppq, tempoMap, timeSignatureMap)
-                    measureStartMs = measureStartMs + (firstNoteTimeMs - measure1TimeMs)
-                }
-            }
             return measureStartMs
         }
         return (barNumber - 1) * msPerBar
@@ -148,6 +153,14 @@ Item {
         var measureStartMs = _measureStartMsForBar(barNumber)
         var fallDurationMs = _fallDurationMsForMeasureBar(measureStartMs, currentTimeMs, fixedFallTime)
         
+        // Log pour debug mesures 4-10
+        if (barNumber >= 4 && barNumber <= 10) {
+            console.log("[createMeasureBar] bar=" + barNumber + 
+                       " measureStartMs=" + measureStartMs.toFixed(0) +
+                       " currentTimeMs=" + currentTimeMs.toFixed(0) +
+                       " fallDurationMs=" + fallDurationMs.toFixed(0))
+        }
+        
         // Ne pas créer si la barre est déjà passée
         if (fallDurationMs <= 0) return
 
@@ -164,8 +177,12 @@ Item {
         }
 
         var newBar = measureBarComponent.createObject(measureBarsContainer, opts)
-        if (newBar)
+        if (newBar) {
             measureBarsContainer._createdBars[barNumber] = newBar
+            // Enregistrer la plus grande barre affichée pour éviter de la recréer après destruction
+            if (barNumber > root._highestBarShown)
+                root._highestBarShown = barNumber
+        }
     }
     
     function updateMeasureBars() {
@@ -174,19 +191,52 @@ Item {
         var currentTimeMs = root.layoutTimeMs || 0
         var fixedFallTime = root.sequencer.animationFallDurationMs || 5000
         var lookaheadMs = root.sequencer.lookaheadMs || 8000
+        var ppq = root.sequencer.sequencerPpq || 480
+        var tempoMap = root.sequencer.sequencerTempoMap || []
+        var timeSignatureMap = root.sequencer.sequencerTimeSignatureMap || []
         var bpm = root.sequencer.sequencerBpm || root.sequencer.currentTempoBpm || 120
-        var msPerBar = (60000 / bpm) * 4
-        var barsInLookahead = Math.ceil(lookaheadMs / msPerBar)
 
-        var currentBar = root.sequencer.currentBar || 1
-        // Inclure toutes les barres dont la fenêtre de chute n'est pas encore fermée
-        // (sinon on rate des barres si currentBar saute ou si une barre a été détruite)
-        var startBar = Math.max(1, Math.floor((currentTimeMs - fixedFallTime) / msPerBar) + 1)
-        var endBar = Math.max(currentBar + barsInLookahead, startBar)
+        // Optimisation : éviter les recalculs trop fréquents (max toutes les 200ms)
+        // Sauf si on a changé de mesure ou si les maps ont changé
+        var timeSinceLastUpdate = currentTimeMs - root._lastUpdateMeasureBarsTime
+        var currentBar = root.sequencer ? root.sequencer.currentBar : 1
+        var needsFullRecalc = (timeSinceLastUpdate < 0 || timeSinceLastUpdate > 200) || 
+                              (root._lastStartBar === 0 || root._lastEndBar === 0) ||
+                              (currentBar < root._lastStartBar || currentBar > root._lastEndBar)
+        
+        if (!needsFullRecalc && root._lastStartBar > 0 && root._lastEndBar > 0) {
+            // Mise à jour incrémentale : seulement créer les nouvelles barres nécessaires
+            var endTimeMs = currentTimeMs + lookaheadMs
+            var endPos = GameSequencer.positionFromMs(endTimeMs, bpm, ppq, tempoMap, timeSignatureMap)
+            var newEndBar = Math.max(root._lastStartBar, Math.ceil(endPos.bar))
+            
+            // Créer seulement les barres manquantes à la fin
+            if (newEndBar > root._lastEndBar) {
+                for (var i = root._lastEndBar + 1; i <= newEndBar; i++) {
+                    createMeasureBar(i)
+                }
+                root._lastEndBar = newEndBar
+            }
+            return
+        }
+
+        // Recalcul complet
+        var startTimeMs = Math.max(0, currentTimeMs - fixedFallTime)
+        var startPos = GameSequencer.positionFromMs(startTimeMs, bpm, ppq, tempoMap, timeSignatureMap)
+        var startBar = Math.max(1, Math.floor(startPos.bar))
+
+        var endTimeMs = currentTimeMs + lookaheadMs
+        var endPos = GameSequencer.positionFromMs(endTimeMs, bpm, ppq, tempoMap, timeSignatureMap)
+        var endBar = Math.max(startBar, Math.ceil(endPos.bar))
 
         for (var i = startBar; i <= endBar; i++) {
             createMeasureBar(i)
         }
+        
+        // Mettre à jour le cache
+        root._lastUpdateMeasureBarsTime = currentTimeMs
+        root._lastStartBar = startBar
+        root._lastEndBar = endBar
     }
 
     // Signal pour recevoir les événements MIDI
@@ -370,6 +420,11 @@ Item {
                 bar.destroy()
         }
         measureBarsContainer._createdBars = {}
+        // Réinitialiser le cache
+        root._lastUpdateMeasureBarsTime = -1
+        root._lastStartBar = 0
+        root._lastEndBar = 0
+        root._highestBarShown = 0
     }
     
     // Fonction pour arrêter le jeu

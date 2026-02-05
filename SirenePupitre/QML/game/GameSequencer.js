@@ -11,6 +11,7 @@ var _bpm = 120;
 var _ppq = 480;
 var _tempoMap = [];
 var _timeSignatureMap = [];
+var _lastFallbackLog = 0;  // Pour limiter les logs de fallback
 
 /**
  * Retourne l'URL de base pour l'API (même logique que GameAutonomyPanel).
@@ -43,11 +44,61 @@ function loadNotes(path, channelOrTrack, callback) {
             try {
                 var resp = JSON.parse(xhr.responseText);
                 if (resp.type === "MIDI_NOTES" && resp.notes) {
+                    console.log("[GameSequencer.loadNotes] Réponse API reçue:")
+                    console.log("  resp.tempoMap:", resp.tempoMap ? "[" + resp.tempoMap.length + "]" : "null/undefined")
+                    console.log("  resp.timeSignatureMap:", resp.timeSignatureMap ? "[" + resp.timeSignatureMap.length + "]" : "null/undefined")
+                    if (resp.tempoMap && resp.tempoMap.length > 0) {
+                        console.log("  resp.tempoMap[0]:", JSON.stringify(resp.tempoMap[0]))
+                    }
+                    if (resp.timeSignatureMap && resp.timeSignatureMap.length > 0) {
+                        console.log("  resp.timeSignatureMap[0]:", JSON.stringify(resp.timeSignatureMap[0]))
+                        if (resp.timeSignatureMap.length > 1) {
+                            console.log("  resp.timeSignatureMap[1]:", JSON.stringify(resp.timeSignatureMap[1]))
+                        }
+                        // Afficher toutes les entrées pour voir les ticks
+                        console.log("  resp.timeSignatureMap complète (tous les ticks):", resp.timeSignatureMap.map(function(e) { return e.tick }).join(", "))
+                    }
+                    
                     _notes = resp.notes;
                     _bpm = resp.bpm || 120;
                     _ppq = resp.ppq || 480;
-                    _tempoMap = resp.tempoMap && resp.tempoMap.length > 0 ? resp.tempoMap : [{ tick: 0, microsecondsPerQuarter: 500000 }];
-                    _timeSignatureMap = resp.timeSignatureMap && resp.timeSignatureMap.length > 0 ? resp.timeSignatureMap : [{ tick: 0, numerator: 4, denominator: 4 }];
+                    
+                    // Nettoyer tempoMap : supprimer les doublons de tick (garder la première) et trier par tick
+                    var rawTempoMap = resp.tempoMap && resp.tempoMap.length > 0 ? resp.tempoMap : [{ tick: 0, microsecondsPerQuarter: 500000 }];
+                    _tempoMap = []
+                    var seenTicks = {}
+                    for (var ti = 0; ti < rawTempoMap.length; ti++) {
+                        var tick = rawTempoMap[ti].tick
+                        if (!seenTicks[tick]) {
+                            seenTicks[tick] = true
+                            _tempoMap.push(rawTempoMap[ti])
+                        }
+                    }
+                    // Trier par tick croissant (au cas où l'API ne le ferait pas)
+                    _tempoMap.sort(function(a, b) { return a.tick - b.tick })
+                    
+                    // Nettoyer timeSignatureMap : supprimer les doublons de tick (garder la première) et trier par tick
+                    var rawTimeSigMap = resp.timeSignatureMap && resp.timeSignatureMap.length > 0 ? resp.timeSignatureMap : [{ tick: 0, numerator: 4, denominator: 4 }];
+                    _timeSignatureMap = []
+                    seenTicks = {}
+                    for (var si = 0; si < rawTimeSigMap.length; si++) {
+                        var sigTick = rawTimeSigMap[si].tick
+                        if (!seenTicks[sigTick]) {
+                            seenTicks[sigTick] = true
+                            _timeSignatureMap.push(rawTimeSigMap[si])
+                        }
+                    }
+                    // Trier par tick croissant (au cas où l'API ne le ferait pas)
+                    _timeSignatureMap.sort(function(a, b) { return a.tick - b.tick })
+                    
+                    console.log("[GameSequencer.loadNotes] Maps finales (après nettoyage doublons):")
+                    console.log("  _tempoMap:", _tempoMap.length, "éléments")
+                    console.log("  _timeSignatureMap:", _timeSignatureMap.length, "éléments")
+                    if (_timeSignatureMap.length > 0) {
+                        var ticks = _timeSignatureMap.map(function(e) { return e.tick + ":" + e.numerator + "/" + e.denominator })
+                        console.log("  _timeSignatureMap ticks:", ticks.join(", "))
+                    }
+                    
                     callback(_notes, _bpm, _ppq, _tempoMap, _timeSignatureMap);
                 } else {
                     _notes = [];
@@ -127,21 +178,85 @@ function tickToPosition(tick, ppq, timeSignatureMap) {
     var lastTick = 0;
     var num = map[0].numerator || 4;
     var den = map[0].denominator || 4;
-    for (var i = 1; i < map.length && map[i].tick <= tick; i++) {
+    
+    // Log pour debug lors des changements de signature (seulement près des transitions critiques)
+    var shouldLog = false;
+    if (map.length > 1) {
+        for (var logIdx = 0; logIdx < map.length; logIdx++) {
+            var changeTick = map[logIdx].tick;
+            // Log si on est à moins de 200 ticks d'un changement de signature (pour réduire le spam)
+            if (Math.abs(tick - changeTick) < 200) {
+                shouldLog = true;
+                break;
+            }
+        }
+    }
+    
+    // Trouver le segment dans lequel se trouve le tick
+    var segmentEndIdx = map.length;
+    for (var i = 1; i < map.length; i++) {
+        if (map[i].tick > tick) {
+            segmentEndIdx = i;
+            break;
+        }
+        // Traiter les segments complets avant le tick
         var tpb = ticksPerBar(ppq, num, den);
         var ticksInSegment = map[i].tick - lastTick;
-        bar += Math.floor(ticksInSegment / tpb);
+        var barsInSegment = Math.floor(ticksInSegment / tpb);
+        if (shouldLog) {
+            console.log("[tickToPosition] Segment " + (i-1) + "->" + i + ": tick=" + tick + 
+                       " lastTick=" + lastTick + " map[i].tick=" + map[i].tick +
+                       " sig=" + num + "/" + den + " tpb=" + tpb + 
+                       " ticksInSegment=" + ticksInSegment + " barsInSegment=" + barsInSegment +
+                       " bar avant=" + bar + " bar après=" + (bar + barsInSegment))
+        }
+        bar += barsInSegment;
         lastTick = map[i].tick;
         num = map[i].numerator || 4;
         den = map[i].denominator || 4;
     }
+    // Calculer la position dans le segment courant (ou dernier segment)
     var tpb = ticksPerBar(ppq, num, den);
-    // Nombre de mesures complètes dans le segment courant (cas map.length === 1 ou dernier segment)
-    bar += Math.floor((tick - lastTick) / tpb);
-    var ticksInCurrentBar = (tick - lastTick) % tpb;
+    var ticksFromLastChange = tick - lastTick;
+    
+    // Utiliser une division propre pour éviter les erreurs de modulo flottant
+    var exactBars = ticksFromLastChange / tpb;
+    var barsInCurrentSegment = Math.floor(exactBars);
+    var ticksInCurrentBar = ticksFromLastChange - (barsInCurrentSegment * tpb);
+    
+    // Protection contre les erreurs d'arrondi flottant :
+    // Seulement si ticksInCurrentBar est >= tpb (ce qui ne devrait pas arriver, mais erreurs flottantes)
+    if (ticksInCurrentBar >= tpb) {
+        barsInCurrentSegment += 1;
+        ticksInCurrentBar = 0;
+    }
+    // Si ticksInCurrentBar est négatif (erreur d'arrondi), le mettre à 0
+    if (ticksInCurrentBar < 0) {
+        ticksInCurrentBar = 0;
+    }
+    
+    bar += barsInCurrentSegment;
+    
+    if (shouldLog) {
+        console.log("[tickToPosition] Segment final: tick=" + tick + " lastTick=" + lastTick +
+                   " sig=" + num + "/" + den + " tpb=" + tpb +
+                   " ticksFromLastChange=" + ticksFromLastChange +
+                   " barsInCurrentSegment=" + barsInCurrentSegment +
+                   " ticksInCurrentBar=" + ticksInCurrentBar + " bar=" + bar)
+    }
+    
     var ticksPerBeat = tpb / num;
-    var beatInBar = Math.floor(ticksInCurrentBar / ticksPerBeat) + 1;
-    var beat = (ticksInCurrentBar / ticksPerBeat) + 1;
+    var beatInBarRaw = Math.floor(ticksInCurrentBar / ticksPerBeat) + 1;
+    var beatDecimal = (ticksInCurrentBar / ticksPerBeat) + 1;
+    
+    // Protection : beatInBar ne doit pas dépasser num
+    var beatInBar = Math.min(beatInBarRaw, num);
+    var beat = Math.min(beatDecimal, num + 0.9999);
+    
+    if (shouldLog) {
+        console.log("[tickToPosition] Résultat: bar=" + bar + " beatInBar=" + beatInBar + " beat=" + beat.toFixed(2))
+    }
+    
     return { bar: bar, beatInBar: beatInBar, beat: beat };
 }
 
@@ -185,22 +300,49 @@ function positionToTick(bar, beatInBar, beat, ppq, timeSignatureMap) {
         totalBeats = Math.max(0, totalBeats);
         return totalBeats * ppq;
     }
-    var barIdx = 1;
-    var lastTick = 0;
-    var num = map[0].numerator || 4;
-    var den = map[0].denominator || 4;
-    for (var i = 1; i < map.length && barIdx < bar; i++) {
-        var tpb = ticksPerBar(ppq, num, den);
-        var ticksInSegment = map[i].tick - lastTick;
-        barIdx += Math.floor(ticksInSegment / tpb);
-        lastTick = map[i].tick;
-        num = map[i].numerator || 4;
-        den = map[i].denominator || 4;
+    
+    // Approche simplifiée : calculer le tick de début de chaque segment et le numéro de la première barre
+    // Puis trouver le segment qui contient la barre demandée
+    var segmentStarts = [];  // [{tick, bar, num, den}]
+    var currentBar = 1;
+    var currentTick = 0;
+    
+    for (var i = 0; i < map.length; i++) {
+        var num = map[i].numerator || 4;
+        var den = map[i].denominator || 4;
+        segmentStarts.push({
+            tick: map[i].tick,
+            bar: currentBar,
+            num: num,
+            den: den
+        });
+        
+        // Calculer le nombre de barres dans ce segment (jusqu'au prochain changement ou fin)
+        if (i + 1 < map.length) {
+            var tpb = ticksPerBar(ppq, num, den);
+            var ticksInSegment = map[i + 1].tick - map[i].tick;
+            var barsInSegment = Math.floor(ticksInSegment / tpb);
+            currentBar += barsInSegment;
+        }
     }
-    var tpb = ticksPerBar(ppq, num, den);
-    var ticksPerBeat = tpb / num;
-    var tickInBar = (bar - barIdx) * tpb + (b - 1) * ticksPerBeat;
-    return lastTick + tickInBar;
+    
+    // Trouver le segment qui contient la barre demandée
+    var segmentIdx = segmentStarts.length - 1;
+    for (var i = segmentStarts.length - 1; i >= 0; i--) {
+        if (bar >= segmentStarts[i].bar) {
+            segmentIdx = i;
+            break;
+        }
+    }
+    
+    var seg = segmentStarts[segmentIdx];
+    var tpb = ticksPerBar(ppq, seg.num, seg.den);
+    var ticksPerBeat = tpb / seg.num;
+    var barsFromSegmentStart = bar - seg.bar;
+    var tickInBar = barsFromSegmentStart * tpb + (b - 1) * ticksPerBeat;
+    var resultTick = seg.tick + tickInBar;
+    
+    return resultTick;
 }
 
 /**
@@ -238,6 +380,24 @@ function positionFromMs(currentTimeMs, bpm, ppq, tempoMap, timeSignatureMap) {
     var pq = ppq || _ppq || 480;
     var tmap = tempoMap && tempoMap.length > 0 ? tempoMap : null;
     var smap = timeSignatureMap && timeSignatureMap.length > 0 ? timeSignatureMap : null;
+    
+    // Log pour debug changements de signature (une seule fois par seconde max)
+    if (!tmap || !smap) {
+        var now = Date.now()
+        if (!_lastFallbackLog || (now - _lastFallbackLog) > 1000) {
+            _lastFallbackLog = now
+            console.log("[positionFromMs] FALLBACK utilisé - currentTimeMs=" + currentTimeMs + 
+                        " tempoMap=" + (tempoMap ? "[" + tempoMap.length + "]" : "null/undefined") +
+                        " timeSignatureMap=" + (timeSignatureMap ? "[" + timeSignatureMap.length + "]" : "null/undefined"))
+            if (tempoMap && tempoMap.length > 0) {
+                console.log("[positionFromMs] tempoMap contenu:", JSON.stringify(tempoMap.slice(0, 3)))
+            }
+            if (timeSignatureMap && timeSignatureMap.length > 0) {
+                console.log("[positionFromMs] timeSignatureMap contenu:", JSON.stringify(timeSignatureMap.slice(0, 3)))
+            }
+        }
+    }
+    
     if (!tmap || !smap) {
         if (!bpm || bpm <= 0) bpm = 120;
         var totalBeats = (currentTimeMs / 1000) * (bpm / 60);
@@ -355,6 +515,7 @@ function getSegmentsInWindowFromMs(notes, currentTimeMs, lookaheadMs) {
     var pq = _ppq || 480;
     var tmap = _tempoMap && _tempoMap.length > 0 ? _tempoMap : null;
     var out = [];
+    
     for (var i = 0; i < notes.length; i++) {
         var n = notes[i];
         var t = n.timestampMs;

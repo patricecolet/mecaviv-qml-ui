@@ -40,6 +40,13 @@ Item {
     property real lookaheadMs: 8000
     /** Durée de chute (ms) jusqu'au point de jeu — même valeur que l'animation (MelodicLine2D). Délai avant envoi de « play » à Pd. */
     property real animationFallDurationMs: 5000
+    
+    // Pour limiter les logs de debug
+    property real _lastPositionLog: 0
+    property real _lastExtrapolationLog: 0
+    // Cache pour optimiser les calculs de position
+    property real _lastPositionTimeMs: -1
+    property var _lastPositionResult: null
 
 
     readonly property string positionDisplayText: {
@@ -82,6 +89,9 @@ Item {
         root.previousBeat = -1
         root.lastPositionMs = 0
         root._lastUpdateTimestamp = 0
+        // Réinitialiser le cache
+        root._lastPositionTimeMs = -1
+        root._lastPositionResult = null
     }
 
     /** Démarre le séquenceur UI depuis 0. PureData retarde la sortie MIDI de animationFallDurationMs. */
@@ -130,6 +140,26 @@ Item {
         if (!root.currentMidiPath || !root.configController) return
         var channelOrTrack = root.getChannelForCurrentSiren()
         GameSequencer.loadNotes(root.currentMidiPath, channelOrTrack, function(notes, bpm, ppq, tempoMap, timeSignatureMap) {
+            console.log("[SequencerController] reloadNotesForCurrentChannel - Chargement terminé:")
+            console.log("  notes:", notes ? notes.length : 0)
+            console.log("  tempoMap:", tempoMap ? "[" + tempoMap.length + "]" : "null/undefined")
+            console.log("  timeSignatureMap:", timeSignatureMap ? "[" + timeSignatureMap.length + "]" : "null/undefined")
+            if (tempoMap && tempoMap.length > 0) {
+                console.log("  tempoMap[0]:", JSON.stringify(tempoMap[0]))
+            }
+            if (timeSignatureMap && timeSignatureMap.length > 0) {
+                console.log("  timeSignatureMap[0]:", JSON.stringify(timeSignatureMap[0]))
+                if (timeSignatureMap.length > 1) {
+                    console.log("  timeSignatureMap[1]:", JSON.stringify(timeSignatureMap[1]))
+                }
+                // Afficher tous les ticks pour voir les changements
+                var ticks = []
+                for (var ti = 0; ti < timeSignatureMap.length; ti++) {
+                    ticks.push(timeSignatureMap[ti].tick + ":" + timeSignatureMap[ti].numerator + "/" + timeSignatureMap[ti].denominator)
+                }
+                console.log("  timeSignatureMap ticks:", ticks.join(", "))
+            }
+            
             root.sequencerNotes = notes || []
             root.sequencerPpq = ppq || 480
             root.sequencerTempoMap = tempoMap || []
@@ -169,7 +199,18 @@ Item {
                 root.currentTempoBpm = GameSequencer.getBpmAtMs(timeMs, root.sequencerPpq, root.sequencerTempoMap, root.sequencerBpm)
                 // Affichage = mesure à targetY (ce qui est joué), pas à spawn (délai MIDI)
                 var displayTimeMs = timeMs - root.animationFallDurationMs
+                // Log seulement toutes les secondes pour éviter le spam
+                var now = Date.now()
+                if (!root._lastPositionLog || (now - root._lastPositionLog) > 1000) {
+                    root._lastPositionLog = now
+                    console.log("[SequencerController] playbackPositionReceived - displayTimeMs=" + displayTimeMs +
+                               " tempoMap=" + (root.sequencerTempoMap ? "[" + root.sequencerTempoMap.length + "]" : "null") +
+                               " timeSignatureMap=" + (root.sequencerTimeSignatureMap ? "[" + root.sequencerTimeSignatureMap.length + "]" : "null"))
+                }
                 var pos = GameSequencer.positionFromMs(displayTimeMs, root.sequencerBpm, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
+                // Mettre à jour le cache
+                root._lastPositionTimeMs = displayTimeMs
+                root._lastPositionResult = pos
                 root.currentBar = Math.max(1, Math.min(9999, Math.floor(pos.bar)))
                 root.currentBeatInBar = Math.max(1, Math.min(16, Math.floor(pos.beatInBar || 1)))
                 root.currentBeat = Math.max(1, Math.min(17, (typeof pos.beat === "number" && isFinite(pos.beat)) ? pos.beat : 1))
@@ -196,7 +237,21 @@ Item {
             
             // Affichage = mesure à targetY (ce qui est joué), pas à spawn (délai MIDI)
             var displayTimeMs = root.currentTimeMs - root.animationFallDurationMs
+            
+            // Toujours recalculer pour éviter les erreurs lors des changements de signature
+            // (le cache peut causer des valeurs incorrectes lors des transitions)
             var pos = GameSequencer.positionFromMs(displayTimeMs, root.sequencerBpm, root.sequencerPpq, root.sequencerTempoMap, root.sequencerTimeSignatureMap)
+            root._lastPositionTimeMs = displayTimeMs
+            root._lastPositionResult = pos
+            
+            // Log seulement toutes les 2 secondes pour éviter le spam
+            if (!root._lastExtrapolationLog || (now - root._lastExtrapolationLog) > 2000) {
+                root._lastExtrapolationLog = now
+                console.log("[SequencerController] extrapolationTimer - displayTimeMs=" + displayTimeMs +
+                           " tempoMap=" + (root.sequencerTempoMap ? "[" + root.sequencerTempoMap.length + "]" : "null") +
+                           " timeSignatureMap=" + (root.sequencerTimeSignatureMap ? "[" + root.sequencerTimeSignatureMap.length + "]" : "null"))
+            }
+            
             root.currentBar = Math.max(1, Math.min(9999, Math.floor(pos.bar)))
             root.currentBeatInBar = Math.max(1, Math.min(16, Math.floor(pos.beatInBar || 1)))
             root.currentBeat = Math.max(1, Math.min(17, (typeof pos.beat === "number" && isFinite(pos.beat)) ? pos.beat : 1))
