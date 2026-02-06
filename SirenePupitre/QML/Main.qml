@@ -76,7 +76,10 @@ Window {
         debugMode: mainWindow.debugMode
         configController: configController
         rootWindow: mainWindow
-        
+
+        // --- Handlers WebSocket (ordre : playback → game mode → data binaire → config) ---
+
+        // Playback : position / tick → met à jour isGamePlaying (sauf si user a cliqué Stop)
         onPlaybackPositionReceived: function(playing, bar, beatInBar, beat) {
             if (!playing) {
                 mainWindow.userRequestedStop = false
@@ -93,35 +96,30 @@ Window {
                 mainWindow.isGamePlaying = true
             }
         }
-        
+
+        // Game mode : activation/désactivation du mode jeu 2D
         onGameModeReceived: function(enabled) {
             mainWindow.gameMode = enabled
         }
-        
+
+        // Données binaires : 0x04 (séquence) → jeu, 0x02 (contrôleurs) → panneau, 0x01 (note) → portée
         onDataReceived: function(data) {
-            // Format 0x04 : Note de séquence MIDI -> mode jeu (vue 2D)
             if (data.isSequence) {
                 if (mainWindow.gameMode && testViewLoader.item && testViewLoader.item.gameModeItem) {
                     testViewLoader.item.gameModeItem.midiEventReceived(data)
                 }
                 return
             }
-            
-            // Format 0x02 : Contrôleurs physiques uniquement
             if (data.isControllersOnly) {
                 if (data.controllers && testViewLoader.item && testViewLoader.item.updateControllers) {
                     testViewLoader.item.updateControllers(data.controllers)
                 }
                 return
             }
-            
-            // Format 0x01 : Note volant uniquement -> curseur portée
             if (data.isVolantNote) {
                 sirenController.midiNote = data.midiNote
                 return
             }
-            
-            // Format JSON legacy
             if (data.midiNote !== undefined) {
                 sirenController.midiNote = data.midiNote
             }
@@ -129,15 +127,16 @@ Window {
                 testViewLoader.item.updateControllers(data.controllers)
             }
         }
-        
+
+        // CC MIDI : transmis au mode jeu (gameModeItem)
         onControlChangeReceived: function(ccNumber, ccValue) {
             if (mainWindow.gameMode && testViewLoader.item && testViewLoader.item.gameModeItem) {
                 testViewLoader.item.gameModeItem.handleControlChange(ccNumber, ccValue)
             }
         }
-        
+
+        // Config envoyée par Pd (pour info)
         onConfigReceived: function(config) {
-            // Configuration reçue
         }
     }
 
