@@ -90,9 +90,10 @@ Item {
                 }
 
                 Text {
+                    z: 10
                     visible: root.showDebugLabels
                     text: noteItem.noteName
-                    color: "#FFFF80"
+                    color: "#00cc66"
                     font.pixelSize: 10
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.bottom

@@ -25,6 +25,8 @@ Item {
     }
 
     required property real currentNoteMidi
+    property real rpm: 0
+    property int frequency: 0
     property real ambitusMin: sirenInfo ? sirenInfo.ambitus.min : 48.0
     property real ambitusMax: sirenInfo ? (sirenInfo.mode === "restricted" && sirenInfo.restrictedMax !== undefined ? sirenInfo.restrictedMax : sirenInfo.ambitus.max) : 84.0
     property int octaveOffset: sirenInfo && sirenInfo.displayOctaveOffset !== undefined ? sirenInfo.displayOctaveOffset : 0
@@ -50,6 +52,17 @@ Item {
     height: 4 * lineSpacing + lineThickness * 2
 
     readonly property real _centerY: height / 2
+
+    // Position du curseur (alignée sur la barre de progression) pour RPM/Hz
+    NotePositionCalculator2D { id: _noteCalc }
+    readonly property real _marginX: lineSpacing * 2
+    readonly property real _firstNoteY: _noteCalc.calculateNoteY(ambitusMin + (octaveOffset * 12), lineSpacing, clef)
+    readonly property real _barStartX: staffPosX + ambitusOffset + _marginX
+    readonly property real _barWidth: (staffWidth - ambitusOffset) - _marginX * 2
+    readonly property real _normalizedProgress: ambitusMax > ambitusMin ? Math.max(0, Math.min(1, (currentNoteMidi - ambitusMin) / (ambitusMax - ambitusMin))) : 0
+    readonly property real _cursorCenterX: _barStartX + _normalizedProgress * _barWidth
+    readonly property real _progressBarY: _centerY + _firstNoteY + (progressConfig.barOffsetY || 30)
+    readonly property real _belowProgressY: _progressBarY + (progressConfig.barHeight || 5) + 6
 
     // Wrapper à _centerY : y=0 = ligne du milieu, y augmente vers le bas.
     // Référence lignes : 2e en partant du bas = +lineSpacing (sol), 2e en partant du haut = -lineSpacing (fa).
@@ -119,7 +132,7 @@ Item {
         width: root.staffWidth
         height: root.height
         centerY: root._centerY
-        visible: root.showAmbitus && (configController ? configController.getConfigValue("displayConfig.components.musicalStaff.ambitus.visible", true) : true)
+        visible: root.showAmbitus && (configController ? (configController.updateCounter >= 0 && configController.isSubComponentVisible("musicalStaff", "ambitus")) : true)
         ambitusMin: Math.floor(root.ambitusMin)
         ambitusMax: Math.ceil(root.ambitusMax)
         ambitusStartX: root.staffPosX + root.ambitusOffset + root._ambitusMarginX
@@ -136,9 +149,9 @@ Item {
                 var c = Qt.color(ambitusConfig.noteColor)
                 return Qt.rgba(c.r, c.g, c.b, c.a)
             }
-            return Qt.rgba(1, 1, 1, 0.9)
+            return Qt.rgba(1, 1, 1, 1)  // Blanc pour mieux voir le reste (curseur, barre)
         }
-        showDebugLabels: configController ? configController.getConfigValue("displayConfig.components.musicalStaff.noteName.visible", false) : false
+        showDebugLabels: configController ? (configController.updateCounter >= 0 && configController.isSubComponentVisible("musicalStaff", "noteName")) : false
     }
 
     // Curseur 2D (Phase 2.5) — barre verticale + pastille sur la note actuelle
@@ -236,5 +249,34 @@ Item {
         }
         cursorSize: progressConfig.cursorSize || 10
         showPercentage: progressConfig.showPercentage !== false
+    }
+
+    // RPM et Fréquence sous la barre de progression, centrés sur le curseur
+    Item {
+        z: 10
+        x: root._cursorCenterX - 45
+        y: root._belowProgressY
+        width: 90
+        height: 36
+        visible: root.configController && (root.configController.updateCounter >= 0 && (root.configController.isSubComponentVisible("musicalStaff", "rpm") || root.configController.isSubComponentVisible("musicalStaff", "frequency")))
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 0
+            text: Math.round(root.rpm) + " RPM"
+            color: "#00cc66"
+            font.pixelSize: 14
+            font.bold: true
+            visible: root.configController && root.configController.isSubComponentVisible("musicalStaff", "rpm")
+        }
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 18
+            text: root.frequency + " Hz"
+            color: "#00cc66"
+            font.pixelSize: 14
+            font.bold: true
+            visible: root.configController && root.configController.isSubComponentVisible("musicalStaff", "frequency")
+        }
     }
 }

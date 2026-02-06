@@ -482,6 +482,40 @@ function getSegmentsInWindowFromMs(notes, currentTimeMs, lookaheadMs) {
 }
 
 /**
+ * Retourne la note MIDI actuellement jouée à currentTimeMs (celle qui a commencé avant currentTimeMs et n'est pas encore terminée).
+ * Si plusieurs notes, retourne la plus récemment commencée. Sinon null.
+ */
+function getCurrentNoteAtMs(notes, currentTimeMs, optPpq, optTempoMap) {
+    if (!notes || notes.length === 0) return null;
+    var pq = (optPpq != null && optPpq > 0) ? optPpq : (_ppq || 480);
+    var tmap = (optTempoMap && optTempoMap.length > 0) ? optTempoMap : (_tempoMap && _tempoMap.length > 0 ? _tempoMap : null);
+    var best = null;
+    var bestStart = -1;
+    for (var i = 0; i < notes.length; i++) {
+        var n = notes[i];
+        var t = n.timestampMs;
+        if (typeof t !== "number" || !isFinite(t)) {
+            if (n.tick != null && typeof n.tick === "number" && pq > 0 && tmap && tmap.length > 0)
+                t = tickToMs(n.tick, pq, tmap);
+            else
+                t = (n.timestamp != null && typeof n.timestamp === "number" && isFinite(n.timestamp)) ? n.timestamp : 0;
+        }
+        var dur = n.durationMs;
+        if (typeof dur !== "number" || !isFinite(dur) || dur <= 0) {
+            if (n.durationTicks != null && typeof n.durationTicks === "number" && n.tick != null && pq > 0 && tmap && tmap.length > 0)
+                dur = tickToMs(n.tick + n.durationTicks, pq, tmap) - tickToMs(n.tick, pq, tmap);
+            else
+                dur = n.duration || 500;
+        }
+        if (t <= currentTimeMs && t + dur >= currentTimeMs && t >= bestStart) {
+            best = n.note;
+            bestStart = t;
+        }
+    }
+    return best;
+}
+
+/**
  * Calcule la durée de chute (fallDurationMs) pour un élément (note ou barre de mesure).
  * Prend en compte le délai MIDI : la note au temps t sera jouée à currentTimeMs = t + midiDelay.
  * 

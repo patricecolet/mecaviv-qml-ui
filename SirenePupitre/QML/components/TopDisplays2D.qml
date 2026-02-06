@@ -12,6 +12,7 @@ Item {
     property real midiNote: 0
     property int velocity: 0
     property real bend: 0.0
+    property var configController: null
 
     property real uiScale: 0.8
 
@@ -27,6 +28,7 @@ Item {
         frameColor: root.accentColor
         scaleX: 2 * root.uiScale
         scaleY: 0.8 * root.uiScale
+        visible: root.configController ? root.configController.isComponentVisible("rpm") : true
     }
 
     Rectangle {
@@ -38,6 +40,7 @@ Item {
         border.color: root.accentColor
         border.width: 2
         radius: 4
+        visible: root.configController ? root.configController.isComponentVisible("noteDetails") : true
 
         Column {
             anchors.centerIn: parent
@@ -88,5 +91,6 @@ Item {
         frameColor: root.accentColor
         scaleX: 1.8 * root.uiScale
         scaleY: 0.7 * root.uiScale
+        visible: root.configController ? root.configController.isComponentVisible("frequency") : true
     }
 }

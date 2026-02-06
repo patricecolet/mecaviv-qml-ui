@@ -10,6 +10,8 @@ Item {
     property var configController: null
     property real lineSpacing: 20
     property real lineThickness: 2
+    property real rpm: 0
+    property int frequency: 0
     height: 120
 
     MusicalStaff2D {
@@ -19,9 +21,11 @@ Item {
         staffWidth: root.width
         lineSpacing: root.lineSpacing
         lineThickness: root.lineThickness
-        lineColor: root.accentColor
+        lineColor: Qt.rgba(1, 1, 1, 1)  // Blanc pour mieux voir le curseur et le reste
         currentNoteMidi: root.currentNoteMidi
         sirenInfo: root.sirenInfo
         configController: root.configController
+        rpm: root.rpm
+        frequency: root.frequency
     }
 }

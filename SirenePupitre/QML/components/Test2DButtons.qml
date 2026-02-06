@@ -45,7 +45,7 @@ Item {
         color: "#2a2a2a"
         border.color: root.controllersPanelVisible ? "#00ff00" : "#FFD700"
         radius: 5
-        visible: root.uiControlsEnabled
+        visible: root.uiControlsEnabled && (root.configController ? root.configController.isComponentVisible("controllers") : true)
 
         MouseArea {
             anchors.fill: parent

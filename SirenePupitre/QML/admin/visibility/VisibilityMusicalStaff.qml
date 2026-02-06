@@ -39,16 +39,16 @@ Item {
             opacity: enabled ? 1.0 : 0.5
             
             CheckBox {
-                text: "Nom de la note"
+                text: "Nom de la note (sur la portée)"
                 checked: {
                     configController.updateCounter
-                    return configController ? configController.isComponentVisible("noteName") : true
+                    return configController ? configController.isSubComponentVisible("musicalStaff", "noteName") : true
                 }
                 font.pixelSize: 13
                 
                 onToggled: {
                     if (configController) {
-                        configController.setComponentVisibility("noteName", checked)
+                        configController.setSubComponentVisibility("musicalStaff", "noteName", checked)
                     }
                 }
                 
@@ -63,8 +63,17 @@ Item {
             
             CheckBox {
                 text: "RPM sur la portée"
-                checked: true
+                checked: {
+                    configController.updateCounter
+                    return configController ? configController.isSubComponentVisible("musicalStaff", "rpm") : true
+                }
                 font.pixelSize: 13
+                
+                onToggled: {
+                    if (configController) {
+                        configController.setSubComponentVisibility("musicalStaff", "rpm", checked)
+                    }
+                }
                 
                 contentItem: Text {
                     text: parent.text
@@ -77,8 +86,17 @@ Item {
             
             CheckBox {
                 text: "Fréquence sur la portée"
-                checked: true
+                checked: {
+                    configController.updateCounter
+                    return configController ? configController.isSubComponentVisible("musicalStaff", "frequency") : true
+                }
                 font.pixelSize: 13
+                
+                onToggled: {
+                    if (configController) {
+                        configController.setSubComponentVisibility("musicalStaff", "frequency", checked)
+                    }
+                }
                 
                 contentItem: Text {
                     text: parent.text

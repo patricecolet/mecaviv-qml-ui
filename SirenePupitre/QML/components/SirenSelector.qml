@@ -110,7 +110,8 @@ Item {
         border.width: 2
         anchors.left: parent.left
         anchors.top: parent.top
-        visible: !configController || configController.mode === "restricted"
+        visible: (!configController || configController.mode === "restricted") 
+                 && (configController ? configController.isComponentVisible("sirenCircle") : true)
 
         Text {
             anchors.centerIn: parent

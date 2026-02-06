@@ -4,6 +4,7 @@ import "../components"
 import "../components/ambitus"
 import "../utils"
 import "../game"
+import "../game/GameSequencer.js" as GameSequencerModule
 
 Page {
     id: root
@@ -33,8 +34,59 @@ Page {
     property real midiNote: sirenController ? sirenController.midiNote : 69.0
     property real clampedNote: sirenController ? sirenController.clampedNote : 69.0
     property string noteName: sirenController ? sirenController.trueNoteName : "La4"
-    property real rpm: sirenController ? sirenController.trueRpm : 1200
-    property int frequency: sirenController ? sirenController.trueFrequency : 440
+
+    MusicUtils { id: _musicUtils }
+
+    // Note à afficher sur la portée : en mode jeu = note courante du séquenceur, sinon clampedNote
+    property real displayNoteForStaff: {
+        if (root.gameMode && gameModeOverlay && gameModeOverlay.sequencerController) {
+            var seq = gameModeOverlay.sequencerController
+            var notes = seq.sequencerNotes || []
+            var t = seq.currentTimeMs || 0
+            var ppq = seq.sequencerPpq || 480
+            var tmap = seq.sequencerTempoMap || []
+            var note = GameSequencerModule.getCurrentNoteAtMs(notes, t, ppq, tmap)
+            if (note != null) return note
+        }
+        return root.clampedNote
+    }
+
+    // En mode jeu : rpm/frequency depuis la note courante du séquenceur ; sinon depuis sirenController
+    property real rpm: {
+        if (root.gameMode && gameModeOverlay && gameModeOverlay.sequencerController) {
+            var seq = gameModeOverlay.sequencerController
+            var notes = seq.sequencerNotes || []
+            var t = seq.currentTimeMs || 0
+            var ppq = seq.sequencerPpq || 480
+            var tmap = seq.sequencerTempoMap || []
+            var note = GameSequencerModule.getCurrentNoteAtMs(notes, t, ppq, tmap)
+            if (note != null && root.sirenInfo) {
+                var trans = root.sirenInfo.transposition != null ? root.sirenInfo.transposition : 0
+                var out = root.sirenInfo.outputs > 0 ? root.sirenInfo.outputs : 12
+                var freq = _musicUtils.midiToFrequency(note, trans)
+                return _musicUtils.formatRPM(_musicUtils.frequencyToRPM(freq, out))
+            }
+            return 0
+        }
+        return sirenController ? sirenController.trueRpm : 1200
+    }
+    property int frequency: {
+        if (root.gameMode && gameModeOverlay && gameModeOverlay.sequencerController) {
+            var seq = gameModeOverlay.sequencerController
+            var notes = seq.sequencerNotes || []
+            var t = seq.currentTimeMs || 0
+            var ppq = seq.sequencerPpq || 480
+            var tmap = seq.sequencerTempoMap || []
+            var note = GameSequencerModule.getCurrentNoteAtMs(notes, t, ppq, tmap)
+            if (note != null && root.sirenInfo) {
+                var trans = root.sirenInfo.transposition != null ? root.sirenInfo.transposition : 0
+                var freq = _musicUtils.midiToFrequency(note, trans)
+                return _musicUtils.formatFrequency(freq)
+            }
+            return 0
+        }
+        return sirenController ? sirenController.trueFrequency : 440
+    }
     property int velocity: 100
     property real bend: 0.0
     property real uiScale: (configController && configController.getValueAtPath(["ui", "scale"], 0.8)) || 0.8
@@ -88,6 +140,7 @@ Page {
             midiNote: root.midiNote
             velocity: root.velocity
             bend: root.bend
+            configController: root.configController
         }
 
         Item {
@@ -143,6 +196,9 @@ Page {
                 currentNoteMidi: root.clampedNote
                 sirenInfo: root.sirenInfo
                 configController: root.configController
+                rpm: root.rpm
+                frequency: root.frequency
+                visible: root.configController ? root.configController.isComponentVisible("musicalStaff") : true
             }
 
             GearShiftPositionIndicator {
@@ -427,9 +483,11 @@ Page {
                 StaffZone2D {
                     anchors.fill: parent
                     accentColor: root.accentColor
-                    currentNoteMidi: root.clampedNote
+                    currentNoteMidi: root.displayNoteForStaff
                     sirenInfo: root.sirenInfo
                     configController: root.configController
+                    rpm: root.rpm
+                    frequency: root.frequency
                     lineSpacing: 16
                     lineThickness: 1.5
                 }

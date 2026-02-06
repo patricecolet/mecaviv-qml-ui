@@ -122,31 +122,7 @@ Item {
                     }
                 }
             }
-            
-            CheckBox {
-                text: "Bouton Mode Studio"
-                checked: {
-                    if (!configController) return true
-                    var dummy = configController.updateCounter
-                    return configController.isComponentVisible("studioButton")
-                }
-                font.pixelSize: 13
-                
-                contentItem: Text {
-                    text: parent.text
-                    color: "#bbb"
-                    font.pixelSize: parent.font.pixelSize
-                    leftPadding: parent.indicator.width + 8
-                    verticalAlignment: Text.AlignVCenter
-                }
-                
-                onToggled: {
-                    if (configController) {
-                        configController.setComponentVisibility("studioButton", checked)
-                    }
-                }
-            }
-            
+
             CheckBox {
                 text: "Portée musicale"
                 checked: {
