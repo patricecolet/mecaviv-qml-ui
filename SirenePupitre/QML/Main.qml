@@ -42,18 +42,18 @@ Window {
             }
         }
     }
-    
-    // Contrôleurs
+
+    // --- Contrôleurs ---
+
+    // ConfigController : configuration, mode admin/restricted, état console
     ConfigController {
         id: configController
         webSocketController: webSocketController
-        
-        // Utiliser le signal existant pour tout
+
         onSettingsUpdated: {
             // L'interface se met à jour automatiquement grâce aux bindings
         }
-        
-        // Synchroniser le mode global avec isAdminMode
+
         onModeChanged: {
             if (configController.mode === "admin" && !isAdminMode) {
                 isAdminMode = true
@@ -62,12 +62,14 @@ Window {
             }
         }
     }
-    
+
+    // SirenController : note MIDI courante (curseur portée, sirène)
     SirenController {
         id: sirenController
         configController: configController
     }
-    
+
+    // WebSocketController : connexion Pd, messages 0x01/0x02/0x04, game mode
     WebSocketController {
         id: webSocketController
         serverUrl: (configController.config && configController.config.serverUrl) ? configController.config.serverUrl : "ws://127.0.0.1:10002"
@@ -138,7 +140,9 @@ Window {
             // Configuration reçue
         }
     }
-    
+
+    // --- UI : panneaux et overlays ---
+
     // Panneau d'administration
     AdminPanel {
         id: adminPanel
