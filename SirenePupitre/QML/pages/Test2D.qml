@@ -159,6 +159,7 @@ Page {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: parent.height * 0.35
+                z: 200  // Au-dessus de la portée (z:1) et du gameModeOverlay (z:100)
                 configController: root.configController
                 webSocketController: null
                 visible: configController ? configController.getValueAtPath(["controllersPanel", "visible"], false) : false
@@ -175,9 +176,13 @@ Page {
                 onToggleControllers: {
                     if (configController) {
                         var v = configController.getValueAtPath(["controllersPanel", "visible"], false)
-                        configController.setValueAtPath(["controllersPanel", "visible"], !v)
+                        var newValue = !v
+                        configController.setValueAtPath(["controllersPanel", "visible"], newValue)
+                        controllersPanel.visible = newValue  // Mise à jour immédiate
+                        console.log("🎮 [Test2D] Contrôleurs:", newValue ? "affichés" : "masqués")
                     } else {
                         controllersPanel.visible = !controllersPanel.visible
+                        console.log("🎮 [Test2D] Contrôleurs (sans config):", controllersPanel.visible ? "affichés" : "masqués")
                     }
                 }
                 onToggleGameMode: {
