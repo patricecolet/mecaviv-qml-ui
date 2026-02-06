@@ -66,8 +66,6 @@
         <file>QML/admin/advanced/AdvancedSizes.qml</file>
         <file>QML/utils/ColorPicker.qml</file>
         <file>QML/components/NoteSpeedometer3D.qml</file>
-        <file>QML/utils/meshes/TrebleKey.mesh</file>
-        <file>QML/utils/meshes/BassKey.mesh</file>
         <file>QML/game/MelodicLine2D.qml</file>
         <file>QML/game/GameMode.qml</file>
         <file>QML/game/FallingNote2D.qml</file>
@@ -78,14 +76,6 @@
         <file>QML/game/SongSelectorDialog.qml</file>
         <file>QML/game/PlaybackState.qml</file>
         <file>QML/game/ScoringEngine.qml</file>
-        <file>QML/game/shaders/bend.vert</file>
-        <file>QML/game/shaders/squash.vert</file>
-        <file>QML/game/shaders/bend_uniform.vert</file>
-        <file>QML/game/shaders/tremolo.vert</file>
-        <file>QML/game/shaders/vibrato.vert</file>
-        <file>QML/game/shaders/tremolo_vibrato.vert</file>
-        <file>QML/game/shaders/tremolo_vibrato_release.vert</file>
-        <file>QML/game/shaders/bend.frag</file>
         <file>QML/game/README.md</file>
         <file>QML/pages/Test2D.qml</file>
     </qresource>
