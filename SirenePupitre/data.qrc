@@ -68,14 +68,10 @@
         <file>QML/components/NoteSpeedometer3D.qml</file>
         <file>QML/utils/meshes/TrebleKey.mesh</file>
         <file>QML/utils/meshes/BassKey.mesh</file>
-        <file>QML/game/MelodicLine3D.qml</file>
         <file>QML/game/MelodicLine2D.qml</file>
         <file>QML/game/GameMode.qml</file>
-        <file>QML/game/FallingCube.qml</file>
         <file>QML/game/FallingNote2D.qml</file>
         <file>QML/game/FallingMeasureBar2D.qml</file>
-        <file>QML/game/FallingNoteCustomGeo.qml</file>
-        <file>QML/game/TestSimpleGeo.qml</file>
         <file>QML/game/GameAutonomyPanel.qml</file>
         <file>QML/game/GameSequencer.js</file>
         <file>QML/game/SequencerController.qml</file>
