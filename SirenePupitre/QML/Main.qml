@@ -13,27 +13,26 @@ Window {
     visible: true
     title: qsTr("Sirène Pupitre")
     color: "#6f6a6a"
-    
-    // Police Emoji globale
+
+    // --- Ressources globales ---
     FontLoader {
         id: emojiFont
         source: "qrc:/fonts/NotoEmoji-VariableFont_wght.ttf"
     }
-    
-    // Rendre la police accessible globalement
     readonly property string globalEmojiFont: emojiFont.name
-    
-    property bool debugMode: true  // Mettre à true pour activer les logs
-    property bool isAdminMode: false  // État admin persistant
-    property bool isGamePlaying: false  // État de lecture du mode jeu
-    property bool userRequestedStop: false  // Clic Stop : ne pas laisser 0x01(playing=true) réécraser isGamePlaying
 
-    // Mode jeu (une seule vue 2D)
+    // --- Debug ---
+    property bool debugMode: true  // Mettre à true pour activer les logs
+
+    // --- État application ---
+    property bool isAdminMode: false
+    property bool isGamePlaying: false
+    property bool userRequestedStop: false  // Clic Stop : ne pas laisser 0x01(playing=true) réécraser isGamePlaying
     property bool gameMode: false
 
-    // ➜ PROPRIÉTÉ GLOBALE POUR LES BOUTONS UI
+    // --- UI ---
     property bool uiControlsEnabled: true
-    
+
     // Synchroniser isAdminMode avec le mode global
     onIsAdminModeChanged: {
         if (configController) {
