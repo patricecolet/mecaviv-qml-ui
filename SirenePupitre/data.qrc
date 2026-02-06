@@ -6,7 +6,6 @@
         <file>QML/utils/Knob.qml</file>
         <file>QML/utils/LEDSegment.qml</file>
         <file>QML/utils/LEDText3D.qml</file>
-        <file>QML/components/SirenDisplay.qml</file>
         <file>QML/components/NumberDisplay2D.qml</file>
         <file>QML/components/TopDisplays2D.qml</file>
         <file>QML/components/StaffZone2D.qml</file>
@@ -25,7 +24,6 @@
         <file>QML/utils/Clef2DPath.qml</file>
         <file>QML/components/ControllersPanel.qml</file>
         <file>QML/utils/Ring3D.qml</file>
-        <file>QML/components/StudioView.qml</file>
         <file>QML/admin/AdminPanel.qml</file>
         <file>QML/admin/AdvancedSection.qml</file>
         <file>QML/admin/SirenSelectionSection.qml</file>
