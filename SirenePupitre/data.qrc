@@ -64,6 +64,7 @@
         <file>QML/game/SequencerController.qml</file>
         <file>QML/game/SongSelectorDialog.qml</file>
         <file>QML/game/GameOptionsDialog.qml</file>
+        <file>QML/game/AnticipationLine2D.qml</file>
         <file>QML/game/PlaybackState.qml</file>
         <file>QML/game/ScoringEngine.qml</file>
         <file>QML/game/README.md</file>

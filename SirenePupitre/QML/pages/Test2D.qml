@@ -95,6 +95,10 @@ Page {
     property var _gameModeItem: null
     property var gameModeItem: _gameModeItem
 
+    // Options mode jeu (liées à GameMode)
+    property bool showAnticipationLine: false
+    property bool showMeasureBars: false
+
     // Affichage mesure/temps : n’afficher les valeurs qu’une fois Pd lancé (après fallingTime), pas avant
     property bool transportDisplayActive: false
 
@@ -286,7 +290,26 @@ Page {
                 rootWindow: root.rootWindow
             }
 
-            // Les barres de mesure sont maintenant créées dynamiquement dans GameMode
+            // Options affichage (ligne d'anticipation, barres de mesure) — bindings vers GameMode
+            Column {
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: 20
+                z: 10
+                spacing: 8
+                CheckBox {
+                    text: "Ligne d'anticipation"
+                    checked: root.showAnticipationLine
+                    onCheckedChanged: root.showAnticipationLine = checked
+                    palette.buttonText: "#fff"
+                }
+                CheckBox {
+                    text: "Barres de mesure"
+                    checked: root.showMeasureBars
+                    onCheckedChanged: root.showMeasureBars = checked
+                    palette.buttonText: "#fff"
+                }
+            }
 
             // Transport : mesure, temps, tempo (à gauche du Play) — encadré large pour mesure complète et durée totale
             Rectangle {
@@ -506,6 +529,9 @@ Page {
                             item.lineSpacing = 16
                             item.staffWidth = gameOverlayStaffZone.width
                             item.staffPosX = 0
+                            item.currentNoteMidi = Qt.binding(function() { return root.clampedNote })
+                            item.showAnticipationLine = Qt.binding(function() { return root.showAnticipationLine })
+                            item.showMeasureBars = Qt.binding(function() { return root.showMeasureBars })
                             root._gameModeItem = item
                         }
                     }

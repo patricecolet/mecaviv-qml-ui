@@ -1,4 +1,5 @@
 import QtQuick
+import "../components/ambitus"
 import "."
 import "GameSequencer.js" as GameSequencer
 
@@ -9,232 +10,69 @@ Item {
     property var configController: null
     property var sirenInfo: null
     property real currentNoteMidi: 60.0
+    property var sequencer: null  // Référence au SequencerController
     
     // Propriétés de jeu
     property var midiEvents: []  // Événements MIDI reçus
     property real gameStartTime: 0
     property bool gameActive: false
     
-    // Séquenceur partagé (optionnel) : si fourni, mesure/temps/tempo viennent de lui
-    property var sequencer: null
-
-    property bool isGameModeActive: false
-    property var lineSegmentsData
-
-    Component.onCompleted: {
-        if (lineSegmentsData === undefined)
-            lineSegmentsData = []
-        if (staffWidth === 0)
-            staffWidth = root.width || 1600
-    }
-
-    // État local (utilisé quand sequencer est null)
-    property real _localTimeMs: 0
-    property int _localBar: 1
-    property int _localBeatInBar: 1
-    property real _localBeat: 1.0
-    property int _localTotalBars: 1
-    property real _localTempoBpm: 120
-
-    // Position / transport : depuis sequencer si fourni, sinon état local
-    /** Temps "layout" : temps réel du séquenceur (négatif en preroll). Utilisé pour segments, barres et durée de chute des notes (aligné avec les barres). */
-    readonly property real layoutTimeMs: root.sequencer ? root.sequencer.currentTimeMs : root._localTimeMs
-    /** Temps pour affichage / compat : >= 0 (0 pendant preroll). Utiliser layoutTimeMs pour barres et notes. */
-    readonly property real currentTimeMs: {
-        if (!root.sequencer) return root._localTimeMs
-        var t = root.sequencer.currentTimeMs
-        return Math.max(0, t)
-    }
-    readonly property int currentBar: root.sequencer ? root.sequencer.currentBar : root._localBar
-    readonly property int currentBeatInBar: root.sequencer ? root.sequencer.currentBeatInBar : root._localBeatInBar
-    readonly property real currentBeat: root.sequencer ? root.sequencer.currentBeat : root._localBeat
-    readonly property int totalBars: root.sequencer ? root.sequencer.totalBars : root._localTotalBars
-    readonly property real currentTempoBpm: root.sequencer ? root.sequencer.currentTempoBpm : root._localTempoBpm
-    // Chaîne formatée pour l’affichage (évite les bindings imbriqués foireux côté Test2D)
-    readonly property string positionDisplayText: {
-        var b = currentBar
-        var t = currentBeat
-        if (typeof b !== "number" || typeof t !== "number" || !isFinite(b) || !isFinite(t))
-            return "—"
-        // Permettre les mesures négatives (preroll) ou positives (normal)
-        var bar = b < 0 ? Math.max(-9999, Math.min(-1, Math.floor(b))) : Math.max(1, Math.min(9999, Math.floor(b)))
-        var beat = Math.max(1, Math.min(17, t))
-        return bar + " · " + beat.toFixed(1)
-    }
-    // Temps écoulé formaté mm:ss (ex. "1:23")
-    readonly property string currentTimeDisplay: {
-        var ms = currentTimeMs
-        if (typeof ms !== "number" || !isFinite(ms) || ms < 0) return "0:00"
-        var sec = Math.floor(ms / 1000)
-        var min = Math.floor(sec / 60)
-        sec = sec % 60
-        return min + ":" + (sec < 10 ? "0" : "") + sec
-    }
-    // Quand true, lineSegmentsData est fourni par le séquenceur (getSegmentsInWindowFromMs)
-    property bool useSequencerData: false
-
-    function updateLineSegmentsFromSequencer() {
-        if (!root.sequencer || !root.useSequencerData) return
-        if (!root.sequencer.isPlaying) {
-            root.lineSegmentsData = []
-            return
-        }
-        var notes = root.sequencer.sequencerNotes || []
-        var t = root.layoutTimeMs  // Même référence que les barres (négatif en preroll) pour aligner notes et barres
-        var look = root.sequencer.lookaheadMs || 8000
-        // En fin de morceau : étendre le lookahead jusqu'à la fin du contenu pour que les dernières notes restent visibles
-        var contentEndMs = root.sequencer.endOfPieceMs - (root.sequencer.animationFallDurationMs || 5000)
-        if (contentEndMs > 0 && t < contentEndMs)
-            look = Math.max(look, contentEndMs - t)
-        var segs = GameSequencer.getSegmentsInWindowFromMs(notes, t, look)
-        root.lineSegmentsData = segs
-    }
+    // Propriété pour savoir si le mode jeu est actif (liée depuis Test2D)
+    property bool isGameModeActive: true  // Toujours actif quand GameMode est chargé
     
-    // Suivi de la dernière mesure pour créer les barres
-    property int _lastBar: 0
-    // Cache pour éviter les recalculs trop fréquents
-    property real _lastUpdateMeasureBarsTime: -1
-    property int _lastStartBar: 0
-    property int _lastEndBar: 0
-    // Numéro de la plus grande barre déjà affichée (pour éviter de recréer les barres détruites)
-    property int _highestBarShown: 0
+    // Propriété pour suivre le temps du séquenceur (mis à jour par le Timer)
+    property real _sequencerTime: 0
 
-    /** Retourne true si une barre pour ce numéro existe déjà ou a déjà été affichée et détruite. */
-    function _measureBarExists(barNumber) {
-        // Si cette barre a déjà été affichée et détruite, ne pas la recréer
-        if (barNumber <= root._highestBarShown) {
-            var bar = measureBarsContainer._createdBars[barNumber]
-            // Seulement retourner true si la barre n'existe pas (a été détruite)
-            // ou si elle existe encore
-            if (!bar) return true  // Déjà affichée et détruite
-            if (!bar.parent || bar.parent !== measureBarsContainer) {
-                delete measureBarsContainer._createdBars[barNumber]
-                return true  // Déjà affichée et détruite
-            }
-            return true  // Existe encore
-        }
-        
-        var bar = measureBarsContainer._createdBars[barNumber]
-        if (!bar) return false
-        // Vérifier que la barre est toujours dans le conteneur (pas encore détruite)
-        if (!bar.parent || bar.parent !== measureBarsContainer) {
-            delete measureBarsContainer._createdBars[barNumber]
-            return false
-        }
-        return true
-    }
-
-    /** Temps en ms du début de la mesure (négatif pour preroll). */
-    function _measureStartMsForBar(barNumber) {
-        var seq = root.sequencer
-        var bpm = seq.sequencerBpm || seq.currentTempoBpm || 120
-        var msPerBar = (60000 / bpm) * 4
-        if (barNumber < 0)
-            return barNumber * msPerBar
-        var ppq = seq.sequencerPpq || 480
-        var tempoMap = seq.sequencerTempoMap || []
-        var timeSignatureMap = seq.sequencerTimeSignatureMap || []
-        if (tempoMap.length > 0 && timeSignatureMap.length > 0) {
-            // Utiliser directement positionToMsWithMaps sans ajustement firstNoteTimeMs
-            // pour éviter les incohérences lors des changements de signature
-            var measureStartMs = GameSequencer.positionToMsWithMaps(barNumber, 1, 1.0, ppq, tempoMap, timeSignatureMap)
-            return measureStartMs
-        }
-        return (barNumber - 1) * msPerBar
-    }
-
-    /** Durée de chute en ms (0 = ne pas créer, barre déjà passée). */
-    function _fallDurationMsForMeasureBar(measureStartMs, currentTimeMs, fixedFallTime) {
-        return GameSequencer.calculateFallDurationMs(measureStartMs, currentTimeMs, fixedFallTime)
-    }
-
-    function createMeasureBar(barNumber) {
-        if (!root.sequencer || !root.sequencer.isPlaying) return
-        if (_measureBarExists(barNumber)) return
-
-        var currentTimeMs = root.layoutTimeMs || 0
-        var fixedFallTime = root.sequencer.animationFallDurationMs || 5000
-        var measureStartMs = _measureStartMsForBar(barNumber)
-        var fallDurationMs = _fallDurationMsForMeasureBar(measureStartMs, currentTimeMs, fixedFallTime)
-        
-        // Ne pas créer si la barre est déjà passée
-        if (fallDurationMs <= 0) return
-
-        var targetY = melodicLine ? melodicLine.cursorBarY : (root.height / 2)
-        var fallSpeed = melodicLine ? melodicLine.fallSpeed : 150
-
-        var opts = {
-            "targetY": targetY,
-            "fallSpeed": fallSpeed,
-            "fixedFallTime": fixedFallTime,
-            "fallDurationMs": fallDurationMs,
-            "measureNumber": barNumber,
-            "accentColor": "#d1ab00"
-        }
-
-        var newBar = measureBarComponent.createObject(measureBarsContainer, opts)
-        if (newBar) {
-            measureBarsContainer._createdBars[barNumber] = newBar
-            // Enregistrer la plus grande barre affichée pour éviter de la recréer après destruction
-            if (barNumber > root._highestBarShown)
-                root._highestBarShown = barNumber
-        }
-    }
+    // Option : afficher les segments d'anticipation (fin note N → début note N+1). Désactivé par défaut.
+    property bool showAnticipationLine: false
+    // Option : afficher les barres de mesure en chute. Désactivé par défaut.
+    property bool showMeasureBars: false
     
-    function updateMeasureBars() {
-        if (!root.sequencer || !root.sequencer.isPlaying) return
-
-        var currentTimeMs = root.layoutTimeMs || 0
-        var fixedFallTime = root.sequencer.animationFallDurationMs || 5000
-        var lookaheadMs = root.sequencer.lookaheadMs || 8000
-        var ppq = root.sequencer.sequencerPpq || 480
-        var tempoMap = root.sequencer.sequencerTempoMap || []
-        var timeSignatureMap = root.sequencer.sequencerTimeSignatureMap || []
-        var bpm = root.sequencer.sequencerBpm || root.sequencer.currentTempoBpm || 120
-
-        // Optimisation : éviter les recalculs trop fréquents (max toutes les 200ms)
-        // Sauf si on a changé de mesure ou si les maps ont changé
-        var timeSinceLastUpdate = currentTimeMs - root._lastUpdateMeasureBarsTime
-        var currentBar = root.sequencer ? root.sequencer.currentBar : 1
-        var needsFullRecalc = (timeSinceLastUpdate < 0 || timeSinceLastUpdate > 200) || 
-                              (root._lastStartBar === 0 || root._lastEndBar === 0) ||
-                              (currentBar < root._lastStartBar || currentBar > root._lastEndBar)
-        
-        if (!needsFullRecalc && root._lastStartBar > 0 && root._lastEndBar > 0) {
-            // Mise à jour incrémentale : seulement créer les nouvelles barres nécessaires
-            var endTimeMs = currentTimeMs + lookaheadMs
-            var endPos = GameSequencer.positionFromMs(endTimeMs, bpm, ppq, tempoMap, timeSignatureMap)
-            var newEndBar = Math.max(root._lastStartBar, Math.ceil(endPos.bar))
+    // Propriété calculée pour les segments de ligne
+    // Si sequencer est disponible, utiliser les segments calculés avec lookahead
+    // Sinon, utiliser les événements MIDI reçus
+    // Dépend de _sequencerTime pour forcer la réévaluation
+    property var lineSegmentsData: {
+        // Utiliser _sequencerTime pour forcer la réévaluation quand le Timer met à jour
+        var dummy = root._sequencerTime
+        // Ne pas afficher les notes en chute tant qu'on n'a pas appuyé sur Play
+        if (!root.sequencer || !root.sequencer.isPlaying)
+            return []
+        if (root.sequencer.sequencerNotes && root.sequencer.sequencerNotes.length > 0) {
+            // Utiliser le séquenceur pour calculer les segments avec lookahead
+            var currentMs = root.sequencer.currentTimeMs || 0
+            var lookahead = root.sequencer.lookaheadMs || 8000
+            var notes = root.sequencer.sequencerNotes
+            var ppq = root.sequencer.sequencerPpq || 480
+            var tempoMap = root.sequencer.sequencerTempoMap || []
             
-            // Créer seulement les barres manquantes à la fin
-            if (newEndBar > root._lastEndBar) {
-                for (var i = root._lastEndBar + 1; i <= newEndBar; i++) {
-                    createMeasureBar(i)
-                }
-                root._lastEndBar = newEndBar
+            // Debug log (limité pour éviter le spam)
+            if (dummy % 1000 < 50) {  // Log toutes les secondes environ
+                console.log("🎮 [GameMode] lineSegmentsData - notes:", notes.length, "currentMs:", currentMs, "lookahead:", lookahead)
             }
-            return
+            
+            // Mettre à jour les variables globales du module GameSequencer
+            GameSequencer._notes = notes
+            GameSequencer._ppq = ppq
+            GameSequencer._tempoMap = tempoMap
+            
+            var segments = GameSequencer.getSegmentsInWindowFromMs(notes, currentMs, lookahead)
+            if (dummy % 1000 < 50 && segments.length > 0) {
+                console.log("🎮 [GameMode] segments calculés:", segments.length, "premier:", segments[0])
+            }
+            return segments
+        } else {
+            // Fallback : utiliser les événements MIDI reçus
+            // Utiliser midiEvents pour forcer la réévaluation
+            var dummy2 = root.midiEvents.length
+            var fallbackSegments = processMidiEvents()
+            if (fallbackSegments.length > 0) {
+                console.log("🎮 [GameMode] fallback segments:", fallbackSegments.length)
+            }
+            return fallbackSegments
         }
-
-        // Recalcul complet
-        var startTimeMs = Math.max(0, currentTimeMs - fixedFallTime)
-        var startPos = GameSequencer.positionFromMs(startTimeMs, bpm, ppq, tempoMap, timeSignatureMap)
-        var startBar = Math.max(1, Math.floor(startPos.bar))
-
-        var endTimeMs = currentTimeMs + lookaheadMs
-        var endPos = GameSequencer.positionFromMs(endTimeMs, bpm, ppq, tempoMap, timeSignatureMap)
-        var endBar = Math.max(startBar, Math.ceil(endPos.bar))
-
-        for (var i = startBar; i <= endBar; i++) {
-            createMeasureBar(i)
-        }
-        
-        // Mettre à jour le cache
-        root._lastUpdateMeasureBarsTime = currentTimeMs
-        root._lastStartBar = startBar
-        root._lastEndBar = endBar
     }
-
+    
     // Signal pour recevoir les événements MIDI
     signal midiEventReceived(var event)
     
@@ -246,8 +84,8 @@ Item {
     property real attackTime: 0         // CC73 (0-127 → 0ms-38.1s, formule: 38100/(128-cc))
     property real releaseTime: 0        // CC72 (0-127 → 0ms-38.1s, formule: 38100/(128-cc))
     
-    // Propriétés de la portée (staffWidth : défaut root.width||1600, peut être surchargé par le parent ex. Test2D)
-    property real staffWidth
+    // Propriétés de la portée
+    property real staffWidth: 1600
     property real staffPosX: 0
     property real lineSpacing: 20
     
@@ -303,47 +141,143 @@ Item {
     property real clefWidth: showClef ? (clefConfig.width || 100) : 0
     property real keySignatureWidth: showKeySignature ? (keySignatureConfig.width || 80) : 0
     property real ambitusOffset: clefWidth + keySignatureWidth
-    
-    // Ligne mélodique 2D (notes en chute) — même coordonnées que la portée 2D de l'overlay
-    MelodicLine2D {
-        id: melodicLine
-        anchors.fill: parent
-        
-        fixedFallTime: root.sequencer ? root.sequencer.animationFallDurationMs : 5000
-        lineSegments: root.lineSegmentsData
-        currentTimeMs: root.layoutTimeMs
-        lineSpacing: root.lineSpacing
-        clef: root.clef
-        ambitusMin: root.ambitusMin
-        ambitusMax: root.ambitusMax
-        staffWidth: root.staffWidth
-        staffPosX: root.staffPosX
-        ambitusOffset: root.ambitusOffset
-        octaveOffset: root.octaveOffset
-        
-        vibratoAmount: root.vibratoAmount
-        vibratoRate: root.vibratoRate
-        tremoloAmount: root.tremoloAmount
-        tremoloRate: root.tremoloRate
-        attackTime: root.attackTime
-        releaseTime: root.releaseTime
+
+    // Segments pour la ligne d'anticipation : fenêtre élargie vers le passé
+    // pour inclure les notes actuellement en chute (visibles sur la portée)
+    property var anticipationSegmentsData: {
+        var dummy = root._sequencerTime
+        if (!root.sequencer || !root.sequencer.isPlaying)
+            return []
+        if (!root.sequencer.sequencerNotes || root.sequencer.sequencerNotes.length === 0)
+            return []
+        var currentMs = root.sequencer.currentTimeMs || 0
+        var lookahead = root.sequencer.lookaheadMs || 8000
+        var fft = root.sequencer.animationFallDurationMs || 5000
+        var notes = root.sequencer.sequencerNotes
+        // Fenêtre élargie : [currentMs - fft, currentMs + lookahead]
+        // Inclut les notes dont le timestamp est passé mais qui tombent encore
+        var wideStart = Math.max(0, currentMs - fft)
+        GameSequencer._notes = notes
+        GameSequencer._ppq = root.sequencer.sequencerPpq || 480
+        GameSequencer._tempoMap = root.sequencer.sequencerTempoMap || []
+        return GameSequencer.getSegmentsInWindowFromMs(notes, wideStart, lookahead + fft)
     }
-    
-    // Conteneur pour les barres de mesure en chute
+
+    // Données des barres de mesure dans la fenêtre lookahead (pour création dynamique)
+    property var measureBarsData: {
+        var dummy = root._sequencerTime
+        // Ne pas afficher les barres de mesure tant qu'on n'a pas appuyé sur Play
+        if (!root.sequencer || !root.sequencer.isPlaying || !root.sequencer.sequencerNotes || root.sequencer.sequencerNotes.length === 0)
+            return []
+        var currentMs = root.sequencer.currentTimeMs || 0
+        var lookahead = root.sequencer.lookaheadMs || 8000
+        var ppq = root.sequencer.sequencerPpq || 480
+        var tmap = root.sequencer.sequencerTempoMap || []
+        var smap = root.sequencer.sequencerTimeSignatureMap || []
+        return GameSequencer.getMeasureStartsInWindow(currentMs, lookahead, ppq, tmap, smap)
+    }
+
+    property var _measureBarCache: ({})
+    Component {
+        id: measureBarComponent
+        FallingMeasureBar2D {}
+    }
+
+    // Zone de jeu : ordre d'affichage (notes z:1, ligne d'anticipation z:2 au-dessus, barres de mesure z:3)
     Item {
-        id: measureBarsContainer
+        id: gameArea
         anchors.fill: parent
-        z: 5  // Au-dessus de la ligne mélodique mais sous d'autres éléments
-        
-        Component {
-            id: measureBarComponent
-            FallingMeasureBar2D {}
+
+        // Ligne d'anticipation (volant) — z: 2 au-dessus des notes pour rester visible
+        // Utilise anticipationSegments (fenêtre élargie) pour inclure les notes actuellement en chute
+        AnticipationLine2D {
+            z: 2
+            anchors.fill: parent
+            visible: root.isGameModeActive && root.showAnticipationLine
+            lineSegments: root.anticipationSegmentsData
+            currentNoteMidi: root.currentNoteMidi
+            currentTimeMs: root.sequencer ? root.sequencer.currentTimeMs : 0
+            fallSpeed: 150
+            fixedFallTime: root.sequencer ? root.sequencer.animationFallDurationMs : 5000
+            lineSpacing: root.lineSpacing
+            clef: root.clef
+            ambitusMin: root.ambitusMin
+            ambitusMax: root.ambitusMax
+            staffWidth: root.staffWidth
+            staffPosX: root.staffPosX
+            ambitusOffset: root.ambitusOffset
+            octaveOffset: root.octaveOffset
         }
-        
-        // Barres de mesure déjà créées (clé = numéro de mesure)
-        property var _createdBars: ({})
+
+        // Ligne mélodique 2D (notes en chute) — z: 1
+        MelodicLine2D {
+            id: melodicLine
+            z: 1
+            anchors.fill: parent
+            visible: root.isGameModeActive
+
+            lineSegments: root.lineSegmentsData
+            currentTimeMs: root.sequencer ? root.sequencer.currentTimeMs : 0
+            lineSpacing: root.lineSpacing
+            clef: root.clef
+            ambitusMin: root.ambitusMin
+            ambitusMax: root.ambitusMax
+            staffWidth: root.staffWidth
+            staffPosX: root.staffPosX
+            ambitusOffset: root.ambitusOffset
+            octaveOffset: root.octaveOffset
+            fixedFallTime: root.sequencer ? root.sequencer.animationFallDurationMs : 5000
+
+            vibratoAmount: root.vibratoAmount
+            vibratoRate: root.vibratoRate
+            tremoloAmount: root.tremoloAmount
+            tremoloRate: root.tremoloRate
+            attackTime: root.attackTime
+            releaseTime: root.releaseTime
+        }
     }
-    
+
+    onShowMeasureBarsChanged: {
+        if (!root.showMeasureBars) {
+            for (var k in _measureBarCache) {
+                var barObj = _measureBarCache[k]
+                if (barObj && barObj.destroy) barObj.destroy()
+            }
+            _measureBarCache = {}
+        }
+    }
+    onMeasureBarsDataChanged: {
+        if (!root.sequencer || !root.showMeasureBars) return
+        var currentMs = root.sequencer.currentTimeMs || 0
+        var midiDelay = root.sequencer.animationFallDurationMs || 5000
+        var cursorBarY = melodicLine ? melodicLine.cursorBarY : (root.height / 2 + 30)
+        var list = measureBarsData || []
+        for (var i = 0; i < list.length; i++) {
+            var m = list[i]
+            var bar = m.bar
+            var startMs = m.startMs
+            var key = "bar-" + bar
+            if (_measureBarCache[key]) {
+                if (_measureBarCache[key].parent) continue
+                delete _measureBarCache[key]
+            }
+            var fallMs = GameSequencer.calculateFallDurationMs(startMs, currentMs, midiDelay)
+            if (fallMs <= 0) continue
+            var obj = measureBarComponent.createObject(root, {
+                targetY: cursorBarY,
+                fallSpeed: 150,
+                fixedFallTime: midiDelay,
+                fallDurationMs: fallMs,
+                measureNumber: bar,
+                accentColor: "#d1ab00"
+            })
+            if (obj) {
+                obj.z = 3
+                _measureBarCache[key] = obj
+            }
+        }
+    }
+
     // Fonction pour traiter les événements MIDI
     function processMidiEvents() {
         var segments = []
@@ -391,36 +325,24 @@ Item {
     
     // Fonction pour réinitialiser le mode jeu (appelée lors d'un stop)
     function resetGame() {
+        // Vider les événements MIDI
         midiEvents = []
-        lineSegmentsData = []
-        _localTimeMs = 0
-        _localBar = 1
-        _localBeatInBar = 1
-        _localBeat = 1.0
-        _localTotalBars = 1
-        _localTempoBpm = 120
-        if (!root.sequencer)
-            useSequencerData = false
+        // NE PAS faire lineSegmentsData = [] ici !
+        // Cela détruirait le binding QML de façon permanente.
+        // Le binding retourne déjà [] quand !sequencer.isPlaying.
         gameActive = false
         gameStartTime = 0
-        if (melodicLine)
+        
+        // Effacer toutes les notes en vol
+        if (melodicLine) {
             melodicLine.clearAllNotes()
-        // Nettoyer les barres de mesure
-        clearMeasureBars()
-    }
-    
-    function clearMeasureBars() {
-        for (var key in measureBarsContainer._createdBars) {
-            var bar = measureBarsContainer._createdBars[key]
-            if (bar && typeof bar.destroy === "function")
-                bar.destroy()
         }
-        measureBarsContainer._createdBars = {}
-        // Réinitialiser le cache
-        root._lastUpdateMeasureBarsTime = -1
-        root._lastStartBar = 0
-        root._lastEndBar = 0
-        root._highestBarShown = 0
+        // Détruire les barres de mesure et vider le cache
+        for (var k in _measureBarCache) {
+            var barObj = _measureBarCache[k]
+            if (barObj && barObj.destroy) barObj.destroy()
+        }
+        _measureBarCache = {}
     }
     
     // Fonction pour arrêter le jeu
@@ -469,80 +391,32 @@ Item {
         }
     }
     
-    // Mettre à jour les segments quand les événements changent (sauf si séquenceur actif)
-    onMidiEventsChanged: {
-        if (!useSequencerData)
-            lineSegmentsData = processMidiEvents()
+    // Timer pour mettre à jour _sequencerTime régulièrement quand le séquenceur joue
+    // Cela force la réévaluation de lineSegmentsData qui dépend de _sequencerTime
+    Timer {
+        interval: 50  // Mise à jour toutes les 50ms (même fréquence que l'extrapolation du séquenceur)
+        running: root.sequencer && root.sequencer.isPlaying
+        repeat: true
+        onTriggered: {
+            if (root.sequencer) {
+                root._sequencerTime = root.sequencer.currentTimeMs || 0
+            }
+        }
     }
-
+    
+    // Mettre à jour _sequencerTime quand le séquenceur change
     onSequencerChanged: {
-        root.useSequencerData = !!root.sequencer
-        // Nettoyer les barres de mesure quand le séquenceur change (nouveau morceau)
-        root.clearMeasureBars()
-        if (root.sequencer) {
-            if (root.sequencer.isPlaying) {
-                root.updateLineSegmentsFromSequencer()
-                root.updateMeasureBars()
-            } else {
-                root.lineSegmentsData = []
-            }
-        } else {
-            root.lineSegmentsData = []
+        if (sequencer) {
+            console.log("🎮 [GameMode] Sequencer assigné, notes:", sequencer.sequencerNotes ? sequencer.sequencerNotes.length : 0, "currentTimeMs:", sequencer.currentTimeMs)
+            _sequencerTime = sequencer.currentTimeMs || 0
         }
     }
-
-    Connections {
-        target: root.sequencer
-        enabled: !!root.sequencer
-        function onCurrentTimeMsChanged() {
-            // Toujours recalculer les segments quand currentTimeMs change
-            // Pendant le preroll, currentTimeMs reste à 0 donc les segments restent stables
-            // Après le preroll, currentTimeMs change et les segments sont mis à jour
-            if (root.useSequencerData) {
-                root.updateLineSegmentsFromSequencer()
-            }
-            root.updateMeasureBars()
-        }
-        // Ne pas appeler updateMeasureBars ici : currentBar dérive de currentTimeMs, on évite la double mise à jour
-        function onCurrentBarChanged() {
-            // (barres mises à jour via onCurrentTimeMsChanged)
-        }
-        function onIsPlayingChanged() {
-            if (!root.sequencer || !root.useSequencerData) return
-            if (root.sequencer.isPlaying) {
-                root.updateLineSegmentsFromSequencer()
-                // Nettoyer les barres existantes avant de recréer
-                root.clearMeasureBars()
-                root.updateMeasureBars()
-            } else {
-                root.lineSegmentsData = []
-                root.clearMeasureBars()
-            }
-        }
-        function onSequencerNotesChanged() {
-            if (root.useSequencerData) {
-                root.updateLineSegmentsFromSequencer()
-                // Quand les notes changent (nouveau morceau), nettoyer et recréer les barres
-                if (root.sequencer.isPlaying) {
-                    root.clearMeasureBars()
-                    root.updateMeasureBars()
-                }
-            }
-        }
-        function onSequencerTempoMapChanged() {
-            // Quand la tempo map change (nouveau morceau), nettoyer et recréer les barres
-            if (root.sequencer && root.sequencer.isPlaying) {
-                root.clearMeasureBars()
-                root.updateMeasureBars()
-            }
-        }
-        function onSequencerTimeSignatureMapChanged() {
-            // Quand la time signature map change (nouveau morceau), nettoyer et recréer les barres
-            if (root.sequencer && root.sequencer.isPlaying) {
-                root.clearMeasureBars()
-                root.updateMeasureBars()
-            }
-        }
+    
+    // Mettre à jour _sequencerTime quand les événements MIDI changent (fallback si pas de séquenceur)
+    // Ne pas réassigner lineSegmentsData directement, laisser le binding faire son travail
+    onMidiEventsChanged: {
+        // Le binding de lineSegmentsData se mettra à jour automatiquement
+        // car il vérifie si sequencer.sequencerNotes existe
     }
 }
 

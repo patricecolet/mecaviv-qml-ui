@@ -482,6 +482,30 @@ function getSegmentsInWindowFromMs(notes, currentTimeMs, lookaheadMs) {
 }
 
 /**
+ * Retourne les débuts de mesure dans la fenêtre [currentTimeMs, currentTimeMs + lookaheadMs].
+ * Utilisé par GameMode pour créer les FallingMeasureBar2D.
+ * @returns {Array<{bar: number, startMs: number}>}
+ */
+function getMeasureStartsInWindow(currentTimeMs, lookaheadMs, optPpq, optTempoMap, optTimeSignatureMap) {
+    var pq = (optPpq != null && optPpq > 0) ? optPpq : (_ppq || 480);
+    var tmap = (optTempoMap && optTempoMap.length > 0) ? optTempoMap : (_tempoMap && _tempoMap.length > 0 ? _tempoMap : null);
+    var smap = (optTimeSignatureMap && optTimeSignatureMap.length > 0) ? optTimeSignatureMap : (_timeSignatureMap && _timeSignatureMap.length > 0 ? _timeSignatureMap : null);
+    var bpm = getBpmAtMs(currentTimeMs, pq, tmap, 120);
+    var endMs = currentTimeMs + (lookaheadMs || 8000);
+    var startPos = positionFromMs(currentTimeMs, bpm, pq, tmap, smap);
+    var endPos = positionFromMs(endMs, bpm, pq, tmap, smap);
+    var startBar = startPos && typeof startPos.bar === "number" ? startPos.bar : 1;
+    var endBar = endPos && typeof endPos.bar === "number" ? Math.max(startBar, endPos.bar) : startBar + 50;
+    var out = [];
+    for (var bar = startBar; bar <= endBar; bar++) {
+        var startMs = positionToMsWithMaps(bar, 1, 1.0, pq, tmap, smap);
+        if (startMs >= currentTimeMs && startMs <= endMs)
+            out.push({ bar: bar, startMs: startMs });
+    }
+    return out;
+}
+
+/**
  * Retourne la note MIDI actuellement jouée à currentTimeMs (celle qui a commencé avant currentTimeMs et n'est pas encore terminée).
  * Si plusieurs notes, retourne la plus récemment commencée. Sinon null.
  */
