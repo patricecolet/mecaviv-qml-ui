@@ -23,8 +23,6 @@ Window {
     // Rendre la police accessible globalement
     readonly property string globalEmojiFont: emojiFont.name
     
-    // Propriété pour le mode studio
-    property bool studioMode: false
     property bool debugMode: true  // Mettre à true pour activer les logs
     property bool isAdminMode: false  // État admin persistant
     property bool isGamePlaying: false  // État de lecture du mode jeu
@@ -49,8 +47,7 @@ Window {
     // Contrôleurs
     ConfigController {
         id: configController
-        webSocketController: webSocketController  // AJOUTER CETTE LIGNE
-        //debugMode: mainWindow.debugMode
+        webSocketController: webSocketController
         
         // Utiliser le signal existant pour tout
         onSettingsUpdated: {
@@ -70,7 +67,6 @@ Window {
     SirenController {
         id: sirenController
         configController: configController
-        //debugMode: mainWindow.debugMode
     }
     
     WebSocketController {
@@ -144,11 +140,6 @@ Window {
         }
     }
     
-    
-    // Vue principale : uniquement la vue 2D (plus de vue 3D)
-    
-    // Authentification supprimée - accès direct à l'admin
-    
     // Panneau d'administration
     AdminPanel {
         id: adminPanel
@@ -156,8 +147,8 @@ Window {
         visible: false
         enabled: visible
         z: 9999
-        configController: configController  // Vérifiez que c'est bien là
-        webSocketController: webSocketController  // Vérifiez que c'est bien là
+        configController: configController
+        webSocketController: webSocketController
         
         
         onClose: {
@@ -175,8 +166,7 @@ Window {
         color: mouseAreaAdmin.containsMouse ? "#3a3a3a" : "#2a2a2a"
         border.color: "#666"
         radius: 5
-        visible: !studioMode
-                 && mainWindow.uiControlsEnabled
+        visible: mainWindow.uiControlsEnabled
                  && configController.getValueAtPath(["admin", "enabled"], true)
         
         MouseArea {
@@ -327,7 +317,7 @@ Window {
     Loader {
         id: testViewLoader
         anchors.fill: parent
-        visible: !studioMode && !adminPanel.visible
+        visible: !adminPanel.visible
         source: "qrc:/QML/pages/Test2D.qml"
         onItemChanged: {
             if (item) {
