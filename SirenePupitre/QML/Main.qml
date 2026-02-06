@@ -157,47 +157,15 @@ Window {
                 item.setGameMode2D = function(value) {
                     mainWindow.gameMode = value
                 }
+                item.openAdminPanel = function() {
+                    if (configController.getValueAtPath(["admin", "enabled"], true))
+                        adminPanel.visible = true
+                }
             }
         }
     }
 
     // Boutons et bandeaux de statut (z 0 ou 5000)
-    // Bouton Admin (en haut à gauche)
-    Rectangle {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.margins: 20
-        width: 80
-        height: 40
-        color: mouseAreaAdmin.containsMouse ? "#3a3a3a" : "#2a2a2a"
-        border.color: "#666"
-        radius: 5
-        visible: mainWindow.uiControlsEnabled
-                 && configController.getValueAtPath(["admin", "enabled"], true)
-        
-        MouseArea {
-            id: mouseAreaAdmin
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            
-            onClicked: {
-                if (configController.getValueAtPath(["admin", "enabled"], true)) {
-                    adminPanel.visible = true
-                } else {
-                }
-            }
-        }
-        
-        Text {
-            text: "ADMIN"
-            color: "#888"
-            font.pixelSize: 14
-            font.bold: true
-            anchors.centerIn: parent
-        }
-    }
-    
     // Bandeau "Console connectée" (en haut à droite) quand Pd/console est connecté
     Rectangle {
         z: 5000

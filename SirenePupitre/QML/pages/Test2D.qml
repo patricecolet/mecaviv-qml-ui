@@ -3,7 +3,6 @@ import QtQuick.Controls
 import "../components"
 import "../components/ambitus"
 import "../utils"
-import "../admin"
 import "../game"
 
 Page {
@@ -17,7 +16,7 @@ Page {
     property var rootWindow: null  // Main : pour lire gameMode2D (binding)
     property var setGameMode2D: null  // Callback Main pour écrire gameMode2D (plus fiable que rootWindow en écriture)
     property bool gameMode: rootWindow ? rootWindow.gameMode : false  // Mode jeu (seule vue)
-    property bool adminPanelVisible: false
+    property var openAdminPanel: null  // fourni par Main pour ouvrir le panneau Admin global
     property var webSocketController: null
 
     readonly property var _defaultSirenInfo: ({
@@ -208,7 +207,7 @@ Page {
                     }
                 }
                 onTogglePlayStop: root.isGamePlaying = !root.isGamePlaying
-                onAdminClicked: root.adminPanelVisible = true
+                onAdminClicked: if (root.openAdminPanel) root.openAdminPanel()
             }
         }
 
@@ -505,15 +504,5 @@ Page {
                 }
             }
         }
-    }
-
-    AdminPanel {
-        anchors.fill: parent
-        visible: root.adminPanelVisible
-        enabled: root.adminPanelVisible
-        z: 10000
-        configController: root.configController
-        webSocketController: root.webSocketController
-        onClose: root.adminPanelVisible = false
     }
 }

@@ -17,6 +17,24 @@ Item {
     signal togglePlayStop()
     signal adminClicked()
 
+    function getPrimarySirenIndex() {
+        if (!configController || !configController.primarySiren) return -1
+        var sirens = configController.config && configController.config.sirenConfig ? (configController.config.sirenConfig.sirens || []) : []
+        for (var i = 0; i < sirens.length; i++)
+            if (sirens[i].id === configController.primarySiren.id) return i
+        return -1
+    }
+
+    property bool frettedEnabled: {
+        if (!configController) return false
+        var _ = configController.updateCounter
+        var idx = getPrimarySirenIndex()
+        if (idx < 0) return false
+        var sirens = configController.config.sirenConfig.sirens || []
+        var s = sirens[idx]
+        return !!(s && s.frettedMode && s.frettedMode.enabled)
+    }
+
     Rectangle {
         anchors.top: parent.top
         anchors.right: parent.right
@@ -43,13 +61,14 @@ Item {
     }
 
     Rectangle {
+        id: frettedButton
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 20
         x: parent.width * 0.25 - width / 2
         width: 140
         height: 60
-        color: "#2a2a2a"
-        border.color: "#FFD700"
+        color: root.frettedEnabled ? "#1a4a2a" : "#2a2a2a"
+        border.color: root.frettedEnabled ? "#4ade80" : "#FFD700"
         border.width: 2
         radius: 5
         visible: root.uiControlsEnabled && !root.gameMode && !root.controllersPanelVisible
@@ -57,15 +76,21 @@ Item {
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: { }
+            onClicked: {
+                if (!root.configController) return
+                var idx = root.getPrimarySirenIndex()
+                if (idx < 0) return
+                var path = ["sirenConfig", "sirens", idx, "frettedMode", "enabled"]
+                root.configController.setValueAtPath(path, !root.frettedEnabled)
+            }
         }
 
         Column {
             anchors.centerIn: parent
             spacing: 5
             Text {
-                text: "Fretté OFF"
-                color: "#FFD700"
+                text: root.frettedEnabled ? "Fretté ON" : "Fretté OFF"
+                color: root.frettedEnabled ? "#4ade80" : "#FFD700"
                 font.pixelSize: 14
                 font.bold: true
                 anchors.horizontalCenter: parent.horizontalCenter
