@@ -4,11 +4,9 @@
         <file>QML/controllers/WebSocketController.qml</file>
         <file>QML/utils/DigitLED3D.qml</file>
         <file>QML/utils/Knob.qml</file>
-        <file>QML/utils/Knob3D.qml</file>
         <file>QML/utils/LEDSegment.qml</file>
         <file>QML/utils/LEDText3D.qml</file>
         <file>QML/components/SirenDisplay.qml</file>
-        <file>QML/components/NumberDisplay3D.qml</file>
         <file>QML/components/NumberDisplay2D.qml</file>
         <file>QML/components/TopDisplays2D.qml</file>
         <file>QML/components/StaffZone2D.qml</file>
@@ -21,7 +19,6 @@
         <file>QML/utils/MusicUtils.qml</file>
         <file>QML/controllers/ConfigController.qml</file>
         <file>config.js</file>
-        <file>QML/utils/Clef3D.qml</file>
         <file>QML/utils/Clef2D.qml</file>
         <file>QML/fonts/NotoMusic-Regular.ttf</file>
         <file>QML/fonts/MusiSync.ttf</file>
@@ -41,15 +38,11 @@
         <file>QML/admin/advanced/AdvancedConfig.qml</file>
         <file>QML/admin/advanced/AdvancedWebSocket.qml</file>
         <file>QML/components/ambitus/LedgerLines2D.qml</file>
-        <file>QML/components/ambitus/LedgerLines3D.qml</file>
         <file>QML/components/ambitus/MusicalStaff2D.qml</file>
-        <file>QML/components/ambitus/MusicalStaff3D.qml</file>
         <file>QML/components/ambitus/NoteCursor2D.qml</file>
-        <file>QML/components/ambitus/NoteCursor3D.qml</file>
         <file>QML/components/ambitus/NotePositionCalculator.qml</file>
         <file>QML/components/ambitus/NotePositionCalculator2D.qml</file>
         <file>QML/components/ambitus/NoteProgressBar2D.qml</file>
-        <file>QML/components/ambitus/NoteProgressBar3D.qml</file>
         <file>QML/components/ambitus/GearShiftPositionIndicator.qml</file>
         <file>QML/components/ambitus/MeasureBar2D.qml</file>
         <file>QML/components/indicators/FaderIndicator.qml</file>
@@ -60,12 +53,10 @@
         <file>QML/components/indicators/WheelIndicator.qml</file>
         <file>QML/components/indicators/EncoderIndicator.qml</file>
         <file>QML/components/ambitus/AmbitusDisplay2D.qml</file>
-        <file>QML/components/ambitus/AmbitusDisplay3D.qml</file>
         <file>QML/admin/advanced/AdvancedAnimations.qml</file>
         <file>QML/admin/advanced/AdvancedColors.qml</file>
         <file>QML/admin/advanced/AdvancedSizes.qml</file>
         <file>QML/utils/ColorPicker.qml</file>
-        <file>QML/components/NoteSpeedometer3D.qml</file>
         <file>QML/game/MelodicLine2D.qml</file>
         <file>QML/game/GameMode.qml</file>
         <file>QML/game/FallingNote2D.qml</file>
