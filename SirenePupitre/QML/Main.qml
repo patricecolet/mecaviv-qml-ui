@@ -140,24 +140,28 @@ Window {
         }
     }
 
-    // --- UI : panneaux et overlays ---
+    // --- UI : panneaux et overlays (ordre par z-index : vue → boutons/bandeaux → overlays) ---
 
-    // Panneau d'administration
-    AdminPanel {
-        id: adminPanel
+    // Vue principale 2D (z implicite 0)
+    Loader {
+        id: testViewLoader
         anchors.fill: parent
-        visible: false
-        enabled: visible
-        z: 9999
-        configController: configController
-        webSocketController: webSocketController
-        
-        
-        onClose: {
-            adminPanel.visible = false
+        visible: !adminPanel.visible
+        source: "qrc:/QML/pages/Test2D.qml"
+        onItemChanged: {
+            if (item) {
+                item.configController = configController
+                item.webSocketController = webSocketController
+                item.sirenController = sirenController
+                item.rootWindow = mainWindow
+                item.setGameMode2D = function(value) {
+                    mainWindow.gameMode = value
+                }
+            }
         }
     }
-    
+
+    // Boutons et bandeaux de statut (z 0 ou 5000)
     // Bouton Admin (en haut à gauche)
     Rectangle {
         anchors.top: parent.top
@@ -241,14 +245,29 @@ Window {
             anchors.centerIn: parent
         }
     }
-    
-    // Overlay d'attente de la configuration
+
+    // Overlays (z 9999 puis 10000)
+    AdminPanel {
+        id: adminPanel
+        anchors.fill: parent
+        visible: false
+        enabled: visible
+        z: 9999
+        configController: configController
+        webSocketController: webSocketController
+
+        onClose: {
+            adminPanel.visible = false
+        }
+    }
+
+    // Overlay d'attente de la configuration (z 10000)
     Rectangle {
         id: waitingConfigOverlay
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.7)  // Fond semi-transparent
+        color: Qt.rgba(0, 0, 0, 0.7)
         visible: configController && configController.waitingForConfig
-        z: 10000  // Au-dessus de tout
+        z: 10000
         
         MouseArea {
             anchors.fill: parent
@@ -311,25 +330,6 @@ Window {
                 text: "Connexion à PureData en cours"
                 color: "#CCCCCC"
                 font.pixelSize: 14
-            }
-        }
-    }
-    
-    // Vue principale 2D (seule vue du projet)
-    Loader {
-        id: testViewLoader
-        anchors.fill: parent
-        visible: !adminPanel.visible
-        source: "qrc:/QML/pages/Test2D.qml"
-        onItemChanged: {
-            if (item) {
-                item.configController = configController
-                item.webSocketController = webSocketController
-                item.sirenController = sirenController
-                item.rootWindow = mainWindow
-                item.setGameMode2D = function(value) {
-                    mainWindow.gameMode = value
-                }
             }
         }
     }
