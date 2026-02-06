@@ -63,29 +63,29 @@ Item {
         anchors.margins: 20
         spacing: 16
 
-        Row {
+        Rectangle {
+            id: openOptionsBtn
+            width: Math.max(100, optionsBtnText.contentWidth + 20)
             height: 44
-            spacing: 8
+            radius: 8
+            color: "#2a2a2a"
+            border.color: "#6bb6ff"
+            border.width: 1
             visible: root.rootWindow ? root.rootWindow.uiControlsEnabled : true
-            CheckBox {
-                id: accompanimentCheck
-                checked: root.playAccompaniment
-                onCheckedChanged: {
-                    root.playAccompaniment = checked
-                    if (root.configController && root.configController.webSocketController) {
-                        root.configController.webSocketController.sendBinaryMessage({
-                            type: "ACCOMPANIMENT_ENABLED",
-                            enabled: checked,
-                            source: "pupitre"
-                        })
-                    }
-                }
-            }
+
             Text {
-                text: "Jouer l'accompagnement"
+                id: optionsBtnText
+                anchors.centerIn: parent
+                anchors.margins: 10
+                text: "Options"
                 color: "#fff"
-                font.pixelSize: 13
-                anchors.verticalCenter: parent.verticalCenter
+                font.pixelSize: 14
+                font.bold: true
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: gameOptionsDialog.open()
             }
         }
 
@@ -134,6 +134,16 @@ Item {
                     source: "pupitre"
                 })
             }
+        }
+    }
+
+    GameOptionsDialog {
+        id: gameOptionsDialog
+        configController: root.configController
+        playAccompaniment: root.playAccompaniment
+        pupitreId: "P1"
+        onAccompanimentChanged: function(enabled) {
+            root.playAccompaniment = enabled
         }
     }
 }
