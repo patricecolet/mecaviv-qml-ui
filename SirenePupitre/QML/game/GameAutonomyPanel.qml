@@ -26,14 +26,6 @@ Item {
         }
     }
 
-    // Recharger les notes du séquenceur quand on change de sirène (morceau déjà chargé)
-    Connections {
-        target: root.configController
-        function onCurrentSirenInfoChanged() {
-            if (root.sequencer && root.sequencer.currentMidiPath) root.sequencer.reloadNotesForCurrentChannel()
-        }
-    }
-
     function loadMidiFilesList() {
         var xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {

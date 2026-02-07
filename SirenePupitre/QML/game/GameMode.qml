@@ -1,76 +1,40 @@
 import QtQuick
 import "../components/ambitus"
 import "."
-import "GameSequencer.js" as GameSequencer
 
 Item {
     id: root
-    
-    // Propriétés de configuration
+
     property var configController: null
     property var sirenInfo: null
     property real currentNoteMidi: 60.0
-    property var sequencer: null  // Référence au SequencerController
-    
-    // Propriétés de jeu
-    property var midiEvents: []  // Événements MIDI reçus
+    /** Mis à true par Test2D quand l'utilisateur appuie sur Play (pour le Timer et le filtre de segments). */
+    property bool isPlaying: false
+
+    property var midiEvents: []
     property real gameStartTime: 0
     property bool gameActive: false
-    
-    // Propriété pour savoir si le mode jeu est actif (liée depuis Test2D)
-    property bool isGameModeActive: true  // Toujours actif quand GameMode est chargé
-    
-    // Propriété pour suivre le temps du séquenceur (mis à jour par le Timer)
-    property real _sequencerTime: 0
+    property bool isGameModeActive: true
 
-    // Option : afficher les segments d'anticipation (fin note N → début note N+1). Désactivé par défaut.
+    property real _currentTimeMs: 0
+    property real lookaheadMs: 8000
+    property real fixedFallTime: 5000
+
     property bool showAnticipationLine: false
-    // Option : afficher les barres de mesure en chute. Désactivé par défaut.
     property bool showMeasureBars: false
-    
-    // Propriété calculée pour les segments de ligne
-    // Si sequencer est disponible, utiliser les segments calculés avec lookahead
-    // Sinon, utiliser les événements MIDI reçus
-    // Dépend de _sequencerTime pour forcer la réévaluation
+
     property var lineSegmentsData: {
-        // Utiliser _sequencerTime pour forcer la réévaluation quand le Timer met à jour
-        var dummy = root._sequencerTime
-        // Ne pas afficher les notes en chute tant qu'on n'a pas appuyé sur Play
-        if (!root.sequencer || !root.sequencer.isPlaying)
-            return []
-        if (root.sequencer.sequencerNotes && root.sequencer.sequencerNotes.length > 0) {
-            // Utiliser le séquenceur pour calculer les segments avec lookahead
-            var currentMs = root.sequencer.currentTimeMs || 0
-            var lookahead = root.sequencer.lookaheadMs || 8000
-            var notes = root.sequencer.sequencerNotes
-            var ppq = root.sequencer.sequencerPpq || 480
-            var tempoMap = root.sequencer.sequencerTempoMap || []
-            
-            // Debug log (limité pour éviter le spam)
-            if (dummy % 1000 < 50) {  // Log toutes les secondes environ
-                console.log("🎮 [GameMode] lineSegmentsData - notes:", notes.length, "currentMs:", currentMs, "lookahead:", lookahead)
-            }
-            
-            // Mettre à jour les variables globales du module GameSequencer
-            GameSequencer._notes = notes
-            GameSequencer._ppq = ppq
-            GameSequencer._tempoMap = tempoMap
-            
-            var segments = GameSequencer.getSegmentsInWindowFromMs(notes, currentMs, lookahead)
-            if (dummy % 1000 < 50 && segments.length > 0) {
-                console.log("🎮 [GameMode] segments calculés:", segments.length, "premier:", segments[0])
-            }
-            return segments
-        } else {
-            // Fallback : utiliser les événements MIDI reçus
-            // Utiliser midiEvents pour forcer la réévaluation
-            var dummy2 = root.midiEvents.length
-            var fallbackSegments = processMidiEvents()
-            if (fallbackSegments.length > 0) {
-                console.log("🎮 [GameMode] fallback segments:", fallbackSegments.length)
-            }
-            return fallbackSegments
+        var dummy = root._currentTimeMs
+        if (!root.isPlaying) return []
+        var all = root.processMidiEvents()
+        var list = []
+        var endMs = root._currentTimeMs + root.lookaheadMs
+        for (var i = 0; i < all.length; i++) {
+            var t = all[i].timestamp
+            if (t >= root._currentTimeMs && t <= endMs)
+                list.push(all[i])
         }
+        return list
     }
     
     // Signal pour recevoir les événements MIDI
@@ -142,40 +106,22 @@ Item {
     property real keySignatureWidth: showKeySignature ? (keySignatureConfig.width || 80) : 0
     property real ambitusOffset: clefWidth + keySignatureWidth
 
-    // Segments pour la ligne d'anticipation : fenêtre élargie vers le passé
-    // pour inclure les notes actuellement en chute (visibles sur la portée)
     property var anticipationSegmentsData: {
-        var dummy = root._sequencerTime
-        if (!root.sequencer || !root.sequencer.isPlaying)
-            return []
-        if (!root.sequencer.sequencerNotes || root.sequencer.sequencerNotes.length === 0)
-            return []
-        var currentMs = root.sequencer.currentTimeMs || 0
-        var lookahead = root.sequencer.lookaheadMs || 8000
-        var fft = root.sequencer.animationFallDurationMs || 5000
-        var notes = root.sequencer.sequencerNotes
-        // Fenêtre élargie : [currentMs - fft, currentMs + lookahead]
-        // Inclut les notes dont le timestamp est passé mais qui tombent encore
-        var wideStart = Math.max(0, currentMs - fft)
-        GameSequencer._notes = notes
-        GameSequencer._ppq = root.sequencer.sequencerPpq || 480
-        GameSequencer._tempoMap = root.sequencer.sequencerTempoMap || []
-        return GameSequencer.getSegmentsInWindowFromMs(notes, wideStart, lookahead + fft)
+        var dummy = root._currentTimeMs
+        if (!root.isPlaying) return []
+        var all = root.processMidiEvents()
+        var list = []
+        var wideStart = Math.max(0, root._currentTimeMs - root.fixedFallTime)
+        var endMs = root._currentTimeMs + root.lookaheadMs + root.fixedFallTime
+        for (var i = 0; i < all.length; i++) {
+            var t = all[i].timestamp
+            if (t >= wideStart && t <= endMs)
+                list.push(all[i])
+        }
+        return list
     }
 
-    // Données des barres de mesure dans la fenêtre lookahead (pour création dynamique)
-    property var measureBarsData: {
-        var dummy = root._sequencerTime
-        // Ne pas afficher les barres de mesure tant qu'on n'a pas appuyé sur Play
-        if (!root.sequencer || !root.sequencer.isPlaying || !root.sequencer.sequencerNotes || root.sequencer.sequencerNotes.length === 0)
-            return []
-        var currentMs = root.sequencer.currentTimeMs || 0
-        var lookahead = root.sequencer.lookaheadMs || 8000
-        var ppq = root.sequencer.sequencerPpq || 480
-        var tmap = root.sequencer.sequencerTempoMap || []
-        var smap = root.sequencer.sequencerTimeSignatureMap || []
-        return GameSequencer.getMeasureStartsInWindow(currentMs, lookahead, ppq, tmap, smap)
-    }
+    property var measureBarsData: []
 
     property var _measureBarCache: ({})
     Component {
@@ -196,9 +142,9 @@ Item {
             visible: root.isGameModeActive && root.showAnticipationLine
             lineSegments: root.anticipationSegmentsData
             currentNoteMidi: root.currentNoteMidi
-            currentTimeMs: root.sequencer ? root.sequencer.currentTimeMs : 0
+            currentTimeMs: root._currentTimeMs
             fallSpeed: 150
-            fixedFallTime: root.sequencer ? root.sequencer.animationFallDurationMs : 5000
+            fixedFallTime: root.fixedFallTime
             lineSpacing: root.lineSpacing
             clef: root.clef
             ambitusMin: root.ambitusMin
@@ -217,7 +163,7 @@ Item {
             visible: root.isGameModeActive
 
             lineSegments: root.lineSegmentsData
-            currentTimeMs: root.sequencer ? root.sequencer.currentTimeMs : 0
+            currentTimeMs: root._currentTimeMs
             lineSpacing: root.lineSpacing
             clef: root.clef
             ambitusMin: root.ambitusMin
@@ -226,7 +172,7 @@ Item {
             staffPosX: root.staffPosX
             ambitusOffset: root.ambitusOffset
             octaveOffset: root.octaveOffset
-            fixedFallTime: root.sequencer ? root.sequencer.animationFallDurationMs : 5000
+            fixedFallTime: root.fixedFallTime
 
             vibratoAmount: root.vibratoAmount
             vibratoRate: root.vibratoRate
@@ -247,35 +193,7 @@ Item {
         }
     }
     onMeasureBarsDataChanged: {
-        if (!root.sequencer || !root.showMeasureBars) return
-        var currentMs = root.sequencer.currentTimeMs || 0
-        var midiDelay = root.sequencer.animationFallDurationMs || 5000
-        var cursorBarY = melodicLine ? melodicLine.cursorBarY : (root.height / 2 + 30)
-        var list = measureBarsData || []
-        for (var i = 0; i < list.length; i++) {
-            var m = list[i]
-            var bar = m.bar
-            var startMs = m.startMs
-            var key = "bar-" + bar
-            if (_measureBarCache[key]) {
-                if (_measureBarCache[key].parent) continue
-                delete _measureBarCache[key]
-            }
-            var fallMs = GameSequencer.calculateFallDurationMs(startMs, currentMs, midiDelay)
-            if (fallMs <= 0) continue
-            var obj = measureBarComponent.createObject(root, {
-                targetY: cursorBarY,
-                fallSpeed: 150,
-                fixedFallTime: midiDelay,
-                fallDurationMs: fallMs,
-                measureNumber: bar,
-                accentColor: "#d1ab00"
-            })
-            if (obj) {
-                obj.z = 3
-                _measureBarCache[key] = obj
-            }
-        }
+        // Barres de mesure désactivées (measureBarsData = [])
     }
 
     // Fonction pour traiter les événements MIDI
@@ -303,17 +221,17 @@ Item {
         return segments
     }
     
-    // Fonction pour ajouter un événement MIDI
     function addMidiEvent(event) {
-        var newEvents = midiEvents.slice()  // Copier le tableau
-        newEvents.push(event)
-        
-        // Trier par timestamp
-        newEvents.sort(function(a, b) {
-            return a.timestamp - b.timestamp
+        var elapsed = (root.gameStartTime > 0) ? (Date.now() - root.gameStartTime) : 0
+        var newEvents = midiEvents.slice()
+        newEvents.push({
+            timestamp: elapsed,
+            note: event.note ?? event.midiNote ?? 60,
+            velocity: event.velocity ?? 100,
+            duration: event.duration ?? 500,
+            controllers: event.controllers ?? {}
         })
-        
-        // Réassigner pour déclencher onMidiEventsChanged
+        newEvents.sort(function(a, b) { return a.timestamp - b.timestamp })
         midiEvents = newEvents
     }
     
@@ -350,16 +268,8 @@ Item {
         gameActive = false
     }
     
-    // Gérer la réception d'événements MIDI
     onMidiEventReceived: function(event) {
-        // Ajouter l'événement à la liste
-        addMidiEvent({
-            timestamp: event.timestamp ?? Date.now(),
-            note: event.note ?? event.midiNote ?? 60,
-            velocity: event.velocity ?? 100,
-            duration: event.duration ?? 500,  // Durée en ms
-            controllers: event.controllers ?? {}
-        })
+        addMidiEvent(event)
     }
     
     // Gérer les Control Change MIDI
@@ -391,32 +301,13 @@ Item {
         }
     }
     
-    // Timer pour mettre à jour _sequencerTime régulièrement quand le séquenceur joue
-    // Cela force la réévaluation de lineSegmentsData qui dépend de _sequencerTime
     Timer {
-        interval: 50  // Mise à jour toutes les 50ms (même fréquence que l'extrapolation du séquenceur)
-        running: root.sequencer && root.sequencer.isPlaying
+        interval: 50
+        running: root.isPlaying && root.gameStartTime > 0
         repeat: true
         onTriggered: {
-            if (root.sequencer) {
-                root._sequencerTime = root.sequencer.currentTimeMs || 0
-            }
+            root._currentTimeMs = Date.now() - root.gameStartTime
         }
-    }
-    
-    // Mettre à jour _sequencerTime quand le séquenceur change
-    onSequencerChanged: {
-        if (sequencer) {
-            console.log("🎮 [GameMode] Sequencer assigné, notes:", sequencer.sequencerNotes ? sequencer.sequencerNotes.length : 0, "currentTimeMs:", sequencer.currentTimeMs)
-            _sequencerTime = sequencer.currentTimeMs || 0
-        }
-    }
-    
-    // Mettre à jour _sequencerTime quand les événements MIDI changent (fallback si pas de séquenceur)
-    // Ne pas réassigner lineSegmentsData directement, laisser le binding faire son travail
-    onMidiEventsChanged: {
-        // Le binding de lineSegmentsData se mettra à jour automatiquement
-        // car il vérifie si sequencer.sequencerNotes existe
     }
 }
 

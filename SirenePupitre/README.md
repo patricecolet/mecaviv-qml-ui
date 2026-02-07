@@ -68,8 +68,7 @@ SirenePupitre/
     │       ├── PedalIndicator.qml       ✅
     │       ├── PadIndicator.qml         ✅
     │       ├── JoystickIndicator.qml    ✅
-    │       ├── WheelIndicator.qml       ✅
-    │       └── EncoderIndicator.qml     ✅
+    │       └── WheelIndicator.qml       ✅
     ├── controllers/                # Contrôleurs logiques
     │   ├── ConfigController.qml    ✅
     │   ├── SirenController.qml     ✅
@@ -328,7 +327,7 @@ Le **premier byte** de chaque message binaire identifie son type :
 | Type | Hex | Usage | Taille | Source |
 |------|-----|-------|--------|--------|
 | CONFIG | 0x00 | Configuration complète (JSON) | Variable (8 bytes header + données) | PureData |
-| **POSITION** | **0x01** | **Position lecture (tick seul)** | **6 bytes** | **PureData/Séquenceur** |
+| **POSITION** | **0x01** | **Position lecture (bar/beat)** | **10 bytes** | **PureData/Séquenceur** |
 | **CONTROLLERS** | **0x02** | **États contrôleurs physiques** | **16 bytes** | **Contrôleurs physiques** |
 | **MIDI_NOTE_VOLANT** | **0x03** | **Note MIDI du volant (contrôleur)** | **5 bytes** | **Volant physique** |
 | MIDI_NOTE_DURATION | 0x04 | Note MIDI avec durée (séquence) | 5 bytes | Fichier MIDI |
@@ -347,24 +346,25 @@ Le **premier byte** de chaque message binaire identifie son type :
 - `0x04` : Notes de la séquence avec durée → Mode jeu uniquement
 - `0x05` : Control Change (vibrato, tremolo, enveloppe) → Modulations en mode jeu
 
-**Position lecture (type 0x01, 6 bytes) — tick seul, JS dérive bar/beat** :
-
-Tu envoies uniquement le **tick** (position MIDI en pulses). Le Pupitre a déjà BPM et PPQ du fichier (chargé via l’API) et calcule bar/beat/currentTimeMs côté JS.
+**Position lecture (type 0x01, 10 bytes)** :
 
 | Byte | Champ | Type | Plage | Description |
 |------|-------|------|-------|-------------|
 | 0 | Type | uint8 | 0x01 | Identifiant POSITION |
 | 1 | Flags | uint8 | 0-255 | bit0=playing, autres réservés |
-| 2-5 | tick | uint32 | 0-4294967295 | Position en ticks MIDI (LE) |
+| 2-3 | barNumber | uint16 | 0-65535 | Numéro de mesure (LE) |
+| 4-5 | beatInBar | uint16 | 0-65535 | Beat dans la mesure (LE) |
+| 6-9 | beat | float32 | 0.0+ | Beat total décimal (LE) |
 
 **Format** :
 ```
-[0x01][Flags][Tick_L][Tick_H][Tick_2][Tick_3]
+[0x01][Flags][Bar_L][Bar_H][BeatInBar_L][BeatInBar_H][Beat_f32LE]
 ```
 
-**Exemple décimal** : playing=true, tick=9600 → `1, 1, 128, 37, 0, 0` (9600 = 0x2580, LE = 0x80, 0x25, 0, 0)
-
-**Format legacy (9 bytes)** : bar, beatInBar, beat — toujours accepté pour rétrocompatibilité.
+**Exemple** : Mesure 13, beat 2, beat total 50.5, playing=true
+```
+[0x01, 0x01, 0x0D, 0x00, 0x02, 0x00, 0x00, 0x00, 0x49, 0x42]
+```
 
 **Note MIDI volant (type 0x03, 5 bytes)** :
 
@@ -429,9 +429,13 @@ Note 60 (Do4) :
 - **Parfait pour le mode jeu** avec beaucoup de notes
 - **Durée précise** pour la hauteur des cubes
 
-**Contrôleurs physiques (type 0x02) - 18 BYTES** :
+**Contrat Pd — mode jeu (animation 0x04, monitoring 0x01)** :
+- **0x04** : envoyé **en avance** par Pd (d’un délai au moins égal à `midiDelayMs`, ex. 5 s) pour que l’UI affiche la chute des notes au bon moment.
+- **0x01** : envoyé **au moment** où Pd envoie les messages MIDI (sortie réelle), pour l’affichage mesure / beat / temps (monitoring).
+
+**Contrôleurs physiques (type 0x02) - 16 BYTES** :
 ```
-[0x02][Volant_L][Volant_H][Pad1_A][Pad1_V][Pad2_A][Pad2_V][Joy_X][Joy_Y][Joy_Z][Joy_B][Sel][Fader][Pedal][Btn1][Btn2][Enc_V][Enc_P]
+[0x02][Volant_L][Volant_H][Pad1_A][Pad1_V][Pad2_A][Pad2_V][Joy_X][Joy_Y][Joy_Z][Joy_B][Sel][Fader][Pedal][Btn1][Btn2]
 ```
 
 | Byte | Champ | Type | Plage | Description |
@@ -451,8 +455,6 @@ Note 60 (Do4) :
 | 13 | Pedal | uint8 | 0-127 | Pédale de modulation |
 | 14 | Button1 | uint8 | 0/1 | Bouton 1 (>0 = 1) |
 | 15 | Button2 | uint8 | 0/1 | Bouton 2 (>0 = 1) |
-| 16 | Encoder Value | uint8 | 0-127 | Valeur de rotation de l'encodeur |
-| 17 | Encoder Pressed | uint8 | 0/1 | État du poussoir de l'encodeur (>0 = 1) |
 
 **Mapping Sélecteur/GearShift** :
 - Position 0 : SEMITONE (demi-ton)
@@ -461,10 +463,10 @@ Note 60 (Do4) :
 - Position 3 : OCTAVE (octave)
 - Position 4 : DOUBLE_OCTAVE (double octave)
 
-**Exemple** : Volant à 180°, Pad1 actif (vel=100, after=50), Joystick centré, Sélecteur en position 2, Encoder à 63
+**Exemple** : Volant à 180°, Pad1 actif (vel=100, after=50), Joystick centré, Sélecteur en position 2
 ```
-[0x02, 0xB4, 0x00, 0x32, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x30, 0x00, 0x00, 0x3F, 0x00]
-  │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │
+[0x02, 0xB4, 0x00, 0x32, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x30, 0x00, 0x00]
+  │     │     │     │     │     │     │     │     │     │     │     │     │     │     │     │
   │     └─────┴─ 0x00B4 = 180 degrés
   │           └─────┴─ Pad1: after=50, vel=100
   │                 └─────┴─ Pad2: after=0, vel=0
@@ -472,7 +474,6 @@ Note 60 (Do4) :
   │                                         └─ Sélecteur: 2 (MINOR_SIXTH)
   │                                           └─────┴─ Fader=64, Pedal=48
   │                                                 └─────┴─ Btn1=0, Btn2=0
-  │                                                       └─────┴─ Encoder: value=63, pressed=0
   └─ Type: CONTROLLERS
 ```
 
@@ -647,10 +648,6 @@ webSocketController.sendBinaryMessage({
 #### Boutons supplémentaires
 - **button1** : booléen (0 ou 1)
 - **button2** : booléen (0 ou 1)
-
-#### Encodeur rotatif (Encoder)
-- **value** : entier (0-127)
-- **pressed** : booléen (0 ou 1)
 
 ## Flux de données
 
@@ -859,7 +856,6 @@ Les notes altérées **partagent la même position Y** que leur note naturelle v
 - [X] Composant FaderIndicator
 - [X] Composant PedalIndicator
 - [X] Composant PadIndicator (vélocité + aftertouch)
-- [X] Composant EncoderIndicator (encodeur rotatif + poussoir)
 
 **Note Phase 3** : L'esthétique des composants doit être validée avant de passer à la phase suivante
 

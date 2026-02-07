@@ -1,10 +1,9 @@
 import QtQuick
 import QtQuick.Controls
-import "../../game/GameSequencer.js" as GameSequencer
 
 /**
  * Barre de mesure animée qui descend verticalement avec le numéro de mesure.
- * Utilisée pour vérifier l'anticipation du séquenceur UI.
+ * En mode monitoring 0x01 uniquement (sans tempo map / currentTimeMs), la barre est masquée.
  */
 Item {
     id: root
@@ -17,42 +16,23 @@ Item {
 
     property real lineHeight: 2
 
-    // Mesure actuelle à afficher
     readonly property int currentBar: root.sequencerController && root.sequencerController.isPlaying
         ? (root.sequencerController.currentBar || 1)
         : 1
 
-    // Calculer la position Y de la barre pour la mesure actuelle
     function calculateBarY() {
         if (!root.sequencerController || !root.sequencerController.isPlaying) return -1000
-        
+        // Désactivé quand le monitor n'expose pas currentTimeMs (mode 0x01 seul, sans séquenceur UI)
+        if (typeof root.sequencerController.currentTimeMs !== "number") return -1000
+
         var currentTimeMs = root.sequencerController.currentTimeMs || 0
-        var targetTimeMs = 0
-        
-        // Calculer le temps en ms du début de la mesure actuelle
-        if (root.sequencerController.sequencerTempoMap && root.sequencerController.sequencerTempoMap.length > 0) {
-            targetTimeMs = GameSequencer.positionToMsWithMaps(
-                root.currentBar, 1, 1.0,
-                root.sequencerController.sequencerPpq || 480,
-                root.sequencerController.sequencerTempoMap,
-                root.sequencerController.sequencerTimeSignatureMap || []
-            )
-        } else {
-            // Fallback : calcul simple avec BPM fixe
-            var bpm = root.sequencerController.sequencerBpm || root.sequencerController.currentTempoBpm || 120
-            var msPerBeat = 60000 / bpm
-            var msPerBar = msPerBeat * 4
-            targetTimeMs = (root.currentBar - 1) * msPerBar
-        }
-        
-        // Temps jusqu'à cette mesure
+        var bpm = root.sequencerController.currentTempoBpm || 120
+        var msPerBeat = 60000 / bpm
+        var msPerBar = msPerBeat * 4
+        var targetTimeMs = (root.currentBar - 1) * msPerBar
         var msUntilTarget = targetTimeMs - currentTimeMs
-        
-        // Position Y : distance depuis cursorBarY proportionnelle au temps restant
         var distanceFromCursor = (msUntilTarget / root.fixedFallTime) * (root.fallSpeed * root.fixedFallTime / 1000)
-        var barY = root.cursorBarY - distanceFromCursor
-        
-        return barY
+        return root.cursorBarY - distanceFromCursor
     }
 
     // Barre de mesure unique

@@ -55,9 +55,11 @@ Vue du mode jeu qui affiche :
 ### 2. Réception des événements MIDI
 - Les messages MIDI arrivent via WebSocket depuis PureData
 - **Format binaire optimisé** : `[0x04, note, velocity, duration_lsb, duration_msb]` (5 bytes)
+- **0x04** est envoyé **en avance** par Pd (délai ≥ `midiDelayMs`, ex. 5 s) pour que l’UI affiche la chute des notes au bon moment.
+- **0x01** (position) est envoyé **au moment** où Pd joue le MIDI, pour l’affichage mesure/beat (monitoring).
 - `WebSocketController` décode le format binaire et les transmet à `Main.qml`
 - `Main.qml` les transmet à `GameMode` si le mode jeu est actif
-- `GameMode` ajoute les événements à la liste `midiEvents`
+- `GameMode` ajoute les événements à la liste `midiEvents` avec un timestamp = temps écoulé depuis le Play
 
 ### 3. Traitement des événements
 - `GameMode.processMidiEvents()` traite la liste des événements

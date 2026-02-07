@@ -4,7 +4,6 @@ import "../components"
 import "../components/ambitus"
 import "../utils"
 import "../game"
-import "../game/GameSequencer.js" as GameSequencerModule
 
 Page {
     id: root
@@ -37,56 +36,11 @@ Page {
 
     MusicUtils { id: _musicUtils }
 
-    // Note à afficher sur la portée : en mode jeu = note courante du séquenceur, sinon clampedNote
-    property real displayNoteForStaff: {
-        if (root.gameMode && gameModeOverlay && gameModeOverlay.sequencerController) {
-            var seq = gameModeOverlay.sequencerController
-            var notes = seq.sequencerNotes || []
-            var t = seq.currentTimeMs || 0
-            var ppq = seq.sequencerPpq || 480
-            var tmap = seq.sequencerTempoMap || []
-            var note = GameSequencerModule.getCurrentNoteAtMs(notes, t, ppq, tmap)
-            if (note != null) return note
-        }
-        return root.clampedNote
-    }
+    // Note à afficher sur la portée (mode jeu : clampedNote ; Pd peut envoyer la note courante plus tard)
+    property real displayNoteForStaff: root.clampedNote
 
-    // En mode jeu : rpm/frequency depuis la note courante du séquenceur ; sinon depuis sirenController
-    property real rpm: {
-        if (root.gameMode && gameModeOverlay && gameModeOverlay.sequencerController) {
-            var seq = gameModeOverlay.sequencerController
-            var notes = seq.sequencerNotes || []
-            var t = seq.currentTimeMs || 0
-            var ppq = seq.sequencerPpq || 480
-            var tmap = seq.sequencerTempoMap || []
-            var note = GameSequencerModule.getCurrentNoteAtMs(notes, t, ppq, tmap)
-            if (note != null && root.sirenInfo) {
-                var trans = root.sirenInfo.transposition != null ? root.sirenInfo.transposition : 0
-                var out = root.sirenInfo.outputs > 0 ? root.sirenInfo.outputs : 12
-                var freq = _musicUtils.midiToFrequency(note, trans)
-                return _musicUtils.formatRPM(_musicUtils.frequencyToRPM(freq, out))
-            }
-            return 0
-        }
-        return sirenController ? sirenController.trueRpm : 1200
-    }
-    property int frequency: {
-        if (root.gameMode && gameModeOverlay && gameModeOverlay.sequencerController) {
-            var seq = gameModeOverlay.sequencerController
-            var notes = seq.sequencerNotes || []
-            var t = seq.currentTimeMs || 0
-            var ppq = seq.sequencerPpq || 480
-            var tmap = seq.sequencerTempoMap || []
-            var note = GameSequencerModule.getCurrentNoteAtMs(notes, t, ppq, tmap)
-            if (note != null && root.sirenInfo) {
-                var trans = root.sirenInfo.transposition != null ? root.sirenInfo.transposition : 0
-                var freq = _musicUtils.midiToFrequency(note, trans)
-                return _musicUtils.formatFrequency(freq)
-            }
-            return 0
-        }
-        return sirenController ? sirenController.trueFrequency : 440
-    }
+    property real rpm: sirenController ? sirenController.trueRpm : 1200
+    property int frequency: sirenController ? sirenController.trueFrequency : 440
     property int velocity: 100
     property real bend: 0.0
     property real uiScale: (configController && configController.getValueAtPath(["ui", "scale"], 0.8)) || 0.8
@@ -333,7 +287,7 @@ Page {
                         Text { text: "Mesure"; color: "#888"; font.pixelSize: 9; width: 44 }
                         Text {
                             text: root.transportDisplayActive && sequencerController
-                                ? (sequencerController.positionDisplayText + " / " + sequencerController.totalBars)
+                                ? (sequencerController.positionDisplayText + " / " + (sequencerController.totalBars > 0 ? sequencerController.totalBars : "—"))
                                 : "— / —"
                             color: "#fff"
                             font.pixelSize: 12
@@ -346,7 +300,7 @@ Page {
                         Text {
                             text: root.transportDisplayActive && sequencerController
                                 ? (sequencerController.currentTimeDisplay + " / " + sequencerController.totalTimeDisplay)
-                                : "0:00 / 0:00"
+                                : "— / —"
                             color: "#fff"
                             font.pixelSize: 12
                         }
@@ -394,26 +348,19 @@ Page {
                             var playing = root.rootWindow && root.rootWindow.isGamePlaying
                             var newPlaying = !playing
                             if (newPlaying) {
-                                // Ne pas lancer la lecture si aucun morceau chargé (évite séquence vide et bugs)
-                                var hasNotes = sequencerController && sequencerController.sequencerNotes
-                                    && sequencerController.sequencerNotes.length > 0
-                                if (!hasNotes)
-                                    return
                                 if (root.rootWindow) {
                                     root.rootWindow.userRequestedStop = false
                                     root.rootWindow.isGamePlaying = true
                                 }
                                 if (sequencerController)
                                     sequencerController.startFromZero()
+                                if (root._gameModeItem && typeof root._gameModeItem.startGame === "function")
+                                    root._gameModeItem.startGame()
                                 root.transportDisplayActive = true
-                                // Envoyer play immédiatement avec délai MIDI pour que PD retarde la sortie audio
-                                var midiDelayMs = (sequencerController && sequencerController.animationFallDurationMs > 0)
-                                    ? sequencerController.animationFallDurationMs
-                                    : 5000
                                 root.webSocketController.sendBinaryMessage({
                                     type: "MIDI_TRANSPORT",
                                     action: "play",
-                                    midiDelayMs: Math.round(midiDelayMs),
+                                    midiDelayMs: 5000,
                                     source: "pupitre"
                                 })
                             } else {
@@ -530,13 +477,13 @@ Page {
                         if (item) {
                             item.configController = root.configController
                             item.sirenInfo = root.sirenInfo
-                            item.sequencer = sequencerController
                             item.lineSpacing = 16
                             item.staffWidth = gameOverlayStaffZone.width
                             item.staffPosX = 0
                             item.currentNoteMidi = Qt.binding(function() { return root.clampedNote })
                             item.showAnticipationLine = Qt.binding(function() { return root.showAnticipationLine })
                             item.showMeasureBars = Qt.binding(function() { return root.showMeasureBars })
+                            item.isPlaying = Qt.binding(function() { return !!(root.rootWindow && root.rootWindow.isGamePlaying) })
                             root._gameModeItem = item
                         }
                     }
