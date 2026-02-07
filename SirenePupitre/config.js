@@ -140,6 +140,7 @@ var configData = {
       "studioButton": { "visible": true },
       "musicalStaff": {
         "visible": true,
+        "viewMode": "staff",
         "noteName": {
           "visible": true
         },

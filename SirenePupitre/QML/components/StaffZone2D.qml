@@ -14,18 +14,42 @@ Item {
     property int frequency: 0
     height: 120
 
-    MusicalStaff2D {
-        width: root.width
+    readonly property string _viewMode: configController && configController.updateCounter >= 0
+        ? (configController.getValueAtPath(["displayConfig", "components", "musicalStaff", "viewMode"], "staff") || "staff")
+        : "staff"
+
+    Component {
+        id: staffComponent
+        MusicalStaff2D {
+            currentNoteMidi: root.currentNoteMidi
+            sirenInfo: root.sirenInfo
+            configController: root.configController
+            lineSpacing: root.lineSpacing
+            lineThickness: root.lineThickness
+            staffWidth: root.width
+            lineColor: Qt.rgba(1, 1, 1, 1)
+            rpm: root.rpm
+            frequency: root.frequency
+        }
+    }
+
+    Component {
+        id: pianoComponent
+        AmbitusPiano2D {
+            currentNoteMidi: root.currentNoteMidi
+            sirenInfo: root.sirenInfo
+            configController: root.configController
+            lineSpacing: root.lineSpacing
+            staffWidth: root.width
+            accentColor: root.accentColor
+        }
+    }
+
+    Loader {
+        id: viewLoader
+        anchors.fill: parent
         anchors.verticalCenter: parent.verticalCenter
         anchors.horizontalCenter: parent.horizontalCenter
-        staffWidth: root.width
-        lineSpacing: root.lineSpacing
-        lineThickness: root.lineThickness
-        lineColor: Qt.rgba(1, 1, 1, 1)  // Blanc pour mieux voir le curseur et le reste
-        currentNoteMidi: root.currentNoteMidi
-        sirenInfo: root.sirenInfo
-        configController: root.configController
-        rpm: root.rpm
-        frequency: root.frequency
+        sourceComponent: root._viewMode === "piano" ? pianoComponent : staffComponent
     }
 }

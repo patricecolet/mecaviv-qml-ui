@@ -29,6 +29,48 @@ Item {
             font.pixelSize: 12
             visible: text !== ""
         }
+
+        RowLayout {
+            Layout.leftMargin: 20
+            Layout.rightMargin: 20
+            spacing: 12
+            enabled: configController ? configController.isComponentVisible("musicalStaff") : true
+            opacity: enabled ? 1.0 : 0.5
+            Text {
+                text: "Vue de l'ambitus :"
+                color: "#bbb"
+                font.pixelSize: 13
+            }
+            ComboBox {
+                id: viewModeCombo
+                Layout.preferredWidth: 180
+                model: ["Portée", "Piano"]
+                currentIndex: {
+                    if (!configController) return 0
+                    var dummy = configController.updateCounter
+                    var mode = configController.getValueAtPath(["displayConfig", "components", "musicalStaff", "viewMode"], "staff")
+                    return (mode === "piano") ? 1 : 0
+                }
+                onActivated: function(index) {
+                    if (configController) {
+                        configController.setValueAtPath(["displayConfig", "components", "musicalStaff", "viewMode"], index === 1 ? "piano" : "staff")
+                    }
+                }
+                contentItem: Text {
+                    text: viewModeCombo.displayText
+                    color: "#eee"
+                    font.pixelSize: 13
+                    verticalAlignment: Text.AlignVCenter
+                    leftPadding: viewModeCombo.indicator.width + 10
+                }
+                background: Rectangle {
+                    color: "#2a2a2a"
+                    border.color: "#555"
+                    border.width: 1
+                    radius: 4
+                }
+            }
+        }
         
         ColumnLayout {
             Layout.fillWidth: true

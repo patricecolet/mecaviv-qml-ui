@@ -36,6 +36,7 @@ QtObject {
             "components": {
                 "musicalStaff": {
                     "visible": true,
+                    "viewMode": "staff",
                     "ambitus": {
                         "showNoteNames": true,
                         "noteNameSettings": {
