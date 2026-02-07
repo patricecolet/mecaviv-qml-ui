@@ -394,6 +394,11 @@ Page {
                             var playing = root.rootWindow && root.rootWindow.isGamePlaying
                             var newPlaying = !playing
                             if (newPlaying) {
+                                // Ne pas lancer la lecture si aucun morceau chargé (évite séquence vide et bugs)
+                                var hasNotes = sequencerController && sequencerController.sequencerNotes
+                                    && sequencerController.sequencerNotes.length > 0
+                                if (!hasNotes)
+                                    return
                                 if (root.rootWindow) {
                                     root.rootWindow.userRequestedStop = false
                                     root.rootWindow.isGamePlaying = true

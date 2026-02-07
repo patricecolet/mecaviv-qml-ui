@@ -246,6 +246,12 @@ QtObject {
                     path: path,
                     value: finalValue
                 })
+            if (path.length === 2 && path[0] === "controllersPanel" && path[1] === "visible") {
+                webSocketController.sendMessage({
+                    type: "ENABLE_0x02_PROTOCOL",
+                    value: !!finalValue
+                });
+            }
                 
                 if (path.join(".").startsWith("composeSiren.controllers.") && path.length === 4 && path[3] === "value") {
                     var controllerName = path[2]
