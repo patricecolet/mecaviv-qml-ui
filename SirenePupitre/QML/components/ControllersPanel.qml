@@ -39,7 +39,27 @@ Rectangle {
     property var configController: null
     property var webSocketController: null
     property bool faderTestActive: false  // État du toggle de test
-    
+    // Calibrage pads
+    property string padCalibrationMode: "min"  // "min" | "max"
+    property bool pad1CalibrationActive: false
+    property bool pad2CalibrationActive: false
+    property int pad1CalibMinV: 0
+    property int pad1CalibMaxV: 127
+    property int pad1CalibMinA: 0
+    property int pad1CalibMaxA: 127
+    property int pad2CalibMinV: 0
+    property int pad2CalibMaxV: 127
+    property int pad2CalibMinA: 0
+    property int pad2CalibMaxA: 127
+    /** Valeur int16 affichée sous chaque bouton de calibration (reçue par WebSocket). */
+    property int pad1CalibDisplayValue: 0
+    property int pad2CalibDisplayValue: 0
+
+    function setPadCalibrationValue(pad, value) {
+        if (pad === 0) root.pad1CalibDisplayValue = value
+        else if (pad === 1) root.pad2CalibDisplayValue = value
+    }
+
     function showControllerValues() {
         return configController ? configController.isComponentVisible("controllerValues") : true
     }
@@ -61,7 +81,30 @@ Rectangle {
         webSocketController.sendBinaryMessage(message)
         console.log("✅ Message de test fader envoyé:", JSON.stringify(message))
     }
-    
+
+    property bool leftSpeakerTestOn: false
+    property bool rightSpeakerTestOn: false
+
+    function testSpeaker(channel, active) {
+        if (!webSocketController || !webSocketController.connected) {
+            console.log("❌ WebSocket non connecté, impossible d'envoyer le test HP")
+            return
+        }
+        webSocketController.sendBinaryMessage({ type: "SPEAKER_TEST", channel: channel, active: active })
+        console.log("✅ Message SPEAKER_TEST envoyé:", channel, active)
+    }
+
+    /** Envoie un message PAD_CALIBRATION à chaque clic : pad (0 ou 1), mode (min ou max), active (true/false). */
+    function sendPadCalibration(pad, active) {
+        if (!webSocketController || !webSocketController.connected) return
+        webSocketController.sendBinaryMessage({
+            type: "PAD_CALIBRATION",
+            pad: pad,
+            mode: root.padCalibrationMode,
+            active: active
+        })
+    }
+
     color: backgroundColor
     border.color: borderColor
     border.width: 1
@@ -127,7 +170,7 @@ Rectangle {
             id: controllersContainer
             property real totalWidth: 800
             property real itemSpacing: totalWidth / 4
-            
+
             // 🔧 Échelle globale depuis la configuration
             property real configScale: {
                 if (configController && configController.updateCounter >= 0) {
@@ -137,9 +180,9 @@ Rectangle {
             }
             
             scale: Qt.vector3d(
-                Math.min(1.5, controllerView3D.width / 900) * configScale,
-                Math.min(1.5, controllerView3D.width / 900) * configScale,
-                Math.min(1.5, controllerView3D.width / 900) * configScale
+                Math.min(1.5, Math.min(controllerView3D.width / 900, controllerView3D.height / 320)) * configScale,
+                Math.min(1.5, Math.min(controllerView3D.width / 900, controllerView3D.height / 320)) * configScale,
+                Math.min(1.5, Math.min(controllerView3D.width / 900, controllerView3D.height / 320)) * configScale
             )
             
             // Position 1/6 - Wheel
@@ -313,7 +356,7 @@ Rectangle {
         anchors.bottomMargin: 30
     }
     
-    // Labels pour les pads
+    // Labels pour les pads (+ plage calibrage en mode calibrage)
     Row {
         visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "pad")
         anchors.horizontalCenter: parent.horizontalCenter
@@ -322,75 +365,295 @@ Rectangle {
         anchors.bottomMargin: 30
         spacing: 50
         
-        Text {
-            text: "PAD 1"
-            font.pixelSize: 12
-            font.bold: root.pad1Active
-            color: root.pad1Active ? "#00ff00" : "#666666"
+        Column {
+            spacing: 2
+            Text {
+                text: "PAD 1"
+                font.pixelSize: 12
+                font.bold: root.pad1Active
+                color: root.pad1Active ? "#00ff00" : "#666666"
+            }
         }
         
-        Text {
-            text: "PAD 2"
-            font.pixelSize: 12
-            font.bold: root.pad2Active
-            color: root.pad2Active ? "#00ff00" : "#666666"
+        Column {
+            spacing: 2
+            Text {
+                text: "PAD 2"
+                font.pixelSize: 12
+                font.bold: root.pad2Active
+                color: root.pad2Active ? "#00ff00" : "#666666"
+            }
         }
     }
     
-    // Bouton de test pour le fader (toggle 1/0)
-    Rectangle {
-        id: testFaderButton
-        visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "fader")
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.horizontalCenterOffset: parent.width * 0.0  // Aligné avec le fader (position 0.0)
+    // Boutons test haut-parleurs (tout à gauche)
+    Row {
+        id: speakerTestBar
+        visible: showControllerValues()
         anchors.top: parent.top
-        anchors.topMargin: 5
-        width: 80
-        height: 30
-        radius: 4
-        z: 1000  // S'assurer que le bouton est au-dessus des autres éléments
-        color: root.faderTestActive ? "#00aa00" : (testFaderButtonMouseArea.containsMouse ? "#3a3a3a" : "#2a2a2a")
-        border.color: "#00ff00"
-        border.width: root.faderTestActive ? 3 : 2
-        
-        MouseArea {
-            id: testFaderButtonMouseArea
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            propagateComposedEvents: false
-            preventStealing: true  // Empêcher le vol du clic par d'autres MouseArea
-            z: 1001  // Au-dessus du Rectangle parent
-            
-            onClicked: function(mouse) {
-                // Empêcher la propagation du clic
-                mouse.accepted = true
-                // Toggle l'état et envoyer 1 ou 0
-                root.faderTestActive = !root.faderTestActive
-                root.testFader(root.faderTestActive)
+        anchors.topMargin: 6
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        spacing: 8
+        z: 1000
+
+        // HP G (switch on/off)
+        Rectangle {
+            width: 56
+            height: 28
+            radius: 4
+            color: root.leftSpeakerTestOn ? "#00aa00" : (maHPG.containsMouse ? "#3a3a3a" : "#2a2a2a")
+            border.color: "#00ff00"
+            border.width: root.leftSpeakerTestOn ? 2 : 1
+            MouseArea {
+                id: maHPG
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    root.leftSpeakerTestOn = !root.leftSpeakerTestOn
+                    root.testSpeaker("left", root.leftSpeakerTestOn)
+                }
             }
-            
-            onPressed: function(mouse) {
-                // Empêcher la propagation même au press
-                mouse.accepted = true
-            }
-            
-            onReleased: function(mouse) {
-                // Empêcher la propagation au release aussi
-                mouse.accepted = true
+            Text {
+                anchors.centerIn: parent
+                text: root.leftSpeakerTestOn ? "HP G ON" : "HP G"
+                color: root.leftSpeakerTestOn ? "#000000" : "#00ff00"
+                font.pixelSize: 10
+                font.bold: root.leftSpeakerTestOn
             }
         }
-        
-        Text {
-            text: root.faderTestActive ? "TEST ON" : "TEST FADER"
-            anchors.centerIn: parent
-            color: root.faderTestActive ? "#000000" : "#00ff00"
-            font.pixelSize: 10
-            font.bold: true
-            z: 1002  // Au-dessus du MouseArea
+
+        // HP D (switch on/off)
+        Rectangle {
+            width: 56
+            height: 28
+            radius: 4
+            color: root.rightSpeakerTestOn ? "#00aa00" : (maHPD.containsMouse ? "#3a3a3a" : "#2a2a2a")
+            border.color: "#00ff00"
+            border.width: root.rightSpeakerTestOn ? 2 : 1
+            MouseArea {
+                id: maHPD
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    root.rightSpeakerTestOn = !root.rightSpeakerTestOn
+                    root.testSpeaker("right", root.rightSpeakerTestOn)
+                }
+            }
+            Text {
+                anchors.centerIn: parent
+                text: root.rightSpeakerTestOn ? "HP D ON" : "HP D"
+                color: root.rightSpeakerTestOn ? "#000000" : "#00ff00"
+                font.pixelSize: 10
+                font.bold: root.rightSpeakerTestOn
+            }
         }
     }
-    
+
+    // Boutons calibration pads (tout à droite)
+    Row {
+        id: padCalibBar
+        visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "pad")
+        anchors.top: parent.top
+        anchors.topMargin: 6
+        anchors.right: parent.right
+        anchors.rightMargin: 12
+        spacing: 8
+        z: 1000
+
+        // Sélecteur Min / Max
+        Row {
+            spacing: 4
+            Rectangle {
+                width: 44
+                height: 28
+                radius: 4
+                color: root.padCalibrationMode === "min" ? "#00aa00" : (maMin.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                border.color: "#00ff00"
+                border.width: root.padCalibrationMode === "min" ? 2 : 1
+                MouseArea {
+                    id: maMin
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.padCalibrationMode = "min"
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: "Min"
+                    color: root.padCalibrationMode === "min" ? "#000000" : "#00ff00"
+                    font.pixelSize: 10
+                    font.bold: root.padCalibrationMode === "min"
+                }
+            }
+            Rectangle {
+                width: 44
+                height: 28
+                radius: 4
+                color: root.padCalibrationMode === "max" ? "#00aa00" : (maMax.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                border.color: "#00ff00"
+                border.width: root.padCalibrationMode === "max" ? 2 : 1
+                MouseArea {
+                    id: maMax
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.padCalibrationMode = "max"
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: "Max"
+                    color: root.padCalibrationMode === "max" ? "#000000" : "#00ff00"
+                    font.pixelSize: 10
+                    font.bold: root.padCalibrationMode === "max"
+                }
+            }
+        }
+
+        // Calibrer PAD 1 + valeur int16 en dessous
+        Column {
+            spacing: 4
+            Rectangle {
+                width: 110
+                height: 28
+                radius: 4
+                color: root.pad1CalibrationActive ? "#00aa00" : (ma1.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                border.color: "#00ff00"
+                border.width: root.pad1CalibrationActive ? 3 : 1
+                MouseArea {
+                    id: ma1
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.pad1CalibrationActive = !root.pad1CalibrationActive
+                        root.sendPadCalibration(0, root.pad1CalibrationActive)
+                        if (!root.pad1CalibrationActive) {
+                            root.pad1CalibMinV = 0
+                            root.pad1CalibMaxV = 127
+                            root.pad1CalibMinA = 0
+                            root.pad1CalibMaxA = 127
+                        } else {
+                            if (root.padCalibrationMode === "min") {
+                                root.pad1CalibMinV = 127
+                                root.pad1CalibMinA = 127
+                            } else {
+                                root.pad1CalibMaxV = 0
+                                root.pad1CalibMaxA = 0
+                            }
+                        }
+                    }
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: root.pad1CalibrationActive ? "CAL. PAD 1 ON" : "Calibrer PAD 1"
+                    color: root.pad1CalibrationActive ? "#000000" : "#00ff00"
+                    font.pixelSize: 10
+                    font.bold: root.pad1CalibrationActive
+                }
+            }
+            Text {
+                width: 110
+                horizontalAlignment: Text.AlignHCenter
+                text: root.pad1CalibDisplayValue
+                font.pixelSize: 11
+                color: "#00ff00"
+            }
+        }
+
+        // Calibrer PAD 2 + valeur int16 en dessous
+        Column {
+            spacing: 4
+            Rectangle {
+                width: 110
+                height: 28
+                radius: 4
+                color: root.pad2CalibrationActive ? "#00aa00" : (ma2.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                border.color: "#00ff00"
+                border.width: root.pad2CalibrationActive ? 3 : 1
+                MouseArea {
+                    id: ma2
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.pad2CalibrationActive = !root.pad2CalibrationActive
+                        root.sendPadCalibration(1, root.pad2CalibrationActive)
+                        if (!root.pad2CalibrationActive) {
+                            root.pad2CalibMinV = 0
+                            root.pad2CalibMaxV = 127
+                            root.pad2CalibMinA = 0
+                            root.pad2CalibMaxA = 127
+                        } else {
+                            if (root.padCalibrationMode === "min") {
+                                root.pad2CalibMinV = 127
+                                root.pad2CalibMinA = 127
+                            } else {
+                                root.pad2CalibMaxV = 0
+                                root.pad2CalibMaxA = 0
+                            }
+                        }
+                    }
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: root.pad2CalibrationActive ? "CAL. PAD 2 ON" : "Calibrer PAD 2"
+                    color: root.pad2CalibrationActive ? "#000000" : "#00ff00"
+                    font.pixelSize: 10
+                    font.bold: root.pad2CalibrationActive
+                }
+            }
+            Text {
+                width: 110
+                horizontalAlignment: Text.AlignHCenter
+                text: root.pad2CalibDisplayValue
+                font.pixelSize: 11
+                color: "#00ff00"
+            }
+        }
+    }
+
+    // Barre "Tests et calibrage" (2D, centrée) — TEST FADER uniquement
+    Row {
+        id: testsCalibBar
+        visible: showControllerValues()
+        anchors.top: parent.top
+        anchors.topMargin: 6
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 12
+        z: 1000
+
+        // TEST FADER
+        Rectangle {
+            width: 80
+            height: 28
+            radius: 4
+            visible: configController && configController.isSubComponentVisible("controllers", "fader")
+            color: root.faderTestActive ? "#00aa00" : (maFader.containsMouse ? "#3a3a3a" : "#2a2a2a")
+            border.color: "#00ff00"
+            border.width: root.faderTestActive ? 3 : 1
+            MouseArea {
+                id: maFader
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    root.faderTestActive = !root.faderTestActive
+                    root.testFader(root.faderTestActive)
+                }
+            }
+            Text {
+                anchors.centerIn: parent
+                text: root.faderTestActive ? "TEST ON" : "TEST FADER"
+                color: root.faderTestActive ? "#000000" : "#00ff00"
+                font.pixelSize: 10
+                font.bold: true
+            }
+        }
+    }
+
     // Boutons supplémentaires en overlay 2D (en bas)
     Row {
         visible: showControllerValues()
@@ -470,6 +733,15 @@ Rectangle {
             pad1Velocity = controllersData.pad1.velocity || 0
             pad1Aftertouch = controllersData.pad1.aftertouch || 0
             pad1Active = controllersData.pad1.active || false
+            if (root.pad1CalibrationActive) {
+                if (root.padCalibrationMode === "min") {
+                    root.pad1CalibMinV = Math.min(root.pad1CalibMinV, pad1Velocity)
+                    root.pad1CalibMinA = Math.min(root.pad1CalibMinA, pad1Aftertouch)
+                } else {
+                    root.pad1CalibMaxV = Math.max(root.pad1CalibMaxV, pad1Velocity)
+                    root.pad1CalibMaxA = Math.max(root.pad1CalibMaxA, pad1Aftertouch)
+                }
+            }
         }
         
         // Pad 2
@@ -477,6 +749,15 @@ Rectangle {
             pad2Velocity = controllersData.pad2.velocity || 0
             pad2Aftertouch = controllersData.pad2.aftertouch || 0
             pad2Active = controllersData.pad2.active || false
+            if (root.pad2CalibrationActive) {
+                if (root.padCalibrationMode === "min") {
+                    root.pad2CalibMinV = Math.min(root.pad2CalibMinV, pad2Velocity)
+                    root.pad2CalibMinA = Math.min(root.pad2CalibMinA, pad2Aftertouch)
+                } else {
+                    root.pad2CalibMaxV = Math.max(root.pad2CalibMaxV, pad2Velocity)
+                    root.pad2CalibMaxA = Math.max(root.pad2CalibMaxA, pad2Aftertouch)
+                }
+            }
         }
         
         // Rétrocompatibilité : ancien format "pad" unique -> pad1
@@ -484,6 +765,15 @@ Rectangle {
             pad1Velocity = controllersData.pad.velocity || 0
             pad1Aftertouch = controllersData.pad.aftertouch || 0
             pad1Active = controllersData.pad.active || false
+            if (root.pad1CalibrationActive) {
+                if (root.padCalibrationMode === "min") {
+                    root.pad1CalibMinV = Math.min(root.pad1CalibMinV, pad1Velocity)
+                    root.pad1CalibMinA = Math.min(root.pad1CalibMinA, pad1Aftertouch)
+                } else {
+                    root.pad1CalibMaxV = Math.max(root.pad1CalibMaxV, pad1Velocity)
+                    root.pad1CalibMaxA = Math.max(root.pad1CalibMaxA, pad1Aftertouch)
+                }
+            }
         }
         
         // Boutons supplémentaires

@@ -82,6 +82,11 @@ Page {
         }
     }
 
+    function setPadCalibrationDisplayValue(pad, value) {
+        if (controllersPanel && controllersPanel.setPadCalibrationValue)
+            controllersPanel.setPadCalibrationValue(pad, value)
+    }
+
     Rectangle {
         anchors.fill: parent
         color: root.backgroundColor
@@ -171,10 +176,10 @@ Page {
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: parent.height * 0.35
+                height: Math.max(280, parent.height * 0.42)
                 z: 200  // Au-dessus de la portée (z:1) et du gameModeOverlay (z:100)
                 configController: root.configController
-                webSocketController: null
+                webSocketController: root.webSocketController
                 visible: configController ? configController.getValueAtPath(["controllersPanel", "visible"], false) : false
             }
 

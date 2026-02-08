@@ -55,6 +55,7 @@ Item {
     signal playbackTickReceived(bool playing, int tick)  // Position lecture = tick seul (6 octets), JS gère bar/beat
     signal filesListReceived(var categories)  // Liste fichiers MIDI
     signal gameModeReceived(bool enabled)  // Mode jeu activé/désactivé par le serveur
+    signal padCalibrationValueReceived(int pad, int value)  // Valeur int16 pour affichage sous le bouton (pad 0 ou 1)
     property var configController: null
     property var rootWindow: null  // Référence vers la fenêtre racine (Main.qml)
     
@@ -586,6 +587,16 @@ Item {
                     var enabled = data.enabled || false;
                     console.log("🎮 [WebSocket] Début chaîne - GAME_MODE reçu:", "enabled:", enabled);
                     controller.gameModeReceived(enabled);
+                    return;
+                }
+
+                // PAD_CALIBRATION_VALUE - Valeur int16 à afficher sous le bouton (Pd envoie { type: "PAD_CALIBRATION_VALUE", pad: 0|1, value: int16 })
+                if (data.type === "PAD_CALIBRATION_VALUE") {
+                    var pad = (data.pad === 1) ? 1 : 0;
+                    var val = (typeof data.value === "number" && isFinite(data.value)) ? data.value : 0;
+                    if (val < -32768) val = -32768;
+                    if (val > 32767) val = 32767;
+                    controller.padCalibrationValueReceived(pad, val);
                     return;
                 }
                 

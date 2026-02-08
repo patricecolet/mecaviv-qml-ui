@@ -135,6 +135,12 @@ Window {
             }
         }
 
+        // Valeur int16 calibration pad (affichée sous les boutons Calibrer PAD 1/2)
+        onPadCalibrationValueReceived: function(pad, value) {
+            if (testViewLoader.item && testViewLoader.item.setPadCalibrationDisplayValue)
+                testViewLoader.item.setPadCalibrationDisplayValue(pad, value)
+        }
+
         // Config envoyée par Pd (pour info)
         onConfigReceived: function(config) {
         }
