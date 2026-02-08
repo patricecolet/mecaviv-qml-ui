@@ -457,8 +457,8 @@ Page {
                 anchors.leftMargin: 24
                 anchors.rightMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.verticalCenterOffset: 50
-                height: 95
+                anchors.verticalCenterOffset: 110
+                height: 145
 
                 StaffZone2D {
                     anchors.fill: parent

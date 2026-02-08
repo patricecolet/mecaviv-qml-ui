@@ -19,8 +19,20 @@ Item {
         // Test temporaire
         
     signal close()
-    
-    // Panneau principal (sans fond noir transparent)
+
+    // Fond semi-transparent + bloqueur d'événements : empêche le ScrollView/Flickable
+    // en dessous d'intercepter les touch events (bug sur Raspberry tactile en WASM).
+    Rectangle {
+        anchors.fill: parent
+        color: "#80000000"
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: root.close()
+        }
+    }
+
+    // Panneau principal
     Rectangle {
         anchors.centerIn: parent
         width: Math.min(parent.width * 0.9, 900)
@@ -221,6 +233,59 @@ Item {
                         radius: 5
                     }
                 }
+            }
+
+            // Boutons sirènes : même niveau que le TabBar (pas dans le Loader) pour que le touch marche comme les onglets.
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 50
+                Layout.leftMargin: 20
+                Layout.rightMargin: 20
+                spacing: 8
+                visible: tabBar.currentIndex === 0
+
+                Repeater {
+                    model: configController && configController.config && configController.config.sirenConfig
+                        ? configController.config.sirenConfig.sirens
+                        : []
+
+                    delegate: Button {
+                        id: sirenTabBtn
+                        Layout.preferredWidth: 90
+                        Layout.preferredHeight: 44
+                        Layout.fillWidth: false
+
+                        property bool isSelected: configController && configController.primarySiren &&
+                                                 configController.primarySiren.id === modelData.id
+
+                        contentItem: Text {
+                            text: modelData.name
+                            color: sirenTabBtn.isSelected ? "black" : "#fff"
+                            font.pixelSize: 14
+                            font.bold: sirenTabBtn.isSelected
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        background: Rectangle {
+                            color: sirenTabBtn.isSelected ? "#FFD700" :
+                                   (sirenTabBtn.hovered ? "#3a3a3a" : "#2a2a2a")
+                            border.color: sirenTabBtn.isSelected ? "#FFA500" : "#555"
+                            border.width: sirenTabBtn.isSelected ? 2 : 1
+                            radius: 5
+                        }
+
+                        onClicked: {
+                            if (configController && configController.config) {
+                                var sirens = configController.config.sirenConfig.sirens
+                                if (sirens && sirens[index])
+                                    configController.setValueAtPath(["sirenConfig", "currentSirens"], [sirens[index].id])
+                            }
+                        }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
             }
             
             // Contenu des onglets (chemins explicites pour fonctionner depuis Main ou Test2D).

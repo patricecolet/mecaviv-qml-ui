@@ -6,6 +6,8 @@ Item {
 
     property color accentColor: '#d1ab00'
     property real currentNoteMidi: 0
+    /** Vélocité 0–127 pour l’intensité de la touche courante du clavier (volume). */
+    property real currentVelocity: 127
     property var sirenInfo: null
     property var configController: null
     property real lineSpacing: 20
@@ -37,6 +39,7 @@ Item {
         id: pianoComponent
         AmbitusPiano2D {
             currentNoteMidi: root.currentNoteMidi
+            currentVelocity: root.currentVelocity
             sirenInfo: root.sirenInfo
             configController: root.configController
             lineSpacing: root.lineSpacing

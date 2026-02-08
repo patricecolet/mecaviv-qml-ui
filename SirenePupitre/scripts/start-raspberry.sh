@@ -211,6 +211,9 @@ start_browser() {
     if [ -n "$DISPLAY" ] && command -v chromium-browser >/dev/null 2>&1; then
         export DISPLAY=:0
         chromium-browser --kiosk --disable-web-security \
+            --disable-pinch \
+            --overscroll-history-navigation=0 \
+            --touch-events=enabled \
             "http://localhost:8000/appSirenePupitre.html" &
         echo "$(date): ✅ Navigateur démarré"
     else

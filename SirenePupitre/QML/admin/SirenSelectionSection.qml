@@ -18,101 +18,13 @@ Item {
         
         Item { height: 10 }
         
-        // Titre de la section
+        // Titre (les boutons sirènes sont dans AdminPanel, au-dessus du Loader, pour touch fiable)
         Text {
             Layout.leftMargin: 20
-            text: "Sélection de la sirène"
+            text: "Sirène sélectionnée"
             color: "#FFD700"
             font.pixelSize: 20
             font.bold: true
-        }
-        
-        // Zone de sélection des sirènes (sans ScrollView)
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 100
-            Layout.margins: 20
-            color: "#1a1a1a"
-            border.color: "#333"
-            radius: 10
-            
-            Flow {
-                anchors.fill: parent
-                anchors.margins: 15
-                spacing: 10
-                
-                Repeater {
-                    // Liste des sirènes (ne change qu'au chargement config). La sélection (isSelected) dépend de primarySiren.
-                    model: root.configController && root.configController.config
-                        ? root.configController.config.sirenConfig.sirens
-                        : []
-                    
-                    delegate: Button {
-                        id: sirenButton
-                        width: 100
-                        height: 80
-                        
-                        property bool isSelected: root.configController &&
-                                                 root.configController.primarySiren &&
-                                                 root.configController.primarySiren.id === modelData.id
-                        
-                        background: Rectangle {
-                            color: sirenButton.isSelected ? "#FFD700" :
-                                   (sirenButton.hovered ? "#3a3a3a" : "#2a2a2a")
-                            border.color: sirenButton.isSelected ? "#FFA500" : "#555"
-                            border.width: sirenButton.isSelected ? 2 : 1
-                            radius: 8
-                            
-                            Behavior on color {
-                                ColorAnimation { duration: 200 }
-                            }
-                        }
-                        
-                        contentItem: Column {
-                            spacing: 3
-                            anchors.centerIn: parent
-                            
-                            Text {
-                                text: modelData.name
-                                color: sirenButton.isSelected ? "black" : "white"
-                                font.pixelSize: 18
-                                font.bold: sirenButton.isSelected
-                                anchors.horizontalCenter: parent.horizontalCenter
-                            }
-                            
-                            Text {
-                                text: modelData.outputs + " sorties"
-                                color: sirenButton.isSelected ? "#333" : "#888"
-                                font.pixelSize: 13
-                                anchors.horizontalCenter: parent.horizontalCenter
-                            }
-                            
-                            Text {
-                                text: {
-                                    if (!root.configController) return "♪ -"
-                                    var min = modelData.ambitus.min
-                                    var max = modelData.ambitus.max
-                                    
-                                    if (root.configController.mode === "restricted") {
-                                        max = modelData.restrictedMax  // Utiliser directement modelData
-                                    }
-                                    
-                                    return "♪ " + min + "-" + max
-                                }
-                                color: sirenButton.isSelected ? "#333" : "#666"
-                                font.pixelSize: 11
-                                anchors.horizontalCenter: parent.horizontalCenter
-                            }
-                        }
-                        
-                        onClicked: {
-                    if (root.configController) {
-                        root.configController.setValueAtPath(["sirenConfig", "currentSirens"], [modelData.id])
-                    }
-                        }
-                    }
-                }
-            }
         }
         
         // Séparateur
