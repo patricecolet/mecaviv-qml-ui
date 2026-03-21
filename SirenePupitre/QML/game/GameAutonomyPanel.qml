@@ -24,7 +24,8 @@ Item {
 
     // Exposer les dialogs pour NavigationManager
     property alias songSelectorDialog: songSelectorDialog
-    property alias gameOptionsDialog: gameOptionsDialog
+    /** Référence fournie par Test2D (dialog défini au niveau page) */
+    property var gameOptionsDialog: null
     
     // Focus encodeur pour les boutons (reçu depuis Test2D via NavigationManager)
     property int gameModeFocusIndex: -1
@@ -91,7 +92,10 @@ Item {
 
             MouseArea {
                 anchors.fill: parent
-                onClicked: gameOptionsDialog.open()
+                onClicked: {
+                    if (root.gameOptionsDialog)
+                        root.gameOptionsDialog.open()
+                }
             }
         }
 
@@ -144,28 +148,4 @@ Item {
         }
     }
 
-    GameOptionsDialog {
-        id: gameOptionsDialog
-        configController: root.configController
-        playAccompaniment: root.playAccompaniment
-        autonomyVolant: root.autonomyVolant
-        autonomyVolet: root.autonomyVolet
-        autonomyVibrato: root.autonomyVibrato
-        autonomyTremolo: root.autonomyTremolo
-        pupitreId: "P1"
-        onAccompanimentChanged: function(enabled) {
-            if (root.test2DPage)
-                root.test2DPage.playAccompaniment = enabled
-            else
-                root.playAccompaniment = enabled
-        }
-        onAutonomyChanged: function(device, enabled) {
-            if (root.test2DPage) {
-                if (device === "volant") root.test2DPage.autonomyVolant = enabled
-                else if (device === "volet") root.test2DPage.autonomyVolet = enabled
-                else if (device === "vibrato") root.test2DPage.autonomyVibrato = enabled
-                else if (device === "tremolo") root.test2DPage.autonomyTremolo = enabled
-            }
-        }
-    }
 }

@@ -1,165 +1,146 @@
 import QtQuick
 
-Item {
+/**
+ * Croix des vitesses (0 / 1 / 12 / 24 / 48). Racine = Column pour éviter
+ * width/height implicites circulaires (Item + Column ancrée) qui plaquaient le bloc en haut.
+ */
+Column {
     id: root
-    
-    // Propriétés requises
+    width: 120
+    spacing: 10
+
     property int currentPosition: 0
     property var configController: null
-    
-    // Debug logs
-    onCurrentPositionChanged: {
-    }
-    
-    // Propriétés configurables
-    property var positions: [0, 1, 12, 24, 48]  // Valeurs par défaut (demi-tons)
-    
-    // Mise à jour des positions depuis la config
+    property var positions: [0, 1, 12, 24, 48]
+
     onConfigControllerChanged: {
-        if (configController) {
+        if (configController)
             updatePositions()
-        }
     }
-    
+
     function updatePositions() {
-        if (!configController) return
-        
+        if (!configController)
+            return
         var gearShiftConfig = configController.getConfigValue("displayConfig.components.musicalStaff.gearShiftIndicator.positions", [0, 1, 12, 24, 48])
-        if (Array.isArray(gearShiftConfig)) {
+        if (Array.isArray(gearShiftConfig))
             positions = gearShiftConfig
+    }
+
+    Item {
+        width: 120
+        height: 120
+        anchors.horizontalCenter: parent.horizontalCenter
+
+        Rectangle {
+            id: centerPos
+            width: 30
+            height: 25
+            radius: 3
+            color: root.currentPosition === 0 ? "#4A90E2" : "#2A2A2A"
+            border.color: root.currentPosition === 0 ? "#6BB6FF" : "#555555"
+            border.width: 1
+            anchors.centerIn: parent
+
+            Text {
+                anchors.centerIn: parent
+                text: root.positions[0] !== undefined ? root.positions[0].toString() : "0"
+                font.pixelSize: 10
+                font.bold: true
+                color: root.currentPosition === 0 ? "#FFFFFF" : "#CCCCCC"
+            }
+        }
+
+        Rectangle {
+            id: leftPos
+            width: 30
+            height: 25
+            radius: 3
+            color: root.currentPosition === 1 ? "#4A90E2" : "#2A2A2A"
+            border.color: root.currentPosition === 1 ? "#6BB6FF" : "#555555"
+            border.width: 1
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: centerPos.left
+            anchors.rightMargin: 10
+
+            Text {
+                anchors.centerIn: parent
+                text: root.positions[1] !== undefined ? root.positions[1].toString() : "1"
+                font.pixelSize: 10
+                font.bold: true
+                color: root.currentPosition === 1 ? "#FFFFFF" : "#CCCCCC"
+            }
+        }
+
+        Rectangle {
+            id: bottomPos
+            width: 30
+            height: 25
+            radius: 3
+            color: root.currentPosition === 2 ? "#4A90E2" : "#2A2A2A"
+            border.color: root.currentPosition === 2 ? "#6BB6FF" : "#555555"
+            border.width: 1
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: centerPos.bottom
+            anchors.topMargin: 10
+
+            Text {
+                anchors.centerIn: parent
+                text: root.positions[2] !== undefined ? root.positions[2].toString() : "12"
+                font.pixelSize: 10
+                font.bold: true
+                color: root.currentPosition === 2 ? "#FFFFFF" : "#CCCCCC"
+            }
+        }
+
+        Rectangle {
+            id: rightPos
+            width: 30
+            height: 25
+            radius: 3
+            color: root.currentPosition === 3 ? "#4A90E2" : "#2A2A2A"
+            border.color: root.currentPosition === 3 ? "#6BB6FF" : "#555555"
+            border.width: 1
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left: centerPos.right
+            anchors.leftMargin: 10
+
+            Text {
+                anchors.centerIn: parent
+                text: root.positions[3] !== undefined ? root.positions[3].toString() : "24"
+                font.pixelSize: 10
+                font.bold: true
+                color: root.currentPosition === 3 ? "#FFFFFF" : "#CCCCCC"
+            }
+        }
+
+        Rectangle {
+            id: topPos
+            width: 30
+            height: 25
+            radius: 3
+            color: root.currentPosition === 4 ? "#4A90E2" : "#2A2A2A"
+            border.color: root.currentPosition === 4 ? "#6BB6FF" : "#555555"
+            border.width: 1
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: centerPos.top
+            anchors.bottomMargin: 10
+
+            Text {
+                anchors.centerIn: parent
+                text: root.positions[4] !== undefined ? root.positions[4].toString() : "48"
+                font.pixelSize: 10
+                font.bold: true
+                color: root.currentPosition === 4 ? "#FFFFFF" : "#CCCCCC"
+            }
         }
     }
-    
-    // Conteneur principal - overlay 2D
-    Column {
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: 20
-        anchors.bottomMargin: 20
-        spacing: 10
-        
-        // Titre
-        Text {
-            text: "VITESSE"
-            font.pixelSize: 12
-            font.bold: true
-            color: "#CCCCCC"
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
-        
-        // Croix des 5 positions
-        Item {
-            width: 120
-            height: 120
-            anchors.horizontalCenter: parent.horizontalCenter
-            
-            // Position 0: Centre (0)
-            Rectangle {
-                id: centerPos
-                width: 30
-                height: 25
-                radius: 3
-                color: root.currentPosition === 0 ? "#4A90E2" : "#2A2A2A"
-                border.color: root.currentPosition === 0 ? "#6BB6FF" : "#555555"
-                border.width: 1
-                anchors.centerIn: parent
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: root.positions[0] !== undefined ? root.positions[0].toString() : "0"
-                    font.pixelSize: 10
-                    font.bold: true
-                    color: root.currentPosition === 0 ? "#FFFFFF" : "#CCCCCC"
-                }
-            }
-            
-            // Position 1: Gauche (1)
-            Rectangle {
-                id: leftPos
-                width: 30
-                height: 25
-                radius: 3
-                color: root.currentPosition === 1 ? "#4A90E2" : "#2A2A2A"
-                border.color: root.currentPosition === 1 ? "#6BB6FF" : "#555555"
-                border.width: 1
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.right: centerPos.left
-                anchors.rightMargin: 10
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: root.positions[1] !== undefined ? root.positions[1].toString() : "1"
-                    font.pixelSize: 10
-                    font.bold: true
-                    color: root.currentPosition === 1 ? "#FFFFFF" : "#CCCCCC"
-                }
-            }
-            
-            // Position 2: Bas (12)
-            Rectangle {
-                id: bottomPos
-                width: 30
-                height: 25
-                radius: 3
-                color: root.currentPosition === 2 ? "#4A90E2" : "#2A2A2A"
-                border.color: root.currentPosition === 2 ? "#6BB6FF" : "#555555"
-                border.width: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: centerPos.bottom
-                anchors.topMargin: 10
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: root.positions[2] !== undefined ? root.positions[2].toString() : "12"
-                    font.pixelSize: 10
-                    font.bold: true
-                    color: root.currentPosition === 2 ? "#FFFFFF" : "#CCCCCC"
-                }
-            }
-            
-            // Position 3: Droite (24)
-            Rectangle {
-                id: rightPos
-                width: 30
-                height: 25
-                radius: 3
-                color: root.currentPosition === 3 ? "#4A90E2" : "#2A2A2A"
-                border.color: root.currentPosition === 3 ? "#6BB6FF" : "#555555"
-                border.width: 1
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: centerPos.right
-                anchors.leftMargin: 10
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: root.positions[3] !== undefined ? root.positions[3].toString() : "24"
-                    font.pixelSize: 10
-                    font.bold: true
-                    color: root.currentPosition === 3 ? "#FFFFFF" : "#CCCCCC"
-                }
-            }
-            
-            // Position 4: Haut (48)
-            Rectangle {
-                id: topPos
-                width: 30
-                height: 25
-                radius: 3
-                color: root.currentPosition === 4 ? "#4A90E2" : "#2A2A2A"
-                border.color: root.currentPosition === 4 ? "#6BB6FF" : "#555555"
-                border.width: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: centerPos.top
-                anchors.bottomMargin: 10
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: root.positions[4] !== undefined ? root.positions[4].toString() : "48"
-                    font.pixelSize: 10
-                    font.bold: true
-                    color: root.currentPosition === 4 ? "#FFFFFF" : "#CCCCCC"
-                }
-            }
-        }
+
+    Text {
+        width: parent.width
+        text: "VITESSE"
+        font.pixelSize: 12
+        font.bold: true
+        color: "#CCCCCC"
+        horizontalAlignment: Text.AlignHCenter
     }
 }

@@ -9,8 +9,11 @@ Item {
     property bool controllersPanelVisible: false
     property bool uiControlsEnabled: true
     property bool gameMode: false
+    /** Vue microtonale active (mode normal : libellé au-dessus d’Options) */
+    property bool useMicrotonalDisplay: false
     property bool isGamePlaying: false
     property bool consoleConnected: false
+    property var gameOptionsDialog: null
     // Focus UI pour l’encodeur : 0 = ADMIN, 1 = CONTRÔLEURS (top right)
     property int encoderFocusIndex: -1
 
@@ -150,6 +153,50 @@ Item {
                 color: root.isGamePlaying ? "#4ade80" : "#888"
                 font.pixelSize: 10
                 anchors.horizontalCenter: parent.horizontalCenter
+            }
+        }
+    }
+
+    Column {
+        id: optionsNormalModeBlock
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 20
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 6
+        visible: root.uiControlsEnabled && !root.controllersPanelVisible && !root.gameMode
+
+        Text {
+            visible: root.useMicrotonalDisplay
+            text: "Mode Microtonal"
+            color: "#6bb6ff"
+            font.pixelSize: 13
+            font.bold: true
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+
+        Rectangle {
+            id: optionsNormalModeBtn
+            width: 120
+            height: 44
+            color: "#2a2a2a"
+            border.color: "#6bb6ff"
+            border.width: 2
+            radius: 5
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    if (root.gameOptionsDialog)
+                        root.gameOptionsDialog.open()
+                }
+            }
+            Text {
+                anchors.centerIn: parent
+                text: "Options"
+                color: "#6bb6ff"
+                font.pixelSize: 13
+                font.bold: true
             }
         }
     }

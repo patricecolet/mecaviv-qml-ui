@@ -14,7 +14,7 @@ Dialog {
     modal: true
     focus: true
     width: Math.min(parent ? parent.width * 0.5 : 480, 480)
-    height: Math.min(parent ? parent.height * 0.7 : 420, 420)
+    height: Math.min(parent ? parent.height * 0.75 : 480, 520)
     title: "Options du jeu"
 
     background: Rectangle {
@@ -35,14 +35,16 @@ Dialog {
     property bool autonomyVolet: false
     property bool autonomyVibrato: false
     property bool autonomyTremolo: false
+    property bool useMicrotonalDisplay: false
     signal accompanimentChanged(bool enabled)
     signal autonomyChanged(string device, bool enabled)
+    signal microtonalDisplayChanged(bool enabled)
     
     // Navigation encodeur
-    // 0 = accompagnement, 1-4 = checkboxes mode autonome
+    // 0 = vue microtonale, 1 = accompagnement, 2-5 = mode autonome
     property int encoderFocusIndex: 0
     property color focusColor: "#00BFFF"
-    readonly property int focusCount: 5  // nombre d'items navigables
+    readonly property int focusCount: 6
 
     // Envoyer AUTONOMY_MODE au serveur
     function sendAutonomy(device, enabled) {
@@ -80,14 +82,16 @@ Dialog {
     function handleEncoderClick() {
         // Clic = toggler l'item actuellement en focus
         if (encoderFocusIndex === 0) {
-            accompanimentCheck.checked = !accompanimentCheck.checked
+            microtonalDisplayCheck.checked = !microtonalDisplayCheck.checked
         } else if (encoderFocusIndex === 1) {
-            volantCheckbox.checked = !volantCheckbox.checked
+            accompanimentCheck.checked = !accompanimentCheck.checked
         } else if (encoderFocusIndex === 2) {
-            voletCheckbox.checked = !voletCheckbox.checked
+            volantCheckbox.checked = !volantCheckbox.checked
         } else if (encoderFocusIndex === 3) {
-            vibratoCheckbox.checked = !vibratoCheckbox.checked
+            voletCheckbox.checked = !voletCheckbox.checked
         } else if (encoderFocusIndex === 4) {
+            vibratoCheckbox.checked = !vibratoCheckbox.checked
+        } else if (encoderFocusIndex === 5) {
             tremoloCheckbox.checked = !tremoloCheckbox.checked
         }
     }
@@ -108,9 +112,9 @@ Dialog {
             width: scrollView.width - 24
             spacing: 20
 
-        // ——— Lecture ———
+        // ——— Affichage ———
         Label {
-            text: "Lecture"
+            text: "Affichage"
             color: "#aaa"
             font.pixelSize: 12
             font.bold: true
@@ -120,10 +124,57 @@ Dialog {
             Layout.fillWidth: true
             spacing: 10
             CheckBox {
+                id: microtonalDisplayCheck
+                Layout.fillWidth: true
+                checked: gameOptionsDialog.useMicrotonalDisplay
+                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 0
+                onCheckedChanged: {
+                    gameOptionsDialog.microtonalDisplayChanged(checked)
+                }
+                contentItem: Text {
+                    text: "Vue microtonale (partiels, cents, séquence)"
+                    color: microtonalDisplayCheck.isFocused ? gameOptionsDialog.focusColor : "#eee"
+                    font.pixelSize: 14
+                    font.bold: microtonalDisplayCheck.isFocused
+                    wrapMode: Text.WordWrap
+                    leftPadding: microtonalDisplayCheck.indicator.width + microtonalDisplayCheck.spacing
+                    verticalAlignment: Text.AlignVCenter
+                }
+                indicator: Rectangle {
+                    implicitWidth: 20
+                    implicitHeight: 20
+                    x: microtonalDisplayCheck.leftPadding
+                    y: parent.height / 2 - height / 2
+                    radius: 3
+                    border.color: microtonalDisplayCheck.isFocused ? gameOptionsDialog.focusColor : (microtonalDisplayCheck.checked ? "#FFD700" : "#666")
+                    border.width: microtonalDisplayCheck.isFocused ? 2 : 1
+                    color: "transparent"
+                    Rectangle {
+                        width: 12; height: 12; x: 4; y: 4; radius: 2
+                        color: microtonalDisplayCheck.isFocused ? gameOptionsDialog.focusColor : "#FFD700"
+                        visible: microtonalDisplayCheck.checked
+                    }
+                }
+            }
+        }
+
+        // ——— Lecture ———
+        Label {
+            text: "Lecture"
+            color: "#aaa"
+            font.pixelSize: 12
+            font.bold: true
+            Layout.fillWidth: true
+            Layout.topMargin: 8
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            CheckBox {
                 id: accompanimentCheck
                 Layout.fillWidth: true
                 checked: gameOptionsDialog.playAccompaniment
-                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 0
+                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 1
                 onCheckedChanged: {
                     gameOptionsDialog.sendAccompaniment(checked)
                     gameOptionsDialog.accompanimentChanged(checked)
@@ -170,7 +221,7 @@ Dialog {
                 id: volantCheckbox
                 Layout.fillWidth: true
                 checked: gameOptionsDialog.autonomyVolant
-                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 1
+                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 2
                 onCheckedChanged: {
                     gameOptionsDialog.sendAutonomy("volant", checked)
                     gameOptionsDialog.autonomyChanged("volant", checked)
@@ -208,7 +259,7 @@ Dialog {
                 id: voletCheckbox
                 Layout.fillWidth: true
                 checked: gameOptionsDialog.autonomyVolet
-                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 2
+                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 3
                 onCheckedChanged: {
                     gameOptionsDialog.sendAutonomy("volet", checked)
                     gameOptionsDialog.autonomyChanged("volet", checked)
@@ -246,7 +297,7 @@ Dialog {
                 id: vibratoCheckbox
                 Layout.fillWidth: true
                 checked: gameOptionsDialog.autonomyVibrato
-                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 3
+                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 4
                 onCheckedChanged: {
                     gameOptionsDialog.sendAutonomy("vibrato", checked)
                     gameOptionsDialog.autonomyChanged("vibrato", checked)
@@ -284,7 +335,7 @@ Dialog {
                 id: tremoloCheckbox
                 Layout.fillWidth: true
                 checked: gameOptionsDialog.autonomyTremolo
-                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 4
+                property bool isFocused: gameOptionsDialog.encoderFocusIndex === 5
                 onCheckedChanged: {
                     gameOptionsDialog.sendAutonomy("tremolo", checked)
                     gameOptionsDialog.autonomyChanged("tremolo", checked)

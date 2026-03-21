@@ -4,6 +4,7 @@ import "../components"
 import "../components/ambitus"
 import "../utils"
 import "../game"
+import "../game/microtonal"
 
 Page {
     id: root
@@ -36,6 +37,23 @@ Page {
 
     MusicUtils { id: _musicUtils }
 
+    MicrotonalViewModel {
+        id: microtonalVm
+    }
+
+    MicrotonalTypes {
+        id: microtonalTypes
+    }
+
+    function syncMicrotonalSubMode() {
+        if (!root.useMicrotonalDisplay)
+            return
+        if (!root.gameMode)
+            microtonalVm.subMode = microtonalTypes.modeDirected
+        else if (microtonalVm.subMode === microtonalTypes.modeDirected)
+            microtonalVm.subMode = microtonalTypes.modeSequencedStrict
+    }
+
     // Note à afficher sur la portée (mode jeu : clampedNote ; Pd peut envoyer la note courante plus tard)
     property real displayNoteForStaff: root.clampedNote
 
@@ -51,7 +69,7 @@ Page {
     // Exposer controllersPanel pour NavigationManager
     property alias controllersPanel: controllersPanel
     
-    // Focus UI pour l'encodeur en mode jeu : 0 = Play/Stop, 1 = Morceaux, 2 = Options, 3 = Ligne anticipation, 4 = Barres mesure, 5 = Mode Normal
+    // Focus UI encodeur mode jeu : 0 Options, 1 Play/Stop, 2 Morceaux, 3 anticipation, 4 barres, 5 microtonal, 6 Mode Normal
     property int gameModeFocusIndex: 0
     property color gameModeFocusColor: "#00BFFF"
     readonly property int gameModeFocusCount: 6
@@ -70,6 +88,8 @@ Page {
     // Options mode jeu (liées à GameMode)
     property bool showAnticipationLine: false
     property bool showMeasureBars: false
+    /** true = vue microtonale (mode normal + mode jeu) */
+    property bool useMicrotonalDisplay: false
     // Options du menu Options (persistantes car GameAutonomyPanel peut être détruit en vue normale)
     property bool playAccompaniment: false
     property bool autonomyVolant: false
@@ -104,6 +124,12 @@ Page {
             root._gameModeItem = null
             root.transportDisplayActive = false
         }
+        root.syncMicrotonalSubMode()
+    }
+
+    onUseMicrotonalDisplayChanged: {
+        if (root.useMicrotonalDisplay)
+            root.syncMicrotonalSubMode()
     }
 
     function updateControllers(controllersData) {
@@ -122,6 +148,7 @@ Page {
     }
 
     Rectangle {
+        id: test2dBackground
         anchors.fill: parent
         color: root.backgroundColor
 
@@ -159,6 +186,7 @@ Page {
 
             VelocityGauge2D {
                 id: velocityGauge
+                z: 0
                 anchors.top: sirenSelector.bottom
                 anchors.topMargin: 12
                 anchors.horizontalCenter: sirenSelector.horizontalCenter
@@ -166,11 +194,27 @@ Page {
                 padConnected: configController ? configController.padConnected : false
                 accentColor: root.accentColor
                 configController: root.configController
+                // En mode microtonal le volet sert d'indicateur : la jauge vélocité est superflue
+                visible: !(root.useMicrotonalDisplay && !root.gameMode)
+                         && !padConnected
+                         && (configController ? configController.getConfigValue("displayConfig.components.velocityGauge.visible", true) : true)
 
                 onVelocityChanged: function(v) {
                     if (sirenController) sirenController.velocity = v
                 }
             }
+
+            /** Marge haute de la zone microtonale : sous TopDisplays et sélecteur de sirène */
+            readonly property real microtonalTopInset: {
+                var tb = topDisplays.mapToItem(infoContainer, 0, topDisplays.height).y
+                if (root.useMicrotonalDisplay && !root.gameMode) {
+                    var sb = sirenSelector.mapToItem(infoContainer, 0, sirenSelector.height).y
+                    return Math.max(tb, sb) + 16
+                }
+                var vb = velocityGauge.mapToItem(infoContainer, 0, velocityGauge.height).y
+                return Math.max(tb, vb) + 16
+            }
+
 
             ScrollView {
                 anchors.top: parent.top
@@ -212,14 +256,22 @@ Page {
                 configController: root.configController
                 rpm: root.rpm
                 frequency: root.frequency
-                visible: root.configController ? root.configController.isComponentVisible("musicalStaff") : true
+                visible: (root.configController ? root.configController.isComponentVisible("musicalStaff") : true)
+                        && !(root.useMicrotonalDisplay && !root.gameMode)
             }
 
-            GearShiftPositionIndicator {
-                anchors.fill: parent
-                visible: true
-                currentPosition: configController ? (configController.gearShiftPosition || 0) : 0
-                configController: root.configController
+            MicrotonalDisplay {
+                id: microtonalDisplayNormal
+                visible: root.useMicrotonalDisplay && !root.gameMode
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.topMargin: parent.microtonalTopInset
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: root.useMicrotonalDisplay ? 128 : 100
+                z: 2
+                viewModel: microtonalVm
+                layoutPreset: "normal"
             }
 
             ControllersPanel {
@@ -239,9 +291,11 @@ Page {
                 configController: root.configController
                 uiControlsEnabled: root.uiControlsEnabled
                 gameMode: root.gameMode
+                useMicrotonalDisplay: root.useMicrotonalDisplay
                 isGamePlaying: root.isGamePlaying
                 consoleConnected: configController ? configController.consoleConnected : false
                 encoderFocusIndex: root.encoderUiFocusIndex
+                gameOptionsDialog: gameOptionsDialog
 
                 onToggleControllers: {
                     if (configController) {
@@ -280,6 +334,28 @@ Page {
                 onTogglePlayStop: root.isGamePlaying = !root.isGamePlaying
                 onAdminClicked: if (root.openAdminPanel) root.openAdminPanel()
             }
+        }
+
+        /**
+         * Hors de infoContainer, ancré au Rectangle plein écran.
+         * Hors microtonal : marge fixe 40 px du bas (comme avant).
+         * En microtonal + jauge dockée : y dérivé de mapToItem(velocityGauge) — la formule
+         * bottomMargin = 20+20+h+8 échoue si velocityGauge.height vaut 0 avant layout (Web)
+         * ou si la marge dépasse la hauteur utile → item ramené en haut.
+         */
+        GearShiftPositionIndicator {
+            id: gearShiftIndicator
+            z: 50
+            visible: !root.gameMode && !root.controllersPanelVisible
+                    && (configController
+                        ? configController.getConfigValue("displayConfig.components.musicalStaff.gearShiftIndicator.visible", true)
+                        : true)
+            anchors.left: test2dBackground.left
+            anchors.leftMargin: 20
+            anchors.bottom: test2dBackground.bottom
+            anchors.bottomMargin: 40
+            currentPosition: configController ? (configController.gearShiftPosition || 0) : 0
+            configController: root.configController
         }
 
         // Overlay mode jeu : séquenceur partagé + portée 2D + transport (visible quand gameMode)
@@ -558,61 +634,13 @@ Page {
                 }
             }
 
-            Item {
-                id: gameOverlayStaffZone
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.leftMargin: 24
-                anchors.rightMargin: 24
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.verticalCenterOffset: 110
-                height: 145
-
-                StaffZone2D {
-                    anchors.fill: parent
-                    accentColor: root.accentColor
-                    currentNoteMidi: root.displayNoteForStaff
-                    currentVelocity: root.velocity
-                    sirenInfo: root.sirenInfo
-                    configController: root.configController
-                    rpm: root.rpm
-                    frequency: root.frequency
-                    lineSpacing: 16
-                    lineThickness: 1.5
-                }
-
-                Loader {
-                    id: gameModeLoader
-                    anchors.fill: parent
-                    z: 1
-                    active: root.gameMode || (root.rootWindow && root.rootWindow.isGamePlaying) || (root.rootWindow && root.rootWindow.isGamePlaying)
-                    source: "../game/GameMode.qml"
-                    onLoaded: {
-                        if (item) {
-                            item.configController = root.configController
-                            item.sirenInfo = root.sirenInfo
-                            item.lineSpacing = 16
-                            item.staffWidth = gameOverlayStaffZone.width
-                            item.staffPosX = 0
-                            item.currentNoteMidi = Qt.binding(function() { return root.clampedNote })
-                            item.showAnticipationLine = Qt.binding(function() { return root.showAnticipationLine })
-                            item.showMeasureBars = Qt.binding(function() { return root.showMeasureBars })
-                            item.isPlaying = Qt.binding(function() { return !!(root.rootWindow && root.rootWindow.isGamePlaying) })
-                            root._gameModeItem = item
-                        }
-                    }
-                    onStatusChanged: {
-                        if (status === Loader.Null || status === Loader.Error)
-                            root._gameModeItem = null
-                    }
-                }
-            }
-
             Row {
+                id: gameOverlayRpmHzRow
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 70
                 spacing: 80
+                z: 5
 
                 NumberDisplay2D {
                     width: 180
@@ -639,6 +667,77 @@ Page {
                 }
             }
 
+            Item {
+                id: gameOverlayStaffZone
+                z: 1
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 24
+                anchors.rightMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: 110
+                height: 145
+
+                states: [
+                    State {
+                        name: "microtonalGame"
+                        when: root.useMicrotonalDisplay
+                        AnchorChanges {
+                            target: gameOverlayStaffZone
+                            anchors.top: parent.top
+                            anchors.bottom: gameOverlayRpmHzRow.top
+                        }
+                        PropertyChanges {
+                            target: gameOverlayStaffZone
+                            anchors.topMargin: 88
+                            anchors.bottomMargin: 12
+                        }
+                    }
+                ]
+
+                StaffZone2D {
+                    anchors.fill: parent
+                    accentColor: root.accentColor
+                    currentNoteMidi: root.displayNoteForStaff
+                    currentVelocity: root.velocity
+                    sirenInfo: root.sirenInfo
+                    configController: root.configController
+                    rpm: root.rpm
+                    frequency: root.frequency
+                    lineSpacing: 16
+                    lineThickness: 1.5
+                    visible: !root.useMicrotonalDisplay
+                }
+
+                Loader {
+                    id: gameModeLoader
+                    anchors.fill: parent
+                    z: 1
+                    active: root.gameMode || (root.rootWindow && root.rootWindow.isGamePlaying) || (root.rootWindow && root.rootWindow.isGamePlaying)
+                    source: root.useMicrotonalDisplay ? "../game/microtonal/MicrotonalGameMode.qml" : "../game/GameMode.qml"
+                    onLoaded: {
+                        if (item) {
+                            item.configController = root.configController
+                            item.sirenInfo = root.sirenInfo
+                            item.lineSpacing = 16
+                            item.staffWidth = gameOverlayStaffZone.width
+                            item.staffPosX = 0
+                            item.currentNoteMidi = Qt.binding(function() { return root.clampedNote })
+                            item.showAnticipationLine = Qt.binding(function() { return root.showAnticipationLine })
+                            item.showMeasureBars = Qt.binding(function() { return root.showMeasureBars })
+                            item.isPlaying = Qt.binding(function() { return !!(root.rootWindow && root.rootWindow.isGamePlaying) })
+                            if (typeof item.viewModel !== "undefined")
+                                item.viewModel = microtonalVm
+                            root._gameModeItem = item
+                        }
+                    }
+                    onStatusChanged: {
+                        if (status === Loader.Null || status === Loader.Error)
+                            root._gameModeItem = null
+                    }
+                }
+            }
+
             Loader {
                 id: gameAutonomyLoader
                 anchors.fill: parent
@@ -660,12 +759,43 @@ Page {
                         item.autonomyVibrato = Qt.binding(function() { return root.autonomyVibrato })
                         item.autonomyTremolo = Qt.binding(function() { return root.autonomyTremolo })
                         item.test2DPage = root  // Pour mettre à jour Test2D depuis le panel
+                        item.gameOptionsDialog = gameOptionsDialog
                     }
                 }
             }
             
             // Exposer GameAutonomyPanel pour NavigationManager
             readonly property var gameAutonomyPanel: gameAutonomyLoader.item
+        }
+    }
+
+    GameOptionsDialog {
+        id: gameOptionsDialog
+        parent: root
+        z: 10000
+        configController: root.configController
+        useMicrotonalDisplay: root.useMicrotonalDisplay
+        playAccompaniment: root.playAccompaniment
+        autonomyVolant: root.autonomyVolant
+        autonomyVolet: root.autonomyVolet
+        autonomyVibrato: root.autonomyVibrato
+        autonomyTremolo: root.autonomyTremolo
+        pupitreId: "P1"
+        onMicrotonalDisplayChanged: function(enabled) {
+            root.useMicrotonalDisplay = enabled
+        }
+        onAccompanimentChanged: function(enabled) {
+            root.playAccompaniment = enabled
+        }
+        onAutonomyChanged: function(device, enabled) {
+            if (device === "volant")
+                root.autonomyVolant = enabled
+            else if (device === "volet")
+                root.autonomyVolet = enabled
+            else if (device === "vibrato")
+                root.autonomyVibrato = enabled
+            else if (device === "tremolo")
+                root.autonomyTremolo = enabled
         }
     }
 }
