@@ -40,6 +40,16 @@ Démarre le serveur Node.js pour le développement WebAssembly.
 ./scripts/start-server.sh 8080
 ```
 
+### 📡 `atim-diagnostic.sh` - Diagnostic carte ATIM ARM-Nano
+Vérifie la configuration UART et les prérequis pour la carte radio ATIM.
+
+**Usage :** Exécuter sur le Raspberry Pi (directement ou via SSH)
+```bash
+./scripts/atim-diagnostic.sh
+```
+
+Voir `docs/ATIM_ARM_NANO_GUIDE.md` pour le guide complet.
+
 ### 🍓 `start-raspberry.sh` - Démarrage Raspberry Pi 5
 Script optimisé pour Raspberry Pi 5 avec Chrome et PureData.
 

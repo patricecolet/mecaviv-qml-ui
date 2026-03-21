@@ -51,7 +51,8 @@ QtObject {
                     }
                 }
             },
-            "controllers": { "visible": true, "scale": 0.8 }
+            "controllers": { "visible": true, "scale": 0.8 },
+                "velocityGauge": { "visible": true }
         },
         "reverbConfig": { "enabled": true },
         "outputConfig": {
@@ -72,6 +73,8 @@ QtObject {
     property int gearShiftPosition: 0
     // État de priorité console
     property bool consoleConnected: false
+    // Pad connecté (PureData envoie PAD_CONNECTED) — si false, la jauge vélocité manuelle est utilisée
+    property bool padConnected: false
     // État d'attente de la configuration
     property bool waitingForConfig: false
     

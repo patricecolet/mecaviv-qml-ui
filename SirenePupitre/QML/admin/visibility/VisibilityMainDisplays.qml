@@ -6,6 +6,26 @@ Item {
     id: root
     
     property var configController: null
+    // Focus encodeur dans le panneau Admin (reçu depuis VisibilitySection)
+    property int adminFocusIndex: -1
+    property color focusColor: "#00BFFF"
+
+    // Nombre d'éléments navigables dans cette section (pour NavigationManager)
+    readonly property int focusCount: 5  // 5 CheckBox
+
+    // Liste des IDs des CheckBox pour la navigation
+    readonly property var checkboxIds: ["rpm", "frequency", "sirenCircle", "noteDetails", "musicalStaff"]
+
+    // Fonction appelée par NavigationManager pour gérer la rotation de l'encodeur
+    function handleEncoderStep(delta) {
+        if (adminFocusIndex < 1 || adminFocusIndex > focusCount) return
+        var checkboxIndex = adminFocusIndex - 1  // adminFocusIndex 1 = première checkbox (index 0)
+        var componentId = checkboxIds[checkboxIndex]
+        if (!componentId || !configController) return
+
+        var currentValue = configController.isComponentVisible(componentId)
+        configController.setComponentVisibility(componentId, !currentValue)
+    }
     
     ColumnLayout {
         anchors.fill: parent
@@ -28,7 +48,9 @@ Item {
             spacing: 8
             
             CheckBox {
+                id: rpmCheckbox
                 text: "Tours par minute (RPM)"
+                property bool isFocused: root.adminFocusIndex === 1
                 checked: {
                     if (!configController) return true
                     var dummy = configController.updateCounter
@@ -38,8 +60,9 @@ Item {
                 
                 contentItem: Text {
                     text: parent.text
-                    color: "#bbb"
+                    color: parent.isFocused ? root.focusColor : "#bbb"
                     font.pixelSize: parent.font.pixelSize
+                    font.bold: parent.isFocused
                     leftPadding: parent.indicator.width + 8
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -52,7 +75,9 @@ Item {
             }
             
             CheckBox {
+                id: frequencyCheckbox
                 text: "Fréquence (Hz)"
+                property bool isFocused: root.adminFocusIndex === 2
                 checked: {
                     if (!configController) return true
                     var dummy = configController.updateCounter
@@ -62,8 +87,9 @@ Item {
                 
                 contentItem: Text {
                     text: parent.text
-                    color: "#bbb"
+                    color: parent.isFocused ? root.focusColor : "#bbb"
                     font.pixelSize: parent.font.pixelSize
+                    font.bold: parent.isFocused
                     leftPadding: parent.indicator.width + 8
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -76,7 +102,9 @@ Item {
             }
             
             CheckBox {
+                id: sirenCircleCheckbox
                 text: "Cercle nom de sirène"
+                property bool isFocused: root.adminFocusIndex === 3
                 checked: {
                     if (!configController) return true
                     var dummy = configController.updateCounter
@@ -86,8 +114,9 @@ Item {
                 
                 contentItem: Text {
                     text: parent.text
-                    color: "#bbb"
+                    color: parent.isFocused ? root.focusColor : "#bbb"
                     font.pixelSize: parent.font.pixelSize
+                    font.bold: parent.isFocused
                     leftPadding: parent.indicator.width + 8
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -100,7 +129,9 @@ Item {
             }
             
             CheckBox {
+                id: noteDetailsCheckbox
                 text: "Encadré détails note"
+                property bool isFocused: root.adminFocusIndex === 4
                 checked: {
                     if (!configController) return true
                     var dummy = configController.updateCounter
@@ -110,8 +141,9 @@ Item {
                 
                 contentItem: Text {
                     text: parent.text
-                    color: "#bbb"
+                    color: parent.isFocused ? root.focusColor : "#bbb"
                     font.pixelSize: parent.font.pixelSize
+                    font.bold: parent.isFocused
                     leftPadding: parent.indicator.width + 8
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -124,7 +156,9 @@ Item {
             }
 
             CheckBox {
+                id: musicalStaffCheckbox
                 text: "Portée musicale"
+                property bool isFocused: root.adminFocusIndex === 5
                 checked: {
                     if (!configController) return true
                     var dummy = configController.updateCounter
@@ -134,8 +168,9 @@ Item {
                 
                 contentItem: Text {
                     text: parent.text
-                    color: "#bbb"
+                    color: parent.isFocused ? root.focusColor : "#bbb"
                     font.pixelSize: parent.font.pixelSize
+                    font.bold: parent.isFocused
                     leftPadding: parent.indicator.width + 8
                     verticalAlignment: Text.AlignVCenter
                 }

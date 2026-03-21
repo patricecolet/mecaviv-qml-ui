@@ -41,32 +41,66 @@ Page {
 
     property real rpm: sirenController ? sirenController.trueRpm : 1200
     property int frequency: sirenController ? sirenController.trueFrequency : 440
-    property int velocity: 100
+    property int velocity: sirenController ? sirenController.velocity : 127
     property real bend: 0.0
     property real uiScale: (configController && configController.getValueAtPath(["ui", "scale"], 0.8)) || 0.8
+
+    // Focus UI pour l’encodeur dans la vue principale : 0 = ADMIN, 1 = CONTRÔLEURS
+    property int encoderUiFocusIndex: 0
+    
+    // Exposer controllersPanel pour NavigationManager
+    property alias controllersPanel: controllersPanel
+    
+    // Focus UI pour l'encodeur en mode jeu : 0 = Play/Stop, 1 = Morceaux, 2 = Options, 3 = Ligne anticipation, 4 = Barres mesure, 5 = Mode Normal
+    property int gameModeFocusIndex: 0
+    property color gameModeFocusColor: "#00BFFF"
+    readonly property int gameModeFocusCount: 6
+    
+    // Exposer GameAutonomyPanel (depuis l'overlay) pour NavigationManager
+    readonly property var gameAutonomyPanel: gameModeOverlay ? gameModeOverlay.gameAutonomyPanel : null
+    
+    // Propriété locale pour contrôler la visibilité du panneau Contrôleurs (comme controllersPanelVisible dans Test2DButtons)
+    property bool controllersPanelVisible: configController ? configController.getValueAtPath(["controllersPanel", "visible"], false) : false
 
     // Référence au GameMode (overlay) pour que Main puisse envoyer les événements MIDI séquence
     property var _gameModeItem: null
     property var gameModeItem: _gameModeItem
+    property bool _wasPlayingWhenLeaving: false
 
     // Options mode jeu (liées à GameMode)
     property bool showAnticipationLine: false
     property bool showMeasureBars: false
+    // Options du menu Options (persistantes car GameAutonomyPanel peut être détruit en vue normale)
+    property bool playAccompaniment: false
+    property bool autonomyVolant: false
+    property bool autonomyVolet: false
+    property bool autonomyVibrato: false
+    property bool autonomyTremolo: false
 
     // Affichage mesure/temps : n’afficher les valeurs qu’une fois Pd lancé (après fallingTime), pas avant
     property bool transportDisplayActive: false
 
     onGameModeChanged: {
         if (root.gameMode) {
-            // Entrée en mode jeu : état propre (bouton Play gris, séquenceur arrêté)
-            if (root.rootWindow) {
-                root.rootWindow.userRequestedStop = false
-                root.rootWindow.isGamePlaying = false
+            // Entrée en mode jeu
+            if (root._wasPlayingWhenLeaving) {
+                // Retour pendant la lecture : ne pas reset, restaurer _gameModeItem
+                root._gameModeItem = gameModeLoader.item
+            } else {
+                // Première entrée ou après stop : état propre
+                if (root.rootWindow) {
+                    root.rootWindow.userRequestedStop = false
+                    root.rootWindow.isGamePlaying = false
+                }
+                if (sequencerController)
+                    sequencerController.reset()
+                root._gameModeItem = gameModeLoader.item
             }
-            if (sequencerController)
-                sequencerController.reset()
+            root._wasPlayingWhenLeaving = false
             root.transportDisplayActive = false
+            root.gameModeFocusIndex = 0
         } else {
+            root._wasPlayingWhenLeaving = root.rootWindow ? root.rootWindow.isGamePlaying : false
             root._gameModeItem = null
             root.transportDisplayActive = false
         }
@@ -82,9 +116,9 @@ Page {
         }
     }
 
-    function setPadCalibrationDisplayValue(pad, value) {
-        if (controllersPanel && controllersPanel.setPadCalibrationValue)
-            controllersPanel.setPadCalibrationValue(pad, value)
+    function setPadCalibrationDisplayValues(values) {
+        if (controllersPanel && controllersPanel.setPadCalibrationValues)
+            controllersPanel.setPadCalibrationValues(values)
     }
 
     Rectangle {
@@ -113,6 +147,7 @@ Page {
             anchors.bottomMargin: 20
 
             SirenSelector {
+                id: sirenSelector
                 anchors.left: parent.left
                 anchors.leftMargin: 40
                 anchors.top: parent.top
@@ -120,6 +155,21 @@ Page {
                 configController: root.configController
                 accentColor: root.accentColor
                 sirenInfo: root.sirenInfo
+            }
+
+            VelocityGauge2D {
+                id: velocityGauge
+                anchors.top: sirenSelector.bottom
+                anchors.topMargin: 12
+                anchors.horizontalCenter: sirenSelector.horizontalCenter
+                value: root.velocity
+                padConnected: configController ? configController.padConnected : false
+                accentColor: root.accentColor
+                configController: root.configController
+
+                onVelocityChanged: function(v) {
+                    if (sirenController) sirenController.velocity = v
+                }
             }
 
             ScrollView {
@@ -157,6 +207,7 @@ Page {
                 z: 1
                 accentColor: root.accentColor
                 currentNoteMidi: root.clampedNote
+                currentVelocity: root.velocity
                 sirenInfo: root.sirenInfo
                 configController: root.configController
                 rpm: root.rpm
@@ -180,27 +231,28 @@ Page {
                 z: 200  // Au-dessus de la portée (z:1) et du gameModeOverlay (z:100)
                 configController: root.configController
                 webSocketController: root.webSocketController
-                visible: configController ? configController.getValueAtPath(["controllersPanel", "visible"], false) : false
+                visible: root.controllersPanelVisible
             }
 
             Test2DButtons {
-                controllersPanelVisible: controllersPanel.visible
+                controllersPanelVisible: root.controllersPanelVisible
                 configController: root.configController
                 uiControlsEnabled: root.uiControlsEnabled
                 gameMode: root.gameMode
                 isGamePlaying: root.isGamePlaying
                 consoleConnected: configController ? configController.consoleConnected : false
+                encoderFocusIndex: root.encoderUiFocusIndex
 
                 onToggleControllers: {
                     if (configController) {
                         var v = configController.getValueAtPath(["controllersPanel", "visible"], false)
                         var newValue = !v
                         configController.setValueAtPath(["controllersPanel", "visible"], newValue)
-                        controllersPanel.visible = newValue  // Mise à jour immédiate
+                        root.controllersPanelVisible = newValue  // Mise à jour immédiate via propriété locale
                         console.log("🎮 [Test2D] Contrôleurs:", newValue ? "affichés" : "masqués")
                     } else {
-                        controllersPanel.visible = !controllersPanel.visible
-                        console.log("🎮 [Test2D] Contrôleurs (sans config):", controllersPanel.visible ? "affichés" : "masqués")
+                        root.controllersPanelVisible = !root.controllersPanelVisible
+                        console.log("🎮 [Test2D] Contrôleurs (sans config):", root.controllersPanelVisible ? "affichés" : "masqués")
                     }
                 }
                 onToggleGameMode: {
@@ -236,6 +288,9 @@ Page {
             z: 100
             anchors.fill: parent
             visible: root.gameMode
+            
+            // Exposer sequencerController pour NavigationManager
+            readonly property var sequencerController: sequencerController
 
             Rectangle {
                 anchors.fill: parent
@@ -257,16 +312,66 @@ Page {
                 z: 10
                 spacing: 8
                 CheckBox {
+                    id: anticipationCheckbox
                     text: "Ligne d'anticipation"
                     checked: root.showAnticipationLine
+                    property bool isFocused: root.gameModeFocusIndex === 3
                     onCheckedChanged: root.showAnticipationLine = checked
-                    palette.buttonText: "#fff"
+                    palette.buttonText: isFocused ? root.gameModeFocusColor : "#fff"
+                    contentItem: Text {
+                        text: parent.text
+                        color: parent.isFocused ? root.gameModeFocusColor : "#fff"
+                        font.pixelSize: 14
+                        font.bold: parent.isFocused
+                        leftPadding: parent.indicator.width + parent.spacing
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    indicator: Rectangle {
+                        implicitWidth: 20
+                        implicitHeight: 20
+                        x: anticipationCheckbox.leftPadding
+                        y: parent.height / 2 - height / 2
+                        radius: 3
+                        border.color: parent.parent.isFocused ? root.gameModeFocusColor : (anticipationCheckbox.checked ? "#FFD700" : "#666")
+                        border.width: parent.parent.isFocused ? 2 : 1
+                        color: "transparent"
+                        Rectangle {
+                            width: 12; height: 12; x: 4; y: 4; radius: 2
+                            color: parent.parent.parent.isFocused ? root.gameModeFocusColor : "#FFD700"
+                            visible: anticipationCheckbox.checked
+                        }
+                    }
                 }
                 CheckBox {
+                    id: measureBarsCheckbox
                     text: "Barres de mesure"
                     checked: root.showMeasureBars
+                    property bool isFocused: root.gameModeFocusIndex === 4
                     onCheckedChanged: root.showMeasureBars = checked
-                    palette.buttonText: "#fff"
+                    palette.buttonText: isFocused ? root.gameModeFocusColor : "#fff"
+                    contentItem: Text {
+                        text: parent.text
+                        color: parent.isFocused ? root.gameModeFocusColor : "#fff"
+                        font.pixelSize: 14
+                        font.bold: parent.isFocused
+                        leftPadding: parent.indicator.width + parent.spacing
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    indicator: Rectangle {
+                        implicitWidth: 20
+                        implicitHeight: 20
+                        x: measureBarsCheckbox.leftPadding
+                        y: parent.height / 2 - height / 2
+                        radius: 3
+                        border.color: parent.parent.isFocused ? root.gameModeFocusColor : (measureBarsCheckbox.checked ? "#FFD700" : "#666")
+                        border.width: parent.parent.isFocused ? 2 : 1
+                        color: "transparent"
+                        Rectangle {
+                            width: 12; height: 12; x: 4; y: 4; radius: 2
+                            color: parent.parent.parent.isFocused ? root.gameModeFocusColor : "#FFD700"
+                            visible: measureBarsCheckbox.checked
+                        }
+                    }
                 }
             }
 
@@ -333,9 +438,10 @@ Page {
                 width: 140
                 height: 60
                 z: 10
+                property bool isFocused: root.gameModeFocusIndex === 1
                 color: (root.rootWindow && root.rootWindow.isGamePlaying) ? "#1a5a3a" : "#2a2a2a"
-                border.color: (root.rootWindow && root.rootWindow.isGamePlaying) ? "#4ade80" : "#6bb6ff"
-                border.width: 2
+                border.color: isFocused ? root.gameModeFocusColor : ((root.rootWindow && root.rootWindow.isGamePlaying) ? "#4ade80" : "#6bb6ff")
+                border.width: isFocused ? 3 : 2
                 radius: 5
 
                 SequentialAnimation on opacity {
@@ -388,7 +494,7 @@ Page {
                     spacing: 5
                     Text {
                         text: (root.rootWindow && root.rootWindow.isGamePlaying) ? "⏹ Stop" : "▶︎ Play"
-                        color: (root.rootWindow && root.rootWindow.isGamePlaying) ? "#4ade80" : "#fff"
+                        color: playStopButton.isFocused ? root.gameModeFocusColor : ((root.rootWindow && root.rootWindow.isGamePlaying) ? "#4ade80" : "#fff")
                         font.pixelSize: 14
                         font.bold: true
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -404,21 +510,23 @@ Page {
 
             // Mode Normal (en bas à droite, 3/4 — même position que Mode Jeu en vue normale)
             Rectangle {
+                id: modeNormalButton
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 20
                 x: parent.width * 0.75 - width / 2
                 width: 140
                 height: 60
                 z: 10
+                property bool isFocused: root.gameModeFocusIndex === 5
                 color: "#00CED1"
-                border.color: "#00CED1"
-                border.width: 2
+                border.color: isFocused ? root.gameModeFocusColor : "#00CED1"
+                border.width: isFocused ? 3 : 2
                 radius: 5
 
                 Text {
                     anchors.centerIn: parent
                     text: "Mode Normal"
-                    color: "#000"
+                    color: parent.isFocused ? root.gameModeFocusColor : "#000"
                     font.pixelSize: 14
                     font.bold: true
                 }
@@ -464,6 +572,7 @@ Page {
                     anchors.fill: parent
                     accentColor: root.accentColor
                     currentNoteMidi: root.displayNoteForStaff
+                    currentVelocity: root.velocity
                     sirenInfo: root.sirenInfo
                     configController: root.configController
                     rpm: root.rpm
@@ -476,7 +585,7 @@ Page {
                     id: gameModeLoader
                     anchors.fill: parent
                     z: 1
-                    active: root.gameMode
+                    active: root.gameMode || (root.rootWindow && root.rootWindow.isGamePlaying) || (root.rootWindow && root.rootWindow.isGamePlaying)
                     source: "../game/GameMode.qml"
                     onLoaded: {
                         if (item) {
@@ -541,9 +650,22 @@ Page {
                         item.rootWindow = root.rootWindow
                         item.sequencer = sequencerController
                         item.gameMode = Qt.binding(function() { return root.gameModeItem })
+                        // Passer le focus depuis Test2D
+                        item.gameModeFocusIndex = Qt.binding(function() { return root.gameModeFocusIndex })
+                        item.gameModeFocusColor = Qt.binding(function() { return root.gameModeFocusColor })
+                        // Options du menu : Test2D est la source de vérité (persiste en vue normale)
+                        item.playAccompaniment = Qt.binding(function() { return root.playAccompaniment })
+                        item.autonomyVolant = Qt.binding(function() { return root.autonomyVolant })
+                        item.autonomyVolet = Qt.binding(function() { return root.autonomyVolet })
+                        item.autonomyVibrato = Qt.binding(function() { return root.autonomyVibrato })
+                        item.autonomyTremolo = Qt.binding(function() { return root.autonomyTremolo })
+                        item.test2DPage = root  // Pour mettre à jour Test2D depuis le panel
                     }
                 }
             }
+            
+            // Exposer GameAutonomyPanel pour NavigationManager
+            readonly property var gameAutonomyPanel: gameAutonomyLoader.item
         }
     }
 }

@@ -13,9 +13,22 @@ Item {
     property var rootWindow: null
     property var gameMode: null
     property var sequencer: null  // Contrôleur séquenceur partagé (plusieurs jeux possibles)
+    property var test2DPage: null  // Test2D : source de vérité pour options autonomes (persiste en vue normale)
 
-    property bool playAccompaniment: true
+    property bool playAccompaniment: false
+    property bool autonomyVolant: false
+    property bool autonomyVolet: false
+    property bool autonomyVibrato: false
+    property bool autonomyTremolo: false
     property bool debugPlayback: false
+
+    // Exposer les dialogs pour NavigationManager
+    property alias songSelectorDialog: songSelectorDialog
+    property alias gameOptionsDialog: gameOptionsDialog
+    
+    // Focus encodeur pour les boutons (reçu depuis Test2D via NavigationManager)
+    property int gameModeFocusIndex: -1
+    property color gameModeFocusColor: "#00BFFF"
 
     // Clic Stop : reset séquenceur et état jeu
     property bool uiPlaying: root.rootWindow ? root.rootWindow.isGamePlaying : false
@@ -60,9 +73,10 @@ Item {
             width: Math.max(100, optionsBtnText.contentWidth + 20)
             height: 44
             radius: 8
+            property bool isFocused: root.gameModeFocusIndex === 0
             color: "#2a2a2a"
-            border.color: "#6bb6ff"
-            border.width: 1
+            border.color: isFocused ? root.gameModeFocusColor : "#6bb6ff"
+            border.width: isFocused ? 2 : 1
             visible: root.rootWindow ? root.rootWindow.uiControlsEnabled : true
 
             Text {
@@ -70,7 +84,7 @@ Item {
                 anchors.centerIn: parent
                 anchors.margins: 10
                 text: "Options"
-                color: "#fff"
+                color: parent.parent.isFocused ? root.gameModeFocusColor : "#fff"
                 font.pixelSize: 14
                 font.bold: true
             }
@@ -86,9 +100,10 @@ Item {
             width: Math.max(140, songTitleText.contentWidth + 20)
             height: 44
             radius: 8
+            property bool isFocused: root.gameModeFocusIndex === 2
             color: "#2a2a2a"
-            border.color: "#6bb6ff"
-            border.width: 1
+            border.color: isFocused ? root.gameModeFocusColor : "#6bb6ff"
+            border.width: isFocused ? 2 : 1
             visible: root.rootWindow ? root.rootWindow.uiControlsEnabled : true
 
             Text {
@@ -96,7 +111,7 @@ Item {
                 anchors.centerIn: parent
                 anchors.margins: 10
                 text: root.sequencer ? (root.sequencer.currentSongTitle || "Morceaux") : "Morceaux"
-                color: "#fff"
+                color: parent.parent.isFocused ? root.gameModeFocusColor : "#fff"
                 font.pixelSize: 14
                 font.bold: true
                 elide: Text.ElideRight
@@ -133,9 +148,24 @@ Item {
         id: gameOptionsDialog
         configController: root.configController
         playAccompaniment: root.playAccompaniment
+        autonomyVolant: root.autonomyVolant
+        autonomyVolet: root.autonomyVolet
+        autonomyVibrato: root.autonomyVibrato
+        autonomyTremolo: root.autonomyTremolo
         pupitreId: "P1"
         onAccompanimentChanged: function(enabled) {
-            root.playAccompaniment = enabled
+            if (root.test2DPage)
+                root.test2DPage.playAccompaniment = enabled
+            else
+                root.playAccompaniment = enabled
+        }
+        onAutonomyChanged: function(device, enabled) {
+            if (root.test2DPage) {
+                if (device === "volant") root.test2DPage.autonomyVolant = enabled
+                else if (device === "volet") root.test2DPage.autonomyVolet = enabled
+                else if (device === "vibrato") root.test2DPage.autonomyVibrato = enabled
+                else if (device === "tremolo") root.test2DPage.autonomyTremolo = enabled
+            }
         }
     }
 }

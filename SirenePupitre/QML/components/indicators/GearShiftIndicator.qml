@@ -7,7 +7,7 @@ Node {
     
     // Propriétés publiques
     property int position: 0 // Position du levier (0-3)
-    property string mode: "SEMITONE" // Mode actuel
+    property string mode: "0"  // Valeur demi-tons affichée : 0, 1, 12, 24, 48
     
     onModeChanged: {
     }

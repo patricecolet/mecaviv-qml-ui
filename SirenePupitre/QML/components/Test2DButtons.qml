@@ -11,6 +11,8 @@ Item {
     property bool gameMode: false
     property bool isGamePlaying: false
     property bool consoleConnected: false
+    // Focus UI pour l’encodeur : 0 = ADMIN, 1 = CONTRÔLEURS (top right)
+    property int encoderFocusIndex: -1
 
     signal toggleControllers()
     signal toggleGameMode()
@@ -42,8 +44,11 @@ Item {
         anchors.rightMargin: 20
         width: 100
         height: 35
-        color: "#2a2a2a"
-        border.color: root.controllersPanelVisible ? "#00ff00" : "#FFD700"
+        color: root.encoderFocusIndex === 1 ? "#3a3a3a" : "#2a2a2a"
+        border.color: root.controllersPanelVisible
+                     ? "#00ff00"
+                     : (root.encoderFocusIndex === 1 ? "#FFD700" : "#555")
+        border.width: root.encoderFocusIndex === 1 ? 2 : 1
         radius: 5
         visible: root.uiControlsEnabled && (root.configController ? root.configController.isComponentVisible("controllers") : true)
 
@@ -54,8 +59,9 @@ Item {
 
         Text {
             text: root.controllersPanelVisible ? "Masquer" : "Contrôleurs"
-            color: "white"
+            color: root.encoderFocusIndex === 1 ? "#FFD700" : "white"
             font.pixelSize: 12
+            font.bold: root.encoderFocusIndex === 1
             anchors.centerIn: parent
         }
     }
@@ -190,8 +196,9 @@ Item {
         anchors.margins: 20
         width: 80
         height: 40
-        color: mouseAreaAdmin.containsMouse ? "#3a3a3a" : "#2a2a2a"
-        border.color: "#666"
+        color: root.encoderFocusIndex === 0 ? "#3a3a3a" : "#2a2a2a"
+        border.color: root.encoderFocusIndex === 0 ? "#FFD700" : "#555"
+        border.width: root.encoderFocusIndex === 0 ? 2 : 1
         radius: 5
         visible: root.uiControlsEnabled
 
@@ -205,9 +212,9 @@ Item {
 
         Text {
             text: "ADMIN"
-            color: "#888"
+            color: root.encoderFocusIndex === 0 ? "#FFD700" : "#888"
             font.pixelSize: 14
-            font.bold: true
+            font.bold: root.encoderFocusIndex === 0
             anchors.centerIn: parent
         }
     }

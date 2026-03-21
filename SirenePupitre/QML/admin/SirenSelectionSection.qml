@@ -7,6 +7,9 @@ Item {
     id: root
     
     property var configController: null
+    // Focus encodeur dans le panneau Admin (reçu depuis AdminPanel)
+    property int adminFocusIndex: -1
+    property color focusColor: "#00BFFF"
     
     MusicUtils {
         id: musicUtils
@@ -84,8 +87,9 @@ Item {
                         
                         Text {
                             text: "Note max:"
-                            color: "#bbb"
+                            color: root.adminFocusIndex === 3 ? root.focusColor : "#bbb"
                             font.pixelSize: 14
+                            font.bold: root.adminFocusIndex === 3
                         }
                         
                         SpinBox {
@@ -102,19 +106,20 @@ Item {
                             contentItem: TextInput {
                                 text: parent.textFromValue(parent.value, parent.locale)
                                 font: parent.font
-                                color: "#FFD700"
+                                color: root.adminFocusIndex === 3 ? root.focusColor : "#FFD700"
                                 horizontalAlignment: Qt.AlignHCenter
                                 verticalAlignment: Qt.AlignVCenter
                                 readOnly: !parent.editable
                                 validator: parent.validator
                                 inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                rightPadding: 35  // Ajouter cette ligne pour la marge
+                                rightPadding: 35
                             }
                             
                             background: Rectangle {
-                                implicitWidth: 90  // Augmenter un peu la largeur
+                                implicitWidth: 90
                                 color: "#1a1a1a"
-                                border.color: "#FFD700"
+                                border.color: root.adminFocusIndex === 3 ? root.focusColor : "#FFD700"
+                                border.width: root.adminFocusIndex === 3 ? 2 : 1
                                 radius: 5
                             }
                             
@@ -188,8 +193,9 @@ Item {
                     
                            Text {
                                text: "Transposition affichage:"
-                               color: "#888"
+                               color: root.adminFocusIndex === 4 ? root.focusColor : "#888"
                                font.pixelSize: 13
+                               font.bold: root.adminFocusIndex === 4
                                Layout.preferredWidth: 120
                            }
                     
@@ -206,7 +212,7 @@ Item {
                                contentItem: TextInput {
                                    text: parent.textFromValue(parent.value, parent.locale)
                                    font: parent.font
-                                   color: "#FFD700"
+                                   color: root.adminFocusIndex === 4 ? root.focusColor : "#FFD700"
                                    horizontalAlignment: Qt.AlignHCenter
                                    verticalAlignment: Qt.AlignVCenter
                                    readOnly: !parent.editable
@@ -218,7 +224,8 @@ Item {
                                background: Rectangle {
                                    implicitWidth: 90
                                    color: "#1a1a1a"
-                                   border.color: "#FFD700"
+                                   border.color: root.adminFocusIndex === 4 ? root.focusColor : "#FFD700"
+                                   border.width: root.adminFocusIndex === 4 ? 2 : 1
                                    radius: 5
                                }
                         

@@ -13,7 +13,7 @@ Rectangle {
     property real joystickZ: 0
     property bool joystickButton: false
     property int gearShiftPosition: 0
-    property string gearShiftMode: "RONDE"
+    property string gearShiftMode: "0"   // Valeur demi-tons : 0, 1, 12, 24, 48
     property int faderValue: 0
     property int modPedalValue: 0
     property real modPedalPercent: 0
@@ -51,13 +51,12 @@ Rectangle {
     property int pad2CalibMaxV: 127
     property int pad2CalibMinA: 0
     property int pad2CalibMaxA: 127
-    /** Valeur int16 affichée sous chaque bouton de calibration (reçue par WebSocket). */
-    property int pad1CalibDisplayValue: 0
-    property int pad2CalibDisplayValue: 0
+    /** Valeurs int16 affichées sous les boutons de calibration (reçues par WebSocket), une seule structure [pad0, pad1]. */
+    property var padCalibDisplayValues: [0, 0]
 
-    function setPadCalibrationValue(pad, value) {
-        if (pad === 0) root.pad1CalibDisplayValue = value
-        else if (pad === 1) root.pad2CalibDisplayValue = value
+    function setPadCalibrationValues(values) {
+        if (values && Array.isArray(values) && values.length >= 2)
+            root.padCalibDisplayValues = [values[0], values[1]]
     }
 
     function showControllerValues() {
@@ -94,14 +93,13 @@ Rectangle {
         console.log("✅ Message SPEAKER_TEST envoyé:", channel, active)
     }
 
-    /** Envoie un message PAD_CALIBRATION à chaque clic : pad (0 ou 1), mode (min ou max), active (true/false). */
-    function sendPadCalibration(pad, active) {
+    /** Envoie un message PAD_CALIBRATION pour déclencher le calibrage : pad (0 ou 1), mode (min ou max). */
+    function sendPadCalibration(pad) {
         if (!webSocketController || !webSocketController.connected) return
         webSocketController.sendBinaryMessage({
             type: "PAD_CALIBRATION",
             pad: pad,
-            mode: root.padCalibrationMode,
-            active: active
+            mode: root.padCalibrationMode
         })
     }
 
@@ -519,45 +517,30 @@ Rectangle {
                 width: 110
                 height: 28
                 radius: 4
-                color: root.pad1CalibrationActive ? "#00aa00" : (ma1.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                color: ma1.containsMouse ? "#3a3a3a" : "#2a2a2a"
                 border.color: "#00ff00"
-                border.width: root.pad1CalibrationActive ? 3 : 1
+                border.width: 1
                 MouseArea {
                     id: ma1
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.pad1CalibrationActive = !root.pad1CalibrationActive
-                        root.sendPadCalibration(0, root.pad1CalibrationActive)
-                        if (!root.pad1CalibrationActive) {
-                            root.pad1CalibMinV = 0
-                            root.pad1CalibMaxV = 127
-                            root.pad1CalibMinA = 0
-                            root.pad1CalibMaxA = 127
-                        } else {
-                            if (root.padCalibrationMode === "min") {
-                                root.pad1CalibMinV = 127
-                                root.pad1CalibMinA = 127
-                            } else {
-                                root.pad1CalibMaxV = 0
-                                root.pad1CalibMaxA = 0
-                            }
-                        }
+                        root.sendPadCalibration(0)
                     }
                 }
                 Text {
                     anchors.centerIn: parent
-                    text: root.pad1CalibrationActive ? "CAL. PAD 1 ON" : "Calibrer PAD 1"
-                    color: root.pad1CalibrationActive ? "#000000" : "#00ff00"
+                    text: "Calibrer PAD 1"
+                    color: "#00ff00"
                     font.pixelSize: 10
-                    font.bold: root.pad1CalibrationActive
+                    font.bold: true
                 }
             }
             Text {
                 width: 110
                 horizontalAlignment: Text.AlignHCenter
-                text: root.pad1CalibDisplayValue
+                text: root.padCalibDisplayValues[0]
                 font.pixelSize: 11
                 color: "#00ff00"
             }
@@ -570,45 +553,30 @@ Rectangle {
                 width: 110
                 height: 28
                 radius: 4
-                color: root.pad2CalibrationActive ? "#00aa00" : (ma2.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                color: ma2.containsMouse ? "#3a3a3a" : "#2a2a2a"
                 border.color: "#00ff00"
-                border.width: root.pad2CalibrationActive ? 3 : 1
+                border.width: 1
                 MouseArea {
                     id: ma2
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.pad2CalibrationActive = !root.pad2CalibrationActive
-                        root.sendPadCalibration(1, root.pad2CalibrationActive)
-                        if (!root.pad2CalibrationActive) {
-                            root.pad2CalibMinV = 0
-                            root.pad2CalibMaxV = 127
-                            root.pad2CalibMinA = 0
-                            root.pad2CalibMaxA = 127
-                        } else {
-                            if (root.padCalibrationMode === "min") {
-                                root.pad2CalibMinV = 127
-                                root.pad2CalibMinA = 127
-                            } else {
-                                root.pad2CalibMaxV = 0
-                                root.pad2CalibMaxA = 0
-                            }
-                        }
+                        root.sendPadCalibration(1)
                     }
                 }
                 Text {
                     anchors.centerIn: parent
-                    text: root.pad2CalibrationActive ? "CAL. PAD 2 ON" : "Calibrer PAD 2"
-                    color: root.pad2CalibrationActive ? "#000000" : "#00ff00"
+                    text: "Calibrer PAD 2"
+                    color: "#00ff00"
                     font.pixelSize: 10
-                    font.bold: root.pad2CalibrationActive
+                    font.bold: true
                 }
             }
             Text {
                 width: 110
                 horizontalAlignment: Text.AlignHCenter
-                text: root.pad2CalibDisplayValue
+                text: root.padCalibDisplayValues[1]
                 font.pixelSize: 11
                 color: "#00ff00"
             }
@@ -716,7 +684,7 @@ Rectangle {
         
         if (controllersData.gearShift) {
             gearShiftPosition = controllersData.gearShift.position || 0
-            gearShiftMode = controllersData.gearShift.mode || "SEMITONE"
+            gearShiftMode = controllersData.gearShift.mode || "0"
         }
         
         if (controllersData.fader) {

@@ -14,6 +14,101 @@ Dialog {
     property string selectedCategory: ""
     signal songChosen(var file)
     
+    // Navigation encodeur
+    property int encoderFocusIndex: 0  // 0 = catégories, 1 = fichiers
+    property int selectedCategoryIndex: 0
+    property int selectedFileIndex: 0
+    property color focusColor: "#00BFFF"
+    
+    readonly property int focusCount: 2  // catégories + fichiers
+    
+    function handleEncoderStep(delta) {
+        var step = (delta > 0) ? 1 : -1
+        if (encoderFocusIndex === 0) {
+            // Navigation dans les catégories
+            var newIdx = selectedCategoryIndex + step
+            if (newIdx < 0) newIdx = 0
+            if (newIdx >= categoriesModel.length) newIdx = categoriesModel.length - 1
+            if (newIdx !== selectedCategoryIndex && categoriesModel.length > 0) {
+                selectedCategoryIndex = newIdx
+                selectedCategory = categoriesModel[selectedCategoryIndex].name
+            }
+        } else {
+            // Navigation dans les fichiers
+            var files = _getCurrentCategoryFiles()
+            var newIdx = selectedFileIndex + step
+            if (newIdx < 0) newIdx = 0
+            if (newIdx >= files.length) newIdx = files.length - 1
+            selectedFileIndex = newIdx
+        }
+    }
+    
+    function handleEncoderClick() {
+        if (encoderFocusIndex === 0) {
+            // Passer aux fichiers
+            encoderFocusIndex = 1
+            selectedFileIndex = 0
+            // Scroll vers le premier fichier
+            Qt.callLater(function() {
+                fileList.positionViewAtIndex(0, ListView.Beginning)
+            })
+        } else {
+            // Sélectionner le fichier
+            var files = _getCurrentCategoryFiles()
+            if (files.length > 0 && selectedFileIndex >= 0 && selectedFileIndex < files.length) {
+                songChosen(files[selectedFileIndex])
+                close()
+            }
+        }
+    }
+    
+    function _getCurrentCategoryFiles() {
+        for (var i = 0; i < categoriesModel.length; i++) {
+            if (categoriesModel[i].name === selectedCategory) {
+                return categoriesModel[i].files || []
+            }
+        }
+        return []
+    }
+    
+    onSelectedCategoryChanged: {
+        selectedFileIndex = 0
+        // Mettre à jour selectedCategoryIndex
+        for (var i = 0; i < categoriesModel.length; i++) {
+            if (categoriesModel[i].name === selectedCategory) {
+                selectedCategoryIndex = i
+                break
+            }
+        }
+    }
+    
+    onSelectedCategoryIndexChanged: {
+        // Scroll vers la catégorie sélectionnée
+        if (encoderFocusIndex === 0 && selectedCategoryIndex >= 0) {
+            Qt.callLater(function() {
+                catList.positionViewAtIndex(selectedCategoryIndex, ListView.Center)
+            })
+        }
+    }
+    
+    onSelectedFileIndexChanged: {
+        // Scroll vers le fichier sélectionné
+        if (encoderFocusIndex === 1) {
+            Qt.callLater(function() {
+                fileList.positionViewAtIndex(selectedFileIndex, ListView.Center)
+            })
+        }
+    }
+    
+    onOpened: {
+        encoderFocusIndex = 0
+        selectedFileIndex = 0
+        if (categoriesModel.length > 0 && selectedCategoryIndex >= categoriesModel.length) {
+            selectedCategoryIndex = 0
+            selectedCategory = categoriesModel[0].name
+        }
+    }
+    
     // Conteneur principal
     Item {
         anchors.fill: parent
@@ -30,25 +125,38 @@ Dialog {
             clip: true
             spacing: 4
             
+            // Scroll vers l'élément sélectionné
+            onModelChanged: {
+                if (songSelectorDialog.encoderFocusIndex === 0 && selectedCategoryIndex >= 0) {
+                    Qt.callLater(function() {
+                        catList.positionViewAtIndex(selectedCategoryIndex, ListView.Center)
+                    })
+                }
+            }
+            
             delegate: Rectangle {
                 width: parent ? parent.width : 240
                 height: 40
                 radius: 6
-                color: (songSelectorDialog.selectedCategory === modelData.name) ? "#3a3a3a" : "#2a2a2a"
-                border.color: "#555"
-                border.width: 1
+                property bool isSelected: songSelectorDialog.selectedCategory === modelData.name
+                property bool isFocused: songSelectorDialog.encoderFocusIndex === 0 && songSelectorDialog.selectedCategoryIndex === index
+                color: isSelected ? "#3a3a3a" : "#2a2a2a"
+                border.color: isFocused ? songSelectorDialog.focusColor : (isSelected ? "#555" : "#333")
+                border.width: isFocused ? 2 : 1
                 
                 Text {
                     anchors.centerIn: parent
                     text: modelData.name
-                    color: "#ccc"
+                    color: isFocused ? songSelectorDialog.focusColor : (isSelected ? "#fff" : "#ccc")
                     font.pixelSize: 14
+                    font.bold: isFocused || isSelected
                 }
                 
                 MouseArea {
                     anchors.fill: parent
                     onClicked: {
                         songSelectorDialog.selectedCategory = modelData.name
+                        songSelectorDialog.selectedCategoryIndex = index
                     }
                 }
             }
@@ -65,6 +173,15 @@ Dialog {
             clip: true
             spacing: 6
             
+            // Scroll vers l'élément sélectionné
+            onModelChanged: {
+                if (songSelectorDialog.encoderFocusIndex === 1 && selectedFileIndex >= 0) {
+                    Qt.callLater(function() {
+                        fileList.positionViewAtIndex(selectedFileIndex, ListView.Center)
+                    })
+                }
+            }
+            
             model: {
                 var cats = songSelectorDialog.categoriesModel || [];
                 for (var i = 0; i < cats.length; i++) {
@@ -79,9 +196,10 @@ Dialog {
                 width: parent ? parent.width : 400
                 height: 44
                 radius: 6
+                property bool isFocused: songSelectorDialog.encoderFocusIndex === 1 && songSelectorDialog.selectedFileIndex === index
                 color: "#2a2a2a"
-                border.color: "#555"
-                border.width: 1
+                border.color: isFocused ? songSelectorDialog.focusColor : "#555"
+                border.width: isFocused ? 2 : 1
                 
                 Row {
                     anchors.fill: parent
@@ -90,8 +208,9 @@ Dialog {
                     
                     Text {
                         text: modelData.title || modelData.path
-                        color: "#eee"
+                        color: isFocused ? songSelectorDialog.focusColor : "#eee"
                         font.pixelSize: 14
+                        font.bold: isFocused
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
@@ -99,6 +218,7 @@ Dialog {
                 MouseArea {
                     anchors.fill: parent
                     onClicked: {
+                        songSelectorDialog.selectedFileIndex = index
                         songSelectorDialog.songChosen(modelData);
                         songSelectorDialog.close();
                     }

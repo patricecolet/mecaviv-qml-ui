@@ -39,7 +39,8 @@ Item {
         "fader": -1,
         "pedal": -1,
         "selector": -1,
-        "encoder": -1
+        "encoder": -1,
+        "encoderPressed": false
     })
     
     // Seuils de changement minimum (réglables)
@@ -55,7 +56,7 @@ Item {
     signal playbackTickReceived(bool playing, int tick)  // Position lecture = tick seul (6 octets), JS gère bar/beat
     signal filesListReceived(var categories)  // Liste fichiers MIDI
     signal gameModeReceived(bool enabled)  // Mode jeu activé/désactivé par le serveur
-    signal padCalibrationValueReceived(int pad, int value)  // Valeur int16 pour affichage sous le bouton (pad 0 ou 1)
+    signal padCalibrationValuesReceived(var values)  // [int16, int16] pour affichage sous les boutons (pad 0 et 1)
     property var configController: null
     property var rootWindow: null  // Référence vers la fenêtre racine (Main.qml)
     
@@ -138,14 +139,9 @@ Item {
             changed = true
         }
         
-        // Vérifier encodeur (pas de seuil, toujours traiter les changements)
+        // Encodeur : toujours laisser passer (la détection des changements est gérée par EncoderController)
         if (controllers.encoder) {
-            if (controllers.encoder.pressed) {
-                changed = true
-            }
-            if (Math.abs(controllers.encoder.value - (lastVals.encoder || -1)) > 0) {
-                changed = true
-            }
+            changed = true
         }
         
         return changed
@@ -161,7 +157,8 @@ Item {
             "fader": controllers.fader.value,
             "pedal": controllers.modPedal.value,
             "selector": controllers.gearShift.position,
-            "encoder": controllers.encoder ? controllers.encoder.value : -1
+            "encoder": controllers.encoder ? controllers.encoder.value : -1,
+            "encoderPressed": controllers.encoder ? (controllers.encoder.pressed > 0 || controllers.encoder.pressed === true) : false
         }
     }
     
@@ -215,9 +212,9 @@ Item {
                     var encoderValue = bytes[16];
                     var encoderPressed = bytes[17] > 0 ? true : false;
                     
-                    // Mapper le mode GearShift (5 positions)
-                    var gearModeNames = ["SEMITONE", "THIRD", "MINOR_SIXTH", "OCTAVE", "DOUBLE_OCTAVE"];
-                    var gearModeName = gearModeNames[selector] || "SEMITONE";
+                    // Valeurs demi-tons pour GearShift (5 positions : 0, 1, 12, 24, 48)
+                    var gearSemitones = [0, 1, 12, 24, 48];
+                    var gearDisplayValue = String(gearSemitones[selector] ?? 0);
                     
                     // Créer l'objet contrôleurs
                     var controllers = {
@@ -233,7 +230,7 @@ Item {
                         },
                         gearShift: {
                             position: selector,      // 0-4 (5 vitesses)
-                            mode: gearModeName
+                            mode: gearDisplayValue   // 0, 1, 12, 24, 48 (demi-tons)
                         },
                         fader: {
                             value: fader
@@ -356,6 +353,48 @@ Item {
                     
                     // Émettre un signal pour les CC de séquence
                     controller.controlChangeReceived(ccNumber, ccValue);
+                    return;
+                }
+                
+                // Format binaire 0x06 - ENCODER_VALUE : rotation de l'encodeur (2 bytes)
+                if (bytes.length === 2 && bytes[0] === 0x06) {
+                    // Format: [0x06, value] où value est 0-127
+                    var encoderValue = bytes[1];
+                    
+                    // Créer l'objet encoder avec uniquement la valeur
+                    var encoderData = {
+                        encoder: {
+                            value: encoderValue
+                        }
+                    };
+                    
+                    // Envoyer vers EncoderController via dataReceived
+                    controller.dataReceived({
+                        controllers: encoderData,
+                        isEncoderNavigation: true,
+                        timestamp: Date.now()
+                    });
+                    return;
+                }
+                
+                // Format binaire 0x07 - ENCODER_PUSH : appui du bouton encodeur (2 bytes)
+                if (bytes.length === 2 && bytes[0] === 0x07) {
+                    // Format: [0x07, pressed] où pressed est 0 (relâché) ou 1 (appuyé)
+                    var encoderPressed = bytes[1] > 0;
+                    
+                    // Créer l'objet encoder avec uniquement l'état du bouton
+                    var encoderData = {
+                        encoder: {
+                            pressed: encoderPressed
+                        }
+                    };
+                    
+                    // Envoyer vers EncoderController via dataReceived
+                    controller.dataReceived({
+                        controllers: encoderData,
+                        isEncoderNavigation: true,
+                        timestamp: Date.now()
+                    });
                     return;
                 }
                 
@@ -497,6 +536,33 @@ Item {
                     if (controller.configController) controller.configController.consoleConnected = false
                     return
                 }
+                if (data.type === "PAD_CONNECTED") {
+                    var padConnected = data.connected === true
+                    if (controller.configController) controller.configController.padConnected = padConnected
+                    return
+                }
+
+                // GEAR - Vitesse / GearShift envoyée par Pure Data en JSON (un seul message simple, pas dans le paquet binaire debug)
+                if (data.type === "GEAR") {
+                    var gearPos = (typeof data.position === "number" && data.position >= 0 && data.position <= 4) ? data.position : 0
+                    var gearSemitones = [0, 1, 12, 24, 48]
+                    var gearDisplayValue = String(gearSemitones[gearPos] ?? 0)
+                    var gearControllers = {
+                        gearShift: {
+                            position: gearPos,
+                            mode: gearDisplayValue   // 0, 1, 12, 24, 48 (demi-tons)
+                        }
+                    }
+                    controller.dataReceived({
+                        controllers: gearControllers,
+                        isControllersOnly: true,
+                        timestamp: Date.now()
+                    })
+                    return
+                }
+
+                // ENCODER_NAV : DÉPRÉCIÉ - Les messages encodeur utilisent maintenant les messages binaires 0x06 (value) et 0x07 (push)
+                // Le traitement JSON ENCODER_NAV a été supprimé en faveur des messages binaires pour améliorer les performances
 
                 // AJOUTER : Traiter PARAM_UPDATE
                 if (data.type === "PARAM_UPDATE") {
@@ -590,13 +656,32 @@ Item {
                     return;
                 }
 
-                // PAD_CALIBRATION_VALUE - Valeur int16 à afficher sous le bouton (Pd envoie { type: "PAD_CALIBRATION_VALUE", pad: 0|1, value: int16 })
+                // PAD_CALIBRATION_VALUE - Une seule structure : valeurs int16 pour les deux pads
+                // Accepte: [val0, val1], ["31 3"] (chaîne space-separated), ou "31 3"
                 if (data.type === "PAD_CALIBRATION_VALUE") {
-                    var pad = (data.pad === 1) ? 1 : 0;
-                    var val = (typeof data.value === "number" && isFinite(data.value)) ? data.value : 0;
-                    if (val < -32768) val = -32768;
-                    if (val > 32767) val = 32767;
-                    controller.padCalibrationValueReceived(pad, val);
+                    var vals = [0, 0];
+                    var raw = data.values;
+                    if (raw !== undefined && raw !== null) {
+                        var parts = [];
+                        if (Array.isArray(raw)) {
+                            if (raw.length > 0 && typeof raw[0] === "string" && raw[0].indexOf(" ") >= 0) {
+                                parts = raw[0].trim().split(/\s+/);
+                            } else {
+                                parts = raw;
+                            }
+                        } else if (typeof raw === "string") {
+                            parts = raw.trim().split(/\s+/);
+                        }
+                        for (var i = 0; i < 2 && i < parts.length; i++) {
+                            var v = parseInt(parts[i], 10);
+                            if (!isFinite(v)) v = 0;
+                            if (v < -32768) v = -32768;
+                            if (v > 32767) v = 32767;
+                            vals[i] = v;
+                        }
+                    }
+                    console.log("[PAD_CALIB] Reçu values:", JSON.stringify(vals), "raw data.values:", raw !== undefined ? JSON.stringify(raw) : "undefined")
+                    controller.padCalibrationValuesReceived(vals);
                     return;
                 }
                 

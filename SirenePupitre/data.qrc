@@ -2,12 +2,15 @@
     <qresource prefix="/">
         <file>QML/Main.qml</file>
         <file>QML/controllers/WebSocketController.qml</file>
+        <file>QML/controllers/EncoderController.qml</file>
+        <file>QML/controllers/NavigationManager.qml</file>
         <file>QML/utils/DigitLED3D.qml</file>
         <file>QML/utils/Knob.qml</file>
         <file>QML/utils/LEDSegment.qml</file>
         <file>QML/utils/LEDText3D.qml</file>
         <file>QML/components/NumberDisplay2D.qml</file>
         <file>QML/components/TopDisplays2D.qml</file>
+        <file>QML/components/VelocityGauge2D.qml</file>
         <file>QML/components/StaffZone2D.qml</file>
         <file>QML/components/SirenSelector.qml</file>
         <file>QML/components/Test2DButtons.qml</file>

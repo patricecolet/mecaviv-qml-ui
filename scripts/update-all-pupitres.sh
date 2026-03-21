@@ -7,6 +7,7 @@ set -e  # Arrêter en cas d'erreur
 # Configuration par défaut
 SSH_PASSWORD="SIRENS"
 SERVER_USER="sirenateur"
+CRITAPEC_REPO_URL="https://github.com/patricecolet/critapec-pd-externals.git"
 REBOOT_AFTER_UPDATE=false
 SELECTED_PUPITRES=""
 EXCLUDED_PUPITRES=""
@@ -25,7 +26,8 @@ show_help() {
     echo "  --password PASSWORD       Mot de passe SSH (défaut: SIRENS)"
     echo "  --reboot                  Redémarre les pupitres après mise à jour"
     echo "  --pupitres IPS            Met à jour uniquement les IPs spécifiées (séparées par des virgules)"
-    echo "                            Exemple: --pupitres \"192.168.1.41,192.168.1.42\""
+    echo "                            Les IPs peuvent être hors config (ex: 10.14.14.144)"
+    echo "                            Exemple: --pupitres \"192.168.1.41,10.14.14.144\""
     echo "  --exclude IPS             Exclut les IPs spécifiées"
     echo "                            Exemple: --exclude \"192.168.1.47\""
     echo "  --interactive, -i         Mode interactif pour sélectionner les pupitres"
@@ -280,10 +282,17 @@ filter_pupitres() {
         local filtered=()
         for ip in "${SELECTED_IPS[@]}"; do
             ip=$(echo "$ip" | xargs)  # Trim whitespace
+            [ -z "$ip" ] && continue
             if [[ " ${PUPITRE_IPS[*]} " =~ " ${ip} " ]]; then
                 filtered+=("$ip")
             else
-                print_error "IP $ip non trouvée dans la configuration"
+                # IP non présente dans config.js : on l'accepte quand même (pupitre hors config)
+                if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+                    print_info "IP $ip non dans la config, utilisation directe"
+                    filtered+=("$ip")
+                else
+                    print_error "IP invalide: $ip"
+                fi
             fi
         done
         PUPITRE_IPS=("${filtered[@]}")
@@ -515,15 +524,15 @@ update_pupitre() {
         return 1
     fi
 
-    print_status "Configuration des pull-ups GPIO (18/23/24)..."
+    print_status "Configuration des pull-ups GPIO (15/22/24)..."
     if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
         "command -v pinctrl >/dev/null 2>&1"; then
         print_error "pinctrl introuvable sur ${host} (Pi 5 requis)."
         return 1
     fi
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-        "sudo pinctrl set 23 pu && sudo pinctrl set 24 pu && sudo pinctrl set 18 pu"; then
-        print_success "Pull-ups configurés sur 18/23/24"
+        "sudo pinctrl set 15 pu && sudo pinctrl set 22 pu && sudo pinctrl set 24 pu"; then
+        print_success "Pull-ups configurés sur 15 (switch), 22 (A), 24 (B)"
     else
         print_error "Échec de la configuration pinctrl sur ${host}"
         return 1
@@ -531,14 +540,34 @@ update_pupitre() {
 
     print_status "Vérification des externals critapec..."
     
-    # Git pull critapec-pd-externals
+    # Vérifier si c'est un dépôt Git valide, sinon supprimer et cloner
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-        "cd ~/dev/src/critapec-pd-externals && \
-         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+        "[ -d ~/dev/src/critapec-pd-externals/.git ]"; then
+        # C'est un dépôt Git valide, faire un pull
+        print_status "Mise à jour de critapec-pd-externals..."
+        if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+            "cd ~/dev/src/critapec-pd-externals && \
+             GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+            print_error "Échec du git pull critapec-pd-externals sur ${host}"
+            return 1
+        fi
         print_success "critapec-pd-externals mis à jour"
     else
-        print_error "Échec du git pull critapec-pd-externals sur ${host}"
-        return 1
+        # Le répertoire existe mais n'est pas un dépôt Git valide, ou n'existe pas
+        if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+            "[ -d ~/dev/src/critapec-pd-externals ]"; then
+            print_status "Suppression de l'ancien répertoire critapec-pd-externals..."
+            sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+                "rm -rf ~/dev/src/critapec-pd-externals"
+        fi
+        print_status "Clonage de critapec-pd-externals..."
+        if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+            "mkdir -p ~/dev/src && cd ~/dev/src && \
+             GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git clone ${CRITAPEC_REPO_URL} critapec-pd-externals"; then
+            print_error "Échec du clone critapec-pd-externals sur ${host}"
+            return 1
+        fi
+        print_success "critapec-pd-externals cloné"
     fi
     
     # Vérifier si une recompilation est nécessaire
@@ -554,6 +583,8 @@ update_pupitre() {
          if [ -z "$src_time" ]; then src_time=0; fi && \
          if [ -z "$bin_time" ]; then bin_time=0; fi && \
          if [ "$src_time" -gt "$bin_time" ]; then \
+             echo "REBUILD"; \
+         elif [ ! -f ~/pd-externals/critapec/rpi_encoder_step.pd_linux ]; then \
              echo "REBUILD"; \
          else \
              echo "OK"; \
@@ -715,7 +746,17 @@ update_pupitre() {
         return 1
     fi
     
-    # 7. Reboot si demandé
+    # 7. Rsync scripts (start-raspberry.sh, etc.)
+    print_status "Rsync de SirenePupitre/scripts..."
+    if sshpass -p"${SSH_PASSWORD}" rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
+        SirenePupitre/scripts/ ${SERVER_USER}@${host}:~/dev/src/mecaviv-qml-ui/SirenePupitre/scripts/; then
+        print_success "scripts synchronisés"
+    else
+        print_error "Échec du rsync scripts sur ${host}"
+        return 1
+    fi
+    
+    # 8. Reboot si demandé
     if [ "$REBOOT_AFTER_UPDATE" = true ]; then
         print_status "Redémarrage du pupitre ${host}..."
         if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \

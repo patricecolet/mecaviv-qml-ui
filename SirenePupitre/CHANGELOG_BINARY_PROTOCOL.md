@@ -282,6 +282,18 @@ joyX = bytes[7] <= 127 ? bytes[7] : -(bytes[7] - 128);
 
 ---
 
+## 13 février 2026
+
+### Vélocité et jauge manuelle
+
+- **SirenController** : propriété `velocity` (0-127), mise à jour depuis le message binaire 0x03 (MIDI_NOTE_VOLANT, byte 2)
+- **Main.qml** : propagation de `data.velocity` vers `sirenController.velocity` quand `isVolantNote`
+- **Test2D** : `velocity` = `sirenController.velocity`, passé à TopDisplays2D, StaffZone2D (`currentVelocity`), AmbitusPiano2D (opacité touche courante)
+- **VelocityGauge2D** : jauge réglable (Slider 0-127) affichée quand le pad n'est pas connecté
+- **Message JSON PAD_CONNECTED** : PureData envoie `{ "type": "PAD_CONNECTED", "connected": true/false }` pour indiquer si le pad est connecté — la jauge est masquée quand `connected: true`
+
+---
+
 **Auteur** : Assistant IA  
 **Validé par** : Patrice Colet  
 **Statut** : Implémenté, en attente de tests

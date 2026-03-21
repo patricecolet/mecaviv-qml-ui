@@ -69,6 +69,31 @@ Window {
         configController: configController
     }
 
+    // EncoderController : normalise la rotation/pression de l'encodeur (step/click/longPress)
+    EncoderController {
+        id: encoderController
+
+        onStep: function(delta) {
+            navigationManager.handleEncoderStep(delta)
+        }
+
+        onClicked: {
+            navigationManager.handleEncoderClick()
+        }
+
+        onLongPressed: {
+            navigationManager.handleEncoderLongPress()
+        }
+    }
+
+    // NavigationManager : route les événements encodeur vers les différentes zones de l'UI
+    NavigationManager {
+        id: navigationManager
+        configController: configController
+        adminPanel: adminPanel
+        testViewLoader: testViewLoader
+    }
+
     // WebSocketController : connexion Pd, messages 0x01/0x02/0x04, game mode
     WebSocketController {
         id: webSocketController
@@ -103,6 +128,7 @@ Window {
         }
 
         // Données binaires : 0x04 (séquence) → jeu, 0x02 (contrôleurs) → panneau, 0x01 (note) → portée
+        // Navigation encodeur : messages binaires 0x06 (value) et 0x07 (push) uniquement (séparés du binaire 0x02)
         onDataReceived: function(data) {
             if (data.isSequence) {
                 if (mainWindow.gameMode && testViewLoader.item && testViewLoader.item.gameModeItem) {
@@ -111,20 +137,38 @@ Window {
                 return
             }
             if (data.isControllersOnly) {
-                if (data.controllers && testViewLoader.item && testViewLoader.item.updateControllers) {
-                    testViewLoader.item.updateControllers(data.controllers)
+                if (data.controllers) {
+                    // Message binaire 0x02 : UNIQUEMENT pour l'affichage visuel des contrôleurs
+                    // (panneau Contrôleurs, indicateurs, GearShift, etc.)
+                    // Note: l'encodeur dans ce message est UNIQUEMENT pour l'affichage visuel
+                    // La navigation utilise les messages binaires 0x06 (value) et 0x07 (push) séparés
+                    if (testViewLoader.item && testViewLoader.item.updateControllers) {
+                        testViewLoader.item.updateControllers(data.controllers)
+                    }
+                }
+                return
+            }
+            if (data.isEncoderNavigation) {
+                // Messages binaires 0x06 (value) et 0x07 (push) : navigation de l'encodeur UNIQUEMENT (pas d'affichage visuel)
+                if (data.controllers && data.controllers.encoder && encoderController) {
+                    encoderController.updateFromControllers(data.controllers)
                 }
                 return
             }
             if (data.isVolantNote) {
                 sirenController.midiNote = data.midiNote
+                if (data.velocity !== undefined) sirenController.velocity = Math.max(0, Math.min(127, data.velocity))
                 return
             }
             if (data.midiNote !== undefined) {
                 sirenController.midiNote = data.midiNote
             }
-            if (data.controllers && testViewLoader.item && testViewLoader.item.updateControllers) {
-                testViewLoader.item.updateControllers(data.controllers)
+            if (data.controllers) {
+                // Mettre à jour la vue Test2D (indicateurs visuels, GearShift, ControllersPanel, etc.)
+                if (testViewLoader.item && testViewLoader.item.updateControllers) {
+                    testViewLoader.item.updateControllers(data.controllers)
+                }
+                // Note: la navigation de l'encodeur utilise les messages binaires 0x06 (value) et 0x07 (push) séparés (isEncoderNavigation)
             }
         }
 
@@ -135,10 +179,10 @@ Window {
             }
         }
 
-        // Valeur int16 calibration pad (affichée sous les boutons Calibrer PAD 1/2)
-        onPadCalibrationValueReceived: function(pad, value) {
-            if (testViewLoader.item && testViewLoader.item.setPadCalibrationDisplayValue)
-                testViewLoader.item.setPadCalibrationDisplayValue(pad, value)
+        // Valeurs int16 calibration pads (affichées sous les boutons), une seule structure [pad0, pad1]
+        onPadCalibrationValuesReceived: function(values) {
+            if (testViewLoader.item && testViewLoader.item.setPadCalibrationDisplayValues)
+                testViewLoader.item.setPadCalibrationDisplayValues(values)
         }
 
         // Config envoyée par Pd (pour info)
@@ -229,6 +273,7 @@ Window {
         z: 9999
         configController: configController
         webSocketController: webSocketController
+        adminFocusIndex: navigationManager.adminFocusIndex
 
         onClose: {
             adminPanel.visible = false

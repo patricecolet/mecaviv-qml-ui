@@ -10,6 +10,7 @@ QtObject {
     // Données d'entrée
     property real midiNote: 60.0
     property real clampedNote: 60.0
+    property int velocity: 127  // 0-127 (volant 0x03, ou jauge manuelle si pas de pad)
     
     // Données calculées
     property int frequency: 0

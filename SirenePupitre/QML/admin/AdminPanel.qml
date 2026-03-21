@@ -16,8 +16,26 @@ Item {
     
     onWebSocketControllerChanged: {
     }
-        // Test temporaire
-        
+
+    // Exposer le TabBar pour NavigationManager
+    property alias tabBar: tabBar
+
+    // Exposer visibilitySection pour NavigationManager (quand l'onglet Visibilité est actif)
+    readonly property var visibilitySection: (tabBar.currentIndex === 1 && tabContentLoader.item) ? tabContentLoader.item : null
+    // Exposer advancedSection pour NavigationManager (quand l'onglet Avancé est actif)
+    readonly property var advancedSection: (tabBar.currentIndex === 2 && tabContentLoader.item) ? tabContentLoader.item : null
+    // Exposer outputSection pour NavigationManager (quand l'onglet Sorties est actif)
+    readonly property var outputSection: (tabBar.currentIndex === 3 && tabContentLoader.item) ? tabContentLoader.item : null
+
+    // Focus encodeur dans le panneau Admin (géré par NavigationManager)
+    // Structure uniforme : 0 = TabBar, 1 = switch admin/restricted (toujours)
+    // Onglet "Sirènes" : 2 = siren select, 3 = note max, 4 = transposition
+    // Onglet "Visibilité" : 2 = menu latéral, 3+ = éléments dans la section
+    property int adminFocusIndex: -1
+
+    // Couleur de focus encodeur
+    readonly property color focusColor: "#00BFFF"
+    
     signal close()
 
     // Fond semi-transparent + bloqueur d'événements : empêche le ScrollView/Flickable
@@ -65,57 +83,68 @@ Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 40
                 
-                // Switch Mode Admin/Restricted
-                RowLayout {
-                    spacing: 10
-                    
-                    Text {
-                        text: "Mode:"
-                        color: "#bbb"
-                        font.pixelSize: 14
-                    }
-                    
-                    Switch {
-                        id: modeSwitch
-                        checked: configController ? configController.mode === "admin" : false
+                // Switch Mode Admin/Restricted — entouré d'un indicateur de focus (adminFocusIndex === 1)
+                Rectangle {
+                    Layout.preferredHeight: 40
+                    Layout.preferredWidth: modeSwitchRow.implicitWidth + 16
+                    color: "transparent"
+                    border.color: root.adminFocusIndex === 1 ? root.focusColor : "transparent"
+                    border.width: root.adminFocusIndex === 1 ? 2 : 0
+                    radius: 5
+
+                    RowLayout {
+                        id: modeSwitchRow
+                        anchors.centerIn: parent
+                        spacing: 10
                         
-                        onCheckedChanged: {
-                            if (configController) {
-                                var newMode = checked ? "admin" : "restricted"
-                                configController.setMode(newMode)
-                            }
+                        Text {
+                            text: "Mode:"
+                            color: root.adminFocusIndex === 1 ? root.focusColor : "#bbb"
+                            font.pixelSize: 14
                         }
                         
-                        indicator: Rectangle {
-                            implicitWidth: 50
-                            implicitHeight: 25
-                            x: modeSwitch.leftPadding
-                            y: parent.height / 2 - height / 2
-                            radius: 12.5
-                            color: modeSwitch.checked ? "#FFD700" : "#444"
-                            border.color: modeSwitch.checked ? "#FFD700" : "#666"
+                        Switch {
+                            id: modeSwitch
+                            checked: configController ? configController.mode === "admin" : false
                             
-                            Rectangle {
-                                x: modeSwitch.checked ? parent.width - width - 2 : 2
-                                width: 21
-                                height: 21
-                                radius: 10.5
-                                color: "white"
-                                border.color: "#ccc"
-                                anchors.verticalCenter: parent.verticalCenter
+                            onCheckedChanged: {
+                                if (configController) {
+                                    var newMode = checked ? "admin" : "restricted"
+                                    configController.setMode(newMode)
+                                }
+                            }
+                            
+                            indicator: Rectangle {
+                                implicitWidth: 50
+                                implicitHeight: 25
+                                x: modeSwitch.leftPadding
+                                y: parent.height / 2 - height / 2
+                                radius: 12.5
+                                color: modeSwitch.checked ? "#FFD700" : "#444"
+                                border.color: modeSwitch.checked ? "#FFD700" : "#666"
                                 
-                                Behavior on x {
-                                    NumberAnimation { duration: 200 }
+                                Rectangle {
+                                    x: modeSwitch.checked ? parent.width - width - 2 : 2
+                                    width: 21
+                                    height: 21
+                                    radius: 10.5
+                                    color: "white"
+                                    border.color: "#ccc"
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    
+                                    Behavior on x {
+                                        NumberAnimation { duration: 200 }
+                                    }
                                 }
                             }
                         }
-                    }
-                    
-                    Text {
-                        text: modeSwitch.checked ? "ADMIN" : "RESTRICTED"
-                        color: modeSwitch.checked ? "#FFD700" : "#888"
-                        font.pixelSize: 12
-                        font.bold: true
+                        
+                        Text {
+                            text: modeSwitch.checked ? "ADMIN" : "RESTRICTED"
+                            color: modeSwitch.checked ? "#FFD700" : "#888"
+                            font.pixelSize: 12
+                            font.bold: true
+                        }
                     }
                 }
                 
@@ -144,13 +173,16 @@ Item {
                 }
             }
             
-            // Onglets qui prennent toute la largeur
+            // Onglets qui prennent toute la largeur — indicateur de focus (adminFocusIndex === 0)
             TabBar {
                 id: tabBar
                 Layout.fillWidth: true
                 
                 background: Rectangle {
                     color: "#0a0a0a"
+                    border.color: root.adminFocusIndex === 0 ? root.focusColor : "transparent"
+                    border.width: root.adminFocusIndex === 0 ? 2 : 0
+                    radius: 5
                 }
                 
                 TabButton {
@@ -235,14 +267,22 @@ Item {
                 }
             }
 
-            // Boutons sirènes : même niveau que le TabBar (pas dans le Loader) pour que le touch marche comme les onglets.
-            RowLayout {
+            // Boutons sirènes — indicateur de focus (adminFocusIndex === 2)
+            Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 50
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                spacing: 8
+                Layout.preferredHeight: 54
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                color: "transparent"
+                border.color: root.adminFocusIndex === 2 ? root.focusColor : "transparent"
+                border.width: root.adminFocusIndex === 2 ? 2 : 0
+                radius: 5
                 visible: tabBar.currentIndex === 0
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 2
+                spacing: 8
 
                 Repeater {
                     model: configController && configController.config && configController.config.sirenConfig
@@ -287,6 +327,7 @@ Item {
 
                 Item { Layout.fillWidth: true }
             }
+            }  // fin Rectangle focus siren select
             
             // Contenu des onglets (chemins explicites pour fonctionner depuis Main ou Test2D).
             // Ne charger que quand le panneau est visible pour que le 1er onglet s'affiche tout de suite.
@@ -301,6 +342,13 @@ Item {
                         item.configController = root.configController
                         if (item.hasOwnProperty("webSocketController")) {
                             item.webSocketController = root.webSocketController
+                        }
+                        // Passer le focus encodeur pour note max et transposition
+                        if (item.hasOwnProperty("adminFocusIndex")) {
+                            item.adminFocusIndex = Qt.binding(function() { return root.adminFocusIndex })
+                        }
+                        if (item.hasOwnProperty("focusColor")) {
+                            item.focusColor = Qt.binding(function() { return root.focusColor })
                         }
                     }
                 }

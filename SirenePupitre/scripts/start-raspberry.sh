@@ -240,8 +240,23 @@ start_pulseaudio() {
         fi
     fi
     
+    # Attendre que le sink HiFiBerry soit disponible (jusqu'à 10 secondes)
+    local sink_name="alsa_output.platform-soc_107c000000_sound.stereo-fallback"
+    local max_attempts=20
+    local attempt=0
+    
+    echo "$(date): Attente du sink HiFiBerry..."
+    while [ $attempt -lt $max_attempts ]; do
+        if pactl list sinks short 2>/dev/null | grep -q "$sink_name"; then
+            echo "$(date): ✅ Sink HiFiBerry trouvé"
+            break
+        fi
+        sleep 0.5
+        attempt=$((attempt + 1))
+    done
+    
     # S'assurer que la HifiBerry est la sortie par défaut
-    pactl set-default-sink alsa_output.platform-soc_107c000000_sound.stereo-fallback 2>/dev/null
+    pactl set-default-sink "$sink_name" 2>/dev/null
     
     # Afficher la sortie configurée
     local default_sink=$(pactl get-default-sink 2>/dev/null)
@@ -266,13 +281,29 @@ start_composesiren() {
     fi
 }
 
+# Fonction pour configurer les GPIO de l'encodeur rotatif
+# GPIO 15 = switch (bouton poussoir), GPIO 22 = Line A, GPIO 24 = Line B
+configure_encoder_gpio() {
+    echo "$(date): 🔧 Configuration GPIO encodeur (15/22/24)..."
+    
+    if command -v pinctrl >/dev/null 2>&1; then
+        if sudo pinctrl set 15 pu && sudo pinctrl set 22 pu && sudo pinctrl set 24 pu; then
+            echo "$(date): ✅ Pull-ups configurés sur GPIO 15 (switch), 22 (A), 24 (B)"
+        else
+            echo "$(date): ⚠️ Échec configuration pull-ups encodeur"
+        fi
+    else
+        echo "$(date): ⚠️ pinctrl introuvable (Pi 4/5 requis pour GPIO encodeur)"
+    fi
+}
+
 # Fonction pour configurer le volume
 set_volume() {
     echo "$(date): Configuration du volume..."
     
     if command -v amixer >/dev/null 2>&1; then
-        amixer set Master 60% > /dev/null 2>&1
-        echo "$(date): ✅ Volume configuré à 60%"
+        amixer -c 0 set Master 100% > /dev/null 2>&1
+        echo "$(date): ✅ Volume configuré à 100%"
     else
         echo "$(date): ⚠️ amixer non disponible"
     fi
@@ -288,35 +319,37 @@ main() {
     # 2. Configurer le routage (WiFi prioritaire, Ethernet secondaire)
     configure_routing
     
-    # 3. Configurer le volume
+    # 3. Configurer les GPIO de l'encodeur rotatif (15=switch, 22=A, 24=B)
+    configure_encoder_gpio
+    
+    # 4. Configurer le volume
     set_volume
     
-    # 4. Démarrer PulseAudio (avant les autres processus audio)
+    # 5. Démarrer PulseAudio (avant les autres processus audio)
     start_pulseaudio
     
-    # 5. Arrêter les processus existants
+    # 6. Arrêter les processus existants
     stop_processes
     
-    # 6. Démarrer les services
+    # 7. Démarrer les services
     start_server
     start_puredata
     
     # 8. Démarrer ComposeSiren
     start_composesiren
-    # 7. Démarrer le navigateur
+    # 9. Démarrer le navigateur
     start_browser
     
-    
-    # 9. Afficher les informations
+    # 10. Afficher les informations
     local ip=$(get_configured_ip)
     echo "$(date): ✅ Application démarrée!"
     echo "$(date): 🌐 IP: $ip"
     echo "$(date): 🌐 Serveur: http://$ip:8000"
     echo "$(date): 🎵 PureData: ALSA MIDI device 1"
     echo "$(date): 🎹 ComposeSiren: actif avec HifiBerry DAC"
-    echo "$(date): 🔊 Volume: 60%"
+    echo "$(date): 🔊 Volume: 100%"
     
-    # 10. Garder le script en vie
+    # 11. Garder le script en vie
     while true; do
         sleep 60
     done
