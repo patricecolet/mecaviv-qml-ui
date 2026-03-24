@@ -27,6 +27,9 @@ ColumnLayout {
         return root.viewModel.midiAnchor + root.viewModel.targetCents / 100.0
     }
 
+    readonly property real glissTargetMidiFloat: root.viewModel ? root.viewModel.glissTargetMidi : -1
+    readonly property bool hasGlissTarget: root.glissTargetMidiFloat >= 0
+
     Item {
         Layout.fillWidth: true
         Layout.preferredHeight: 8
@@ -58,19 +61,46 @@ ColumnLayout {
                 targetCents: root.viewModel ? root.viewModel.targetCents : 0
                 currentCents: root.viewModel ? root.viewModel.currentCents : 0
                 rangeCents: 100
+                glissTargetCents: root.hasGlissTarget
+                    ? (root.glissTargetMidiFloat - (root.viewModel ? root.viewModel.midiAnchor : 69)) * 100.0
+                    : NaN
             }
         }
 
         Column {
             Layout.alignment: Qt.AlignVCenter
             spacing: 2
+
+            // Note de départ (consigne courante)
             Text {
                 text: mu.midiToNoteName(Math.round(root.midiFloat))
                 color: "#FFD700"
-                font.pixelSize: 44
+                font.pixelSize: root.hasGlissTarget ? 32 : 44
                 font.bold: true
                 font.family: "monospace"
             }
+
+            // Note d'arrivée du glissando
+            Row {
+                visible: root.hasGlissTarget
+                spacing: 4
+                Text {
+                    text: "\u2192"
+                    color: "#4ade80"
+                    font.pixelSize: 22
+                    font.bold: true
+                    font.family: "monospace"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    text: root.hasGlissTarget ? mu.midiToNoteName(Math.round(root.glissTargetMidiFloat)) : ""
+                    color: "#4ade80"
+                    font.pixelSize: 32
+                    font.bold: true
+                    font.family: "monospace"
+                }
+            }
+
             MicrotonalCentsReadout {
                 cents: root.viewModel ? root.viewModel.targetCents : 0
                 showDeltaLabel: false

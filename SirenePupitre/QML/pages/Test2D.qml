@@ -13,7 +13,8 @@ Page {
     property color accentColor: '#d1ab00'
     property color backgroundColor: "#1a1a1a"
     property bool uiControlsEnabled: true
-    property bool isGamePlaying: false
+    /** Aligné sur Main : fin de séquence Pd (0x01 playing=false) met à jour rootWindow.isGamePlaying. */
+    readonly property bool isGamePlaying: root.rootWindow ? root.rootWindow.isGamePlaying : false
     property var rootWindow: null  // Main : pour lire gameMode2D (binding)
     property var setGameMode2D: null  // Callback Main pour écrire gameMode2D (plus fiable que rootWindow en écriture)
     property bool gameMode: rootWindow ? rootWindow.gameMode : false  // Mode jeu (seule vue)
@@ -40,6 +41,21 @@ Page {
     MicrotonalViewModel {
         id: microtonalVm
         onMidiAnchorChanged: root.syncMicrotonalCurrentCentsFromPitch()
+    }
+
+    /** Fin de séquence côté Pd : isGamePlaying passe à false sans clic Stop — couper aussi le transport UI. */
+    Connections {
+        target: root.rootWindow
+        enabled: root.rootWindow !== null
+        function onIsGamePlayingChanged() {
+            if (!root.rootWindow || root.rootWindow.isGamePlaying)
+                return
+            if (!root.transportDisplayActive)
+                return
+            root.transportDisplayActive = false
+            root.transportPlayRequestedAtMs = -1
+            root.transportClockNowMs = 0
+        }
     }
 
     Binding {
@@ -99,6 +115,46 @@ Page {
         microtonalVm.currentCents = (note - anchor) * 100.0
     }
 
+    /** Play/Stop transport : même logique que le bouton overlay mode jeu (WebSocket + état Main). */
+    function toggleTransportPlayStop() {
+        if (!root.webSocketController)
+            return
+        var playing = root.rootWindow && root.rootWindow.isGamePlaying
+        var newPlaying = !playing
+        if (newPlaying) {
+            if (root.rootWindow) {
+                root.rootWindow.userRequestedStop = false
+                root.rootWindow.isGamePlaying = true
+            }
+            root.transportPlayRequestedAtMs = Date.now()
+            root.transportClockNowMs = root.transportPlayRequestedAtMs
+            if (gameModeOverlay && gameModeOverlay.sequencerController)
+                gameModeOverlay.sequencerController.startFromZero()
+            if (root._gameModeItem && typeof root._gameModeItem.startGame === "function")
+                root._gameModeItem.startGame()
+            root.transportDisplayActive = true
+            root.webSocketController.sendBinaryMessage({
+                type: "MIDI_TRANSPORT",
+                action: "play",
+                midiDelayMs: root.midiTransportDelayMs,
+                source: "pupitre"
+            })
+        } else {
+            root.transportDisplayActive = false
+            root.transportPlayRequestedAtMs = -1
+            root.transportClockNowMs = 0
+            root.webSocketController.sendBinaryMessage({
+                type: "MIDI_TRANSPORT",
+                action: "stop",
+                source: "pupitre"
+            })
+            if (root.rootWindow) {
+                root.rootWindow.userRequestedStop = true
+                root.rootWindow.isGamePlaying = false
+            }
+        }
+    }
+
     // Note à afficher sur la portée (mode jeu : clampedNote ; Pd peut envoyer la note courante plus tard)
     property real displayNoteForStaff: root.clampedNote
 
@@ -144,6 +200,65 @@ Page {
 
     // Affichage mesure/temps : n’afficher les valeurs qu’une fois Pd lancé (après fallingTime), pas avant
     property bool transportDisplayActive: false
+    /** Pré-roll entre Play et démarrage réel de la séquence Pd. */
+    property int midiTransportDelayMs: 5000
+    property real transportPlayRequestedAtMs: 0
+    property real transportClockNowMs: 0
+    readonly property bool transportInNegativeAnticipation: {
+        if (!root.transportDisplayActive || !root.rootWindow || !root.rootWindow.isGamePlaying)
+            return false
+        if (root.transportPlayRequestedAtMs <= 0)
+            return false
+        return (root.transportClockNowMs - root.transportPlayRequestedAtMs) < root.midiTransportDelayMs
+    }
+    readonly property real transportAnticipationRemainingMs: root.transportInNegativeAnticipation
+            ? Math.max(0, root.midiTransportDelayMs - (root.transportClockNowMs - root.transportPlayRequestedAtMs))
+            : 0
+    readonly property real transportAnticipationRemainingBeats: {
+        var bpm = (sequencerController && isFinite(sequencerController.currentTempoBpm) && sequencerController.currentTempoBpm > 0)
+                ? sequencerController.currentTempoBpm : 120
+        return root.transportAnticipationRemainingMs * bpm / 60000.0
+    }
+    readonly property real transportPositiveElapsedMs: {
+        if (!root.transportDisplayActive || !root.rootWindow || !root.rootWindow.isGamePlaying)
+            return 0
+        if (root.transportPlayRequestedAtMs <= 0)
+            return 0
+        return Math.max(0, (root.transportClockNowMs - root.transportPlayRequestedAtMs) - root.midiTransportDelayMs)
+    }
+    readonly property real transportPositiveGlobalBeat: {
+        var bpm = (sequencerController && isFinite(sequencerController.currentTempoBpm) && sequencerController.currentTempoBpm > 0)
+                ? sequencerController.currentTempoBpm : 120
+        return 1 + (root.transportPositiveElapsedMs * bpm / 60000.0)
+    }
+    readonly property int transportPositiveBarInt: Math.max(1, Math.floor((root.transportPositiveGlobalBeat - 1) / root.transportBeatsPerBarDisplay) + 1)
+    readonly property int transportPositiveBeatInBarInt: Math.max(1, (Math.floor(root.transportPositiveGlobalBeat - 1) % root.transportBeatsPerBarDisplay) + 1)
+    readonly property int transportBeatsPerBarDisplay: 4
+    readonly property int transportAnticipationRemainingBeatsInt: Math.max(0, Math.ceil(root.transportAnticipationRemainingBeats - 1e-6))
+    readonly property int transportAnticipationRemainingBarsInt: Math.max(0, Math.ceil(root.transportAnticipationRemainingBeatsInt / root.transportBeatsPerBarDisplay))
+    readonly property color transportValueColor: root.transportInNegativeAnticipation ? "#ff9f43" : "#fff"
+    readonly property string transportMeasureDisplayText: {
+        if (!root.transportDisplayActive || !sequencerController)
+            return "— / —"
+        if (root.transportInNegativeAnticipation)
+            return "-" + root.transportAnticipationRemainingBarsInt + " / —"
+        return root.transportPositiveBarInt + " / " + (sequencerController.totalBars > 0 ? sequencerController.totalBars : "—")
+    }
+    readonly property string transportTimeDisplayText: {
+        if (!root.transportDisplayActive || !sequencerController)
+            return "— / —"
+        if (root.transportInNegativeAnticipation)
+            return "-" + root.transportAnticipationRemainingBeatsInt + " / " + root.transportBeatsPerBarDisplay
+        return root.transportPositiveBeatInBarInt + " / " + root.transportBeatsPerBarDisplay
+    }
+
+    Timer {
+        id: transportAnticipationTimer
+        interval: 50
+        repeat: true
+        running: root.transportDisplayActive && root.rootWindow && root.rootWindow.isGamePlaying
+        onTriggered: root.transportClockNowMs = Date.now()
+    }
 
     onGameModeChanged: {
         if (root.gameMode) {
@@ -163,11 +278,15 @@ Page {
             }
             root._wasPlayingWhenLeaving = false
             root.transportDisplayActive = false
+            root.transportPlayRequestedAtMs = 0
+            root.transportClockNowMs = 0
             root.gameModeFocusIndex = 0
         } else {
             root._wasPlayingWhenLeaving = root.rootWindow ? root.rootWindow.isGamePlaying : false
             root._gameModeItem = null
             root.transportDisplayActive = false
+            root.transportPlayRequestedAtMs = 0
+            root.transportClockNowMs = 0
         }
         root.syncMicrotonalSubMode()
         root.ensureFrettedModeDisabledInMicrotonalGame()
@@ -383,7 +502,7 @@ Page {
                         }
                     }
                 }
-                onTogglePlayStop: root.isGamePlaying = !root.isGamePlaying
+                onTogglePlayStop: root.toggleTransportPlayStop()
                 onAdminClicked: if (root.openAdminPanel) root.openAdminPanel()
             }
         }
@@ -454,7 +573,9 @@ Page {
                 showProgressBar: false
                 showCursor: true
                 showMicrotonalTargetMarker: true
-                microtonalTargetMidi: microtonalVm.midiAnchor + microtonalVm.targetCents / 100.0
+                microtonalTargetMidi: (microtonalVm.glissTargetMidi >= 0)
+                    ? microtonalVm.glissTargetMidi
+                    : microtonalVm.midiAnchor + microtonalVm.targetCents / 100.0
             }
 
             // Zone bas-droite : microtonal -> Options/Morceaux ; sinon toggles affichage
@@ -616,40 +737,7 @@ Page {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (root.webSocketController) {
-                            var playing = root.rootWindow && root.rootWindow.isGamePlaying
-                            var newPlaying = !playing
-                            if (newPlaying) {
-                                if (root.rootWindow) {
-                                    root.rootWindow.userRequestedStop = false
-                                    root.rootWindow.isGamePlaying = true
-                                }
-                                if (sequencerController)
-                                    sequencerController.startFromZero()
-                                if (root._gameModeItem && typeof root._gameModeItem.startGame === "function")
-                                    root._gameModeItem.startGame()
-                                root.transportDisplayActive = true
-                                root.webSocketController.sendBinaryMessage({
-                                    type: "MIDI_TRANSPORT",
-                                    action: "play",
-                                    midiDelayMs: 5000,
-                                    source: "pupitre"
-                                })
-                            } else {
-                                root.transportDisplayActive = false
-                                root.webSocketController.sendBinaryMessage({
-                                    type: "MIDI_TRANSPORT",
-                                    action: "stop",
-                                    source: "pupitre"
-                                })
-                                if (root.rootWindow) {
-                                    root.rootWindow.userRequestedStop = true
-                                    root.rootWindow.isGamePlaying = false
-                                }
-                            }
-                        }
-                    }
+                    onClicked: root.toggleTransportPlayStop()
                 }
                 Column {
                     anchors.centerIn: parent
@@ -742,10 +830,8 @@ Page {
                             spacing: 8
                             Text { text: "Mesure"; color: "#888"; font.pixelSize: 9; width: 44 }
                             Text {
-                                text: root.transportDisplayActive && sequencerController
-                                    ? (sequencerController.positionDisplayText + " / " + (sequencerController.totalBars > 0 ? sequencerController.totalBars : "—"))
-                                    : "— / —"
-                                color: "#fff"
+                                text: root.transportMeasureDisplayText
+                                color: root.transportValueColor
                                 font.pixelSize: 12
                                 font.bold: true
                             }
@@ -754,10 +840,8 @@ Page {
                             spacing: 8
                             Text { text: "Temps"; color: "#888"; font.pixelSize: 9; width: 44 }
                             Text {
-                                text: root.transportDisplayActive && sequencerController
-                                    ? (sequencerController.currentTimeDisplay + " / " + sequencerController.totalTimeDisplay)
-                                    : "— / —"
-                                color: "#fff"
+                                text: root.transportTimeDisplayText
+                                color: root.transportValueColor
                                 font.pixelSize: 12
                             }
                         }
@@ -946,5 +1030,8 @@ Page {
         configController: root.configController
         useMicrotonalDisplay: root.useMicrotonalDisplay
         subMode: microtonalVm.subMode
+        playRequestedAtMs: root.transportPlayRequestedAtMs
+        transportDelayMs: root.midiTransportDelayMs
+        transportRunActive: root.transportDisplayActive
     }
 }

@@ -19,6 +19,12 @@ Item {
 
     property bool useMicrotonalDisplay: false
     property int subMode: 0
+    /** Horodatage du clic Play côté UI (ms epoch). */
+    property real playRequestedAtMs: 0
+    /** Pré-roll UI/transport en ms avant démarrage effectif des consignes. */
+    property int transportDelayMs: 0
+    /** true tant que l’UI considère le transport actif (stop immédiat côté pupitre). */
+    property bool transportRunActive: false
 
     /** Si 1–16, surcharge le canal ; 0 = sirène courante (config) */
     property int midiChannelFilter: 0
@@ -56,8 +62,55 @@ Item {
     property int _lastActiveIdx: -2
     property int _lastActiveBarIdx: -2
     property bool _didLogFirstTick: false
+    property bool _tickOffsetLocked: false
+    property real _tickOffset: 0
+    property bool _barOffsetLocked: false
+    property real _barOffsetBeats: 0
 
     readonly property real _anticipationWindowMs: 5000
+
+    function _resetTransportOffsets() {
+        root._tickOffsetLocked = false
+        root._tickOffset = 0
+        root._barOffsetLocked = false
+        root._barOffsetBeats = 0
+    }
+
+    function _effectiveTickFromTransport(playing, tick) {
+        var runGate = root.transportRunActive || root.playRequestedAtMs <= 0
+        if (!playing || !runGate) {
+            root._resetTransportOffsets()
+            return tick
+        }
+        var delay = root.transportDelayMs > 0 ? root.transportDelayMs : 0
+        if (root.playRequestedAtMs <= 0)
+            return tick
+        var elapsedMs = Math.max(0, Date.now() - root.playRequestedAtMs)
+        var bpm = root._bpm()
+        var ppq = root._ppq > 0 ? root._ppq : 480
+        var msPerTick = 60000 / (bpm * ppq)
+        // Horloge unique avant/après t=0 : vitesse parfaitement continue.
+        return (elapsedMs - delay) / msPerTick
+    }
+
+    function _effectiveBarBeatFromTransport(playing, bar, beatF, beatsPerBar) {
+        var runGate = root.transportRunActive || root.playRequestedAtMs <= 0
+        if (!playing || !runGate) {
+            root._resetTransportOffsets()
+            return { bar: bar, beat: beatF }
+        }
+        var bpb = (typeof beatsPerBar === "number" && beatsPerBar > 0) ? beatsPerBar : 4
+        var delay = root.transportDelayMs > 0 ? root.transportDelayMs : 0
+        if (root.playRequestedAtMs <= 0)
+            return { bar: bar, beat: beatF }
+        var elapsedMs = Math.max(0, Date.now() - root.playRequestedAtMs)
+        var bpm = root._bpm()
+        var msPerBeat = 60000 / bpm
+        var ge = (elapsedMs - delay) / msPerBeat
+        var barEff = Math.floor(ge / bpb) + 1
+        var beatEff = ge - (barEff - 1) * bpb + 1
+        return { bar: barEff, beat: beatEff }
+    }
 
     function _normalizeGliss(v) {
         if (typeof v === "number" && v >= 0 && v <= 4 && Math.floor(v) === v)
@@ -99,37 +152,71 @@ Item {
     function applyVisualOnly(vm, data) {
         if (!vm || !data)
             return
-        if (data.midiAnchor !== undefined && typeof data.midiAnchor === "number") {
-            vm.midiAnchor = data.midiAnchor
-            if (data.targetCents !== undefined && typeof data.targetCents === "number")
-                vm.targetCents = data.targetCents
-        } else if (data.targetFrequencyHz !== undefined && typeof data.targetFrequencyHz === "number") {
-            var ac = root._hzToAnchorCents(data.targetFrequencyHz)
+        var ma = root._asFiniteNumber(data.midiAnchor)
+        var tc = root._asFiniteNumber(data.targetCents)
+        var hz = root._asFiniteNumber(data.targetFrequencyHz)
+        if (isFinite(ma)) {
+            vm.midiAnchor = ma
+            if (isFinite(tc))
+                vm.targetCents = tc
+            else if (isFinite(hz) && hz > 0) {
+                var mf = root._midiFromHz(hz)
+                vm.targetCents = isFinite(mf) ? (mf - ma) * 100.0 : 0
+            } else
+                vm.targetCents = 0
+        } else if (isFinite(hz) && hz > 0) {
+            var ac = root._hzToAnchorCents(hz)
             vm.midiAnchor = ac.anchor
             vm.targetCents = ac.cents
-        } else if (data.targetCents !== undefined && typeof data.targetCents === "number") {
-            vm.targetCents = data.targetCents
+        } else if (isFinite(tc)) {
+            vm.targetCents = tc
         }
         if (data.glissSpeed !== undefined)
             vm.glissSpeed = root._normalizeGliss(data.glissSpeed)
-        if (data.voletOpen !== undefined && typeof data.voletOpen === "number")
-            vm.voletOpen = Math.max(0, Math.min(1, data.voletOpen))
+
+        // Note cible du glissando
+        var gs2 = root._asFiniteNumber(data.glissSpeed)
+        var gtc = root._asFiniteNumber(data.glissTargetCents)
+        var gthz = root._asFiniteNumber(data.glissTargetFrequencyHz)
+        var centsNow = isFinite(root._asFiniteNumber(data.targetCents)) ? root._asFiniteNumber(data.targetCents) : 0
+        var glissDelta = isFinite(gtc) ? Math.abs(gtc - centsNow) : 0
+        if (isFinite(gs2) && gs2 > 0 && glissDelta > 3.0) {
+            var gtMidi = -1
+            if (isFinite(gthz) && gthz > 0) {
+                gtMidi = root._midiFromHz(gthz)
+            } else if (isFinite(root._asFiniteNumber(data.midiAnchor)) && isFinite(gtc)) {
+                gtMidi = root._asFiniteNumber(data.midiAnchor) + gtc / 100.0
+            }
+            vm.glissTargetMidi = (isFinite(gtMidi) && gtMidi >= 0) ? gtMidi : -1
+        } else {
+            vm.glissTargetMidi = -1
+        }
+
+        if (data.voletOpen !== undefined) {
+            var vo = root._asFiniteNumber(data.voletOpen)
+            if (isFinite(vo))
+                vm.voletOpen = Math.max(0, Math.min(1, vo))
+        }
         if (data.phase !== undefined && typeof data.phase === "number")
             vm.phase = data.phase
         if (data.harmonicIndex !== undefined && typeof data.harmonicIndex === "number")
             vm.harmonicIndex = data.harmonicIndex
         if (data.partialLabel !== undefined)
             vm.partialLabel = String(data.partialLabel)
-        if (data.currentCents !== undefined && typeof data.currentCents === "number")
-            vm.currentCents = data.currentCents
+        if (data.currentCents !== undefined) {
+            var cc = root._asFiniteNumber(data.currentCents)
+            if (isFinite(cc))
+                vm.currentCents = cc
+        }
     }
 
     /** Mode dirigé ou rafraîchissement complet : inclut le texte */
     function applyPayload(vm, data) {
         if (!vm || !data)
             return
-        if (data.text !== undefined)
-            vm.appendCueTextLine(String(data.text))
+        var line = root.cueDisplayText(data)
+        if (line !== "")
+            vm.appendCueTextLine(line)
         applyVisualOnly(vm, data)
     }
 
@@ -203,33 +290,165 @@ Item {
         }
     }
 
+    /** Nombre JSON fiable (Qt/QML peut exposer des nombres en string selon la chaîne de parse). */
+    function _asFiniteNumber(x) {
+        if (x === undefined || x === null)
+            return NaN
+        if (typeof x === "number")
+            return isFinite(x) ? x : NaN
+        if (typeof x === "string" && x.trim() !== "") {
+            var n = Number(x)
+            return isFinite(n) ? n : NaN
+        }
+        return NaN
+    }
+
+    function _midiFromHz(hz) {
+        if (typeof hz !== "number" || !isFinite(hz) || hz <= 0)
+            return NaN
+        return 69.0 + 12.0 * (Math.log(hz / 440.0) / Math.LN2)
+    }
+
+    function _centsDisplayTrunc(cents) {
+        if (typeof cents !== "number" || !isFinite(cents))
+            return 0
+        if (cents >= 0)
+            return Math.floor(cents)
+        return Math.ceil(cents)
+    }
+
+    function _frenchNoteNameFromMidi(midiFloat) {
+        var n = Math.round(midiFloat)
+        if (n < 0)
+            n = 0
+        if (n > 127)
+            n = 127
+        var names = ["Do", "Do#", "Ré", "Ré#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"]
+        var pc = n % 12
+        var oct = Math.floor(n / 12) - 1
+        return names[pc] + oct
+    }
+
+    /** Décalage d'affichage (en demi-tons) issu de la config sirène. */
+    function _displayOctaveOffsetSemitones() {
+        var o = NaN
+        if (root.configController && root.configController.primarySiren
+                && root.configController.primarySiren.displayOctaveOffset !== undefined) {
+            o = root._asFiniteNumber(root.configController.primarySiren.displayOctaveOffset)
+        } else if (root.configController && root.configController.currentSirenInfo
+                && root.configController.currentSirenInfo.displayOctaveOffset !== undefined) {
+            o = root._asFiniteNumber(root.configController.currentSirenInfo.displayOctaveOffset)
+        }
+        if (!isFinite(o))
+            return 0
+        return Math.round(o) * 12
+    }
+
+    function _displayMidi(midiFloat) {
+        if (!isFinite(midiFloat))
+            return midiFloat
+        return midiFloat + root._displayOctaveOffsetSemitones()
+    }
+
+    /** Texte consigne : départ et cible du glissando. */
+    function cueDisplayText(c) {
+        if (!c)
+            return ""
+        var ma = root._asFiniteNumber(c.midiAnchor)
+        var tcRaw = root._asFiniteNumber(c.targetCents)
+        var hzNum = root._asFiniteNumber(c.targetFrequencyHz)
+
+        // Note de départ (anchor + bend au note-on)
+        var midiStart = NaN
+        if (isFinite(hzNum) && hzNum > 0)
+            midiStart = root._midiFromHz(hzNum)
+        if (!isFinite(midiStart) && isFinite(ma))
+            midiStart = ma + (isFinite(tcRaw) ? tcRaw : 0) / 100.0
+        if (!isFinite(midiStart))
+            return c.text !== undefined ? String(c.text) : ""
+
+        var gs = root._asFiniteNumber(c.glissSpeed)
+        if (!isFinite(gs)) gs = 0
+
+        var centsStart = isFinite(tcRaw) ? tcRaw : (isFinite(ma) ? (midiStart - ma) * 100.0 : 0)
+        var midiStartDisplay = root._displayMidi(midiStart)
+        var noteFrStart = root._frenchNoteNameFromMidi(midiStartDisplay)
+        var nStart = Math.round(midiStartDisplay)
+        var ct = root._centsDisplayTrunc(centsStart)
+        var ctStr = ct > 0 ? ("+" + ct + "ct") : (ct < 0 ? (String(ct) + "ct") : "0ct")
+
+        var track = (c.sirenTrackName !== undefined && c.sirenTrackName !== null) ? String(c.sirenTrackName) : "?"
+        var vel = 127
+        if (c.text !== undefined) {
+            var m = String(c.text).match(/vel\.(\d+)/)
+            if (m) vel = parseInt(m[1], 10)
+        }
+        var vo = root._asFiniteNumber(c.voletOpen)
+        if (!isFinite(vo)) vo = 0
+
+        var glissDeltaCents = Math.abs(root._asFiniteNumber(c.glissTargetCents) - centsStart)
+        if (gs > 0 && glissDeltaCents > 3.0) {
+            // Glissando : note d'arrivée = bend à la fin de la note
+            var gtcRaw = root._asFiniteNumber(c.glissTargetCents)
+            var gtHz = root._asFiniteNumber(c.glissTargetFrequencyHz)
+            var midiEnd = NaN
+            if (isFinite(gtHz) && gtHz > 0)
+                midiEnd = root._midiFromHz(gtHz)
+            if (!isFinite(midiEnd) && isFinite(ma) && isFinite(gtcRaw))
+                midiEnd = ma + gtcRaw / 100.0
+
+            if (isFinite(midiEnd)) {
+                var midiEndDisplay = root._displayMidi(midiEnd)
+                var noteFrEnd = root._frenchNoteNameFromMidi(midiEndDisplay)
+                var nEnd = Math.round(midiEndDisplay)
+                var centsEnd = isFinite(gtcRaw) ? gtcRaw
+                                                : (isFinite(ma) ? (midiEnd - ma) * 100.0 : 0)
+                var ctEnd = root._centsDisplayTrunc(centsEnd)
+                var ctEndStr = ctEnd > 0 ? ("+" + ctEnd + "ct") : (ctEnd < 0 ? (String(ctEnd) + "ct") : "0ct")
+                var hzStart = (isFinite(hzNum) && hzNum > 0) ? Math.round(hzNum) : 0
+                var hzEnd = (isFinite(gtHz) && gtHz > 0) ? Math.round(gtHz) : 0
+                return track + " " + noteFrStart + " (n" + nStart + ") " + ctStr
+                        + " → " + noteFrEnd + " (n" + nEnd + ") " + ctEndStr
+                        + "  vel." + vel + "  " + hzStart + "→" + hzEnd + "hz"
+                        + "  gliss:" + gs + "  volet: " + vo.toFixed(1)
+            }
+        }
+
+        var hz = (isFinite(hzNum) && hzNum > 0) ? Math.round(hzNum) : 0
+        return track + " " + noteFrStart + " (n" + nStart + ") " + ctStr + "  vel." + vel
+                + "  ->  " + hz + "hz  gliss:" + gs + "  volet: " + vo.toFixed(1)
+    }
+
     /** Affichage humain : mesure, temps, tick (transport toujours en ticks). */
     function _formatCueRowDisplay(c) {
         var measureStr = "—"
-        if (c.bar !== undefined && typeof c.bar === "number") {
-            var b = c.beatInBar !== undefined && typeof c.beatInBar === "number"
-                    ? c.beatInBar
-                    : 1
+        var barN = root._asFiniteNumber(c.bar)
+        if (isFinite(barN)) {
+            var b = root._asFiniteNumber(c.beatInBar)
+            if (!isFinite(b))
+                b = 1
             var beatStr = (Math.abs(b - Math.floor(b)) < 1e-4)
                     ? String(Math.floor(b))
                     : b.toFixed(1)
-            measureStr = "m" + Math.floor(c.bar) + "." + beatStr
+            measureStr = "m" + Math.floor(barN) + "." + beatStr
         }
         var timeStr = "—"
-        if (typeof c.tMs === "number" && isFinite(c.tMs)) {
-            var ms = c.tMs
+        var tms = root._asFiniteNumber(c.tMs)
+        if (isFinite(tms)) {
+            var ms = tms
             var totalS = Math.floor(ms / 1000)
             var mm = Math.floor(totalS / 60)
             var s = totalS % 60
             var frac = Math.floor((ms % 1000) / 100)
             timeStr = mm + ":" + (s < 10 ? "0" : "") + s + "." + frac
         }
-        var tickStr = (c.tick !== undefined && typeof c.tick === "number") ? String(c.tick) : "—"
+        var tickN = root._asFiniteNumber(c.tick)
+        var tickStr = isFinite(tickN) ? String(tickN) : "—"
         return {
             measure: measureStr,
             time: timeStr,
             tick: tickStr,
-            text: c.text !== undefined ? String(c.text) : "",
+            text: root.cueDisplayText(c),
         }
     }
 
@@ -291,16 +510,18 @@ Item {
         if (root._tickCues.length > 0) {
             var c0 = root._tickCues[0]
             root.applyVisualOnly(vm, c0)
-            if (c0.text !== undefined)
-                vm.appendCueTextLine(String(c0.text))
+            var line0 = root.cueDisplayText(c0)
+            if (line0 !== "")
+                vm.appendCueTextLine(line0)
             root._lastActiveIdx = 0
             return
         }
         if (root._barCues.length > 0) {
             var b0 = root._barCues[0]
             root.applyVisualOnly(vm, b0)
-            if (b0.text !== undefined)
-                vm.appendCueTextLine(String(b0.text))
+            var lineB0 = root.cueDisplayText(b0)
+            if (lineB0 !== "")
+                vm.appendCueTextLine(lineB0)
             root._lastActiveBarIdx = 0
             return
         }
@@ -503,8 +724,11 @@ Item {
 
         if (activeIdx >= 0) {
             root.applyVisualOnly(vm, root._tickCues[activeIdx])
-            if (activeIdx !== root._lastActiveIdx && root._tickCues[activeIdx].text !== undefined)
-                vm.appendCueTextLine(String(root._tickCues[activeIdx].text))
+            if (activeIdx !== root._lastActiveIdx) {
+                var lineTick = root.cueDisplayText(root._tickCues[activeIdx])
+                if (lineTick !== "")
+                    vm.appendCueTextLine(lineTick)
+            }
             if (activeIdx !== root._lastActiveIdx) {
                 var ac = root._tickCues[activeIdx]
                 console.log("[ConductorCue] tick", tick, "-> cue", activeIdx,
@@ -570,8 +794,11 @@ Item {
 
         if (activeIdx >= 0) {
             root.applyVisualOnly(vm, root._barCues[activeIdx])
-            if (activeIdx !== root._lastActiveBarIdx && root._barCues[activeIdx].text !== undefined)
-                vm.appendCueTextLine(String(root._barCues[activeIdx].text))
+            if (activeIdx !== root._lastActiveBarIdx) {
+                var lineBar = root.cueDisplayText(root._barCues[activeIdx])
+                if (lineBar !== "")
+                    vm.appendCueTextLine(lineBar)
+            }
             root._lastActiveBarIdx = activeIdx
         } else if (previewIdx >= 0) {
             root.applyVisualOnly(vm, root._barCues[previewIdx])
@@ -650,9 +877,9 @@ Item {
                     var raw = doc.cues[i]
                     if (!root._cueMatchesChannel(raw))
                         continue
-                    if (raw.tick !== undefined && typeof raw.tick === "number") {
+                    if (isFinite(root._asFiniteNumber(raw.tick))) {
                         ticks.push(raw)
-                    } else if (raw.bar !== undefined && typeof raw.bar === "number") {
+                    } else if (isFinite(root._asFiniteNumber(raw.bar))) {
                         bars.push(raw)
                     }
                 }
@@ -689,8 +916,11 @@ Item {
     function processTick(playing, tick) {
         if (!root.useMicrotonalDisplay || !root.isSequenced || !root.viewModel)
             return
-        if (!playing) {
-            root._lastTick = tick
+        var runGate = root.transportRunActive || root.playRequestedAtMs === 0
+        var effectivePlaying = playing && runGate
+        var tickEff = root._effectiveTickFromTransport(effectivePlaying, tick)
+        if (!effectivePlaying) {
+            root._lastTick = tickEff
             root.viewModel.sequencedAnticipationProgress = 0
             root.viewModel.sequencedNextVoletOpen = 0
             root.viewModel.sequencedNextNoteDurationMs = 0
@@ -703,38 +933,44 @@ Item {
             root._didLogFirstTick = true
             var firstTick = root._tickCues.length > 0 ? root._tickCues[0].tick : -1
             var lastTick = root._tickCues.length > 0 ? root._tickCues[root._tickCues.length - 1].tick : -1
-            console.log("[ConductorCue] 1er tick transport:", tick,
+            console.log("[ConductorCue] 1er tick transport:", tick, "tickEff:", tickEff,
                         "cues:", root._tickCues.length,
                         "range:", firstTick, "->", lastTick,
                         "subMode:", root.subMode,
                         "microtonal:", root.useMicrotonalDisplay)
         }
         root._seenTickTransport = true
-        if (root._lastTick >= 0 && tick < root._lastTick) {
-            root._rewindTickPointer(tick)
+        if (root._lastTick >= 0 && tickEff < root._lastTick) {
+            root._rewindTickPointer(tickEff)
             root._lastActiveIdx = -2
             if (root.viewModel)
                 root.viewModel.clearCueTextLines()
         }
-        root._lastTick = tick
+        root._lastTick = tickEff
         while (root._tickNext < root._tickCues.length) {
             var c = root._tickCues[root._tickNext]
-            if (tick < c.tick)
+            if (tickEff < c.tick)
                 break
             root._tickNext++
         }
-        root._updateCueBookFromTick(tick)
-        root._updateSequencedTickState(playing, tick)
+        root._updateCueBookFromTick(tickEff)
+        root._updateSequencedTickState(effectivePlaying, tickEff)
     }
 
     function processBarBeat(playing, bar, beatInBar, beatF) {
         if (!root.useMicrotonalDisplay || !root.isSequenced || !root.viewModel)
             return
+        var runGate = root.transportRunActive || root.playRequestedAtMs === 0
+        var effectivePlaying = playing && runGate
+        var bpb = 4
+        var adj = root._effectiveBarBeatFromTransport(effectivePlaying, bar, beatF, bpb)
+        var barEff = adj.bar
+        var beatEff = adj.beat
         if (root._seenTickTransport && root._tickCues.length > 0)
             return
-        if (!playing) {
-            root._lastBar = bar
-            root._lastBeatCmp = beatF
+        if (!effectivePlaying) {
+            root._lastBar = barEff
+            root._lastBeatCmp = beatEff
             root.viewModel.sequencedAnticipationProgress = 0
             root.viewModel.sequencedNextVoletOpen = 0
             root.viewModel.sequencedNextNoteDurationMs = 0
@@ -743,29 +979,44 @@ Item {
             root._updateCueBookFromBar(1, 1)
             return
         }
-        var cmp = beatF
-        if (root._lastBar >= 0 && (bar < root._lastBar || (bar === root._lastBar && cmp < root._lastBeatCmp))) {
-            root._rewindBarPointer(bar, cmp)
+        var cmp = beatEff
+        if (root._lastBar >= 0 && (barEff < root._lastBar || (barEff === root._lastBar && cmp < root._lastBeatCmp))) {
+            root._rewindBarPointer(barEff, cmp)
             root._lastActiveBarIdx = -2
             if (root.viewModel)
                 root.viewModel.clearCueTextLines()
         }
-        root._lastBar = bar
+        root._lastBar = barEff
         root._lastBeatCmp = cmp
         while (root._barNext < root._barCues.length) {
             var c = root._barCues[root._barNext]
-            if (!root._barBeatAhead(bar, cmp, c))
+            if (!root._barBeatAhead(barEff, cmp, c))
                 break
             root._barNext++
         }
-        root._updateCueBookFromBar(bar, cmp)
-        root._updateSequencedBarState(playing, bar, cmp)
+        root._updateCueBookFromBar(barEff, cmp)
+        root._updateSequencedBarState(effectivePlaying, barEff, cmp)
+    }
+
+    onPlayRequestedAtMsChanged: root._resetTransportOffsets()
+    onTransportRunActiveChanged: {
+        if (!root.transportRunActive) {
+            root._resetTransportOffsets()
+            if (root.viewModel) {
+                root.viewModel.sequencedAnticipationProgress = 0
+                root.viewModel.sequencedNextVoletOpen = 0
+                root.viewModel.sequencedNextNoteDurationMs = 0
+                root.viewModel.sequencedNoteSegments = []
+                root.viewModel.glissTargetMidi = -1
+            }
+        }
     }
 
     Connections {
         target: root.sequencerController
         function onCurrentMidiPathChanged() {
-            if (root.sequencerController && root.useMicrotonalDisplay && root.isSequenced)
+            if (root.sequencerController && root.useMicrotonalDisplay
+                    && root.sequencerController.currentMidiPath)
                 root.loadConductorJsonForPath(root.sequencerController.currentMidiPath)
             else if (!root.sequencerController || !root.sequencerController.currentMidiPath)
                 root.clearBook()
@@ -773,7 +1024,7 @@ Item {
     }
 
     onUseMicrotonalDisplayChanged: {
-        if (root.useMicrotonalDisplay && root.isSequenced && root.sequencerController
+        if (root.useMicrotonalDisplay && root.sequencerController
                 && root.sequencerController.currentMidiPath)
             root.loadConductorJsonForPath(root.sequencerController.currentMidiPath)
         if (!root.useMicrotonalDisplay)
@@ -781,10 +1032,8 @@ Item {
     }
 
     onSubModeChanged: {
-        if (root.isSequenced && root.sequencerController && root.sequencerController.currentMidiPath)
+        if (root.useMicrotonalDisplay && root.sequencerController && root.sequencerController.currentMidiPath)
             root.loadConductorJsonForPath(root.sequencerController.currentMidiPath)
-        if (root.isDirected)
-            root.clearBook()
     }
 
     Connections {

@@ -23,6 +23,8 @@ Item {
     property real targetCents: 0
     property real currentCents: 0
     property real voletOpen: 0
+    /** Note d'arrivée du glissando (midiFloat). -1 = pas de gliss actif. */
+    property real glissTargetMidi: -1
     /** Ouverture volet réelle (ex. vélocité WebSocket /127) — jauge bleue à gauche. */
     property real voletOpenLive: 0
     property int glissSpeed: 0 // types.glissInstant

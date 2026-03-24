@@ -23,6 +23,12 @@ Item {
     property real rangeCents:   100
     property real voletOpen:    viewModel ? viewModel.voletOpen    : 0
     property string glissSpeedLabel: viewModel ? viewModel.glissSpeedLabel : ""
+    /** Note d'arrivée du glissando en cents (NaN si pas de gliss actif). */
+    readonly property real glissTargetCents: {
+        if (!viewModel || viewModel.glissTargetMidi < 0)
+            return NaN
+        return (viewModel.glissTargetMidi - viewModel.midiAnchor) * 100.0
+    }
 
     // ── Taille implicite ─────────────────────────────────────────────────
     implicitWidth:  420
@@ -40,9 +46,10 @@ Item {
             Layout.alignment:     Qt.AlignHCenter
             Layout.preferredWidth: Math.min(Math.max(root.width, 280), 420)
             Layout.maximumWidth:  420
-            targetCents:  root.targetCents
-            currentCents: root.currentCents
-            rangeCents:   root.rangeCents
+            targetCents:      root.targetCents
+            currentCents:     root.currentCents
+            rangeCents:       root.rangeCents
+            glissTargetCents: root.glissTargetCents
         }
 
         // ── Ligne d'indicateurs instantanés, centrée sous le ruban ─────────
