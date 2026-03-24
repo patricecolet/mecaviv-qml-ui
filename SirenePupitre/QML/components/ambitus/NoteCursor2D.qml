@@ -26,6 +26,13 @@ Item {
     property bool showNoteHighlight: true
     property color highlightColor: Qt.rgba(1, 1, 0, 0.6)
     property real highlightSize: 0.25
+    property bool showMicrotonalTargetMarker: false
+    property real microtonalTargetMidi: currentNoteMidi
+    property color microtonalTargetColor: "#FFD700"
+    property real microtonalTargetWidth: 2
+    property color cursorOffTargetColor: "#ff4d4f"
+    property color cursorOnTargetColor: "#4ade80"
+    property real onTargetToleranceCents: 5
     property bool debug: false
 
     NotePositionCalculator2D {
@@ -42,6 +49,11 @@ Item {
     property real cursorHeight: Math.max(2, _tailOffset - currentNoteY)
     property real cursorX: noteCalc2D.calculateNoteX2D(currentNoteMidi, ambitusMin, ambitusMax, ambitusStartX, ambitusWidth)
     readonly property real _clampedLeft: Math.max(ambitusStartX, Math.min(ambitusStartX + ambitusWidth - cursorWidth, cursorX - cursorWidth / 2))
+    readonly property real _targetNoteY: noteCalc2D.calculateNoteY(microtonalTargetMidi + (octaveOffset * 12), lineSpacing, clef)
+    readonly property real _targetHeight: Math.max(2, _tailOffset - _targetNoteY)
+    readonly property real _targetX: noteCalc2D.calculateNoteX2D(microtonalTargetMidi, ambitusMin, ambitusMax, ambitusStartX, ambitusWidth)
+    readonly property real _targetLeft: Math.max(ambitusStartX, Math.min(ambitusStartX + ambitusWidth - microtonalTargetWidth, _targetX - microtonalTargetWidth / 2))
+    readonly property bool _onTarget: Math.abs(currentNoteMidi - microtonalTargetMidi) * 100.0 <= Math.max(0, onTargetToleranceCents)
 
     x: _clampedLeft
     y: centerY + currentNoteY
@@ -54,7 +66,9 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: root.cursorColor
+        color: root.showMicrotonalTargetMarker
+               ? (root._onTarget ? root.cursorOnTargetColor : root.cursorOffTargetColor)
+               : root.cursorColor
         radius: Math.min(width, height) / 2
         z: 1
         border.width: root.debug ? 2 : 0
@@ -82,5 +96,16 @@ Item {
         radius: _radius
         color: root.highlightColor
         readonly property real _radius: Math.max(2, root.lineSpacing * root.highlightSize)
+    }
+
+    Rectangle {
+        visible: root.showMicrotonalTargetMarker && isFinite(root.microtonalTargetMidi)
+        z: 0
+        x: root._targetLeft - root.x
+        y: root._targetNoteY - root.currentNoteY
+        width: root.microtonalTargetWidth
+        height: root._targetHeight
+        radius: Math.min(width, height) / 2
+        color: root.microtonalTargetColor
     }
 }

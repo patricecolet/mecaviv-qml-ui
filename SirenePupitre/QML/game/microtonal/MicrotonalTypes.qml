@@ -4,8 +4,8 @@ QtObject {
     id: root
 
     readonly property int modeDirected: 0
+    /** Séquencé (JSON chef + transport) — unique mode séquencé. */
     readonly property int modeSequencedStrict: 1
-    readonly property int modeSequencedContinuous: 2
 
     readonly property int phasePartial: 0
     readonly property int phaseTempered: 1

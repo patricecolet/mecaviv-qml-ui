@@ -57,6 +57,8 @@ Item {
     signal filesListReceived(var categories)  // Liste fichiers MIDI
     signal gameModeReceived(bool enabled)  // Mode jeu activé/désactivé par le serveur
     signal padCalibrationValuesReceived(var values)  // [int16, int16] pour affichage sous les boutons (pad 0 et 1)
+    /** Consigne chef (mode dirigé) — voir docs/CONDUCTOR_CUES_PROTOCOL.md */
+    signal conductorCueReceived(var data)
     property var configController: null
     property var rootWindow: null  // Référence vers la fenêtre racine (Main.qml)
     
@@ -682,6 +684,11 @@ Item {
                     }
                     console.log("[PAD_CALIB] Reçu values:", JSON.stringify(vals), "raw data.values:", raw !== undefined ? JSON.stringify(raw) : "undefined")
                     controller.padCalibrationValuesReceived(vals);
+                    return;
+                }
+
+                if (data.type === "CONDUCTOR_CUE") {
+                    controller.conductorCueReceived(data);
                     return;
                 }
                 

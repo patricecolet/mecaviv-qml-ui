@@ -62,17 +62,21 @@ Item {
         xhr.send()
     }
 
-    Row {
+    // En microtonal, Options/Morceaux sont rendus dans Test2D (à la place des anciens toggles).
+    // En mode jeu normal : empilés verticalement entre Play et Mode Normal, légèrement à droite du centre.
+    Column {
         id: transportRow
         anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: 130
         anchors.bottom: parent.bottom
-        anchors.margins: 20
-        spacing: 16
+        anchors.bottomMargin: 20
+        spacing: 8
+        visible: !(root.test2DPage && root.test2DPage.useMicrotonalDisplay)
 
         Rectangle {
             id: openOptionsBtn
-            width: Math.max(100, optionsBtnText.contentWidth + 20)
-            height: 44
+            width: Math.max(120, optionsBtnText.contentWidth + 20)
+            height: 38
             radius: 8
             property bool isFocused: root.gameModeFocusIndex === 0
             color: "#2a2a2a"
@@ -83,10 +87,9 @@ Item {
             Text {
                 id: optionsBtnText
                 anchors.centerIn: parent
-                anchors.margins: 10
                 text: "Options"
-                color: parent.parent.isFocused ? root.gameModeFocusColor : "#fff"
-                font.pixelSize: 14
+                color: openOptionsBtn.isFocused ? root.gameModeFocusColor : "#fff"
+                font.pixelSize: 13
                 font.bold: true
             }
 
@@ -101,8 +104,8 @@ Item {
 
         Rectangle {
             id: openSongDialogBtn
-            width: Math.max(140, songTitleText.contentWidth + 20)
-            height: 44
+            width: Math.max(120, songTitleText.contentWidth + 20)
+            height: 38
             radius: 8
             property bool isFocused: root.gameModeFocusIndex === 2
             color: "#2a2a2a"
@@ -113,10 +116,9 @@ Item {
             Text {
                 id: songTitleText
                 anchors.centerIn: parent
-                anchors.margins: 10
                 text: root.sequencer ? (root.sequencer.currentSongTitle || "Morceaux") : "Morceaux"
-                color: parent.parent.isFocused ? root.gameModeFocusColor : "#fff"
-                font.pixelSize: 14
+                color: openSongDialogBtn.isFocused ? root.gameModeFocusColor : "#fff"
+                font.pixelSize: 13
                 font.bold: true
                 elide: Text.ElideRight
                 maximumLineCount: 1
@@ -135,6 +137,10 @@ Item {
     SongSelectorDialog {
         id: songSelectorDialog
         onSongChosen: function(file) {
+            if (root.test2DPage) {
+                // Défini côté API : présence d'un JSON livret (conductor-cues) à côté du .mid
+                root.test2DPage.useMicrotonalDisplay = (file.microtonal === true)
+            }
             if (root.configController && root.configController.webSocketController) {
                 if (root.sequencer) {
                     root.sequencer.loadSong(file.path, file.title)

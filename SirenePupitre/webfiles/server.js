@@ -52,6 +52,10 @@ http.createServer(function (request, response) {
         midiNotesAPI.getMidiNotes(request, response);
         return;
     }
+    if (request.url.startsWith('/api/midi/conductor-cues')) {
+        midiAPI.getConductorCues(request, response);
+        return;
+    }
     
     // Route principale
     if (request.url === '/' || request.url === '') {

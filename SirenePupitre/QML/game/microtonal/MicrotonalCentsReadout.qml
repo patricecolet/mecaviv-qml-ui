@@ -6,6 +6,8 @@ Item {
     implicitHeight: 64
 
     property real cents: 0
+    /** Si false : uniquement la valeur (symboles, pas « Δ cents ») */
+    property bool showDeltaLabel: true
     property real okBandCents: 8
     property color textColor: "#fff"
     property color okColor: "#4ade80"
@@ -18,6 +20,7 @@ Item {
         spacing: 4
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
+            visible: root.showDeltaLabel
             text: "Δ cents"
             color: "#888"
             font.pixelSize: 11

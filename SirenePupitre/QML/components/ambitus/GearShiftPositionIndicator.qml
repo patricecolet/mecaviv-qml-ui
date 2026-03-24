@@ -7,7 +7,7 @@ import QtQuick
 Column {
     id: root
     width: 120
-    spacing: 10
+    spacing: 0
 
     property int currentPosition: 0
     property var configController: null
@@ -133,14 +133,5 @@ Column {
                 color: root.currentPosition === 4 ? "#FFFFFF" : "#CCCCCC"
             }
         }
-    }
-
-    Text {
-        width: parent.width
-        text: "VITESSE"
-        font.pixelSize: 12
-        font.bold: true
-        color: "#CCCCCC"
-        horizontalAlignment: Text.AlignHCenter
     }
 }

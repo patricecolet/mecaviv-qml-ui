@@ -78,15 +78,16 @@
         <file>QML/game/microtonal/MicrotonalPitchRibbon.qml</file>
         <file>QML/game/microtonal/MicrotonalPitchPanel.qml</file>
         <file>QML/game/microtonal/MicrotonalCentsReadout.qml</file>
-        <file>QML/game/microtonal/MicrotonalPhaseStrip.qml</file>
         <file>QML/game/microtonal/MicrotonalVoletIndicator.qml</file>
+        <file>QML/game/microtonal/MicrotonalVoletAnticipation.qml</file>
+        <file>QML/game/microtonal/MicrotonalScoreView.qml</file>
         <file>QML/game/microtonal/MicrotonalGlissSpeedLabel.qml</file>
         <file>QML/game/microtonal/MicrotonalTimelineRail.qml</file>
         <file>QML/game/microtonal/MicrotonalDirectedView.qml</file>
         <file>QML/game/microtonal/MicrotonalSequencedStrictView.qml</file>
-        <file>QML/game/microtonal/MicrotonalSequencedContinuousView.qml</file>
         <file>QML/game/microtonal/MicrotonalGameMode.qml</file>
         <file>QML/game/microtonal/MicrotonalDisplay.qml</file>
+        <file>QML/game/microtonal/ConductorCueDriver.qml</file>
         <file>QML/pages/Test2D.qml</file>
     </qresource>
     

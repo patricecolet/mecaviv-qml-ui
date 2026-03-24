@@ -16,7 +16,10 @@ Item {
     property color trackColor: "#333"
     property color centerColor: "#6bb6ff"
     property color targetColor: "#FFD700"
-    property color cursorColor: "#4ade80"
+    property color cursorOffTargetColor: "#ff4d4f"
+    property color cursorOnTargetColor: "#4ade80"
+    property real onTargetToleranceCents: 5
+    readonly property bool onTarget: Math.abs(root.currentCents - root.targetCents) <= Math.max(0, root.onTargetToleranceCents)
 
     function normC(c) {
         var r = Math.max(1, root.rangeCents)
@@ -58,7 +61,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         x: parent.width / 2 + root.normC(root.currentCents) * (parent.width / 2 - 14) - width / 2
         radius: 3
-        color: root.cursorColor
+        color: root.onTarget ? root.cursorOnTargetColor : root.cursorOffTargetColor
         border.color: "#fff"
         border.width: 1
     }

@@ -33,6 +33,8 @@ Item {
 
     property bool showCursor: true
     property bool showProgressBar: true
+    property bool showMicrotonalTargetMarker: false
+    property real microtonalTargetMidi: 69.0
     property bool showAmbitus: true
     property bool showClef: true
 
@@ -206,6 +208,8 @@ Item {
             return Qt.rgba(1, 1, 0, 0.6)
         }
         highlightSize: configController ? configController.getValueAtPath(["displayConfig", "components", "musicalStaff", "cursor", "highlightSize"], 0.25) : 0.25
+        showMicrotonalTargetMarker: root.showMicrotonalTargetMarker
+        microtonalTargetMidi: root.microtonalTargetMidi
     }
 
     // Barre de progression 2D (Phase 2.6)
@@ -258,7 +262,7 @@ Item {
         y: root._belowProgressY
         width: 90
         height: 36
-        visible: root.configController && (root.configController.updateCounter >= 0 && (root.configController.isSubComponentVisible("musicalStaff", "rpm") || root.configController.isSubComponentVisible("musicalStaff", "frequency")))
+        visible: root.showProgressBar && root.configController && (root.configController.updateCounter >= 0 && (root.configController.isSubComponentVisible("musicalStaff", "rpm") || root.configController.isSubComponentVisible("musicalStaff", "frequency")))
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter

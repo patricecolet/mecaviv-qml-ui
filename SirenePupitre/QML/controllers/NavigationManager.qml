@@ -433,12 +433,24 @@ Item {
             }
             break
             
-        case 3: // Ligne d'anticipation
-            page.showAnticipationLine = !page.showAnticipationLine
+        case 3: // Ligne d'anticipation (ou Options en microtonal)
+            if (page.useMicrotonalDisplay) {
+                if (page.gameOptionsDialog)
+                    page.gameOptionsDialog.open()
+            } else {
+                page.showAnticipationLine = !page.showAnticipationLine
+            }
             break
             
-        case 4: // Barres de mesure
-            page.showMeasureBars = !page.showMeasureBars
+        case 4: // Barres de mesure (ou Morceaux en microtonal)
+            if (page.useMicrotonalDisplay) {
+                if (page.gameAutonomyPanel && page.gameAutonomyPanel.songSelectorDialog) {
+                    page.gameAutonomyPanel.loadMidiFilesList()
+                    page.gameAutonomyPanel.songSelectorDialog.open()
+                }
+            } else {
+                page.showMeasureBars = !page.showMeasureBars
+            }
             break
             
         case 5: // Mode Normal

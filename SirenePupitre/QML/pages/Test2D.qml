@@ -39,6 +39,13 @@ Page {
 
     MicrotonalViewModel {
         id: microtonalVm
+        onMidiAnchorChanged: root.syncMicrotonalCurrentCentsFromPitch()
+    }
+
+    Binding {
+        target: microtonalVm
+        property: "voletOpenLive"
+        value: Math.max(0, Math.min(1, root.velocity / 127.0))
     }
 
     MicrotonalTypes {
@@ -48,10 +55,48 @@ Page {
     function syncMicrotonalSubMode() {
         if (!root.useMicrotonalDisplay)
             return
-        if (!root.gameMode)
-            microtonalVm.subMode = microtonalTypes.modeDirected
-        else if (microtonalVm.subMode === microtonalTypes.modeDirected)
+        if (!root.gameMode) {
+            // Vue normale : garder le mode séquencé pour que ConductorCueDriver applique
+            // le JSON + transport (tick/mesure). Le mode « dirigé » n’utilise que CONDUCTOR_CUE WS.
             microtonalVm.subMode = microtonalTypes.modeSequencedStrict
+        } else if (microtonalVm.subMode === microtonalTypes.modeDirected
+                || microtonalVm.subMode === 2) {
+            microtonalVm.subMode = microtonalTypes.modeSequencedStrict
+        }
+    }
+
+    function _getPrimarySirenIndex() {
+        if (!root.configController || !root.configController.primarySiren)
+            return -1
+        var sirens = root.configController.config && root.configController.config.sirenConfig
+                ? (root.configController.config.sirenConfig.sirens || []) : []
+        for (var i = 0; i < sirens.length; i++) {
+            if (sirens[i].id === root.configController.primarySiren.id)
+                return i
+        }
+        return -1
+    }
+
+    function ensureFrettedModeDisabledInMicrotonalGame() {
+        if (!root.useMicrotonalDisplay || !root.gameMode || !root.configController)
+            return
+        var idx = root._getPrimarySirenIndex()
+        if (idx < 0)
+            return
+        var enabledPath = ["sirenConfig", "sirens", idx, "frettedMode", "enabled"]
+        var isEnabled = !!root.configController.getValueAtPath(enabledPath, false)
+        if (isEnabled)
+            root.configController.setValueAtPath(enabledPath, false)
+    }
+
+    function syncMicrotonalCurrentCentsFromPitch() {
+        if (!root.useMicrotonalDisplay)
+            return
+        var note = Number(root.clampedNote)
+        var anchor = Number(microtonalVm.midiAnchor)
+        if (!isFinite(note) || !isFinite(anchor))
+            return
+        microtonalVm.currentCents = (note - anchor) * 100.0
     }
 
     // Note à afficher sur la portée (mode jeu : clampedNote ; Pd peut envoyer la note courante plus tard)
@@ -69,7 +114,7 @@ Page {
     // Exposer controllersPanel pour NavigationManager
     property alias controllersPanel: controllersPanel
     
-    // Focus UI encodeur mode jeu : 0 Options, 1 Play/Stop, 2 Morceaux, 3 anticipation, 4 barres, 5 microtonal, 6 Mode Normal
+    // Focus UI encodeur mode jeu : 0 Options, 1 Play/Stop, 2 Morceaux, 3 (microtonal) Options, 4 (microtonal) Morceaux, 5 microtonal, 6 Mode Normal
     property int gameModeFocusIndex: 0
     property color gameModeFocusColor: "#00BFFF"
     readonly property int gameModeFocusCount: 6
@@ -125,12 +170,19 @@ Page {
             root.transportDisplayActive = false
         }
         root.syncMicrotonalSubMode()
+        root.ensureFrettedModeDisabledInMicrotonalGame()
     }
 
     onUseMicrotonalDisplayChanged: {
-        if (root.useMicrotonalDisplay)
+        if (root.useMicrotonalDisplay) {
             root.syncMicrotonalSubMode()
+            root.ensureFrettedModeDisabledInMicrotonalGame()
+            root.syncMicrotonalCurrentCentsFromPitch()
+        }
     }
+
+    onSirenInfoChanged: root.ensureFrettedModeDisabledInMicrotonalGame()
+    onClampedNoteChanged: root.syncMicrotonalCurrentCentsFromPitch()
 
     function updateControllers(controllersData) {
         if (controllersPanel && controllersPanel.updateControllers) {
@@ -171,7 +223,7 @@ Page {
             id: infoContainer
             anchors.fill: parent
             anchors.topMargin: 20
-            anchors.bottomMargin: 20
+            anchors.bottomMargin: root.useMicrotonalDisplay ? 8 : 20
 
             SirenSelector {
                 id: sirenSelector
@@ -345,15 +397,15 @@ Page {
          */
         GearShiftPositionIndicator {
             id: gearShiftIndicator
-            z: 50
-            visible: !root.gameMode && !root.controllersPanelVisible
+            z: 150
+            visible: !root.controllersPanelVisible
                     && (configController
                         ? configController.getConfigValue("displayConfig.components.musicalStaff.gearShiftIndicator.visible", true)
                         : true)
             anchors.left: test2dBackground.left
             anchors.leftMargin: 20
             anchors.bottom: test2dBackground.bottom
-            anchors.bottomMargin: 40
+            anchors.bottomMargin: 20
             currentPosition: configController ? (configController.gearShiftPosition || 0) : 0
             configController: root.configController
         }
@@ -380,15 +432,102 @@ Page {
                 rootWindow: root.rootWindow
             }
 
-            // Options affichage (ligne d'anticipation, barres de mesure) — bindings vers GameMode
+            // Ambitus compact (portée ou clavier) en haut de la vue microtonal
+            StaffZone2D {
+                id: microtonalAmbitusStrip
+                visible: root.useMicrotonalDisplay
+                anchors.top: parent.top
+                anchors.topMargin: 50
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 24
+                anchors.rightMargin: 24
+                height: 72
+                z: 5
+                accentColor: root.accentColor
+                currentNoteMidi: root.displayNoteForStaff
+                currentVelocity: root.velocity
+                sirenInfo: root.sirenInfo
+                configController: root.configController
+                lineSpacing: 10
+                lineThickness: 1
+                showProgressBar: false
+                showCursor: true
+                showMicrotonalTargetMarker: true
+                microtonalTargetMidi: microtonalVm.midiAnchor + microtonalVm.targetCents / 100.0
+            }
+
+            // Zone bas-droite : microtonal -> Options/Morceaux ; sinon toggles affichage
             Column {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.margins: 20
                 z: 10
                 spacing: 8
+                Rectangle {
+                    id: microtonalOptionsBtn
+                    visible: root.useMicrotonalDisplay
+                    width: Math.max(100, optionsQuickText.contentWidth + 20)
+                    height: 38
+                    radius: 8
+                    property bool isFocused: root.gameModeFocusIndex === 3
+                    color: "#2a2a2a"
+                    border.color: isFocused ? root.gameModeFocusColor : "#6bb6ff"
+                    border.width: isFocused ? 2 : 1
+
+                    Text {
+                        id: optionsQuickText
+                        anchors.centerIn: parent
+                        text: "Options"
+                        color: microtonalOptionsBtn.isFocused ? root.gameModeFocusColor : "#fff"
+                        font.pixelSize: 13
+                        font.bold: true
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            if (gameOptionsDialog)
+                                gameOptionsDialog.open()
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: microtonalSongsBtn
+                    visible: root.useMicrotonalDisplay
+                    width: Math.max(140, songsQuickText.contentWidth + 20)
+                    height: 38
+                    radius: 8
+                    property bool isFocused: root.gameModeFocusIndex === 4
+                    color: "#2a2a2a"
+                    border.color: isFocused ? root.gameModeFocusColor : "#6bb6ff"
+                    border.width: isFocused ? 2 : 1
+
+                    Text {
+                        id: songsQuickText
+                        anchors.centerIn: parent
+                        text: "Morceaux"
+                        color: microtonalSongsBtn.isFocused ? root.gameModeFocusColor : "#fff"
+                        font.pixelSize: 13
+                        font.bold: true
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            if (gameModeOverlay.gameAutonomyPanel
+                                    && gameModeOverlay.gameAutonomyPanel.songSelectorDialog) {
+                                gameModeOverlay.gameAutonomyPanel.loadMidiFilesList()
+                                gameModeOverlay.gameAutonomyPanel.songSelectorDialog.open()
+                            }
+                        }
+                    }
+                }
+
                 CheckBox {
                     id: anticipationCheckbox
+                    visible: !root.useMicrotonalDisplay
                     text: "Ligne d'anticipation"
                     checked: root.showAnticipationLine
                     property bool isFocused: root.gameModeFocusIndex === 3
@@ -420,6 +559,7 @@ Page {
                 }
                 CheckBox {
                     id: measureBarsCheckbox
+                    visible: !root.useMicrotonalDisplay
                     text: "Barres de mesure"
                     checked: root.showMeasureBars
                     property bool isFocused: root.gameModeFocusIndex === 4
@@ -446,60 +586,6 @@ Page {
                             width: 12; height: 12; x: 4; y: 4; radius: 2
                             color: parent.parent.parent.isFocused ? root.gameModeFocusColor : "#FFD700"
                             visible: measureBarsCheckbox.checked
-                        }
-                    }
-                }
-            }
-
-            // Transport : mesure, temps, tempo (à gauche du Play) — encadré large pour mesure complète et durée totale
-            Rectangle {
-                id: positionInSongFrame
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 20
-                x: parent.width * 0.25 - 140 / 2 - 12 - width
-                width: 220
-                height: 88
-                z: 10
-                color: "#2a2a2a"
-                border.color: "#6bb6ff"
-                border.width: 2
-                radius: 5
-
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 6
-                    Row {
-                        spacing: 8
-                        Text { text: "Mesure"; color: "#888"; font.pixelSize: 9; width: 44 }
-                        Text {
-                            text: root.transportDisplayActive && sequencerController
-                                ? (sequencerController.positionDisplayText + " / " + (sequencerController.totalBars > 0 ? sequencerController.totalBars : "—"))
-                                : "— / —"
-                            color: "#fff"
-                            font.pixelSize: 12
-                            font.bold: true
-                        }
-                    }
-                    Row {
-                        spacing: 8
-                        Text { text: "Temps"; color: "#888"; font.pixelSize: 9; width: 44 }
-                        Text {
-                            text: root.transportDisplayActive && sequencerController
-                                ? (sequencerController.currentTimeDisplay + " / " + sequencerController.totalTimeDisplay)
-                                : "— / —"
-                            color: "#fff"
-                            font.pixelSize: 12
-                        }
-                    }
-                    Row {
-                        spacing: 8
-                        Text { text: "Tempo"; color: "#888"; font.pixelSize: 9; width: 44 }
-                        Text {
-                            text: root.transportDisplayActive && sequencerController
-                                ? (Math.round(sequencerController.currentTempoBpm) + " BPM")
-                                : "—"
-                            color: "#fff"
-                            font.pixelSize: 12
                         }
                     }
                 }
@@ -634,37 +720,77 @@ Page {
                 }
             }
 
-            Row {
-                id: gameOverlayRpmHzRow
-                anchors.horizontalCenter: parent.horizontalCenter
+            // Bloc Mesure/Temps/Tempo : entre Play (25%) et Mode Normal (75%), légèrement à gauche du centre
+            Rectangle {
+                id: positionInSongFrame
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: 70
-                spacing: 80
-                z: 5
+                anchors.bottomMargin: 20
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.horizontalCenterOffset: -130
+                width: 220
+                height: 88
+                z: 10
+                color: "#2a2a2a"
+                border.color: "#6bb6ff"
+                border.width: 2
+                radius: 5
 
-                NumberDisplay2D {
-                    width: 180
-                    height: 72
-                    value: root.rpm
-                    label: "RPM"
-                    digitColor: root.accentColor
-                    inactiveColor: "#003333"
-                    frameColor: root.accentColor
-                    scaleX: 1.6 * root.uiScale
-                    scaleY: 0.75 * root.uiScale
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Row {
+                            spacing: 8
+                            Text { text: "Mesure"; color: "#888"; font.pixelSize: 9; width: 44 }
+                            Text {
+                                text: root.transportDisplayActive && sequencerController
+                                    ? (sequencerController.positionDisplayText + " / " + (sequencerController.totalBars > 0 ? sequencerController.totalBars : "—"))
+                                    : "— / —"
+                                color: "#fff"
+                                font.pixelSize: 12
+                                font.bold: true
+                            }
+                        }
+                        Row {
+                            spacing: 8
+                            Text { text: "Temps"; color: "#888"; font.pixelSize: 9; width: 44 }
+                            Text {
+                                text: root.transportDisplayActive && sequencerController
+                                    ? (sequencerController.currentTimeDisplay + " / " + sequencerController.totalTimeDisplay)
+                                    : "— / —"
+                                color: "#fff"
+                                font.pixelSize: 12
+                            }
+                        }
+                        Row {
+                            spacing: 8
+                            Text { text: "Tempo"; color: "#888"; font.pixelSize: 9; width: 44 }
+                            Text {
+                                text: root.transportDisplayActive && sequencerController
+                                    ? (Math.round(sequencerController.currentTempoBpm) + " BPM")
+                                    : "—"
+                                color: "#fff"
+                                font.pixelSize: 12
+                            }
+                        }
+                    }
                 }
 
-                NumberDisplay2D {
-                    width: 180
-                    height: 72
-                    value: root.frequency
-                    label: "Hz"
-                    digitColor: root.accentColor
-                    inactiveColor: "#003333"
-                    frameColor: root.accentColor
-                    scaleX: 1.4 * root.uiScale
-                    scaleY: 0.65 * root.uiScale
-                }
+            NumberDisplay2D {
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 28
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.horizontalCenterOffset: 130
+                width: 180
+                height: 72
+                visible: root.useMicrotonalDisplay
+                value: root.frequency
+                label: "Hz"
+                digitColor: root.accentColor
+                inactiveColor: "#003333"
+                frameColor: root.accentColor
+                scaleX: 1.4 * root.uiScale
+                scaleY: 0.65 * root.uiScale
+                z: 10
             }
 
             Item {
@@ -685,12 +811,14 @@ Page {
                         AnchorChanges {
                             target: gameOverlayStaffZone
                             anchors.top: parent.top
-                            anchors.bottom: gameOverlayRpmHzRow.top
+                            anchors.bottom: playStopButton.top
+                            anchors.verticalCenter: undefined
                         }
                         PropertyChanges {
                             target: gameOverlayStaffZone
-                            anchors.topMargin: 88
-                            anchors.bottomMargin: 12
+                            anchors.topMargin: 84
+                            anchors.bottomMargin: 6
+                            anchors.verticalCenterOffset: 0
                         }
                     }
                 ]
@@ -709,12 +837,24 @@ Page {
                     visible: !root.useMicrotonalDisplay
                 }
 
+                Component {
+                    id: microtonalGameModeComponent
+                    MicrotonalGameMode {
+                        viewModel: microtonalVm
+                    }
+                }
+
+                Component {
+                    id: normalGameModeComponent
+                    GameMode { }
+                }
+
                 Loader {
                     id: gameModeLoader
                     anchors.fill: parent
                     z: 1
                     active: root.gameMode || (root.rootWindow && root.rootWindow.isGamePlaying) || (root.rootWindow && root.rootWindow.isGamePlaying)
-                    source: root.useMicrotonalDisplay ? "../game/microtonal/MicrotonalGameMode.qml" : "../game/GameMode.qml"
+                    sourceComponent: root.useMicrotonalDisplay ? microtonalGameModeComponent : normalGameModeComponent
                     onLoaded: {
                         if (item) {
                             item.configController = root.configController
@@ -726,8 +866,6 @@ Page {
                             item.showAnticipationLine = Qt.binding(function() { return root.showAnticipationLine })
                             item.showMeasureBars = Qt.binding(function() { return root.showMeasureBars })
                             item.isPlaying = Qt.binding(function() { return !!(root.rootWindow && root.rootWindow.isGamePlaying) })
-                            if (typeof item.viewModel !== "undefined")
-                                item.viewModel = microtonalVm
                             root._gameModeItem = item
                         }
                     }
@@ -797,5 +935,16 @@ Page {
             else if (device === "tremolo")
                 root.autonomyTremolo = enabled
         }
+    }
+
+    ConductorCueDriver {
+        id: conductorCueDriver
+        viewModel: microtonalVm
+        webSocketController: root.webSocketController
+        // id fichier (pas test2dBackground.gameModeOverlay : les ids enfants ne sont pas des propriétés du Rectangle)
+        sequencerController: gameModeOverlay.sequencerController
+        configController: root.configController
+        useMicrotonalDisplay: root.useMicrotonalDisplay
+        subMode: microtonalVm.subMode
     }
 }

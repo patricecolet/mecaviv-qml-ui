@@ -18,6 +18,7 @@ QtObject {
                 {
                     "id": "1",
                     "name": "S1",
+                    "midiChannel": 1,
                     "outputs": 12,
                     "ambitus": { "min": 43, "max": 86 },
                     "clef": "bass",
@@ -93,7 +94,9 @@ QtObject {
             clef: primarySiren.clef,
             restrictedMax: primarySiren.restrictedMax,
             mode: mode,
-            displayOctaveOffset: primarySiren.displayOctaveOffset
+            displayOctaveOffset: primarySiren.displayOctaveOffset,
+            /** Canal MIDI 1–16 pour cette sirène (consignes / séquenceur) ; optionnel */
+            midiChannel: primarySiren.midiChannel
         }
     }
     

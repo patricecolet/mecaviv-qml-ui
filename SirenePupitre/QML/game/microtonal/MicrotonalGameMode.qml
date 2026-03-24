@@ -37,10 +37,10 @@ Item {
         id: internalViewModel
     }
 
-    /** Si non défini par le parent, utilise internalViewModel */
-    property var viewModel: internalViewModel
-
-    readonly property int subMode: viewModel ? viewModel.subMode : 0
+    /** ViewModel injecté par le parent. null => fallback interne. */
+    property var viewModel: null
+    readonly property var activeViewModel: viewModel || internalViewModel
+    readonly property int subMode: activeViewModel ? activeViewModel.subMode : 0
 
     signal midiEventReceived(var event)
 
@@ -67,23 +67,17 @@ Item {
     function startGame() {
         root.gameStartTime = Date.now()
         root.gameActive = true
-        root.viewModel.applyMockTimeline()
-        root.viewModel.sessionTimeMs = 0
-        root.viewModel.startDemoClock()
     }
 
     function resetGame() {
         midiEvents = []
-        root.viewModel.reset()
-        root.viewModel.applyMockTimeline()
-        root.viewModel.stopDemoClock()
+        root.activeViewModel.reset()
         root.gameActive = false
         root.gameStartTime = 0
     }
 
     function stopGame() {
         root.gameActive = false
-        root.viewModel.stopDemoClock()
     }
 
     function handleControlChange(ccNumber, ccValue) {
@@ -115,7 +109,7 @@ Item {
 
     MicrotonalDisplay {
         anchors.fill: parent
-        viewModel: root.viewModel
+        viewModel: root.activeViewModel
         layoutPreset: "game"
     }
 }

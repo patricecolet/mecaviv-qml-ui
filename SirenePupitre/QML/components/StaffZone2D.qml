@@ -14,6 +14,10 @@ Item {
     property real lineThickness: 2
     property real rpm: 0
     property int frequency: 0
+    property bool showProgressBar: true
+    property bool showCursor: true
+    property bool showMicrotonalTargetMarker: false
+    property real microtonalTargetMidi: 69.0
     height: 120
 
     readonly property string _viewMode: configController && configController.updateCounter >= 0
@@ -32,6 +36,10 @@ Item {
             lineColor: Qt.rgba(1, 1, 1, 1)
             rpm: root.rpm
             frequency: root.frequency
+            showProgressBar: root.showProgressBar
+            showCursor: root.showCursor
+            showMicrotonalTargetMarker: root.showMicrotonalTargetMarker
+            microtonalTargetMidi: root.microtonalTargetMidi
         }
     }
 
