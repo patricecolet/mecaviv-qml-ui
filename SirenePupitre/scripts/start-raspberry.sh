@@ -152,7 +152,6 @@ stop_processes() {
     pkill -f "node server.js" 2>/dev/null || true
     pkill -f "pd" 2>/dev/null || true
     pkill -f "chromium-browser" 2>/dev/null || true
-    pkill -f "ComposeSiren" 2>/dev/null || true
     
     sleep 2
     echo "$(date): Tous les processus arrêtés"
@@ -265,22 +264,6 @@ start_pulseaudio() {
     fi
 }
 
-# Fonction pour démarrer ComposeSiren
-start_composesiren() {
-    echo "$(date): Démarrage de ComposeSiren..."
-    
-    # Attendre que le navigateur soit lancé
-    #sleep 5
-    
-    if command -v ComposeSiren >/dev/null 2>&1; then
-        export DISPLAY=:0
-        ComposeSiren &
-        echo "$(date): ✅ ComposeSiren démarré avec HifiBerry DAC"
-    else
-        echo "$(date): ❌ ComposeSiren non trouvé dans le PATH"
-    fi
-}
-
 # Fonction pour configurer les GPIO de l'encodeur rotatif
 # GPIO 15 = switch (bouton poussoir), GPIO 22 = Line A, GPIO 24 = Line B
 configure_encoder_gpio() {
@@ -335,21 +318,18 @@ main() {
     start_server
     start_puredata
     
-    # 8. Démarrer ComposeSiren
-    start_composesiren
-    # 9. Démarrer le navigateur
+    # 8. Démarrer le navigateur
     start_browser
     
-    # 10. Afficher les informations
+    # 9. Afficher les informations
     local ip=$(get_configured_ip)
     echo "$(date): ✅ Application démarrée!"
     echo "$(date): 🌐 IP: $ip"
     echo "$(date): 🌐 Serveur: http://$ip:8000"
     echo "$(date): 🎵 PureData: ALSA MIDI device 1"
-    echo "$(date): 🎹 ComposeSiren: actif avec HifiBerry DAC"
     echo "$(date): 🔊 Volume: 100%"
     
-    # 11. Garder le script en vie
+    # 10. Garder le script en vie
     while true; do
         sleep 60
     done
