@@ -25,7 +25,7 @@ Composant pour un cube qui tombe (version simple avec shader).
 
 ### `FallingNoteCustomGeo.qml`
 Composant avancé avec géométrie C++ custom pour visualisation ADSR complète.
-- **Géométrie custom** : `TaperedBoxGeometry` (C++)
+- **Statut** : ancien chemin C++ (`TaperedBoxGeometry`) retiré du build.
 - **Enveloppe ADSR** visualisée en 3D :
   - **Attack** : Pyramide inversée en bas (pointe vers le bas)
   - **Sustain** : Cube central (hauteur variable)
@@ -172,26 +172,12 @@ PrincipledMaterial {
 }
 ```
 
-## 🎼 Enveloppe ADSR et Modulations (Custom Geometry)
+## 🎼 Enveloppe ADSR et Modulations (Legacy)
 
 ### Architecture C++/QML
 
-**Classe C++ : `TaperedBoxGeometry`**
-- Hérite de `QQuick3DGeometry`
-- Génère une géométrie custom : Attack (pyramide inversée) + Sustain (cube) + Release (pyramide)
-- 18 vertices, 18 triangles
-- Propriétés exposées : `attackTime`, `duration`, `totalHeight`, `releaseHeight`, `velocity`, `baseSize`
-- **Calculs ADSR automatiques en C++** :
-  - `attackRatio = min(1.0, duration / attackTime)` → portion d'attack complétée
-  - `effectiveVelocity = velocity * attackRatio` → vélocité réellement atteinte
-  - `attackHeightVisual = totalHeight * attackRatio` → hauteur de la pyramide attack
-  - `sustainHeight = totalHeight - attackHeightVisual` → hauteur du cube
-  - `width = (effectiveVelocity/127 * 0.8 + 0.2) * baseSize` → largeur basée sur effectiveVelocity
-
-**Fichiers C++ :**
-- `taperedboxgeometry.h` : Déclaration de la classe
-- `taperedboxgeometry.cpp` : Génération de la géométrie
-- `main.cpp` : Enregistrement QML avec `qmlRegisterType`
+Cette section décrit une implémentation historique (`TaperedBoxGeometry`) qui n'est plus compilée.
+Conserver ces notes uniquement comme archive de conception.
 
 ### Visualisation ADSR
 

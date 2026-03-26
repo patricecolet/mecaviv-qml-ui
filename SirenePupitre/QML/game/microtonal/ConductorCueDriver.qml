@@ -740,11 +740,17 @@ Item {
         } else if (previewIdx >= 0) {
             root.applyVisualOnly(vm, root._tickCues[previewIdx])
             vm.voletOpen = 0
+        } else if (root._tickCues.length > 0 && tick < root._tickCues[0].tick) {
+            // Playhead avant la 1re note : afficher la cible de la 1re consigne (évite le défaut La4).
+            root.applyVisualOnly(vm, root._tickCues[0])
+            vm.voletOpen = 0
+            root._lastActiveIdx = -1
         } else {
             vm.midiAnchor = 69
             vm.targetCents = 0
             vm.voletOpen = 0
             vm.glissSpeed = types.glissInstant
+            vm.glissTargetMidi = -1
             root._lastActiveIdx = -1
         }
 
@@ -803,11 +809,27 @@ Item {
         } else if (previewIdx >= 0) {
             root.applyVisualOnly(vm, root._barCues[previewIdx])
             vm.voletOpen = 0
+        } else if (root._barCues.length > 0) {
+            var posNow = root._scoreBarPos(bar, beatF)
+            var firstPos = root._scoreBarCue(root._barCues[0])
+            if (posNow < firstPos) {
+                root.applyVisualOnly(vm, root._barCues[0])
+                vm.voletOpen = 0
+                root._lastActiveBarIdx = -1
+            } else {
+                vm.midiAnchor = 69
+                vm.targetCents = 0
+                vm.voletOpen = 0
+                vm.glissSpeed = types.glissInstant
+                vm.glissTargetMidi = -1
+                root._lastActiveBarIdx = -1
+            }
         } else {
             vm.midiAnchor = 69
             vm.targetCents = 0
             vm.voletOpen = 0
             vm.glissSpeed = types.glissInstant
+            vm.glissTargetMidi = -1
             root._lastActiveBarIdx = -1
         }
 
