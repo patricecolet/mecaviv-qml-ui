@@ -50,7 +50,7 @@ Item {
         if (!sirens) return -1
         var currentId = configController.primarySiren ? configController.primarySiren.id : null
         for (var i = 0; i < sirens.length; ++i) {
-            if (sirens[i].id === currentId) return i
+            if (Number(sirens[i].id) === Number(currentId)) return i
         }
         return 0
     }
@@ -388,6 +388,7 @@ Item {
                 if (newPlaying) {
                     if (page.rootWindow) {
                         page.rootWindow.userRequestedStop = false
+                        page.rootWindow.userRequestedPlay = true
                         page.rootWindow.isGamePlaying = true
                     }
                     // Utiliser sequencerController depuis gameModeOverlay
@@ -404,21 +405,26 @@ Item {
                     }
                     if (page.gameModeItem && typeof page.gameModeItem.startGame === "function")
                         page.gameModeItem.startGame()
+                    page.transportPlayRequestedAtMs = Date.now()
+                    page.transportClockNowMs = page.transportPlayRequestedAtMs
                     page.transportDisplayActive = true
                     page.webSocketController.sendBinaryMessage({
                         type: "MIDI_TRANSPORT",
                         action: "play",
-                        midiDelayMs: 5000,
+                        midiDelayMs: page.midiTransportDelayMs || 5000,
                         source: "pupitre"
                     })
                 } else {
                     page.transportDisplayActive = false
+                    page.transportPlayRequestedAtMs = -1
+                    page.transportClockNowMs = 0
                     page.webSocketController.sendBinaryMessage({
                         type: "MIDI_TRANSPORT",
                         action: "stop",
                         source: "pupitre"
                     })
                     if (page.rootWindow) {
+                        page.rootWindow.userRequestedPlay = false
                         page.rootWindow.userRequestedStop = true
                         page.rootWindow.isGamePlaying = false
                     }

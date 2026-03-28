@@ -296,7 +296,7 @@ Item {
                         Layout.fillWidth: false
 
                         property bool isSelected: configController && configController.primarySiren &&
-                                                 configController.primarySiren.id === modelData.id
+                                                 Number(configController.primarySiren.id) === Number(modelData.id)
 
                         contentItem: Text {
                             text: modelData.name

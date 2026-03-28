@@ -269,7 +269,7 @@ Item {
                                    if (configController && configController.primarySiren) {
                                        var sirens = configController.config.sirenConfig.sirens
                                        for (var i = 0; i < sirens.length; i++) {
-                                           if (sirens[i].id === configController.primarySiren.id) {
+                                           if (Number(sirens[i].id) === Number(configController.primarySiren.id)) {
                                                configController.setValueAtPath(["sirenConfig", "sirens", i, "displayOctaveOffset"], value)
                                                break
                                            }

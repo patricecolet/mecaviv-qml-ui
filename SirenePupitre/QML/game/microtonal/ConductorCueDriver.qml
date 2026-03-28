@@ -31,6 +31,7 @@ Item {
 
     MicrotonalTypes { id: types }
 
+    /** Canal MIDI 1–16 pour filtrer les consignes ; même valeur pour nombre ou chaîne numérique (JSON). */
     readonly property int _effectiveMidiChannel: {
         var _ = configController ? configController.updateCounter : 0
         if (root.midiChannelFilter >= 1 && root.midiChannelFilter <= 16)
@@ -39,9 +40,12 @@ Item {
             return 1
         }
         var s = configController.primarySiren
-        if (typeof s.midiChannel === "number" && s.midiChannel >= 1 && s.midiChannel <= 16)
-            return Math.floor(s.midiChannel)
-        var idn = parseInt(s.id, 10)
+        if (s.midiChannel !== undefined && s.midiChannel !== null) {
+            var mcn = (typeof s.midiChannel === "number") ? s.midiChannel : parseInt(String(s.midiChannel), 10)
+            if (!isNaN(mcn) && mcn >= 1 && mcn <= 16)
+                return Math.floor(mcn)
+        }
+        var idn = (typeof s.id === "number") ? s.id : parseInt(String(s.id), 10)
         if (!isNaN(idn) && idn >= 1 && idn <= 16)
             return idn
         return 1
@@ -224,7 +228,12 @@ Item {
         var ch = root._effectiveMidiChannel
         if (cue.sirenTrackIndex === undefined || cue.sirenTrackIndex === null)
             return true
-        return cue.sirenTrackIndex === ch
+        var st = (typeof cue.sirenTrackIndex === "number")
+                ? cue.sirenTrackIndex
+                : parseInt(String(cue.sirenTrackIndex), 10)
+        if (isNaN(st))
+            return false
+        return Math.floor(st) === ch
     }
 
     function _sortBar(a, b) {
@@ -938,9 +947,9 @@ Item {
     function processTick(playing, tick) {
         if (!root.useMicrotonalDisplay || !root.isSequenced || !root.viewModel)
             return
-        var runGate = root.transportRunActive || root.playRequestedAtMs === 0
+        var runGate = root.transportRunActive || root.playRequestedAtMs <= 0
         var effectivePlaying = playing && runGate
-        var tickEff = root._effectiveTickFromTransport(effectivePlaying, tick)
+        var tickEff = effectivePlaying ? root._effectiveTickFromTransport(true, tick) : tick
         if (!effectivePlaying) {
             root._lastTick = tickEff
             root.viewModel.sequencedAnticipationProgress = 0
@@ -982,7 +991,7 @@ Item {
     function processBarBeat(playing, bar, beatInBar, beatF) {
         if (!root.useMicrotonalDisplay || !root.isSequenced || !root.viewModel)
             return
-        var runGate = root.transportRunActive || root.playRequestedAtMs === 0
+        var runGate = root.transportRunActive || root.playRequestedAtMs <= 0
         var effectivePlaying = playing && runGate
         var bpb = 4
         var adj = root._effectiveBarBeatFromTransport(effectivePlaying, bar, beatF, bpb)

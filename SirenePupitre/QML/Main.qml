@@ -28,6 +28,7 @@ Window {
     property bool isAdminMode: false
     property bool isGamePlaying: false
     property bool userRequestedStop: false  // Clic Stop : ne pas laisser 0x01(playing=true) réécraser isGamePlaying
+    property bool userRequestedPlay: false  // Clic Play : ne pas laisser 0x01(playing=false) réécraser isGamePlaying
     property bool gameMode: false
 
     // --- UI ---
@@ -107,18 +108,26 @@ Window {
         // Playback : position / tick → met à jour isGamePlaying (sauf si user a cliqué Stop)
         onPlaybackPositionReceived: function(playing, bar, beatInBar, beat) {
             if (!playing) {
+                if (mainWindow.userRequestedPlay)
+                    return
                 mainWindow.userRequestedStop = false
                 mainWindow.isGamePlaying = false
-            } else if (!mainWindow.userRequestedStop) {
-                mainWindow.isGamePlaying = true
+            } else {
+                mainWindow.userRequestedPlay = false
+                if (!mainWindow.userRequestedStop)
+                    mainWindow.isGamePlaying = true
             }
         }
         onPlaybackTickReceived: function(playing, tick) {
             if (!playing) {
+                if (mainWindow.userRequestedPlay)
+                    return
                 mainWindow.userRequestedStop = false
                 mainWindow.isGamePlaying = false
-            } else if (!mainWindow.userRequestedStop) {
-                mainWindow.isGamePlaying = true
+            } else {
+                mainWindow.userRequestedPlay = false
+                if (!mainWindow.userRequestedStop)
+                    mainWindow.isGamePlaying = true
             }
         }
 

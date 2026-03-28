@@ -66,7 +66,7 @@ Rectangle {
     // Fonction pour envoyer un message de test du fader (1 ou 0)
     function testFader(active) {
         if (!webSocketController || !webSocketController.connected) {
-            console.log("❌ WebSocket non connecté, impossible d'envoyer le test du fader")
+            console.log("[ControllersPanel] WebSocket non connecté, test fader annulé")
             return
         }
         
@@ -78,7 +78,7 @@ Rectangle {
         
         // Envoyer via sendBinaryMessage (qui convertit JSON en binaire)
         webSocketController.sendBinaryMessage(message)
-        console.log("✅ Message de test fader envoyé:", JSON.stringify(message))
+        console.log("[ControllersPanel] FADER_TEST envoyé:", JSON.stringify(message))
     }
 
     property bool leftSpeakerTestOn: false
@@ -86,11 +86,11 @@ Rectangle {
 
     function testSpeaker(channel, active) {
         if (!webSocketController || !webSocketController.connected) {
-            console.log("❌ WebSocket non connecté, impossible d'envoyer le test HP")
+            console.log("[ControllersPanel] WebSocket non connecté, test HP annulé")
             return
         }
         webSocketController.sendBinaryMessage({ type: "SPEAKER_TEST", channel: channel, active: active })
-        console.log("✅ Message SPEAKER_TEST envoyé:", channel, active)
+        console.log("[ControllersPanel] SPEAKER_TEST channel:", channel, "active:", active)
     }
 
     /** Envoie un message PAD_CALIBRATION pour déclencher le calibrage : pad (0 ou 1), mode (min ou max). */

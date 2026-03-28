@@ -48,6 +48,8 @@ trap "echo; echo -e \"${RED}⛔ Opération interrompue par l'utilisateur.${NC}\"
 SERVER_USER="sirenateur"
 SIRENE_PROJECT_PATH="/home/sirenateur/dev/src/mecaviv/patko-scratchpad/qtQmlSockets/SirenePupitre"
 VOLANT_PROJECT_PATH="/home/sirenateur/dev/src/mecaviv/patko-scratchpad/volant"
+CRITAPEC_LOCAL_PATH="${HOME}/dev/src/critapec-pd-externals"
+CRITAPEC_REMOTE_PATH="/home/sirenateur/pd-externals/critapec"
 
 # Commande rsync (comme dans le script qui fonctionne)
 _COPY_COMMAND="rsync -avuPe ssh"
@@ -120,6 +122,35 @@ print_status "Synchronisation de start-raspberry.sh..."
 sshpass -p${SSH_PASSWORD} $_COPY_COMMAND scripts/start-raspberry.sh ${SERVER_USER}@${SERVER_HOST}:${SIRENE_PROJECT_PATH}/start-raspberry.sh
 print_success "start-raspberry.sh synchronisé"
 
+# 6. Synchroniser l'external PureData c-siren~ (critapec)
+print_status "Synchronisation de l'external c-siren~ (critapec)..."
+if [ -d "$CRITAPEC_LOCAL_PATH" ]; then
+    TMP_CRITAPEC_DIR="$(mktemp -d)"
+    trap 'rm -rf "$TMP_CRITAPEC_DIR"; echo; echo -e "${RED}⛔ Opération interrompue par l'utilisateur.${NC}"; exit 130' INT
+
+    # Copier uniquement les artefacts c-siren~ (binaire + help)
+    find "$CRITAPEC_LOCAL_PATH" -type f \( \
+        -name "c-siren~*.pd_linux" -o \
+        -name "c-siren~*.so" -o \
+        -name "c-siren~-help.pd" \
+    \) -exec cp {} "$TMP_CRITAPEC_DIR"/ \;
+
+    if ls "$TMP_CRITAPEC_DIR"/* >/dev/null 2>&1; then
+        sshpass -p${SSH_PASSWORD} ssh ${SERVER_USER}@${SERVER_HOST} "mkdir -p ${CRITAPEC_REMOTE_PATH}"
+        sshpass -p${SSH_PASSWORD} $_COPY_COMMAND "$TMP_CRITAPEC_DIR"/ ${SERVER_USER}@${SERVER_HOST}:${CRITAPEC_REMOTE_PATH}/
+        print_success "External c-siren~ synchronisé vers ${CRITAPEC_REMOTE_PATH}"
+    else
+        print_error "Aucun artefact c-siren~ trouvé dans ${CRITAPEC_LOCAL_PATH}"
+        rm -rf "$TMP_CRITAPEC_DIR"
+        exit 1
+    fi
+
+    rm -rf "$TMP_CRITAPEC_DIR"
+else
+    print_error "Répertoire critapec introuvable: ${CRITAPEC_LOCAL_PATH}"
+    exit 1
+fi
+
 echo ""
 echo -e "${GREEN} Synchronisation terminée avec succès !${NC}"
 echo -e "${BLUE} Fichiers synchronisés :${NC}"
@@ -128,6 +159,7 @@ echo "   • webfiles/"
 echo "   • volant/config.json"
 echo "   • restart-servers.sh"
 echo "   • start-raspberry.sh"
+echo "   • c-siren~ (critapec external)"
 
 # 4. Relancer le client si demandé
 if [ "$RESTART_CLIENT" = true ]; then

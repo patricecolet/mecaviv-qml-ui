@@ -26,7 +26,7 @@ Item {
         if (!configController || !configController.primarySiren) return -1
         var sirens = configController.config && configController.config.sirenConfig ? (configController.config.sirenConfig.sirens || []) : []
         for (var i = 0; i < sirens.length; i++)
-            if (sirens[i].id === configController.primarySiren.id) return i
+            if (Number(sirens[i].id) === Number(configController.primarySiren.id)) return i
         return -1
     }
 

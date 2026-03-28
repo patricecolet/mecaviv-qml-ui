@@ -189,11 +189,11 @@ start_server() {
 # Fonction pour démarrer PureData
 start_puredata() {
     echo "$(date): Démarrage de PureData avec ALSA MIDI..."
-    
+    PURE_DATA_AUDIO_SETTINGS="-audiooutdev 0 -outchannels 2"
     PURE_DATA_PATCH="/home/sirenateur/dev/src/mecaviv/puredata-abstractions/application.layer/M645.pd"
     
     if [ -f "$PURE_DATA_PATCH" ]; then
-        pd -alsamidi -mididev 1 "$PURE_DATA_PATCH" &
+        pd -alsamidi -mididev 1 $PURE_DATA_AUDIO_SETTINGS "$PURE_DATA_PATCH" &
         echo "$(date): ✅ PureData démarré avec ALSA MIDI (device 1)"
     else
         echo "$(date): ❌ PureData patch non trouvé: $PURE_DATA_PATCH"

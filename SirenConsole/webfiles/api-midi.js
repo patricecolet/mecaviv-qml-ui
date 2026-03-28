@@ -8,6 +8,29 @@ const MIDI_REPO_PATH = process.env.MECAVIV_COMPOSITIONS_PATH || config.paths.mid
 
 console.log('📁 MIDI Repository Path:', MIDI_REPO_PATH);
 
+async function hasConductorCuesJson(midiFullPath) {
+    const dir = path.dirname(midiFullPath);
+    const ext = path.extname(midiFullPath);
+    const base = path.basename(midiFullPath, ext);
+    const siblingJsonDir = path.resolve(dir, '..', 'json');
+    const candidates = [
+        path.join(dir, `${base}_conductor-cues.json`),
+        path.join(dir, 'conductor-cues.json'),
+        path.join(dir, `${base}.json`),
+        // Compat historique: dossiers séparés .../midi/<piece>.midi + .../json/<piece>.json
+        path.join(siblingJsonDir, `${base}_conductor-cues.json`),
+        path.join(siblingJsonDir, 'conductor-cues.json'),
+        path.join(siblingJsonDir, `${base}.json`),
+    ];
+    for (const p of candidates) {
+        try {
+            const st = await fs.stat(p);
+            if (st.isFile()) return true;
+        } catch (_) {}
+    }
+    return false;
+}
+
 /**
  * Scanner un répertoire récursivement pour trouver les fichiers MIDI
  */
@@ -26,14 +49,14 @@ async function scanDirectory(dir, category = '', baseDir = dir) {
                 const subFiles = await scanDirectory(fullPath, subCategory, baseDir);
                 files.push(...subFiles);
             } else if (entry.isFile() && /\.(midi?|mid)$/i.test(entry.name)) {
-                // Fichier MIDI trouvé
-                const relativePath = path.relative(baseDir, fullPath);
-                const categoryName = category || 'uncategorized';
-                
+                const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+                const categoryName = (category && category.replace(/\\/g, '/')) || 'uncategorized';
+                const microtonal = await hasConductorCuesJson(fullPath);
                 files.push({
                     name: entry.name,
-                    path: relativePath.replace(/\\/g, '/'), // Unix paths
-                    category: categoryName.split('/')[0], // Première partie du chemin
+                    path: relativePath,
+                    category: categoryName,
+                    microtonal: microtonal,
                     fullPath: fullPath
                 });
             }

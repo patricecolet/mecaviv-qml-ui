@@ -13,10 +13,10 @@ QtObject {
         "midiFiles": { "repositoryPath": "../mecaviv/compositions" },
         "sirenConfig": { 
             "mode": "restricted", 
-            "currentSirens": ["1"],
+            "currentSirens": [1],
             "sirens": [
                 {
-                    "id": "1",
+                    "id": 1,
                     "name": "S1",
                     "midiChannel": 1,
                     "outputs": 12,
@@ -105,15 +105,46 @@ QtObject {
     signal ready()
     signal settingsUpdated()
     
+    /**
+     * Normalise id sirène et currentSirens en nombres (JSON / anciennes configs peuvent encore envoyer des strings).
+     */
+    function normalizeSirenNumericIds(cfg) {
+        if (!cfg || !cfg.sirenConfig)
+            return
+        var sc = cfg.sirenConfig
+        var sirens = sc.sirens
+        if (sirens) {
+            for (var i = 0; i < sirens.length; i++) {
+                if (sirens[i].id !== undefined && typeof sirens[i].id !== "number") {
+                    var nid = parseInt(String(sirens[i].id), 10)
+                    if (!isNaN(nid))
+                        sirens[i].id = nid
+                }
+            }
+        }
+        var cs = sc.currentSirens
+        if (cs && Array.isArray(cs)) {
+            for (var j = 0; j < cs.length; j++) {
+                if (typeof cs[j] !== "number") {
+                    var cid = parseInt(String(cs[j]), 10)
+                    if (!isNaN(cid))
+                        sc.currentSirens[j] = cid
+                }
+            }
+        }
+    }
+
     Component.onCompleted: {
         // En WASM, la vraie config arrive via WebSocket depuis PureData
         
         // Valeur par défaut
         mode = (config && config.mode) ? config.mode : "restricted"
         
+        normalizeSirenNumericIds(config)
+        
         // Sélectionner la/les sirènes par défaut
         if (config.sirenConfig && config.sirenConfig.sirens && config.sirenConfig.sirens.length > 0) {
-            var ids0 = config.sirenConfig.currentSirens || ["1"]
+            var ids0 = config.sirenConfig.currentSirens || [1]
             selectSirens(ids0)
         }
         
@@ -140,50 +171,30 @@ QtObject {
         for (var i = 0; i < path.length - 1; i++) {
             var pathKey = path[i]
             
-            // Conversion spéciale : si on accède au tableau "sirens", convertir l'id en index
-            // Les ids commencent à "1" (S1, S2, S3...) mais les index du tableau commencent à 0
+            // sirens[pathSegment] : README + server.js (PARAM_UPDATE)
+            // - nombre = index tableau 0-based
+            // - chaîne = id sirène (legacy) → index ; id numériques en JSON utilisent des nombres
             if (i === 1 && path[0] === "sirenConfig" && pathKey === "sirens" && i + 1 < path.length) {
                 var nextKey = path[i + 1]
-                // Accéder à config directement pour avoir les sirens
                 var sirens = config.sirenConfig ? config.sirenConfig.sirens : []
                 
-                // Si nextKey est un nombre, TOUJOURS essayer de le traiter comme un id d'abord
-                // Les ids commencent à 1 (S1=1, S2=2, S3=3...), les index à 0
                 if (typeof nextKey === "number") {
-                    // TOUJOURS chercher d'abord comme un id (même si c'est un index valide)
+                    if (nextKey < 0 || nextKey >= sirens.length) {
+                        console.warn("[ConfigController] Index sirens hors limites:", nextKey, "longueur:", sirens.length)
+                    }
+                } else if (typeof nextKey === "string") {
                     var foundIndex = -1
-                    var targetId = nextKey.toString()
+                    var want = parseInt(String(nextKey), 10)
                     for (var j = 0; j < sirens.length; j++) {
-                        if (sirens[j].id === targetId) {
+                        if (Number(sirens[j].id) === want) {
                             foundIndex = j
                             break
                         }
                     }
                     if (foundIndex >= 0) {
-                        // C'est un id, convertir en index
-                        console.log("🎯 [ConfigController] Conversion id→index:", "id", targetId, "→ index", foundIndex);
                         path[i + 1] = foundIndex
                     } else {
-                        // Pas trouvé comme id, utiliser comme index (pour rétrocompatibilité)
-                        if (nextKey >= 0 && nextKey < sirens.length) {
-                            console.log("🎯 [ConfigController] Utilisation comme index:", nextKey, "(id non trouvé)");
-                        } else {
-                            console.log("🎯 [ConfigController] Avertissement: id", nextKey, "non trouvé et index invalide");
-                        }
-                    }
-                } else if (typeof nextKey === "string" && !isNaN(parseInt(nextKey))) {
-                    // Si c'est une string numérique, chercher l'index correspondant à cet id
-                    var foundIndex = -1
-                    for (var j = 0; j < sirens.length; j++) {
-                        if (sirens[j].id === nextKey) {
-                            foundIndex = j
-                            break
-                        }
-                    }
-                    if (foundIndex >= 0) {
-                        // Remplacer l'id par l'index dans le path
-                        console.log("🎯 [ConfigController] Conversion id→index:", "id", nextKey, "→ index", foundIndex);
-                        path[i + 1] = foundIndex
+                        console.warn("[ConfigController] Id sirène introuvable dans sirens:", nextKey)
                     }
                 }
             }
@@ -205,27 +216,35 @@ QtObject {
             finalValue = parseFloat(value) || parseInt(value) || 0
         }
         
-        // Conversion spéciale pour currentSirens (forcer un tableau de strings)
+        // currentSirens : tableau d'ids sirène numériques
         if (path.join(".") === "sirenConfig.currentSirens") {
             if (Array.isArray(value)) {
-                finalValue = value.map(function(v) { return (typeof v === "number") ? v.toString() : v })
+                finalValue = value.map(function(v) {
+                    if (typeof v === "number" && isFinite(v))
+                        return v
+                    var n = parseInt(String(v), 10)
+                    return isNaN(n) ? v : n
+                })
             } else {
-                finalValue = [ (typeof value === "number") ? value.toString() : value ]
+                if (typeof value === "number" && isFinite(value))
+                    finalValue = [value]
+                else {
+                    var n2 = parseInt(String(value), 10)
+                    finalValue = isNaN(n2) ? [value] : [n2]
+                }
             }
         }
         
-        // Log fin de chaîne pour frettedMode
+        // Log fin de chaîne pour frettedMode (path[2] = index tableau après résolution id éventuelle)
         if (path.length >= 4 && path[0] === "sirenConfig" && path[1] === "sirens" && 
             path[3] === "frettedMode" && path[4] === "enabled") {
             var sirenIndex = path[2];
             var modifiedSiren = config.sirenConfig.sirens[sirenIndex];
-            var currentSirenIds = config.sirenConfig.currentSirens || ["1"];
-            var currentSirenId = currentSirenIds.length > 0 ? currentSirenIds[0] : "1";
-            var isCurrentSiren = modifiedSiren && modifiedSiren.id === currentSirenId;
-            console.log("🎯 [ConfigController] Fin chaîne - frettedMode modifié:", 
-                "sirène index", sirenIndex, "id", modifiedSiren ? modifiedSiren.id : "?", 
-                "ancienne valeur:", oldValue, "nouvelle valeur:", finalValue,
-                "sirène actuelle:", currentSirenId, "est la même:", isCurrentSiren);
+            var currentSirenIds = config.sirenConfig.currentSirens || [1];
+            var currentSirenId = currentSirenIds.length > 0 ? currentSirenIds[0] : 1;
+            var isCurrentSiren = modifiedSiren && Number(modifiedSiren.id) === Number(currentSirenId);
+            console.log("[ConfigController] frettedMode sirens[" + sirenIndex + "] id=" + (modifiedSiren ? modifiedSiren.id : "?")
+                + ":", oldValue, "->", finalValue, isCurrentSiren ? "(sirène active)" : "");
         }
         
         // Définir la valeur
@@ -313,7 +332,7 @@ QtObject {
             var sirenIndex = parseInt(path[2])
             if (config.sirenConfig.sirens[sirenIndex] && primarySiren) {
                 var sirenId = config.sirenConfig.sirens[sirenIndex].id
-                if (primarySiren.id === sirenId) {
+                if (Number(primarySiren.id) === Number(sirenId)) {
                     // Mettre à jour la propriété dans currentSiren
                     var propertyName = path[3]
                     primarySiren[propertyName] = value
@@ -336,7 +355,7 @@ QtObject {
         // Trouver l'index de la sirène courante
         var sirens = config.sirenConfig.sirens
         for (var i = 0; i < sirens.length; i++) {
-            if (sirens[i].id === primarySiren.id) {
+            if (Number(sirens[i].id) === Number(primarySiren.id)) {
                 setValueAtPath(["sirenConfig", "sirens", i, "restrictedMax"], value)
                 break
             }
@@ -377,21 +396,28 @@ QtObject {
     
     function selectSirens(ids) {
         if (!config) return false
+        normalizeSirenNumericIds(config)
         var list = Array.isArray(ids) ? ids : [ids]
-        // normaliser en strings
         list = list.map(function(id) {
-            if (typeof id === "number") return id.toString()
-            if (typeof id === "string" && id.startsWith("S") && id.length > 1) return id.substring(1)
+            if (typeof id === "number" && isFinite(id))
+                return id
+            if (typeof id === "string") {
+                if (id.startsWith("S") && id.length > 1) {
+                    var sn = parseInt(id.substring(1), 10)
+                    return isNaN(sn) ? id : sn
+                }
+                var pn = parseInt(id, 10)
+                return isNaN(pn) ? id : pn
+            }
             return id
         })
 
-        // Construire le tableau d'objets sirènes correspondants
         var sirens = config.sirenConfig.sirens
         var selectedObjs = []
         for (var j = 0; j < list.length; j++) {
             var id = list[j]
             for (var k = 0; k < sirens.length; k++) {
-                if (sirens[k].id === id) {
+                if (Number(sirens[k].id) === Number(id)) {
                     selectedObjs.push(sirens[k])
                     break
                 }
@@ -409,7 +435,7 @@ QtObject {
             webSocketController.sendBinaryMessage({
                 type: "SIRENS_SELECTED",
                 sirenIds: list,
-                sirenNumbers: list.map(function(x) { return parseInt(x) })
+                sirenNumbers: list.map(function(x) { return typeof x === "number" ? x : parseInt(String(x), 10) })
             })
         }
         return true
@@ -444,13 +470,14 @@ QtObject {
     }
     function updateFullConfig(newConfig) {
         
+        normalizeSirenNumericIds(newConfig)
         // Remplacer toute la configuration
         config = newConfig;
 
         // Réinitialiser l'état local depuis la nouvelle config
         mode = newConfig.mode || "restricted";
         if (newConfig.sirenConfig) {
-            var ids = newConfig.sirenConfig.currentSirens || ["1"]
+            var ids = newConfig.sirenConfig.currentSirens || [1]
             selectSirens(ids);
         }
 

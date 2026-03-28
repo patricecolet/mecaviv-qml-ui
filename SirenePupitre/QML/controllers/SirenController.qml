@@ -9,6 +9,7 @@ QtObject {
     
     // Données d'entrée
     property real midiNote: 60.0
+    /** Note dans l’ambitus (continue). L’arrondi mode fretté s’applique seulement à freq/rpm/noteName. */
     property real clampedNote: 60.0
     property int velocity: 127  // 0-127 (volant 0x03, ou jauge manuelle si pas de pad)
     
@@ -40,29 +41,26 @@ QtObject {
     
     function calculate() {
         if (!configController || !configController.primarySiren) {
+            clampedNote = midiNote
             return
         }
         
         var siren = configController.primarySiren
         sirenName = siren.name
         
-        // Limiter la note selon le mode et l'ambitus
+        // Limiter la note selon le mode et l'ambitus (curseur portée, microtonal : toujours cette valeur)
         var minNote = configController.getMinNote()
         var maxNote = configController.getMaxNote()
         clampedNote = Math.max(minNote, Math.min(midiNote, maxNote))
         
-        // Appliquer le mode fretté si activé pour la sirène actuelle
-        var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], ["1"]) 
-        var currentSirenId = ids.length > 0 ? ids[0] : "1"
+        // Mode fretté : quantifier seulement Hz / RPM / nom (pas la même valeur que le curseur)
+        var ids = configController.getValueAtPath(["sirenConfig", "currentSirens"], [1]) 
+        var currentSirenId = ids.length > 0 ? ids[0] : 1
         var frettedModeEnabled = configController.getValueAtPath(["sirenConfig", "sirens"], []).find(function(siren) {
-            return siren.id === currentSirenId
+            return Number(siren.id) === Number(currentSirenId)
         })?.frettedMode?.enabled || false
         
-        if (frettedModeEnabled) {
-            var frettedNote = Math.round(clampedNote)
-            // Log désactivé pour performance
-            clampedNote = frettedNote
-        }
+        var noteForLimitedDisplay = frettedModeEnabled ? Math.round(clampedNote) : clampedNote
         
         // Logs désactivés pour performance
         
@@ -74,11 +72,11 @@ QtObject {
         trueNoteName = musicUtils.midiToNoteName(midiNote)
         
         // Calculer les valeurs limitées (pour l'ambitus)
-        var freq = musicUtils.midiToFrequency(clampedNote, siren.transposition)
+        var freq = musicUtils.midiToFrequency(noteForLimitedDisplay, siren.transposition)
         frequency = musicUtils.formatFrequency(freq)
         var calculatedRpm = musicUtils.frequencyToRPM(freq, siren.outputs)
         rpm = musicUtils.formatRPM(calculatedRpm)
-        noteName = musicUtils.midiToNoteName(clampedNote)
+        noteName = musicUtils.midiToNoteName(noteForLimitedDisplay)
         
         // Log désactivé pour performance
     }

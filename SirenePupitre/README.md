@@ -218,10 +218,10 @@ var configData = {
     },
     "sirenConfig": {
         "mode": "restricted",  // "restricted" ou "admin"
-        "currentSiren": "1",   // ID de la sirène active
+        "currentSirens": [1],  // IDs sirène actifs (nombres)
         "sirens": [
             {
-                "id": "1",
+                "id": 1,
                 "name": "S1",
                 "outputs": 12,  // Nombre de sorties mécaniques
                 "ambitus": {

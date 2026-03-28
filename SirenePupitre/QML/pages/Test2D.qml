@@ -87,7 +87,7 @@ Page {
         var sirens = root.configController.config && root.configController.config.sirenConfig
                 ? (root.configController.config.sirenConfig.sirens || []) : []
         for (var i = 0; i < sirens.length; i++) {
-            if (sirens[i].id === root.configController.primarySiren.id)
+            if (Number(sirens[i].id) === Number(root.configController.primarySiren.id))
                 return i
         }
         return -1
@@ -124,6 +124,7 @@ Page {
         if (newPlaying) {
             if (root.rootWindow) {
                 root.rootWindow.userRequestedStop = false
+                root.rootWindow.userRequestedPlay = true
                 root.rootWindow.isGamePlaying = true
             }
             root.transportPlayRequestedAtMs = Date.now()
@@ -149,13 +150,14 @@ Page {
                 source: "pupitre"
             })
             if (root.rootWindow) {
+                root.rootWindow.userRequestedPlay = false
                 root.rootWindow.userRequestedStop = true
                 root.rootWindow.isGamePlaying = false
             }
         }
     }
 
-    // Note à afficher sur la portée (mode jeu : clampedNote ; Pd peut envoyer la note courante plus tard)
+    // Note à afficher sur la portée (SirenController.clampedNote = ambitus continu, pas arrondi fretté)
     property real displayNoteForStaff: root.clampedNote
 
     property real rpm: sirenController ? sirenController.trueRpm : 1200
@@ -474,10 +476,10 @@ Page {
                         var newValue = !v
                         configController.setValueAtPath(["controllersPanel", "visible"], newValue)
                         root.controllersPanelVisible = newValue  // Mise à jour immédiate via propriété locale
-                        console.log("🎮 [Test2D] Contrôleurs:", newValue ? "affichés" : "masqués")
+                        console.log("[Test2D] Contrôleurs:", newValue ? "affichés" : "masqués")
                     } else {
                         root.controllersPanelVisible = !root.controllersPanelVisible
-                        console.log("🎮 [Test2D] Contrôleurs (sans config):", root.controllersPanelVisible ? "affichés" : "masqués")
+                        console.log("[Test2D] Contrôleurs (sans config):", root.controllersPanelVisible ? "affichés" : "masqués")
                     }
                 }
                 onToggleGameMode: {

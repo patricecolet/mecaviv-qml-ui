@@ -15,10 +15,10 @@ var configData = {
   },
   "sirenConfig": {
     "mode": "restricted",
-    "currentSirens": ["1"],
+    "currentSirens": [1],
     "sirens": [
       {
-        "id": "1",
+        "id": 1,
         "name": "S1",
         "outputs": 12,
         "ambitus": {
@@ -34,7 +34,7 @@ var configData = {
         }
       },
       {
-        "id": "2",
+        "id": 2,
         "name": "S2",
         "outputs": 12,
         "ambitus": {
@@ -50,7 +50,7 @@ var configData = {
         }
       },
       {
-        "id": "3",
+        "id": 3,
         "name": "S3",
         "outputs": 8,
         "ambitus": {
@@ -66,7 +66,7 @@ var configData = {
         }
       },
       {
-        "id": "4",
+        "id": 4,
         "name": "S4",
         "outputs": 9,
         "ambitus": {
@@ -82,7 +82,7 @@ var configData = {
         }
       },
       {
-        "id": "5",
+        "id": 5,
         "name": "S5",
         "outputs": 8,
         "ambitus": {
@@ -98,7 +98,7 @@ var configData = {
         }
       },
       {
-        "id": "6",
+        "id": 6,
         "name": "S6",
         "outputs": 8,
         "ambitus": {
@@ -114,7 +114,7 @@ var configData = {
         }
       },
       {
-        "id": "7",
+        "id": 7,
         "name": "S7",
         "outputs": 8,
         "ambitus": {

@@ -67,12 +67,12 @@ function convertPresetToParamUpdates(preset, pupitreId) {
     const pupitreConfig = preset.config.pupitres.find(p => p.id === pupitreId);
     if (!pupitreConfig) return updates;
     
-    // assignedSirenes → ["sirenConfig", "currentSirens"] (convertir en strings pour compatibilité SirenePupitre)
+    // assignedSirenes → ["sirenConfig", "currentSirens"] (ids sirène = nombres)
     if (Array.isArray(pupitreConfig.assignedSirenes)) {
         updates.push({
             type: "PARAM_UPDATE",
             path: ["sirenConfig", "currentSirens"],
-            value: pupitreConfig.assignedSirenes.map(n => String(n)),
+            value: pupitreConfig.assignedSirenes.map(n => (typeof n === 'number' ? n : parseInt(String(n), 10))).filter(n => !isNaN(n)),
             source: "console"
         });
     }
@@ -669,12 +669,12 @@ function requestHandler(request, response) {
                 p.assignedSirenes = Array.isArray(assignedSirenes) ? assignedSirenes : [];
                 await presetAPI.writePresets(data);
                 
-                // Envoyer PARAM_UPDATE si synchronisé (utiliser currentSirens en strings pour compatibilité SirenePupitre)
+                // Envoyer PARAM_UPDATE si synchronisé (ids sirène numériques)
                 if (isSynced(pupitreId) && pureDataProxy) {
                     const update = {
                         type: "PARAM_UPDATE",
                         path: ["sirenConfig", "currentSirens"],
-                        value: p.assignedSirenes.map(n => String(n)),
+                        value: p.assignedSirenes.map(n => (typeof n === 'number' ? n : parseInt(String(n), 10))).filter(n => !isNaN(n)),
                         source: "console"
                     };
                     pureDataProxy.sendToPupitre(pupitreId, update);

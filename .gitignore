@@ -78,3 +78,5 @@ config.json
 # SSL certificates (ne pas versionner les clés privées)
 **/ssl/
 SirenConsole/webfiles/ssl/
+
+.fake

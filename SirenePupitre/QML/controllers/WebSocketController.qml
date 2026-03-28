@@ -515,7 +515,7 @@ Item {
                 // Log spécifique pour PARAM_UPDATE avec uiControls (pour debug)
                 if (data.type === "PARAM_UPDATE" && data.path && Array.isArray(data.path) && 
                     data.path.length === 2 && data.path[0] === "uiControls" && data.path[1] === "enabled") {
-                    console.log("🎨🎨🎨 UI_CONTROLS - Message reçu dans onTextMessageReceived - type:", data.type, "path:", JSON.stringify(data.path), "value:", data.value)
+                    console.log("[WebSocket] UI_CONTROLS message onTextMessageReceived type:", data.type, "path:", JSON.stringify(data.path), "value:", data.value)
                 }
                 
                 // Logs désactivés pour performance
@@ -571,39 +571,34 @@ Item {
                     // Log spécifique pour uiControls (préfixe unique pour filtrage)
                     if (data.path && Array.isArray(data.path) && data.path.length === 2 &&
                         data.path[0] === "uiControls" && data.path[1] === "enabled") {
-                        console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE reçu - path:", JSON.stringify(data.path), "value:", data.value)
+                        console.log("[WebSocket] UI_CONTROLS_PARAM_UPDATE path:", JSON.stringify(data.path), "value:", data.value)
                         var enabled = data.value !== undefined ? (data.value !== 0) : true
-                        console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE - enabled calculé:", enabled, "rootWindow:", !!controller.rootWindow)
+                        console.log("[WebSocket] UI_CONTROLS_PARAM_UPDATE enabled calculé:", enabled, "rootWindow:", !!controller.rootWindow)
                         if (controller.rootWindow && controller.rootWindow.uiControlsEnabled !== undefined) {
-                            console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE - mise à jour uiControlsEnabled à:", enabled)
+                            console.log("[WebSocket] UI_CONTROLS_PARAM_UPDATE mise à jour uiControlsEnabled:", enabled)
                             controller.rootWindow.uiControlsEnabled = enabled
-                            console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE - uiControlsEnabled mis à jour, nouvelle valeur:", controller.rootWindow.uiControlsEnabled)
+                            console.log("[WebSocket] UI_CONTROLS_PARAM_UPDATE uiControlsEnabled:", controller.rootWindow.uiControlsEnabled)
                         } else {
-                            console.log("🎨🎨🎨 UI_CONTROLS_PARAM_UPDATE - ERREUR: rootWindow ou uiControlsEnabled manquant")
+                            console.log("[WebSocket] UI_CONTROLS_PARAM_UPDATE ERREUR rootWindow ou uiControlsEnabled manquant")
                         }
                         return
                     }
                     
-                    // Log début de chaîne pour frettedMode
+                    // Debug : PARAM_UPDATE frettedMode (path[2] = index tableau 0-based ou id chaîne)
                     if (data.path && Array.isArray(data.path) && data.path.length >= 4 && 
                         data.path[0] === "sirenConfig" && data.path[1] === "sirens" && 
                         data.path[3] === "frettedMode" && data.path[4] === "enabled") {
                         var sirenIdentifier = data.path[2];
-                        // Vérifier si c'est un index ou un id
-                        var isIndex = typeof sirenIdentifier === "number";
-                        var sirenId = isIndex ? null : sirenIdentifier;
-                        var sirenIndex = isIndex ? sirenIdentifier : null;
-                        
-                        // Si c'est un index, essayer de trouver l'id correspondant
-                        if (controller.configController && isIndex) {
+                        var isNumericIndex = typeof sirenIdentifier === "number";
+                        var dbgId = null
+                        if (controller.configController && isNumericIndex) {
                             var sirens = controller.configController.getValueAtPath(["sirenConfig", "sirens"], []);
-                            if (sirens[sirenIndex]) {
-                                sirenId = sirens[sirenIndex].id;
-                            }
+                            if (sirens[sirenIdentifier])
+                                dbgId = sirens[sirenIdentifier].id
                         }
-                        
-                        console.log("🎯 [WebSocket] Début chaîne - PARAM_UPDATE frettedMode reçu:", 
-                            "index:", sirenIndex, "id:", sirenId, "enabled:", data.value);
+                        console.log("[WebSocket] PARAM_UPDATE frettedMode sirens",
+                            isNumericIndex ? ("index=" + sirenIdentifier + (dbgId !== null ? " id=" + dbgId : "")) : ("id=" + sirenIdentifier),
+                            "enabled:", data.value);
                     }
                     
                     if (!controller.configController) {
@@ -653,7 +648,7 @@ Item {
                 // GAME_MODE - Changement de mode jeu/normal depuis le serveur (PureData)
                 if (data.type === "GAME_MODE") {
                     var enabled = data.enabled || false;
-                    console.log("🎮 [WebSocket] Début chaîne - GAME_MODE reçu:", "enabled:", enabled);
+                    console.log("[WebSocket] GAME_MODE enabled:", enabled);
                     controller.gameModeReceived(enabled);
                     return;
                 }

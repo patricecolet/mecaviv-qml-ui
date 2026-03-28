@@ -8,6 +8,9 @@ set -e  # Arrêter en cas d'erreur
 SSH_PASSWORD="SIRENS"
 SERVER_USER="sirenateur"
 CRITAPEC_REPO_URL="https://github.com/patricecolet/critapec-pd-externals.git"
+# Git >= 2.27 exige une stratégie explicite si pull.rebase n'est pas configuré sur la machine distante.
+# GIT_MERGE_AUTOEDIT=no évite d'ouvrir un éditeur lors d'un merge (sessions SSH non interactives).
+GIT_PULL="env GIT_MERGE_AUTOEDIT=no git pull --no-rebase"
 REBOOT_AFTER_UPDATE=false
 SELECTED_PUPITRES=""
 EXCLUDED_PUPITRES=""
@@ -182,18 +185,18 @@ build_composesiren_on() {
     print_status "Mise à jour de ~/dev/src/ComposeSiren..."
     if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
         "cd ~/dev/src/ComposeSiren && \
-         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' ${GIT_PULL}"; then
         print_error "Échec du git pull ComposeSiren sur ${host}"
         return 1
     fi
     print_success "Repository ComposeSiren mis à jour"
     
-    print_status "Compilation et packaging ComposeSiren..."
+    print_status "Compilation de c-siren~ (pd-lib-builder)..."
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-        "cd ~/dev/src/ComposeSiren && ./scripts/deploy-raspberry.sh"; then
-        print_success "Build ComposeSiren terminé"
+        "cd ~/dev/src/ComposeSiren/Source/PureData/c-siren~ && make clean && make"; then
+        print_success "Build c-siren~ terminé"
     else
-        print_error "Échec du déploiement/packaging ComposeSiren sur ${host}"
+        print_error "Échec de la compilation c-siren~ sur ${host}"
         return 1
     fi
     
@@ -415,7 +418,7 @@ update_pupitre() {
     print_status "Mise à jour de ~/dev/src/mecaviv/puredata-abstractions..."
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
         "cd ~/dev/src/mecaviv/puredata-abstractions && \
-         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' ${GIT_PULL}"; then
         print_success "puredata-abstractions mis à jour"
     else
         print_error "Échec du git pull puredata-abstractions sur ${host}"
@@ -426,26 +429,26 @@ update_pupitre() {
     print_status "Mise à jour de ~/dev/src/mecaviv/compositions..."
     if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
         "cd ~/dev/src/mecaviv/compositions && \
-         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' ${GIT_PULL}"; then
         print_success "compositions mis à jour"
     else
         print_error "Échec du git pull compositions sur ${host}"
         return 1
     fi
     
+    # 3. Git pull ComposeSiren (nécessaire pour c-siren~)
+    print_status "Mise à jour de ~/dev/src/ComposeSiren..."
+    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+        "cd ~/dev/src/ComposeSiren && \
+         GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' ${GIT_PULL}"; then
+        print_success "ComposeSiren mis à jour"
+    else
+        print_error "Échec du git pull ComposeSiren sur ${host}"
+        return 1
+    fi
+
     if [ "$DEPLOY_COMPOSESIREN" = true ]; then
-        # 3. Git pull ComposeSiren
-        print_status "Mise à jour de ~/dev/src/ComposeSiren..."
-        if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-            "cd ~/dev/src/ComposeSiren && \
-             GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
-            print_success "ComposeSiren mis à jour"
-        else
-            print_error "Échec du git pull ComposeSiren sur ${host}"
-            return 1
-        fi
-        
-        # 3. Installation ComposeSiren via package
+        # Installation ComposeSiren via package
         if [ -n "$COMPOSESIREN_DEB" ]; then
             local remote_deb="/tmp/$(basename "$COMPOSESIREN_DEB")"
             
@@ -467,12 +470,15 @@ update_pupitre() {
             print_status "Nettoyage du package temporaire..."
             sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} "rm -f '$remote_deb'" &>/dev/null || true
         else
-            print_status "Déploiement de ComposeSiren sur ${host}..."
+            print_status "Compilation et déploiement de c-siren~ sur ${host}..."
             if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-                "cd ~/dev/src/ComposeSiren && ./scripts/deploy-raspberry.sh"; then
-                print_success "ComposeSiren déployé"
+                "cd ~/dev/src/ComposeSiren/Source/PureData/c-siren~ && make clean && make && \
+                 mkdir -p ~/dev/src/critapec-pd-externals && \
+                 cp c-siren~.pd_linux ~/dev/src/critapec-pd-externals/ && \
+                 cp c-siren~-help.pd ~/dev/src/critapec-pd-externals/ 2>/dev/null; true"; then
+                print_success "c-siren~ compilé et déployé"
             else
-                print_error "Échec du déploiement ComposeSiren sur ${host}"
+                print_error "Échec de la compilation/déploiement c-siren~ sur ${host}"
                 return 1
             fi
         fi
@@ -547,7 +553,7 @@ update_pupitre() {
         print_status "Mise à jour de critapec-pd-externals..."
         if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
             "cd ~/dev/src/critapec-pd-externals && \
-             GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull"; then
+             GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' ${GIT_PULL}"; then
             print_error "Échec du git pull critapec-pd-externals sur ${host}"
             return 1
         fi
@@ -570,170 +576,74 @@ update_pupitre() {
         print_success "critapec-pd-externals cloné"
     fi
     
-    # Vérifier si une recompilation est nécessaire
-    print_status "Vérification de la synchronisation des externals..."
+    # Compilation et installation de c-siren~ (external PD depuis ComposeSiren)
+    local CSIREN_SRC="~/dev/src/ComposeSiren/Source/PureData/c-siren~"
+    local CSIREN_BIN="c-siren~.pd_linux"
+    local CRITAPEC_DIR="~/pd-externals"
+
+    print_status "Vérification de la synchronisation de c-siren~..."
     NEEDS_BUILD=$(sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-        'cd ~/dev/src/critapec-pd-externals && \
-         src_time=$(find . -name "*.c" -o -name "*.cpp" 2>/dev/null | xargs -r stat -c "%Y" 2>/dev/null | sort -n | tail -1) && \
-         if [ -d ~/pd-externals/critapec ]; then \
-             bin_time=$(find ~/pd-externals/critapec -name "*.pd_linux" -o -name "*.so" 2>/dev/null | xargs -r stat -c "%Y" 2>/dev/null | sort -n | tail -1); \
-         else \
-             bin_time=0; \
-         fi && \
-         if [ -z "$src_time" ]; then src_time=0; fi && \
-         if [ -z "$bin_time" ]; then bin_time=0; fi && \
-         if [ "$src_time" -gt "$bin_time" ]; then \
-             echo "REBUILD"; \
-         elif [ ! -f ~/pd-externals/critapec/rpi_encoder_step.pd_linux ]; then \
-             echo "REBUILD"; \
-         else \
-             echo "OK"; \
-         fi')
-    
+        "CSRC=${CSIREN_SRC}; CBIN=${CRITAPEC_DIR}/${CSIREN_BIN}; \
+         if [ ! -d \"\$CSRC\" ]; then echo 'MISSING'; exit 0; fi; \
+         if [ ! -f \"\$CBIN\" ]; then echo 'REBUILD'; exit 0; fi; \
+         src_time=\$(stat -c '%Y' \"\$CSRC\"/src/*.cpp \"\$CSRC\"/src/*.h \"\$CSRC\"/Makefile 2>/dev/null | sort -n | tail -1); \
+         bin_time=\$(stat -c '%Y' \"\$CBIN\" 2>/dev/null); \
+         if [ -z \"\$src_time\" ]; then echo 'REBUILD'; \
+         elif [ \"\$src_time\" -gt \"\$bin_time\" ]; then echo 'REBUILD'; \
+         else echo 'OK'; fi")
+
+    if [ "$NEEDS_BUILD" = "MISSING" ]; then
+        print_error "Répertoire c-siren~ introuvable dans ComposeSiren (Source/PureData/c-siren~)"
+        print_info "Vérifiez que le dépôt ComposeSiren est à jour sur ${host}"
+        return 1
+    fi
+
     if [ "$NEEDS_BUILD" = "REBUILD" ]; then
-        print_status "Compilation des externals critapec..."
-        
-        # Fonction pour compiler avec gestion des erreurs de dépendances
-        compile_externals() {
-            local max_attempts=2
-            local attempt=1
-            
-            while [ $attempt -le $max_attempts ]; do
-                if [ $attempt -gt 1 ]; then
-                    print_status "Tentative $attempt/$max_attempts de compilation..."
-                fi
-                
-                # Capturer la sortie de compilation pour analyser les erreurs
-                local build_output=$(sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-            "cd ~/dev/src/critapec-pd-externals && \
-             for dir in */; do \
-                 if [ -f \"\${dir}Makefile\" ]; then \
-                     echo \"Building \$dir...\" && \
-                             cd \"\$dir\" && make clean >/dev/null 2>&1 && make 2>&1 && cd .. || (cd .. && exit 1); \
-                         fi; \
-                     done" 2>&1)
-                
-                local build_status=$?
-                
-                if [ $build_status -eq 0 ]; then
-            print_success "Externals compilés"
-                    return 0
-                fi
-                
-                # Analyser les erreurs pour détecter les bibliothèques manquantes
-                local missing_libs=""
-                local missing_headers=""
-                
-                # Détecter les erreurs de bibliothèques manquantes (-lxxx)
-                if echo "$build_output" | grep -qE "cannot find -l[a-zA-Z0-9_-]+"; then
-                    missing_libs=$(echo "$build_output" | grep -oE "cannot find -l[a-zA-Z0-9_-]+" | \
-                        sed 's/cannot find -l//' | sort -u | tr '\n' ' ')
-                fi
-                
-                # Détecter les erreurs de headers manquants
-                if echo "$build_output" | grep -qE "fatal error: [a-zA-Z0-9_/-]+\.h: No such file or directory"; then
-                    missing_headers=$(echo "$build_output" | grep -oE "fatal error: [a-zA-Z0-9_/-]+\.h" | \
-                        sed 's/fatal error: //' | sed 's/\.h$//' | sort -u | tr '\n' ' ')
-                fi
-                
-                # Si c'est la première tentative et qu'on a détecté des dépendances manquantes
-                if [ $attempt -eq 1 ] && ([ -n "$missing_libs" ] || [ -n "$missing_headers" ]); then
-                    print_info "Dépendances manquantes détectées"
-                    if [ -n "$missing_libs" ]; then
-                        print_status "Bibliothèques manquantes: $missing_libs"
-                    fi
-                    if [ -n "$missing_headers" ]; then
-                        print_status "Headers manquants: $missing_headers"
-                    fi
-                    
-                    # Installer les packages de développement courants
-                    print_status "Installation des dépendances de développement..."
-                    local packages_to_install="build-essential pkg-config"
-                    
-                    # Mapper les bibliothèques courantes aux packages Debian/Ubuntu
-                    for lib in $missing_libs; do
-                        case $lib in
-                            gpiod|gpiod2)
-                                packages_to_install="$packages_to_install libgpiod-dev"
-                                ;;
-                            alsa)
-                                packages_to_install="$packages_to_install libasound2-dev"
-                                ;;
-                            jack)
-                                packages_to_install="$packages_to_install libjack-jackd2-dev"
-                                ;;
-                            *)
-                                # Essayer de deviner le package (libxxx-dev)
-                                packages_to_install="$packages_to_install lib${lib}-dev"
-                                ;;
-                        esac
-                    done
-                    
-                    # Mapper les headers aux packages
-                    for header in $missing_headers; do
-                        case $header in
-                            gpiod)
-                                packages_to_install="$packages_to_install libgpiod-dev"
-                                ;;
-                            alsa|alsa/asoundlib)
-                                packages_to_install="$packages_to_install libasound2-dev"
-                                ;;
-                            jack/jack)
-                                packages_to_install="$packages_to_install libjack-jackd2-dev"
-                                ;;
-                        esac
-                    done
-                    
-                    # Supprimer les doublons
-                    packages_to_install=$(echo "$packages_to_install" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-                    
-                    print_status "Installation: $packages_to_install"
-                    if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-                        "sudo apt-get update && sudo apt-get install -y $packages_to_install"; then
-                        print_success "Dépendances installées"
-                        ((attempt++))
-                        continue
-                    else
-                        print_error "Échec de l'installation des dépendances"
-                        # Afficher l'erreur de compilation pour diagnostic
-                        echo -e "${YELLOW}Sortie de compilation:${NC}"
-                        echo "$build_output" | tail -20
-                        return 1
-                    fi
-                else
-                    # Deuxième tentative échouée ou erreur non liée aux dépendances
-            print_error "Échec de la compilation des externals sur ${host}"
-                    echo -e "${YELLOW}Sortie de compilation:${NC}"
-                    echo "$build_output" | tail -30
-                    return 1
-                fi
-            done
-            
-            return 1
-        }
-        
-        if ! compile_externals; then
+        print_status "Compilation de c-siren~ (pd-lib-builder)..."
+
+        local build_output
+        build_output=$(sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+            "cd ${CSIREN_SRC} && make clean && make" 2>&1)
+        local build_status=$?
+
+        if [ $build_status -ne 0 ]; then
+            # Tenter d'installer les dépendances manquantes puis réessayer
+            if echo "$build_output" | grep -qE "fatal error:.*m_pd\.h|cannot find -lpd"; then
+                print_info "Headers Pure Data manquants, installation de puredata-dev..."
+                sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+                    "sudo apt-get update && sudo apt-get install -y puredata-dev" 2>&1
+                build_output=$(sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+                    "cd ${CSIREN_SRC} && make clean && make" 2>&1)
+                build_status=$?
+            fi
+        fi
+
+        if [ $build_status -ne 0 ]; then
+            print_error "Échec de la compilation de c-siren~ sur ${host}"
+            echo -e "${YELLOW}Sortie de compilation:${NC}"
+            echo "$build_output" | tail -30
             return 1
         fi
-        
-        print_status "Installation des externals et help patches..."
+        print_success "c-siren~ compilé"
+
+        print_status "Installation de c-siren~ dans critapec-pd-externals..."
         if sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-            "mkdir -p ~/pd-externals/critapec && \
-             cd ~/dev/src/critapec-pd-externals && \
-             find . \( -name '*.pd_linux' -o -name '*.so' \) -exec cp {} ~/pd-externals/critapec/ \; && \
-             find . -name '*-help.pd' -exec cp {} ~/pd-externals/critapec/ \;"; then
-            print_success "Externals et help patches installés"
-            if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
-                "[ -f ~/pd-externals/critapec/rpi_encoder_step.pd_linux ]"; then
-                print_error "rpi_encoder_step.pd_linux introuvable après installation"
-                return 1
-            fi
+            "mkdir -p ${CRITAPEC_DIR} && \
+             cp ${CSIREN_SRC}/${CSIREN_BIN} ${CRITAPEC_DIR}/ && \
+             cp ${CSIREN_SRC}/c-siren~-help.pd ${CRITAPEC_DIR}/ 2>/dev/null; true"; then
+            print_success "c-siren~ et help patch installés"
         else
-            print_error "Échec de l'installation des externals sur ${host}"
+            print_error "Échec de la copie de c-siren~ vers critapec-pd-externals sur ${host}"
+            return 1
+        fi
+
+        if ! sshpass -p"${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${host} \
+            "test -f ${CRITAPEC_DIR}/${CSIREN_BIN}"; then
+            print_error "c-siren~.pd_linux introuvable après installation"
             return 1
         fi
     else
-        print_success "Externals critapec déjà à jour"
+        print_success "c-siren~ déjà à jour"
     fi
     
     # 6. Rsync webfiles

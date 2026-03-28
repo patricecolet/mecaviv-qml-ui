@@ -19,8 +19,8 @@ Item {
         visible: configController && configController.mode === "admin"
 
         model: configController && configController.config ? configController.config.sirenConfig.sirens : [
-            { id: "1", name: "S1" },
-            { id: "2", name: "S2" }
+            { id: 1, name: "S1" },
+            { id: 2, name: "S2" }
         ]
         textRole: "name"
         valueRole: "id"
@@ -32,7 +32,7 @@ Item {
             var list = configController.config.sirenConfig.currentSirens || []
             var currentId = list.length > 0 ? list[0] : null
             for (var i = 0; i < sirens.length; i++) {
-                if (sirens[i].id === currentId) return i
+                if (Number(sirens[i].id) === Number(currentId)) return i
             }
             return 0
         }
