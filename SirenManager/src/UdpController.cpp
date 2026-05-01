@@ -16,8 +16,8 @@ UdpController::UdpController(QObject *parent)
     , m_udpSocket(nullptr)
     , m_webSocket(nullptr)
     , m_address(QStringLiteral("192.168.1.101"))
-    , m_port(4443)
-    , m_receivePort(4444)
+    , m_port(8001)        // Default send port for Linux Maître (legacy AppDelegate.m:116)
+    , m_receivePort(8000) // Local receive port (legacy: every SendUdp instance binds 8000)
     , m_connected(false)
     , m_useWebSocket(USE_WEBSOCKET)
     , m_targetMachine(MachineType::LinuxMaitre)
@@ -36,6 +36,9 @@ UdpController::UdpController(QObject *parent)
         m_udpSocket = new QUdpSocket(this);
         connect(m_udpSocket, &QUdpSocket::readyRead, this, &UdpController::onUdpReadyRead);
     }
+
+    connect(this, &UdpController::dataReceived,
+            this, &UdpController::parseIncomingData);
 }
 
 UdpController::~UdpController()
@@ -45,9 +48,12 @@ UdpController::~UdpController()
 
 void UdpController::setAddress(const QString &address)
 {
+    // Always update m_targetAddress: the constructor seeds m_address with a
+    // default string but leaves m_targetAddress null, so an early-return on
+    // m_address == address would leave us unable to send.
+    m_targetAddress = QHostAddress(address);
     if (m_address != address) {
         m_address = address;
-        m_targetAddress = QHostAddress(address);
         emit addressChanged(m_address);
     }
 }
@@ -100,7 +106,8 @@ void UdpController::setupUdpSocket(int receivePort)
     }
     
     if (m_udpSocket->bind(QHostAddress::AnyIPv4, receivePort, QUdpSocket::ShareAddress)) {
-        qDebug() << "[UdpController] UDP socket bound to port" << receivePort;
+        qDebug() << "[UdpController] UDP socket bound to port" << receivePort
+                 << "send target=" << m_address << ":" << m_port;
         if (!m_connected) {
             m_connected = true;
             emit connectedChanged(m_connected);
@@ -122,40 +129,21 @@ void UdpController::setupWebSocket(const QString &wsUrl)
     m_webSocket->open(QUrl(wsUrl));
 }
 
-unsigned char UdpController::calculateBCC(const QByteArray &data)
-{
-    if (data.size() < 3) {
-        return 0;
-    }
-    
-    unsigned char bcc = static_cast<unsigned char>(data[3]);
-    for (int i = 4; i < 10 && i < data.size(); ++i) {
-        bcc ^= static_cast<unsigned char>(data[i]);
-    }
-    return bcc;
-}
-
 QByteArray UdpController::buildPacket(const QByteArray &data)
 {
     QByteArray packet(10, 0x00);
-    
-    // Copy data (max 7 bytes, starting at position 3)
-    int dataSize = qMin(data.size(), 7);
-    for (int i = 0; i < dataSize; ++i) {
-        packet[i + 3] = data[i];
+    int copySize = qMin(data.size(), 10);
+    for (int i = 0; i < copySize; ++i) {
+        packet[i] = data[i];
     }
-    
-    // Calculate BCC (XOR of bytes 3-9)
-    unsigned char bcc = packet[3];
+
+    unsigned char bcc = 0;
     for (int i = 4; i < 10; ++i) {
         bcc ^= static_cast<unsigned char>(packet[i]);
     }
-    
-    // Set packet header
-    packet[0] = 10;        // Length
-    packet[1] = bcc;       // BCC checksum
-    // Bytes 2-9 already set (data or zeros)
-    
+
+    packet[1] = static_cast<char>(10);
+    packet[2] = static_cast<char>(bcc);
     return packet;
 }
 
@@ -180,28 +168,43 @@ void UdpController::sendPacket(const QByteArray &packet)
         // Send via UDP directly
         if (m_udpSocket && m_targetAddress.isNull() == false) {
             qint64 sent = m_udpSocket->writeDatagram(packet, m_targetAddress, m_port);
+            qDebug().noquote() << "[UdpController] TX" << sent << "B to"
+                               << m_address << ":" << m_port
+                               << "hex=" << packet.toHex(' ');
             if (sent != packet.size()) {
                 qWarning() << "[UdpController] Failed to send UDP packet:" << m_udpSocket->errorString();
                 emit errorOccurred(QStringLiteral("Failed to send UDP packet: %1").arg(m_udpSocket->errorString()));
             }
+        } else {
+            qWarning() << "[UdpController] Cannot send: socket="
+                       << (m_udpSocket ? "ok" : "null")
+                       << " target=" << m_address;
         }
     }
 }
 
 void UdpController::sendCommand(unsigned char cmd, const QByteArray &data)
 {
-    QByteArray commandData;
-    commandData.append(static_cast<char>(cmd));
-    commandData.append(data);
-    
-    QByteArray packet = buildPacket(commandData);
+    // Legacy convention: raw payload is [cmd, 0x04, 0x00, data...]; the 0x04
+    // and 0x00 are clobbered by length and BCC inside buildPacket.
+    QByteArray frame;
+    frame.append(static_cast<char>(cmd));
+    frame.append(static_cast<char>(0x04));
+    frame.append(static_cast<char>(0x00));
+    frame.append(data);
+
+    QByteArray packet = buildPacket(frame);
     sendPacket(packet);
 }
 
 void UdpController::sendCommandToMachine(MachineType machine, unsigned char cmd, const QByteArray &data)
 {
+    // Legacy AppDelegate.m:116-123 uses different send ports per machine:
+    //   Linux Maître → 8001, individual sirens S1–S7 → 1234.
     QString ip = SirenConfig::ipAddressForMachineType(machine);
     setAddress(ip);
+    int sendPort = (machine == MachineType::LinuxMaitre) ? 8001 : 1234;
+    setPort(sendPort);
     m_targetMachine = machine;
     sendCommand(cmd, data);
 }
@@ -225,9 +228,38 @@ void UdpController::sendBoucle(MachineType machine, bool enabled)
     sendCommandToMachine(machine, UdpCommands::BOUCLE, data);
 }
 
-void UdpController::sendStart(MachineType machine)
+void UdpController::sendST(MachineType machine, bool state)
 {
-    sendCommandToMachine(machine, UdpCommands::ST);
+    QByteArray data;
+    data.append(static_cast<char>(state ? 1 : 0));
+    sendCommandToMachine(machine, UdpCommands::ST, data);
+}
+
+void UdpController::sendIsSynchro(MachineType machine, bool state)
+{
+    QByteArray data;
+    data.append(static_cast<char>(state ? 1 : 0));
+    sendCommandToMachine(machine, UdpCommands::ISSYNCHRO, data);
+}
+
+void UdpController::sendSeqSelected(MachineType machine, int slotIndex)
+{
+    QByteArray data;
+    data.append(static_cast<char>(slotIndex));
+    sendCommandToMachine(machine, UdpCommands::SEQSELECTED, data);
+}
+
+void UdpController::reprendreAtIndex(MachineType machine, int slotIndex, int measure)
+{
+    // Legacy opcode 0x36: resume from given measure inside given slot.
+    // Wire layout after framing: [0x36, 10, BCC, slot, m_be32(4), pad×2]
+    QByteArray data;
+    data.append(static_cast<char>(slotIndex));
+    data.append(static_cast<char>((measure >> 24) & 0xFF));
+    data.append(static_cast<char>((measure >> 16) & 0xFF));
+    data.append(static_cast<char>((measure >> 8) & 0xFF));
+    data.append(static_cast<char>(measure & 0xFF));
+    sendCommandToMachine(machine, 0x36, data);
 }
 
 void UdpController::sendStop(MachineType machine)
@@ -287,17 +319,94 @@ void UdpController::onUdpReadyRead()
     if (!m_udpSocket) {
         return;
     }
-    
+
     while (m_udpSocket->hasPendingDatagrams()) {
         QByteArray datagram;
         datagram.resize(static_cast<int>(m_udpSocket->pendingDatagramSize()));
         QHostAddress sender;
         quint16 senderPort;
-        
+
         qint64 read = m_udpSocket->readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
         if (read > 0) {
             emit dataReceived(datagram, sender.toString(), senderPort);
         }
+    }
+}
+
+void UdpController::parseIncomingData(const QByteArray &data, const QString &fromAddress, int fromPort)
+{
+    qDebug().noquote() << "[UdpController] RX" << data.size() << "B from"
+                       << fromAddress << ":" << fromPort
+                       << "hex=" << data.toHex(' ');
+    Q_UNUSED(fromAddress)
+    Q_UNUSED(fromPort)
+    if (data.isEmpty()) return;
+
+    const unsigned char b0 = static_cast<unsigned char>(data[0]);
+
+    // Per-slot tick length: [0x34, slot, len_be32]
+    if (b0 == 0x34 && data.size() == 6) {
+        int slot = static_cast<unsigned char>(data[1]);
+        quint32 length =
+              (static_cast<quint32>(static_cast<unsigned char>(data[2])) << 24)
+            | (static_cast<quint32>(static_cast<unsigned char>(data[3])) << 16)
+            | (static_cast<quint32>(static_cast<unsigned char>(data[4])) <<  8)
+            |  static_cast<quint32>(static_cast<unsigned char>(data[5]));
+        emit slotLengthReceived(slot, static_cast<int>(length));
+        return;
+    }
+
+    if (data.size() < 2) return;
+    const unsigned char b1 = static_cast<unsigned char>(data[1]);
+
+    // 'PS' + slot + ? + B + E + filename: playlist slot push from Linux Maître.
+    // Firmware always appends a trailing 0x00; strip it or macOS renders the
+    // NUL glyph as a tofu-bar pattern next to the title.
+    if (b0 == 'P' && b1 == 'S' && data.size() >= 6) {
+        int slot = static_cast<unsigned char>(data[2]);
+        bool isLoop  = (data[4] == '1');
+        bool isChain = (data[5] == '1');
+        QByteArray nameBytes = data.mid(6);
+        while (!nameBytes.isEmpty() && nameBytes.endsWith('\0')) nameBytes.chop(1);
+        QString filename = QString::fromUtf8(nameBytes);
+        emit playlistSlotReceived(slot, filename, isLoop, isChain);
+        return;
+    }
+
+    // 'SL' + min + sec + filename: current sequence length + name
+    if (b0 == 'S' && b1 == 'L' && data.size() >= 4) {
+        int min = static_cast<unsigned char>(data[2]);
+        int sec = static_cast<unsigned char>(data[3]);
+        QByteArray nameBytes = data.mid(4);
+        while (!nameBytes.isEmpty() && nameBytes.endsWith('\0')) nameBytes.chop(1);
+        QString name = QString::fromLatin1(nameBytes);
+        // Legacy strips the file extension before display.
+        int dotIdx = name.lastIndexOf(QLatin1Char('.'));
+        if (dotIdx > 0) name = name.left(dotIdx);
+        emit sequenceInfoReceived(name, min * 60 + sec);
+        return;
+    }
+
+    // 'TI' + min + sec: live timing tick (slider position)
+    if (b0 == 'T' && b1 == 'I' && data.size() >= 4) {
+        int min = static_cast<unsigned char>(data[2]);
+        int sec = static_cast<unsigned char>(data[3]);
+        emit timingUpdated(min * 60 + sec);
+        return;
+    }
+
+    // 'RB' + state: loop button state echo
+    if (b0 == 'R' && b1 == 'B' && data.size() >= 3) {
+        emit loopStateChanged(static_cast<unsigned char>(data[2]) != 0);
+        return;
+    }
+
+    // 'RU' + running + slotIndex: running status + active slot
+    if (b0 == 'R' && b1 == 'U' && data.size() >= 4) {
+        bool running = static_cast<unsigned char>(data[2]) == 1;
+        int slot = static_cast<unsigned char>(data[3]);
+        emit runningStateChanged(running, slot);
+        return;
     }
 }
 

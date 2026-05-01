@@ -3,96 +3,89 @@ import QtQuick.Controls
 
 Rectangle {
     id: root
-    
+
     property int slotIndex: 0
     property string filename: ""
     property string pseudo: ""
     property bool boucle: false
     property bool enchain: false
     property bool isSelected: false
-    property bool isActive: false  // Si la séquence est en cours de lecture
-    
+    property bool isActive: false
+
     signal slotClicked(int index)
     signal slotDoubleClicked(int index)
-    
+
     width: 160
     height: 130
-    
-    // Couleurs selon l'état (d'après viewSeq.m)
+    clip: true
+
     color: {
-        if (isSelected) return "#E67E00"  // Orange RGB(0.9, 0.5, 0) quand sélectionné
-        if (isActive) return "#E63333"     // Rouge RGB(0.9, 0.2, 0.2) quand en lecture
-        return "#333333"                   // Gris foncé RGB(0.2, 0.2, 0.2) par défaut
+        if (mouseArea.pressed) return "#E67E00"
+        if (isActive)          return "#E63333"
+        return "#333333"
     }
-    
-    border.color: boucle ? "#FF0000" : "#FFFFFF"  // Rouge si boucle, blanc sinon
+
+    border.color: boucle ? "#FF0000" : "#FFFFFF"
     border.width: 1
-    radius: 15  // Rayon de 15px comme dans le code original
-    
+    radius: 15
+
     MouseArea {
+        id: mouseArea
         anchors.fill: parent
-        onClicked: {
-            root.slotClicked(root.slotIndex)
-        }
-        onDoubleClicked: {
-            root.slotDoubleClicked(root.slotIndex)
-        }
+        onClicked: root.slotClicked(root.slotIndex)
+        onDoubleClicked: root.slotDoubleClicked(root.slotIndex)
     }
-    
-    // Numéro en haut à droite (brun, police 15pt)
+
+    // Slot number (top-right)
     Text {
-        id: numberText
         anchors.top: parent.top
-        anchors.topMargin: 5
+        anchors.topMargin: 4
         anchors.right: parent.right
-        anchors.rightMargin: 10
+        anchors.rightMargin: 8
         text: (slotIndex + 1).toString()
-        color: "#8B4513"  // Brown
-        font.pixelSize: 15
-        font.family: "AmericanTypewriter-Condensed"
+        color: "#8B4513"
+        font.pixelSize: 13
     }
-    
-    // Nom de la séquence au centre (blanc, police 40pt)
+
+    // Loop indicator (top-left, doesn't overlap title)
     Text {
-        id: nameText
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: 10
-        text: filename || ("seq" + slotIndex)
+        anchors.top: parent.top
+        anchors.topMargin: 2
+        anchors.left: parent.left
+        anchors.leftMargin: 6
+        text: "↻"           // clockwise arrow
+        color: "#FF3333"
+        font.pixelSize: 18
+        visible: boucle
+    }
+
+    // Title — auto-shrinks to fit width (legacy used a condensed font that's
+    // not on macOS, so fallback fonts are wider than the original sizing
+    // assumed). HorizontalFit avoids any ellipsis truncation.
+    Text {
+        anchors.fill: parent
+        anchors.leftMargin: 8
+        anchors.rightMargin: enchain ? 12 : 8
+        anchors.topMargin: 22
+        anchors.bottomMargin: 6
+        text: filename
         color: "#FFFFFF"
-        font.pixelSize: 40
-        font.family: "AmericanTypewriter-Condensed"
+        font.pixelSize: 28
+        font.bold: true
+        minimumPixelSize: 9
+        fontSizeMode: Text.HorizontalFit
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideMiddle
-        width: parent.width - 20
+        wrapMode: Text.NoWrap
     }
-    
-    // Icône de boucle (60x60px) si activée
+
+    // Chain indicator: thin brown stripe on the right edge, INSIDE the slot
     Rectangle {
-        id: loopIcon
-        anchors.centerIn: parent
-        width: 60
-        height: 60
-        color: "transparent"
-        visible: boucle
-        
-        Text {
-            anchors.centerIn: parent
-            text: "⟲"
-            color: "#FF0000"
-            font.pixelSize: 40
-        }
-    }
-    
-    // Barre brune verticale (10x100px) si enchaînée
-    Rectangle {
-        id: chainBar
-        anchors.left: parent.right
-        anchors.leftMargin: 0
+        anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        width: 10
-        height: 100
-        color: "#8B4513"  // Brown
+        width: 4
+        height: parent.height - 20
+        color: "#8B4513"
         visible: enchain
     }
 }

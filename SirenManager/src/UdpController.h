@@ -35,7 +35,10 @@ public:
     Q_INVOKABLE void sendAskSynchro(MachineType machine = MachineType::LinuxMaitre);
     Q_INVOKABLE void sendNewList(MachineType machine, int listIndex);
     Q_INVOKABLE void sendBoucle(MachineType machine, bool enabled);
-    Q_INVOKABLE void sendStart(MachineType machine);
+    Q_INVOKABLE void sendST(MachineType machine, bool state);
+    Q_INVOKABLE void sendIsSynchro(MachineType machine, bool state);
+    Q_INVOKABLE void sendSeqSelected(MachineType machine, int slotIndex);
+    Q_INVOKABLE void reprendreAtIndex(MachineType machine, int slotIndex, int measure);
     Q_INVOKABLE void sendStop(MachineType machine);
     Q_INVOKABLE void sendReset(MachineType machine);
     Q_INVOKABLE void sendReverse(MachineType machine, bool enabled);
@@ -57,7 +60,16 @@ signals:
     void dataReceived(const QByteArray &data, const QString &fromAddress, int fromPort);
     void errorOccurred(const QString &errorString);
 
+    // Parsed Linux Maître responses (Player view)
+    void sequenceInfoReceived(const QString &name, int totalSeconds);
+    void timingUpdated(int currentSeconds);
+    void runningStateChanged(bool running, int slotIndex);
+    void loopStateChanged(bool active);
+    void playlistSlotReceived(int slot, const QString &filename, bool isLoop, bool isChain);
+    void slotLengthReceived(int slot, int lengthTicks);
+
 private slots:
+    void parseIncomingData(const QByteArray &data, const QString &fromAddress, int fromPort);
     void onUdpReadyRead();
     void onWebSocketConnected();
     void onWebSocketDisconnected();
@@ -66,10 +78,11 @@ private slots:
     void onWebSocketError(QAbstractSocket::SocketError error);
 
 private:
-    // Calculate BCC checksum (XOR of bytes 3-9)
-    unsigned char calculateBCC(const QByteArray &data);
-    
-    // Build UDP packet with format: [length(1)][BCC(2)][data(3-10)]
+    // Build UDP packet matching legacy SireneControlMac SendUdp.m wire format.
+    // Input is raw payload `[cmd, 0x04, 0x00, data...]`; output is the 10-byte
+    // frame `[cmd, length=10, BCC, data×7]`. The 0x04/0x00 marker bytes get
+    // overwritten by length and BCC. BCC = XOR of output bytes 4..9 (legacy
+    // quirk: byte 3 is excluded — replicating firmware behavior).
     QByteArray buildPacket(const QByteArray &data);
     
     // Send packet
