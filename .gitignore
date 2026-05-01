@@ -46,6 +46,16 @@ logs/
 Thumbs.db
 *~
 
+# Claude Code per-project state
+**/.claude/
+
+# Debug screenshots / captures
+capture_*.jpg
+capture_*.jpeg
+capture_*.png
+screenshot_*.jpg
+screenshot_*.png
+
 # Compiled files
 *.o
 *.obj
