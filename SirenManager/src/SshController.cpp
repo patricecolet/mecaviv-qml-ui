@@ -1,4 +1,7 @@
 #include "SshController.h"
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkRequest>
@@ -104,6 +107,75 @@ void SshController::uploadFile(int machineType, const QString &remotePath, const
     body[QStringLiteral("machineType")] = machineTypeToString(machineType);
     body[QStringLiteral("remotePath")] = remotePath;
     body[QStringLiteral("content")] = content;
+    QByteArray json = QJsonDocument(body).toJson(QJsonDocument::Compact);
+
+    postJson(QStringLiteral("/api/ssh/upload"), json, [this, requestId](QNetworkReply *reply) {
+        QJsonObject obj = readReplyBody(reply);
+        bool success = obj.value(QStringLiteral("success")).toBool();
+        QString errorStr = obj.value(QStringLiteral("error")).toString();
+        if (errorStr.isEmpty() && reply->error() != QNetworkReply::NoError) {
+            errorStr = reply->errorString();
+        }
+        emit uploadFinished(requestId, success, errorStr);
+    });
+}
+
+void SshController::syncDir(int sourceMachine, const QString &sourcePath,
+                            const QString &targetsJson, const QString &requestId)
+{
+    // targetsJson is a JSON array — convert each entry's machineType (int)
+    // into the backend's string identifier before forwarding.
+    QJsonDocument doc = QJsonDocument::fromJson(targetsJson.toUtf8());
+    QJsonArray arr = doc.array();
+    QJsonArray rewritten;
+    for (const QJsonValue &v : arr) {
+        QJsonObject t = v.toObject();
+        QJsonObject out;
+        out[QStringLiteral("machineType")] = machineTypeToString(t.value(QStringLiteral("machineType")).toInt());
+        out[QStringLiteral("remotePath")] = t.value(QStringLiteral("remotePath")).toString();
+        rewritten.append(out);
+    }
+
+    QJsonObject body;
+    body[QStringLiteral("sourceMachine")] = machineTypeToString(sourceMachine);
+    body[QStringLiteral("sourcePath")] = sourcePath;
+    body[QStringLiteral("targets")] = rewritten;
+    QByteArray json = QJsonDocument(body).toJson(QJsonDocument::Compact);
+
+    postJson(QStringLiteral("/api/ssh/sync-dir"), json, [this, requestId](QNetworkReply *reply) {
+        QJsonObject obj = readReplyBody(reply);
+        bool success = obj.value(QStringLiteral("success")).toBool();
+        int tarSize = obj.value(QStringLiteral("tarSize")).toInt();
+        QString errorStr = obj.value(QStringLiteral("error")).toString();
+        if (errorStr.isEmpty() && reply->error() != QNetworkReply::NoError) {
+            errorStr = reply->errorString();
+        }
+        QJsonArray results = obj.value(QStringLiteral("results")).toArray();
+        QString resultsJson = QString::fromUtf8(QJsonDocument(results).toJson(QJsonDocument::Compact));
+        emit syncDirFinished(requestId, success, tarSize, resultsJson, errorStr);
+    });
+}
+
+void SshController::uploadLocalFile(int machineType, const QString &localUrl,
+                                    const QString &remotePath, const QString &requestId)
+{
+    QString localPath = localUrl;
+    if (localPath.startsWith(QStringLiteral("file://"))) {
+        localPath = QUrl(localPath).toLocalFile();
+    }
+    QFile f(localPath);
+    if (!f.open(QIODevice::ReadOnly)) {
+        emit uploadFinished(requestId, false,
+            QStringLiteral("Cannot open local file %1: %2").arg(localPath, f.errorString()));
+        return;
+    }
+    QByteArray bytes = f.readAll();
+    f.close();
+
+    QJsonObject body;
+    body[QStringLiteral("machineType")] = machineTypeToString(machineType);
+    body[QStringLiteral("remotePath")] = remotePath;
+    body[QStringLiteral("contentBase64")] = QString::fromLatin1(bytes.toBase64());
     QByteArray json = QJsonDocument(body).toJson(QJsonDocument::Compact);
 
     postJson(QStringLiteral("/api/ssh/upload"), json, [this, requestId](QNetworkReply *reply) {

@@ -7,7 +7,8 @@ const config = require('./config.json');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Default Express limit is 100KB — too small for base64-encoded MIDI uploads.
+app.use(express.json({ limit: '50mb' }));
 
 const HTTP_PORT = config.ports.http || 8005;
 const WS_PORT = config.ports.websocket || 8006;
@@ -41,11 +42,45 @@ app.post('/api/ssh/download', async (req, res) => {
 
 app.post('/api/ssh/upload', async (req, res) => {
     try {
-        const { machineType, remotePath, content } = req.body;
-        await sshProxy.uploadFile(machineType, remotePath, content);
+        const { machineType, remotePath, content, contentBase64 } = req.body;
+        const buffer = contentBase64
+            ? Buffer.from(contentBase64, 'base64')
+            : Buffer.from(content, 'utf8');
+        console.log(`[SirenManager Backend] upload: machine=${machineType} path=${remotePath} bytes=${buffer.length} (${contentBase64 ? 'base64' : 'utf8'})`);
+        await sshProxy.uploadFile(machineType, remotePath, buffer);
+        console.log(`[SirenManager Backend] upload OK: ${remotePath}`);
         res.json({ success: true });
     } catch (error) {
         console.error('[SirenManager Backend] SSH error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/ssh/sync-dir
+// Body: { sourceMachine, sourcePath, targets: [{ machineType, remotePath }, …] }
+// Tars the source dir on the master, pipes the buffer into `tar x` on each
+// target. Returns per-target success/error so the UI can show partial results.
+app.post('/api/ssh/sync-dir', async (req, res) => {
+    try {
+        const { sourceMachine, sourcePath, targets } = req.body;
+        console.log(`[SirenManager Backend] sync-dir: source=${sourceMachine}:${sourcePath} → ${targets.length} target(s)`);
+        const tarBuffer = await sshProxy.tarRemote(sourceMachine, sourcePath);
+        console.log(`[SirenManager Backend] sync-dir: tarball size=${tarBuffer.length}`);
+
+        const results = [];
+        for (const tgt of targets) {
+            try {
+                await sshProxy.untarRemote(tgt.machineType, tgt.remotePath, tarBuffer);
+                results.push({ machine: tgt.machineType, success: true });
+                console.log(`[SirenManager Backend] sync-dir: ✓ ${tgt.machineType}`);
+            } catch (e) {
+                results.push({ machine: tgt.machineType, success: false, error: e.message });
+                console.log(`[SirenManager Backend] sync-dir: ✗ ${tgt.machineType}: ${e.message}`);
+            }
+        }
+        res.json({ success: true, tarSize: tarBuffer.length, results });
+    } catch (error) {
+        console.error('[SirenManager Backend] sync-dir error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });

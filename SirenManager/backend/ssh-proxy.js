@@ -86,18 +86,68 @@ class SshProxy {
         });
     }
 
+    // Run `tar c -C remotePath .` on the host and capture stdout (binary).
+    async tarRemote(machineType, remotePath) {
+        const target = this.sshTarget(machineType);
+        return new Promise((resolve, reject) => {
+            const args = [...this.sshOpts(), target, `tar c -C ${this.shellQuote(remotePath)} .`];
+            const child = spawn('ssh', args);
+            const chunks = [];
+            let stderr = '';
+            child.stdout.on('data', (d) => chunks.push(d));
+            child.stderr.on('data', (d) => { stderr += d.toString(); });
+            child.on('error', reject);
+            child.on('close', (code) => {
+                if (code !== 0) {
+                    return reject(new Error(`tar export exited ${code}: ${stderr.trim() || 'no output'}`));
+                }
+                resolve(Buffer.concat(chunks));
+            });
+        });
+    }
+
+    // Pipe a tar buffer into `tar x -C remotePath` on the target host.
+    async untarRemote(machineType, remotePath, buffer) {
+        const target = this.sshTarget(machineType);
+        return new Promise((resolve, reject) => {
+            const args = [...this.sshOpts(), target, `tar x -C ${this.shellQuote(remotePath)}`];
+            const child = spawn('ssh', args);
+            let stderr = '';
+            let stdinErr = null;
+            child.stderr.on('data', (d) => { stderr += d.toString(); });
+            child.stdin.on('error', (err) => { stdinErr = err; });
+            child.on('error', reject);
+            child.on('close', (code) => {
+                if (code !== 0 || stdinErr) {
+                    const detail = [stderr.trim(), stdinErr ? `stdin: ${stdinErr.message}` : null]
+                        .filter(Boolean).join(' | ') || 'no output';
+                    return reject(new Error(`tar import exited ${code}: ${detail}`));
+                }
+                resolve();
+            });
+            child.stdin.end(buffer);
+        });
+    }
+
     async uploadFile(machineType, remotePath, content) {
         // Pipe local content into a remote `cat > path`.
         const target = this.sshTarget(machineType);
         return new Promise((resolve, reject) => {
             const args = [...this.sshOpts(), target, `cat > ${this.shellQuote(remotePath)}`];
+            console.log(`[SirenManager Backend] spawn ssh ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`);
             const child = spawn('ssh', args);
             let stderr = '';
+            let stdinErr = null;
             child.stderr.on('data', (d) => { stderr += d.toString(); });
             child.on('error', reject);
+            // EPIPE on stdin happens if the remote ssh closes before we finish
+            // writing — capture so we can include it in the close error.
+            child.stdin.on('error', (err) => { stdinErr = err; });
             child.on('close', (code) => {
-                if (code !== 0) {
-                    return reject(new Error(`ssh upload exited ${code}: ${stderr.trim() || 'no output'}`));
+                if (code !== 0 || stdinErr) {
+                    const detail = [stderr.trim(), stdinErr ? `stdin: ${stdinErr.message}` : null]
+                        .filter(Boolean).join(' | ') || 'no output';
+                    return reject(new Error(`ssh upload exited ${code}: ${detail}`));
                 }
                 resolve();
             });
