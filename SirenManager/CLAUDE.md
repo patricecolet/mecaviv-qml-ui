@@ -49,7 +49,9 @@ The C++/QML app cannot speak SSH or raw UDP from the browser, so `backend/server
 cd backend && npm install && node server.js
 ```
 
-SSH uses key auth (`~/.ssh/id_rsa_sirenes` per `config.json`). The legacy DH algorithms (`diffie-hellman-group1/14-sha1`) are explicitly enabled because the target Linux/Raspberry sirens run old SSH daemons — don't "modernize" that list without testing against real hardware.
+SSH delegates entirely to the user's `~/.ssh/config` via the system `ssh` / `scp` binaries (spawned by `ssh-proxy.js`) — the backend does NOT load private keys itself. This keeps key/port/user/algorithm decisions in one place: the user's existing SSH config. Each machine entry in `backend/config.json` may set an optional `sshAlias` to target a `Host <alias>` block; otherwise the backend falls back to `<sshUser>@<ip>`. The `sshKeyPath` field in older configs is now ignored.
+
+Uploads pipe content through `ssh host 'cat > remotePath'` rather than scp, because the busybox-based sirens often lack scp (matches the legacy SireneControlMac approach).
 
 ## Architecture
 

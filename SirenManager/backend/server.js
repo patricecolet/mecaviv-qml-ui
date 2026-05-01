@@ -11,7 +11,7 @@ app.use(express.json());
 
 const HTTP_PORT = config.ports.http || 8005;
 const WS_PORT = config.ports.websocket || 8006;
-const UDP_PORT = config.ports.udp || 4443;
+const UDP_PORT = config.ports.udp || 8000;
 
 // Initialize SSH proxy
 const sshProxy = new SshProxy(config);
@@ -23,6 +23,7 @@ app.post('/api/ssh/execute', async (req, res) => {
         const output = await sshProxy.executeCommand(machineType, command);
         res.json({ success: true, output });
     } catch (error) {
+        console.error('[SirenManager Backend] SSH error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -33,6 +34,7 @@ app.post('/api/ssh/download', async (req, res) => {
         const content = await sshProxy.downloadFile(machineType, remotePath);
         res.json({ success: true, content });
     } catch (error) {
+        console.error('[SirenManager Backend] SSH error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -43,6 +45,7 @@ app.post('/api/ssh/upload', async (req, res) => {
         await sshProxy.uploadFile(machineType, remotePath, content);
         res.json({ success: true });
     } catch (error) {
+        console.error('[SirenManager Backend] SSH error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -55,25 +58,65 @@ app.listen(HTTP_PORT, () => {
 // WebSocket server for UDP proxy and real-time communication
 const wss = new WebSocket.Server({ port: WS_PORT });
 
-// UDP socket for proxy
-const udpSocket = dgram.createSocket('udp4');
-udpSocket.bind(UDP_PORT, () => {
-    console.log(`[SirenManager Backend] UDP socket bound to port ${UDP_PORT}`);
-});
+// UDP socket is bound LAZILY: only when at least one WebSocket client is
+// connected (i.e. WASM/browser mode that actually needs UDP relayed). This
+// avoids competing with a desktop SirenManager process for port 8000 — the
+// firmware sends to a hardcoded set of client IPs on 8000, and two listeners
+// on the same port would split the inbound traffic between them.
+let udpSocket = null;
+let wsClientCount = 0;
+
+function ensureUdpBound() {
+    if (udpSocket) return;
+    udpSocket = dgram.createSocket('udp4');
+    udpSocket.bind(UDP_PORT, () => {
+        console.log(`[SirenManager Backend] UDP socket bound to port ${UDP_PORT} (WS client connected)`);
+    });
+    udpSocket.on('error', (err) => {
+        console.error('[SirenManager Backend] UDP socket error:', err);
+    });
+    udpSocket.on('message', (msg, rinfo) => {
+        const data = {
+            type: 'udp_receive',
+            data: msg.toString('hex'),
+            address: rinfo.address,
+            port: rinfo.port
+        };
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(data));
+            }
+        });
+    });
+}
+
+function maybeReleaseUdp() {
+    if (wsClientCount === 0 && udpSocket) {
+        udpSocket.close(() => {
+            console.log(`[SirenManager Backend] UDP socket released (no WS clients)`);
+        });
+        udpSocket = null;
+    }
+}
 
 wss.on('connection', (ws) => {
-    console.log('[SirenManager Backend] WebSocket client connected');
+    wsClientCount++;
+    console.log(`[SirenManager Backend] WebSocket client connected (total ${wsClientCount})`);
+    ensureUdpBound();
 
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message.toString());
-            
+
             if (data.type === 'udp_send') {
-                // Forward UDP packet
+                if (!udpSocket) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'UDP socket not bound' }));
+                    return;
+                }
                 const packet = Buffer.from(data.data, 'hex');
                 const address = data.address;
                 const port = data.port;
-                
+
                 udpSocket.send(packet, port, address, (err) => {
                     if (err) {
                         console.error('[SirenManager Backend] UDP send error:', err);
@@ -88,28 +131,12 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        console.log('[SirenManager Backend] WebSocket client disconnected');
-    });
-});
-
-// Forward received UDP packets to WebSocket clients
-udpSocket.on('message', (msg, rinfo) => {
-    const data = {
-        type: 'udp_receive',
-        data: msg.toString('hex'),
-        address: rinfo.address,
-        port: rinfo.port
-    };
-
-    // Broadcast to all connected WebSocket clients
-    wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data));
-        }
+        wsClientCount = Math.max(0, wsClientCount - 1);
+        console.log(`[SirenManager Backend] WebSocket client disconnected (remaining ${wsClientCount})`);
+        maybeReleaseUdp();
     });
 });
 
 console.log(`[SirenManager Backend] WebSocket server listening on port ${WS_PORT}`);
+console.log(`[SirenManager Backend] UDP socket will bind to port ${UDP_PORT} on first WebSocket connection`);
 console.log('[SirenManager Backend] Backend service started');
-
-

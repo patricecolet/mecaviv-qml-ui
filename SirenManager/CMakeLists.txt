@@ -36,6 +36,7 @@ set(CMAKE_AUTOUIC ON)
 set(SOURCES
     main.cpp
     src/UdpController.cpp
+    src/SshController.cpp
     src/PlaylistManager.cpp
     src/MachineManager.cpp
     src/Config/SirenConfig.cpp
@@ -44,6 +45,7 @@ set(SOURCES
 
 set(HEADERS
     src/UdpController.h
+    src/SshController.h
     src/PlaylistManager.h
     src/MachineManager.h
     src/Config/SirenConfig.h

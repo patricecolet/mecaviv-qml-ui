@@ -5,6 +5,7 @@
 #include <QStandardPaths>
 #include <QtQml>
 #include "src/UdpController.h"
+#include "src/SshController.h"
 #include "src/PlaylistManager.h"
 #include "src/Models/PlaylistModel.h"
 
@@ -29,6 +30,11 @@ int main(int argc, char *argv[])
     auto *udpManager = new UdpController();
     udpManager->connectToHost(QStringLiteral("192.168.1.101"), 8001);
     qmlRegisterSingletonInstance("SirenManager", 1, 0, "UdpManager", udpManager);
+
+    // SSH controller — proxies through the Node.js backend on localhost:8005.
+    // Backend must be running for SystemMaintenance / PlaylistComposer views.
+    auto *sshManager = new SshController();
+    qmlRegisterSingletonInstance("SirenManager", 1, 0, "SshManager", sshManager);
 
     // Créer le moteur QML
     QQmlApplicationEngine engine;
