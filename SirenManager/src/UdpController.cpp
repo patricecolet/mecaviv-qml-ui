@@ -445,6 +445,69 @@ void UdpController::sendLumiere(int side, int proj, int value)
     sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::TOURELLE, data);
 }
 
+void UdpController::sendMidiIn(int channel, int status, int data1, int data2)
+{
+    // Legacy ControleurViewController.m:130: CMD_MIDIIN + channel + 3-byte MIDI message.
+    // Wire layout after framing: [0x12, 10, BCC, channel, status, data1, data2, pad×3]
+    QByteArray data;
+    data.append(static_cast<char>(channel));
+    data.append(static_cast<char>(status));
+    data.append(static_cast<char>(data1));
+    data.append(static_cast<char>(data2));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::MIDIIN, data);
+}
+
+void UdpController::sendSirSelect(int sirenIdx, bool selected)
+{
+    if (sirenIdx < 1 || sirenIdx > 8) return;
+    QByteArray data;
+    data.append(static_cast<char>(sirenIdx));
+    data.append(static_cast<char>(selected ? 1 : 0));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SIRSELECT, data);
+}
+
+void UdpController::sendDefret(bool active)
+{
+    QByteArray data;
+    data.append(static_cast<char>(active ? 1 : 0));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::DEFRET, data);
+}
+
+void UdpController::sendAutomating(bool active)
+{
+    QByteArray data;
+    data.append(static_cast<char>(active ? 1 : 0));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::AUTOMATING, data);
+}
+
+void UdpController::sendVoiture(int carIdx, int directionByte)
+{
+    // Legacy CMD_VOITURE: { 0x1A, 0x05, 0x00, carIdx, byteCh }
+    QByteArray data;
+    data.append(static_cast<char>(carIdx));
+    data.append(static_cast<char>(directionByte));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOITURE, data);
+}
+
+void UdpController::sendTourelle(int side, int sub, int value)
+{
+    // Generic CMD_TOURELLE: side selects pavillon and parameter family
+    // (0x9C/0x9D for position, 0xBC/0xBD for vitesse/accel/decel — see legacy
+    // ViewPavillon.m), sub selects the specific parameter, value is the data.
+    QByteArray data;
+    data.append(static_cast<char>(side));
+    data.append(static_cast<char>(sub));
+    data.append(static_cast<char>(value));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::TOURELLE, data);
+}
+
+void UdpController::sendPchit(bool active)
+{
+    QByteArray data;
+    data.append(static_cast<char>(active ? 1 : 0));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::PCHIIT, data);
+}
+
 void UdpController::onUdpReadyRead()
 {
     if (!m_udpSocket) {
@@ -567,6 +630,23 @@ void UdpController::parseIncomingData(const QByteArray &data, const QString &fro
         for (int i = 1; i <= 7; ++i) {
             emit motorStateReceived(i, static_cast<unsigned char>(data[i]) == 0x01);
         }
+        return;
+    }
+
+    // CMD_IS_SIRENIUM 0x26: sirenium pedal state + currently played note + velocity
+    if (b0 == 0x26 && data.size() >= 5) {
+        bool active = static_cast<unsigned char>(data[1]) != 0;
+        int note = static_cast<unsigned char>(data[2]);
+        int velocity = static_cast<unsigned char>(data[3]);
+        emit sireniumStateReceived(active, note, velocity);
+        return;
+    }
+
+    // 'SE' + sirenIdx + state: selection echo (which siren the pedal is bound to)
+    if (b0 == 'S' && b1 == 'E' && data.size() >= 4) {
+        int sirenIdx = static_cast<unsigned char>(data[2]);
+        bool selected = static_cast<unsigned char>(data[3]) != 0;
+        emit sirenSelectionReceived(sirenIdx, selected);
         return;
     }
 }

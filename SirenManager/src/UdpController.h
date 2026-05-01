@@ -64,6 +64,20 @@ public:
     Q_INVOKABLE void sendLEDTrompe(int value);                  // for S8
     Q_INVOKABLE void sendVoletActif(int sirenIdx, int mask);    // 4-bit mask for which volets are active
     Q_INVOKABLE void sendLumiere(int side, int proj, int value); // side 0x9C/0x9D, proj 1/2
+
+    // Controleur view — MIDI inject. channel 1..7, status is the MIDI status
+    // byte (e.g. 0xB0 = CC, 0xE0 = pitch bend, 0x90 = note on).
+    Q_INVOKABLE void sendMidiIn(int channel, int status, int data1, int data2);
+
+    // Sirenium view
+    Q_INVOKABLE void sendSirSelect(int sirenIdx, bool selected);  // 1..8
+    Q_INVOKABLE void sendDefret(bool active);
+    Q_INVOKABLE void sendAutomating(bool active);
+
+    // Voitures + Pavillons
+    Q_INVOKABLE void sendVoiture(int carIdx, int directionByte);
+    Q_INVOKABLE void sendTourelle(int side, int sub, int value);  // generic CMD_TOURELLE
+    Q_INVOKABLE void sendPchit(bool active);
     
     // Initialize connection
     Q_INVOKABLE void initialize();
@@ -93,6 +107,12 @@ signals:
     void motorStateReceived(int sirenIdx, bool active);     // sirenIdx 1..7
     // 'LL' + idx + size + name: an entry of the playlist-files list on the master
     void playlistFileReceived(int index, const QString &filename);
+
+    // Sirenium view feedback
+    // CMD_IS_SIRENIUM 0x26: state + currently-played MIDI note + velocity
+    void sireniumStateReceived(bool active, int midiNote, int velocity);
+    // 'SE' + sirenIdx + state: selection state echo from firmware
+    void sirenSelectionReceived(int sirenIdx, bool selected);
 
 private slots:
     void parseIncomingData(const QByteArray &data, const QString &fromAddress, int fromPort);
