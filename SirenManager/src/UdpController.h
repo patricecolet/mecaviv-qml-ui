@@ -47,6 +47,23 @@ public:
     Q_INVOKABLE void setVolume(MachineType machine, int volume);
     Q_INVOKABLE void setMute(MachineType machine, bool muted);
     Q_INVOKABLE void setVolumeGeneral(int volume);
+
+    // Maintenance view
+    Q_INVOKABLE void sendSetKEB(int sirenIdx, int speed);       // sirenIdx 1..7
+    Q_INVOKABLE void sendSetVolet(int sirenIdx, int value);     // sirenIdx 1..7
+    Q_INVOKABLE void sendTranspoGlobal(int value);              // -64..+63
+    Q_INVOKABLE void sendClicLatency(int value);
+    Q_INVOKABLE void sendChangeVolet(MachineType siren, int valveIdx);  // valveIdx 0..3
+
+    // Mixer view
+    Q_INVOKABLE void sendSirenVolume(int sirenIdx, int value);  // sirenIdx 1..7, value 0..127
+    Q_INVOKABLE void sendVolumeAll(QList<int> values);          // 7 values 0..127
+    Q_INVOKABLE void sendMute(int sirenIdx, bool muted);        // sirenIdx 0..8 (0 = master)
+    Q_INVOKABLE void sendSourdine(int sirenIdx, int type, int value);   // S1-S4 type=sub-ch, S5-S7 type 1=vol/2=timbre
+    Q_INVOKABLE void sendLED(int ch, int numSourdine, int value);
+    Q_INVOKABLE void sendLEDTrompe(int value);                  // for S8
+    Q_INVOKABLE void sendVoletActif(int sirenIdx, int mask);    // 4-bit mask for which volets are active
+    Q_INVOKABLE void sendLumiere(int side, int proj, int value); // side 0x9C/0x9D, proj 1/2
     
     // Initialize connection
     Q_INVOKABLE void initialize();
@@ -67,6 +84,15 @@ signals:
     void loopStateChanged(bool active);
     void playlistSlotReceived(int slot, const QString &filename, bool isLoop, bool isChain);
     void slotLengthReceived(int slot, int lengthTicks);
+
+    // Parsed Linux Maître responses (Maintenance view)
+    // TRAMPRESENCE 0x21: per-siren KEB liveness + Trompe liveness (byte >= 5 = absent)
+    void kebPresenceReceived(int sirenIdx, bool present);   // sirenIdx 1..7
+    void trompePresenceReceived(bool present);
+    // RECVST 0x22: per-siren motor state echo (1 = active, 0 = no response)
+    void motorStateReceived(int sirenIdx, bool active);     // sirenIdx 1..7
+    // 'LL' + idx + size + name: an entry of the playlist-files list on the master
+    void playlistFileReceived(int index, const QString &filename);
 
 private slots:
     void parseIncomingData(const QByteArray &data, const QString &fromAddress, int fromPort);

@@ -23,6 +23,13 @@ int main(int argc, char *argv[])
     qmlRegisterType<PlaylistManager>("SirenManager", 1, 0, "PlaylistManager");
     qmlRegisterType<PlaylistModel>("SirenManager", 1, 0, "PlaylistModel");
 
+    // Single shared UDP controller across all views — only one process can
+    // bind the receive port (8000), and switching destination per call works
+    // because sendCommandToMachine updates the address before each send.
+    auto *udpManager = new UdpController();
+    udpManager->connectToHost(QStringLiteral("192.168.1.101"), 8001);
+    qmlRegisterSingletonInstance("SirenManager", 1, 0, "UdpManager", udpManager);
+
     // Créer le moteur QML
     QQmlApplicationEngine engine;
 

@@ -40,50 +40,50 @@ Rectangle {
     Component.onCompleted: {
         slotsData = defaultSlots()
         slotLengths = defaultLengths()
-        udp.connectToHost("192.168.1.101", 8001)
-        // Ask the Linux Maître to push its current playlist + state.
-        udp.sendAskSynchro(linuxMaitre)
+        // The singleton UdpManager is already connected (see main.cpp). Just
+        // ask the Linux Maître to push its current playlist + state.
+        UdpManager.sendAskSynchro(linuxMaitre)
     }
 
-    UdpController {
-        id: udp
+    Connections {
+        target: UdpManager
 
-        onPlaylistSlotReceived: function(slot, filename, isLoop, isChain) {
+        function onPlaylistSlotReceived(slot, filename, isLoop, isChain) {
             if (slot < 0 || slot >= 48) return
             var copy = slotsData.slice()
             copy[slot] = { index: slot, name: filename, loop: isLoop, chain: isChain }
             slotsData = copy
         }
 
-        onSequenceInfoReceived: function(name, totalSeconds) {
+        function onSequenceInfoReceived(name, totalSeconds) {
             currentSeqLabel.text = name.length > 0 ? name : "seq..."
             seqTimeLabel.text = formatMMSS(totalSeconds)
             progressSlider.to = Math.max(1, totalSeconds)
             progressSlider.value = 0
         }
 
-        onTimingUpdated: function(currentSeconds) {
+        function onTimingUpdated(currentSeconds) {
             timingLabel.text = formatMMSS(currentSeconds)
             progressSlider.value = currentSeconds
         }
 
-        onRunningStateChanged: function(running, slotIndex) {
+        function onRunningStateChanged(running, slotIndex) {
             root.isPlaying = running
             root.playingSlot = running ? slotIndex : -1
         }
 
-        onLoopStateChanged: function(active) {
+        function onLoopStateChanged(active) {
             root.isLooping = active
         }
 
-        onSlotLengthReceived: function(slot, lengthTicks) {
+        function onSlotLengthReceived(slot, lengthTicks) {
             if (slot < 0 || slot >= 48) return
             var copy = slotLengths.slice()
             copy[slot] = lengthTicks
             slotLengths = copy
         }
 
-        onErrorOccurred: function(errorString) {
+        function onErrorOccurred(errorString) {
             console.log("[PlayerView] UDP error:", errorString)
         }
     }
@@ -206,7 +206,7 @@ Rectangle {
 
                                 onSlotClicked: function(idx) {
                                     root.selectedSlot = idx
-                                    udp.sendSeqSelected(linuxMaitre, idx)
+                                    UdpManager.sendSeqSelected(linuxMaitre, idx)
                                 }
                             }
                         }
@@ -301,7 +301,7 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
-                        onClicked: udp.sendBoucle(linuxMaitre, checked)
+                        onClicked: UdpManager.sendBoucle(linuxMaitre, checked)
                     }
 
                     Button {
@@ -321,7 +321,7 @@ Rectangle {
                             verticalAlignment: Text.AlignVCenter
                         }
                         onClicked: {
-                            udp.sendStop(linuxMaitre)
+                            UdpManager.sendStop(linuxMaitre)
                             // Mirror legacy: STOP forces isSynchro back to true (UI-only).
                             root.isSynchro = true
                         }
@@ -343,7 +343,7 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
-                        onClicked: udp.sendReset(linuxMaitre)
+                        onClicked: UdpManager.sendReset(linuxMaitre)
                     }
 
                     Button {
@@ -366,7 +366,7 @@ Rectangle {
                         }
                         onClicked: {
                             root.stState = checked
-                            udp.sendST(linuxMaitre, checked)
+                            UdpManager.sendST(linuxMaitre, checked)
                         }
                     }
 
@@ -390,7 +390,7 @@ Rectangle {
                         }
                         onClicked: {
                             root.isSynchro = checked
-                            udp.sendIsSynchro(linuxMaitre, checked)
+                            UdpManager.sendIsSynchro(linuxMaitre, checked)
                         }
                     }
 
@@ -410,7 +410,7 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
-                        onClicked: udp.sendAskSynchro(linuxMaitre)
+                        onClicked: UdpManager.sendAskSynchro(linuxMaitre)
                     }
 
                     Item { Layout.fillWidth: true }
@@ -469,7 +469,7 @@ Rectangle {
                             if (slotIdx < 0 || slotIdx >= 48) return
                             var entry = slotsData[slotIdx]
                             if (!entry || entry.name.length === 0) return
-                            udp.reprendreAtIndex(linuxMaitre, slotIdx, measure)
+                            UdpManager.reprendreAtIndex(linuxMaitre, slotIdx, measure)
                         }
                     }
                 }

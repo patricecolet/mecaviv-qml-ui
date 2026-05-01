@@ -1,9 +1,15 @@
 #include "UdpController.h"
 #include "Config/SirenConfig.h"
 #include <QDebug>
+#include <QList>
+#include <QLoggingCategory>
 #include <QNetworkInterface>
 #include <QJsonDocument>
 #include <QJsonObject>
+
+// Verbose UDP wire dump — silent by default. Enable with:
+//   QT_LOGGING_RULES="sirenmanager.udp.debug=true" ./appSirenManager
+Q_LOGGING_CATEGORY(udpLog, "sirenmanager.udp", QtWarningMsg)
 
 #ifdef EMSCRIPTEN
     #define USE_WEBSOCKET 1
@@ -106,8 +112,8 @@ void UdpController::setupUdpSocket(int receivePort)
     }
     
     if (m_udpSocket->bind(QHostAddress::AnyIPv4, receivePort, QUdpSocket::ShareAddress)) {
-        qDebug() << "[UdpController] UDP socket bound to port" << receivePort
-                 << "send target=" << m_address << ":" << m_port;
+        qCInfo(udpLog) << "UDP socket bound to port" << receivePort
+                       << "send target=" << m_address << ":" << m_port;
         if (!m_connected) {
             m_connected = true;
             emit connectedChanged(m_connected);
@@ -168,17 +174,17 @@ void UdpController::sendPacket(const QByteArray &packet)
         // Send via UDP directly
         if (m_udpSocket && m_targetAddress.isNull() == false) {
             qint64 sent = m_udpSocket->writeDatagram(packet, m_targetAddress, m_port);
-            qDebug().noquote() << "[UdpController] TX" << sent << "B to"
-                               << m_address << ":" << m_port
-                               << "hex=" << packet.toHex(' ');
+            qCDebug(udpLog).noquote() << "TX" << sent << "B to"
+                                      << m_address << ":" << m_port
+                                      << "hex=" << packet.toHex(' ');
             if (sent != packet.size()) {
-                qWarning() << "[UdpController] Failed to send UDP packet:" << m_udpSocket->errorString();
+                qCWarning(udpLog) << "Failed to send UDP packet:" << m_udpSocket->errorString();
                 emit errorOccurred(QStringLiteral("Failed to send UDP packet: %1").arg(m_udpSocket->errorString()));
             }
         } else {
-            qWarning() << "[UdpController] Cannot send: socket="
-                       << (m_udpSocket ? "ok" : "null")
-                       << " target=" << m_address;
+            qCWarning(udpLog) << "Cannot send: socket="
+                              << (m_udpSocket ? "ok" : "null")
+                              << " target=" << m_address;
         }
     }
 }
@@ -314,6 +320,131 @@ void UdpController::setVolumeGeneral(int volume)
     sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOLUMEGENE, data);
 }
 
+void UdpController::sendSetKEB(int sirenIdx, int speed)
+{
+    if (sirenIdx < 1 || sirenIdx > 7) return;
+    QByteArray data;
+    data.append(static_cast<char>(sirenIdx));
+    data.append(static_cast<char>((speed >> 8) & 0xFF));
+    data.append(static_cast<char>(speed & 0xFF));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SETKEB, data);
+}
+
+void UdpController::sendSetVolet(int sirenIdx, int value)
+{
+    if (sirenIdx < 1 || sirenIdx > 7) return;
+    QByteArray data;
+    data.append(static_cast<char>(sirenIdx));
+    data.append(static_cast<char>((value >> 8) & 0xFF));
+    data.append(static_cast<char>(value & 0xFF));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SETVOLET, data);
+}
+
+void UdpController::sendTranspoGlobal(int value)
+{
+    // Legacy encodes as (64 + signed value); receiver subtracts 64.
+    QByteArray data;
+    data.append(static_cast<char>((64 + value) & 0xFF));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::TRANSPO, data);
+}
+
+void UdpController::sendClicLatency(int value)
+{
+    // Legacy: { CMD_SET_CLIC_LAT, 0x04, 0x00, 0x0A, value } — the 0x0A is a
+    // sub-selector replicated verbatim from SireneControlMac.
+    QByteArray data;
+    data.append(static_cast<char>(0x0A));
+    data.append(static_cast<char>(value));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SET_CLIC_LAT, data);
+}
+
+void UdpController::sendChangeVolet(MachineType siren, int valveIdx)
+{
+    // Legacy sends "Z000<mask>" UTF-8 directly to the target siren on port 1234.
+    // After framing the wire shape is [Z, 10, BCC, '0', mask, 0, 0, 0, 0, 0],
+    // so the payload (after the cmd + two clobbered marker bytes) is "0<mask>".
+    if (valveIdx < 0 || valveIdx > 3) return;
+    QByteArray data;
+    data.append(static_cast<char>('0'));
+    data.append(static_cast<char>(1 << valveIdx));
+    sendCommandToMachine(siren, static_cast<unsigned char>('Z'), data);
+}
+
+void UdpController::sendSirenVolume(int sirenIdx, int value)
+{
+    if (sirenIdx < 1 || sirenIdx > 7) return;
+    QByteArray data;
+    data.append(static_cast<char>(sirenIdx));
+    data.append(static_cast<char>(qBound(0, value, 127)));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOLUME, data);
+}
+
+void UdpController::sendVolumeAll(QList<int> values)
+{
+    // Legacy CMD_VOLUMEGENE: payload is 7 individual volumes (S1..S7), each 0..127.
+    QByteArray data;
+    for (int i = 0; i < 7; ++i) {
+        int v = (i < values.size()) ? values[i] : 0;
+        data.append(static_cast<char>(qBound(0, v, 127)));
+    }
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOLUMEGENE, data);
+}
+
+void UdpController::sendMute(int sirenIdx, bool muted)
+{
+    // sirenIdx 0 = master (all sirens), 1..8 = individual (S1..S7 + Trompe S8)
+    if (sirenIdx < 0 || sirenIdx > 8) return;
+    QByteArray data;
+    data.append(static_cast<char>(sirenIdx));
+    data.append(static_cast<char>(muted ? 1 : 0));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::MUTE, data);
+}
+
+void UdpController::sendSourdine(int sirenIdx, int type, int value)
+{
+    if (sirenIdx < 1 || sirenIdx > 7) return;
+    QByteArray data;
+    data.append(static_cast<char>(sirenIdx));
+    data.append(static_cast<char>(type));
+    data.append(static_cast<char>(value));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SOURDINE, data);
+}
+
+void UdpController::sendLED(int ch, int numSourdine, int value)
+{
+    QByteArray data;
+    data.append(static_cast<char>(ch));
+    data.append(static_cast<char>(numSourdine));
+    data.append(static_cast<char>(value));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::LED, data);
+}
+
+void UdpController::sendLEDTrompe(int value)
+{
+    QByteArray data;
+    data.append(static_cast<char>(value));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::LEDTROMPE, data);
+}
+
+void UdpController::sendVoletActif(int sirenIdx, int mask)
+{
+    if (sirenIdx < 1 || sirenIdx > 7) return;
+    QByteArray data;
+    data.append(static_cast<char>(sirenIdx));
+    data.append(static_cast<char>(mask & 0x0F));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOLETACTIF, data);
+}
+
+void UdpController::sendLumiere(int side, int proj, int value)
+{
+    // Legacy CMD_TOURELLE: { 0x25, 0x06, 0x00, side(0x9C/0x9D), proj(0x01/0x02), value }
+    QByteArray data;
+    data.append(static_cast<char>(side));
+    data.append(static_cast<char>(proj));
+    data.append(static_cast<char>(value));
+    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::TOURELLE, data);
+}
+
 void UdpController::onUdpReadyRead()
 {
     if (!m_udpSocket) {
@@ -335,9 +466,9 @@ void UdpController::onUdpReadyRead()
 
 void UdpController::parseIncomingData(const QByteArray &data, const QString &fromAddress, int fromPort)
 {
-    qDebug().noquote() << "[UdpController] RX" << data.size() << "B from"
-                       << fromAddress << ":" << fromPort
-                       << "hex=" << data.toHex(' ');
+    qCDebug(udpLog).noquote() << "RX" << data.size() << "B from"
+                              << fromAddress << ":" << fromPort
+                              << "hex=" << data.toHex(' ');
     Q_UNUSED(fromAddress)
     Q_UNUSED(fromPort)
     if (data.isEmpty()) return;
@@ -406,6 +537,36 @@ void UdpController::parseIncomingData(const QByteArray &data, const QString &fro
         bool running = static_cast<unsigned char>(data[2]) == 1;
         int slot = static_cast<unsigned char>(data[3]);
         emit runningStateChanged(running, slot);
+        return;
+    }
+
+    // 'LL' + idx + size + name: a playlist file entry on the master.
+    // Legacy uses 1-based idx, store map[idx-1] -> name.
+    if (b0 == 'L' && b1 == 'L' && data.size() >= 5) {
+        int idx = static_cast<unsigned char>(data[2]) - 1;
+        QByteArray nameBytes = data.mid(4);
+        while (!nameBytes.isEmpty() && nameBytes.endsWith('\0')) nameBytes.chop(1);
+        emit playlistFileReceived(idx, QString::fromUtf8(nameBytes));
+        return;
+    }
+
+    // TRAMPRESENCE 0x21: 10-byte heartbeat — bytes 1..7 are KEB S1..S7
+    // liveness counters, byte 8 is Trompe. Any value >= 5 means absent.
+    if (b0 == 0x21 && data.size() >= 10) {
+        for (int i = 1; i <= 7; ++i) {
+            bool present = static_cast<unsigned char>(data[i]) < 5;
+            emit kebPresenceReceived(i, present);
+        }
+        emit trompePresenceReceived(static_cast<unsigned char>(data[8]) < 5);
+        return;
+    }
+
+    // RECVST 0x22: 10-byte motor-state echo — bytes 1..7 indicate whether the
+    // KEB drive on Sn is responding (1 = active, 0 = silent).
+    if (b0 == 0x22 && data.size() >= 10) {
+        for (int i = 1; i <= 7; ++i) {
+            emit motorStateReceived(i, static_cast<unsigned char>(data[i]) == 0x01);
+        }
         return;
     }
 }
