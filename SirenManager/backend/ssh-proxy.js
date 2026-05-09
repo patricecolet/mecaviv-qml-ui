@@ -129,6 +129,54 @@ class SshProxy {
         });
     }
 
+    // List basenames of files in a remote directory matching a glob pattern.
+    // Uses `ls -1` and filters on the JS side. We can't use `find -maxdepth
+    // -iname`: BusyBox 1.00 (the Artila sirens, vintage 2009) doesn't support
+    // those options and silently prints its usage on stderr while exiting 0
+    // — making listFiles return [] and the mirror diff treat ALL target files
+    // as orphans. `ls -1` is portable across BusyBox 1.00, Pi5, modern GNU.
+    async listFiles(machineType, remotePath, globPattern) {
+        const dir = String(remotePath).replace(/\/+$/, '');
+        const cmd = `ls -1 ${this.shellQuote(dir + '/')}`;
+        let stdout;
+        try {
+            stdout = await this.executeCommand(machineType, cmd);
+        } catch (e) {
+            throw new Error(`listFiles ${dir} (pattern ${globPattern}): ${e.message}`);
+        }
+        const regex = SshProxy.globToRegex(globPattern);
+        return stdout.split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .filter((name) => regex.test(name));
+    }
+
+    // Translate a simple shell glob (* and ?) into a case-insensitive RegExp
+    // anchored to the full string. Used to match the patterns we'd otherwise
+    // pass to `find -iname`.
+    static globToRegex(glob) {
+        const escaped = String(glob)
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*')
+            .replace(/\?/g, '.');
+        return new RegExp('^' + escaped + '$', 'i');
+    }
+
+    // Delete a list of files (basenames) from a remote directory. Single ssh
+    // call, all paths fully quoted.
+    async removeFiles(machineType, remoteDir, basenames) {
+        if (basenames.length === 0) return;
+        const dir = String(remoteDir).replace(/\/+$/, '');
+        const fullPaths = basenames
+            .map((b) => this.shellQuote(`${dir}/${b}`))
+            .join(' ');
+        try {
+            await this.executeCommand(machineType, `rm -f ${fullPaths}`);
+        } catch (e) {
+            throw new Error(`removeFiles ${dir} (${basenames.length} file(s)): ${e.message}`);
+        }
+    }
+
     async uploadFile(machineType, remotePath, content) {
         // Pipe local content into a remote `cat > path`.
         const target = this.sshTarget(machineType);

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import SirenManager
 import "../components"
+import "../controllers/MachinePaths.js" as MachinePaths
 
 Rectangle {
     id: root
@@ -19,9 +20,21 @@ Rectangle {
     property bool isSynchro: true
     property bool stState: false
 
-    // 48 slots, populated from 'PS' messages
+    // 48 slots, populated from 'PS' messages (firmware sends the *pseudo*,
+    // see lire_seq_midi.c:907 — the actual .mid filename comes via SSH below).
     property var slotsData: []
     property var slotLengths: []
+    // Real .mid filename per slot, fetched once from Linux Maître's active
+    // .ListLecture file. Best-effort: silent if SSH fails, slots fall back
+    // to showing only the pseudo.
+    property var slotFilenames: []
+    // Pseudo / loop / chain cached from the .ListLecture file. Used as a
+    // fallback for slot display when the firmware hasn't (yet) emitted a PS
+    // message — happens offline, before sync, or if the playlist was just
+    // saved with empty firmware-side state. PS still wins when it arrives.
+    property var slotPseudos: []
+    property var slotLoopsFile: []
+    property var slotChainsFile: []
 
     function defaultSlots() {
         var data = []
@@ -37,12 +50,80 @@ Rectangle {
         return arr
     }
 
+    function defaultFilenames() {
+        var arr = []
+        for (var i = 0; i < 48; i++) arr.push("")
+        return arr
+    }
+
+    function defaultPseudos() {
+        var arr = []
+        for (var i = 0; i < 48; i++) arr.push("")
+        return arr
+    }
+
+    function defaultBools() {
+        var arr = []
+        for (var i = 0; i < 48; i++) arr.push(false)
+        return arr
+    }
+
+    function fetchPlaylistFilenames() {
+        // Step 1: read derniere_liste pointer; step 2 (in onDownloadFinished)
+        // pulls the actual .ListLecture and parses it.
+        SshManager.downloadFile(linuxMaitre,
+            MachinePaths.derniereListePath(linuxMaitre), "player-load-pointer")
+    }
+
     Component.onCompleted: {
         slotsData = defaultSlots()
         slotLengths = defaultLengths()
+        slotFilenames = defaultFilenames()
+        slotPseudos = defaultPseudos()
+        slotLoopsFile = defaultBools()
+        slotChainsFile = defaultBools()
         // The singleton UdpManager is already connected (see main.cpp). Just
         // ask the Linux Maître to push its current playlist + state.
         UdpManager.sendAskSynchro(linuxMaitre)
+        // Fetch real .mid filenames in parallel (best-effort; needs SSH).
+        fetchPlaylistFilenames()
+    }
+
+    Connections {
+        target: SshManager
+        function onDownloadFinished(requestId, success, content, error) {
+            if (requestId === "player-load-pointer") {
+                if (!success) return  // best-effort, silent
+                var m = content.match(/<string>([^<]+)<\/string>/)
+                if (!m) return
+                SshManager.downloadFile(linuxMaitre, m[1].trim(), "player-load-playlist")
+                return
+            }
+            if (requestId === "player-load-playlist") {
+                if (!success) return
+                var fn = defaultFilenames()
+                var ps = defaultPseudos()
+                var lp = defaultBools()
+                var ch = defaultBools()
+                // Capture [s=filename], [a=pseudo], [B=loop], [E=chain].
+                var rx = /\{[^}]*\[n=(\d+)\][^}]*\[s=([^\]]*)\][^}]*\[a=([^\]]*)\][^}]*\[B=(\d)\][^}]*\[E=(\d)\][^}]*\}/g
+                var match
+                while ((match = rx.exec(content)) !== null) {
+                    var idx = parseInt(match[1])
+                    if (idx >= 0 && idx < 48) {
+                        fn[idx] = match[2]
+                        ps[idx] = match[3]
+                        lp[idx] = match[4] === "1"
+                        ch[idx] = match[5] === "1"
+                    }
+                }
+                slotFilenames = fn
+                slotPseudos = ps
+                slotLoopsFile = lp
+                slotChainsFile = ch
+                return
+            }
+        }
     }
 
     Connections {
@@ -198,9 +279,27 @@ Rectangle {
                                 Layout.preferredHeight: 130
 
                                 slotIndex: globalIndex
-                                filename: slotsData[globalIndex] ? slotsData[globalIndex].name : ""
-                                boucle: slotsData[globalIndex] ? slotsData[globalIndex].loop : false
-                                enchain: slotsData[globalIndex] ? slotsData[globalIndex].chain : false
+                                // PS (firmware UDP) is preferred when alive,
+                                // SSH-loaded playlist file is the fallback. We
+                                // detect "no PS yet" by an empty pseudo on the
+                                // PS side — same heuristic across pseudo, loop
+                                // and chain so they stay consistent.
+                                filename: {
+                                    var psName = slotsData[globalIndex] ? slotsData[globalIndex].name : ""
+                                    if (psName && psName.length > 0) return psName
+                                    return slotPseudos[globalIndex] || ""
+                                }
+                                midiFile: slotFilenames[globalIndex] || ""
+                                boucle: {
+                                    var psName = slotsData[globalIndex] ? slotsData[globalIndex].name : ""
+                                    if (psName && psName.length > 0) return slotsData[globalIndex].loop
+                                    return slotLoopsFile[globalIndex] === true
+                                }
+                                enchain: {
+                                    var psName2 = slotsData[globalIndex] ? slotsData[globalIndex].name : ""
+                                    if (psName2 && psName2.length > 0) return slotsData[globalIndex].chain
+                                    return slotChainsFile[globalIndex] === true
+                                }
                                 isSelected: root.selectedSlot === globalIndex
                                 isActive: root.playingSlot === globalIndex && root.isPlaying
 
@@ -311,7 +410,7 @@ Rectangle {
                         Layout.preferredHeight: 35
 
                         background: Rectangle {
-                            color: "#444444"
+                            color: stopButton.pressed ? "#222222" : "#444444"
                             border.color: "#666666"; border.width: 2; radius: 5
                         }
                         contentItem: Text {
@@ -334,7 +433,7 @@ Rectangle {
                         Layout.preferredHeight: 35
 
                         background: Rectangle {
-                            color: "#444444"
+                            color: resetButton.pressed ? "#222222" : "#444444"
                             border.color: "#666666"; border.width: 2; radius: 5
                         }
                         contentItem: Text {
@@ -410,7 +509,23 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
-                        onClicked: UdpManager.sendAskSynchro(linuxMaitre)
+                        // Refresh = both channels:
+                        //  • UDP ASKSYNCHRO so the firmware re-sends PS (only
+                        //    useful when the local IP is .103/.113 — firmware
+                        //    targets are hardcoded there).
+                        //  • SSH re-read of derniere_liste + the active
+                        //    .ListLecture so the SSH fallback reflects the
+                        //    current on-disk state (handles the common case
+                        //    where the active playlist was changed since the
+                        //    view first loaded).
+                        // We also reset slotsData so any stale PS from a prior
+                        // active playlist disappears immediately; new PS or the
+                        // SSH fallback repopulates moments later.
+                        onClicked: {
+                            slotsData = defaultSlots()
+                            UdpManager.sendAskSynchro(linuxMaitre)
+                            fetchPlaylistFilenames()
+                        }
                     }
 
                     Item { Layout.fillWidth: true }

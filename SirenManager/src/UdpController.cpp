@@ -222,8 +222,13 @@ void UdpController::sendAskSynchro(MachineType machine)
 
 void UdpController::sendNewList(MachineType machine, int listIndex)
 {
+    // Wire convention from the legacy SireneControlMac
+    // (MaintenanceViewController.m:139): the byte at offset 3 is `listIndex+2`.
+    // The firmware (`new_liste_lecture` in lire_seq_midi.c:1232) subtracts 2
+    // back to get the 0-based index into all_list_lecture[]. Caller passes
+    // the 0-based index; we add the +2 here so the API is non-surprising.
     QByteArray data;
-    data.append(static_cast<char>(listIndex));
+    data.append(static_cast<char>(listIndex + 2));
     sendCommandToMachine(machine, UdpCommands::NEWLIST, data);
 }
 

@@ -5,7 +5,8 @@ Rectangle {
     id: root
 
     property int slotIndex: 0
-    property string filename: ""
+    property string filename: ""    // pseudo from firmware (PS message)
+    property string midiFile: ""    // real .mid filename (loaded via SSH from .ListLecture)
     property string pseudo: ""
     property bool boucle: false
     property bool enchain: false
@@ -62,12 +63,13 @@ Rectangle {
     // Title — auto-shrinks to fit width (legacy used a condensed font that's
     // not on macOS, so fallback fonts are wider than the original sizing
     // assumed). HorizontalFit avoids any ellipsis truncation.
+    // Bottom margin reserves room for the .mid filename caption when present.
     Text {
         anchors.fill: parent
         anchors.leftMargin: 8
         anchors.rightMargin: enchain ? 12 : 8
         anchors.topMargin: 22
-        anchors.bottomMargin: 6
+        anchors.bottomMargin: midiFile.length > 0 ? 18 : 6
         text: filename
         color: "#FFFFFF"
         font.pixelSize: 28
@@ -77,6 +79,21 @@ Rectangle {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         wrapMode: Text.NoWrap
+    }
+
+    // Real .mid filename (small caption at the bottom). Hidden when empty
+    // so the title takes the full vertical space.
+    Text {
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 4
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: parent.width - 16
+        text: midiFile
+        color: "#A0A0A0"
+        font.pixelSize: 10
+        elide: Text.ElideMiddle
+        horizontalAlignment: Text.AlignHCenter
+        visible: midiFile.length > 0
     }
 
     // Chain indicator: thin brown stripe on the right edge, INSIDE the slot

@@ -25,6 +25,7 @@
         <file>QML/controllers/UdpController.qml</file>
         <file>QML/controllers/PlaylistController.qml</file>
         <file>QML/controllers/SystemMaintenanceController.qml</file>
+        <file>QML/controllers/MachinePaths.js</file>
     </qresource>
     
     <!-- Resources - Images will be added later -->

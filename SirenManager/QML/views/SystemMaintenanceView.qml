@@ -2,26 +2,28 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import SirenManager
+import "../controllers/MachinePaths.js" as MachinePaths
 
 Rectangle {
     id: root
     color: "#1e1e1e"
 
-    // MachineType enum values mirrored in QML (see src/Config/MachineType.h)
+    // MachineType enum values mirrored in QML (see src/Config/MachineType.h).
+    // Paths come from MachinePaths so they stay in sync with PlaylistComposerView.
     readonly property var machines: [
-        { name: "Linux Maître",   id: 0,  midiPath: "/mnt/disk/home/guest/WorkSpaceSirenes/Midi/", playlistPath: "/mnt/disk/home/guest/WorkSpaceSirenes/liste_de_lecture/" },
-        { name: "Raspberry Clic", id: 1,  midiPath: "/home/pi/mecaviv/compositions/",              playlistPath: "/home/pi/mecaviv/compositions/" },
-        { name: "Sirène S1",      id: 2,  midiPath: "",                                            playlistPath: "" },
-        { name: "Sirène S2",      id: 3,  midiPath: "",                                            playlistPath: "" },
-        { name: "Sirène S3",      id: 4,  midiPath: "",                                            playlistPath: "" },
-        { name: "Sirène S4",      id: 5,  midiPath: "",                                            playlistPath: "" },
-        { name: "Sirène S5",      id: 6,  midiPath: "",                                            playlistPath: "" },
-        { name: "Sirène S6",      id: 7,  midiPath: "",                                            playlistPath: "" },
-        { name: "Sirène S7",      id: 8,  midiPath: "",                                            playlistPath: "" },
-        { name: "Voiture A",      id: 9,  midiPath: "",                                            playlistPath: "" },
-        { name: "Voiture B",      id: 10, midiPath: "",                                            playlistPath: "" },
-        { name: "Pavillon 1",     id: 11, midiPath: "",                                            playlistPath: "" },
-        { name: "Pavillon 2",     id: 12, midiPath: "",                                            playlistPath: "" }
+        { name: "Linux Maître",   id: 0  },
+        { name: "Raspberry Clic", id: 1  },
+        { name: "Sirène S1",      id: 2  },
+        { name: "Sirène S2",      id: 3  },
+        { name: "Sirène S3",      id: 4  },
+        { name: "Sirène S4",      id: 5  },
+        { name: "Sirène S5",      id: 6  },
+        { name: "Sirène S6",      id: 7  },
+        { name: "Sirène S7",      id: 8  },
+        { name: "Voiture A",      id: 9  },
+        { name: "Voiture B",      id: 10 },
+        { name: "Pavillon 1",     id: 11 },
+        { name: "Pavillon 2",     id: 12 }
     ]
 
     property int selectedMachineIdx: 0
@@ -32,7 +34,28 @@ Rectangle {
     Connections {
         target: SshManager
 
+        function onKeysArchiveExportFinished(requestId, success, archivePath, aliasesFound, error) {
+            if (requestId !== "export-keys") return
+            exportKeysDialog.exportRunning = false
+            if (success) {
+                exportKeysDialog.exportPath = archivePath
+                exportKeysDialog.exportAliases = aliasesFound
+                exportKeysDialog.exportError = ""
+            } else {
+                exportKeysDialog.exportPath = ""
+                exportKeysDialog.exportError = error || "Erreur inconnue"
+            }
+        }
+
         function onCommandFinished(requestId, success, output, error) {
+            // Reboot-all results: don't toggle the global busy flag here; the
+            // dialog tracks its own in-flight count and we want partial
+            // results to keep streaming until the last one lands.
+            if (requestId.indexOf("reboot-all-") === 0) {
+                var mid = parseInt(requestId.substring("reboot-all-".length))
+                rebootAllDialog.recordResult(mid, success, error)
+                return
+            }
             busy = false
             if (requestId === "system-info") {
                 ramLabel.text = success ? parseFreeOutput(output) : ("Erreur: " + error)
@@ -97,11 +120,14 @@ Rectangle {
         busy = true
         ramLabel.text = "..."
         diskLabel.text = ""
-        // `df` without -h for compat with the BusyBox 1.00 on the Artila sirens
-        // (v2009 — `-h` is unknown there). humanKB() converts the 1k-blocks
-        // output to human-readable on the QML side.
+        // `df` (no path arg, no -h) for compat with BusyBox 1.00 on Artila:
+        // `df /` there prints only the header — the actual rootfs row only
+        // shows up when df is called without an argument. parseDfOutput
+        // filters to the line mounted on "/", which is unambiguous on every
+        // sample we have (Artila, Pi5, modern Linux). humanKB() turns the
+        // 1k-blocks into a readable size.
         SshManager.executeCommand(currentMachine().id,
-            "free | grep Mem && df /", "system-info")
+            "free | grep Mem && df", "system-info")
     }
 
     function refreshDmesg(filterErr) {
@@ -112,12 +138,7 @@ Rectangle {
     }
 
     function listPlaylists() {
-        var p = currentMachine().playlistPath
-        if (!p || p.length === 0) {
-            playlistStatus.text = "Pas de chemin playlist pour cette machine"
-            playlistsModel.clear()
-            return
-        }
+        var p = MachinePaths.playlistPath(currentMachine().id)
         busy = true
         playlistStatus.text = "Chargement..."
         SshManager.executeCommand(currentMachine().id, "ls -1 " + p, "ls-playlists")
@@ -166,9 +187,19 @@ Rectangle {
                 Item { Layout.fillWidth: true }
 
                 Button {
+                    text: "Exporter clés SSH"
+                    Layout.preferredHeight: 32
+                    onClicked: exportKeysDialog.open()
+                }
+                Button {
                     text: "Reboot"
                     Layout.preferredHeight: 32
                     onClicked: rebootDialog.open()
+                }
+                Button {
+                    text: "Reboot all"
+                    Layout.preferredHeight: 32
+                    onClicked: rebootAllDialog.open()
                 }
             }
         }
@@ -276,6 +307,123 @@ Rectangle {
         }
     }
 
+    // ==================== EXPORT KEYS ARCHIVE ====================
+    // Bundles ~/.ssh/id_rsa_sirenes(.pub) + Host blocks for the 13 siren
+    // aliases + INSTALL.sh + README.txt into a tar.gz dropped in ~/Downloads/
+    // on the BACKEND host. Lets the user clone SSH access onto a 2nd control
+    // machine (the receiving machine runs the bundled INSTALL.sh, interactive,
+    // POSIX sh, macOS 10.15+ / Linux compatible).
+    Dialog {
+        id: exportKeysDialog
+        title: "Exporter les clés SSH"
+        modal: true
+        anchors.centerIn: parent
+        closePolicy: Popup.NoAutoClose
+
+        property bool exportStarted: false
+        property bool exportRunning: false
+        property string exportPath: ""
+        property int exportAliases: 0
+        property string exportError: ""
+
+        onOpened: {
+            exportStarted = false
+            exportRunning = false
+            exportPath = ""
+            exportAliases = 0
+            exportError = ""
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            Layout.preferredWidth: 480
+
+            Label {
+                visible: !exportKeysDialog.exportStarted
+                text: "Crée une archive tar.gz dans ~/Downloads/ contenant la clé privée " +
+                      "id_rsa_sirenes, les Host alias des 13 sirènes, et un script INSTALL.sh " +
+                      "interactif pour installer le tout sur une autre machine de contrôle."
+                color: "white"
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+            Label {
+                visible: !exportKeysDialog.exportStarted
+                text: "⚠ La clé privée donne un accès root à toutes les sirènes. Transférer via canal sûr (USB, scp, AirDrop), pas par email/Slack."
+                color: "#FFA500"
+                font.pixelSize: 11
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+
+            BusyIndicator {
+                visible: exportKeysDialog.exportRunning
+                running: exportKeysDialog.exportRunning
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Label {
+                visible: exportKeysDialog.exportStarted && !exportKeysDialog.exportRunning && exportKeysDialog.exportPath.length > 0
+                text: "✓ Archive créée\n\n" +
+                      exportKeysDialog.exportPath +
+                      "\n\n" + exportKeysDialog.exportAliases + " alias Host extraits."
+                color: "white"
+                font.family: "Menlo"
+                font.pixelSize: 11
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+            Label {
+                visible: exportKeysDialog.exportStarted && !exportKeysDialog.exportRunning && exportKeysDialog.exportError.length > 0
+                text: "✗ Erreur: " + exportKeysDialog.exportError
+                color: "#FF6666"
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+        }
+
+        footer: DialogButtonBox {
+            Button {
+                text: "Annuler"
+                visible: !exportKeysDialog.exportStarted
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                text: "Exporter"
+                visible: !exportKeysDialog.exportStarted
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                text: "Révéler dans le Finder"
+                visible: exportKeysDialog.exportStarted && exportKeysDialog.exportPath.length > 0
+                onClicked: {
+                    // Open the parent dir in the system file browser. macOS
+                    // Finder + Linux file managers both honor file:// URLs
+                    // pointing at a directory.
+                    var parent = exportKeysDialog.exportPath.replace(/\/[^/]+$/, "")
+                    Qt.openUrlExternally("file://" + parent)
+                }
+                DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+            }
+            Button {
+                text: "Fermer"
+                visible: exportKeysDialog.exportStarted && !exportKeysDialog.exportRunning
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+
+        onAccepted: {
+            if (!exportStarted) {
+                exportStarted = true
+                exportRunning = true
+                SshManager.exportKeysArchive("export-keys")
+            } else {
+                close()
+            }
+        }
+        onRejected: close()
+    }
+
     // ==================== REBOOT CONFIRMATION ====================
     Dialog {
         id: rebootDialog
@@ -300,5 +448,117 @@ Rectangle {
             rebootStatus.text = "Envoi en cours..."
             SshManager.executeCommand(currentMachine().id, "reboot", "reboot")
         }
+    }
+
+    // ==================== REBOOT ALL ====================
+    // Fires `reboot` over SSH on every machine in parallel. Results stream
+    // in via onCommandFinished — we treat "success=false, error=ssh closed"
+    // as a reboot-actually-happened: the connection drops mid-command
+    // because sshd dies during the reboot. So both true and false outcomes
+    // are reported to the user but neither is a hard error here.
+    Dialog {
+        id: rebootAllDialog
+        title: "Reboot de TOUTES les machines"
+        modal: true
+        anchors.centerIn: parent
+        // Disable auto-close on Ok so the dialog stays up to show streaming
+        // results. We swap the footer manually based on `rebootAllStarted`.
+        closePolicy: Popup.NoAutoClose
+
+        property int rebootAllInFlight: 0
+        property bool rebootAllStarted: false
+        // Per-machine result: id → { success: bool, error: string }
+        property var rebootAllResults: ({})
+
+        function recordResult(mid, success, error) {
+            var copy = {}
+            for (var k in rebootAllResults) copy[k] = rebootAllResults[k]
+            copy[mid] = { success: success, error: error }
+            rebootAllResults = copy
+            rebootAllInFlight = Math.max(0, rebootAllInFlight - 1)
+        }
+
+        onOpened: {
+            rebootAllStarted = false
+            rebootAllInFlight = 0
+            rebootAllResults = ({})
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            Layout.preferredWidth: 460
+
+            Label {
+                text: rebootAllDialog.rebootAllStarted
+                      ? (rebootAllDialog.rebootAllInFlight > 0
+                         ? ("Reboot en cours… " + rebootAllDialog.rebootAllInFlight + " machine(s) en attente")
+                         : "Reboot envoyé sur toutes les machines.")
+                      : "Redémarrer les " + machines.length + " machines en parallèle ?"
+                color: "white"
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+            Label {
+                visible: !rebootAllDialog.rebootAllStarted
+                text: "Le SSH se ferme dès qu'une machine reboot — un échec de connexion = reboot quand même parti."
+                color: "#FFA500"
+                font.pixelSize: 11
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+            Repeater {
+                model: rebootAllDialog.rebootAllStarted ? machines : []
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Label {
+                        text: modelData.name
+                        color: "#ccc"
+                        Layout.preferredWidth: 140
+                    }
+                    Label {
+                        property var res: rebootAllDialog.rebootAllResults[modelData.id]
+                        text: res === undefined ? "…"
+                              : (res.success ? "✓ envoyé"
+                                             : "↺ reboot parti (ssh fermé : " + (res.error || "?") + ")")
+                        color: res === undefined ? "#888" : (res.success ? "#33CC33" : "#FFA500")
+                        font.pixelSize: 11
+                        Layout.fillWidth: true
+                    }
+                }
+            }
+        }
+
+        footer: DialogButtonBox {
+            Button {
+                text: "Annuler"
+                visible: !rebootAllDialog.rebootAllStarted
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                text: "Reboot all"
+                visible: !rebootAllDialog.rebootAllStarted
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                text: rebootAllDialog.rebootAllInFlight > 0 ? "Patienter…" : "Fermer"
+                enabled: rebootAllDialog.rebootAllInFlight === 0
+                visible: rebootAllDialog.rebootAllStarted
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+
+        onAccepted: {
+            if (!rebootAllStarted) {
+                rebootAllStarted = true
+                rebootAllInFlight = machines.length
+                for (var i = 0; i < machines.length; i++) {
+                    SshManager.executeCommand(machines[i].id, "reboot", "reboot-all-" + machines[i].id)
+                }
+            } else {
+                close()
+            }
+        }
+        onRejected: close()
     }
 }

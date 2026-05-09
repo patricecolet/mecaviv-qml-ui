@@ -39,7 +39,7 @@ SSH_PUB_KEY_PATH="$SSH_KEY_PATH.pub"
 # ALIAS  IP  USER
 declare -a machines=(
     "linux-maître   192.168.1.101  root"
-    "raspberry-clic 192.168.1.104  pi"
+    "raspberry-clic 192.168.1.104  sirenateur"
     "sirene-s1      192.168.1.11   root"
     "sirene-s2      192.168.1.12   root"
     "sirene-s3      192.168.1.13   root"

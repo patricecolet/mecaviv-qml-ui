@@ -121,7 +121,9 @@ void SshController::uploadFile(int machineType, const QString &remotePath, const
 }
 
 void SshController::syncDir(int sourceMachine, const QString &sourcePath,
-                            const QString &targetsJson, const QString &requestId)
+                            const QString &targetsJson, bool mirror,
+                            const QString &mirrorPattern, bool dryRun,
+                            const QString &requestId)
 {
     // targetsJson is a JSON array — convert each entry's machineType (int)
     // into the backend's string identifier before forwarding.
@@ -140,6 +142,13 @@ void SshController::syncDir(int sourceMachine, const QString &sourcePath,
     body[QStringLiteral("sourceMachine")] = machineTypeToString(sourceMachine);
     body[QStringLiteral("sourcePath")] = sourcePath;
     body[QStringLiteral("targets")] = rewritten;
+    body[QStringLiteral("mirror")] = mirror;
+    if (mirror && !mirrorPattern.isEmpty()) {
+        body[QStringLiteral("mirrorPattern")] = mirrorPattern;
+    }
+    if (mirror && dryRun) {
+        body[QStringLiteral("dryRun")] = true;
+    }
     QByteArray json = QJsonDocument(body).toJson(QJsonDocument::Compact);
 
     postJson(QStringLiteral("/api/ssh/sync-dir"), json, [this, requestId](QNetworkReply *reply) {
@@ -186,5 +195,23 @@ void SshController::uploadLocalFile(int machineType, const QString &localUrl,
             errorStr = reply->errorString();
         }
         emit uploadFinished(requestId, success, errorStr);
+    });
+}
+
+void SshController::exportKeysArchive(const QString &requestId)
+{
+    // No body needed — the backend reads ~/.ssh on its host.
+    QByteArray json = QJsonDocument(QJsonObject{}).toJson(QJsonDocument::Compact);
+
+    postJson(QStringLiteral("/api/keys/export"), json, [this, requestId](QNetworkReply *reply) {
+        QJsonObject obj = readReplyBody(reply);
+        bool success = obj.value(QStringLiteral("success")).toBool();
+        QString archivePath = obj.value(QStringLiteral("path")).toString();
+        int aliasesFound = obj.value(QStringLiteral("aliasesFound")).toInt();
+        QString errorStr = obj.value(QStringLiteral("error")).toString();
+        if (errorStr.isEmpty() && reply->error() != QNetworkReply::NoError) {
+            errorStr = reply->errorString();
+        }
+        emit keysArchiveExportFinished(requestId, success, archivePath, aliasesFound, errorStr);
     });
 }

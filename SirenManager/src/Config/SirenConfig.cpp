@@ -58,11 +58,12 @@ QString SirenConfig::nameForMachineType(MachineType machineType)
     }
 }
 
+// Raspberry Clic = Pi 5 deployment (m_seqPi5 firmware). Pi2 paths are obsolete.
 QString SirenConfig::midiPathForMachineType(MachineType machineType)
 {
     switch (machineType) {
         case MachineType::RaspberryClic:
-            return QStringLiteral("/home/pi/mecaviv/compositions/");
+            return QStringLiteral("/home/sirenateur/WorkSpaceSirenes/Midi/");
         default:
             return QStringLiteral("/mnt/disk/home/guest/WorkSpaceSirenes/Midi/");
     }
@@ -72,7 +73,7 @@ QString SirenConfig::playlistPathForMachineType(MachineType machineType)
 {
     switch (machineType) {
         case MachineType::RaspberryClic:
-            return QStringLiteral("/home/pi/mecaviv/compositions/");
+            return QStringLiteral("/home/sirenateur/WorkSpaceSirenes/liste_de_lecture/");
         default:
             return QStringLiteral("/mnt/disk/home/guest/WorkSpaceSirenes/liste_de_lecture/");
     }
@@ -82,7 +83,7 @@ QString SirenConfig::derniereListePathForMachineType(MachineType machineType)
 {
     switch (machineType) {
         case MachineType::RaspberryClic:
-            return QStringLiteral("/home/pi/mecaviv/derniere_liste");
+            return QStringLiteral("/home/sirenateur/WorkSpaceSirenes/derniere_liste");
         default:
             return QStringLiteral("/mnt/disk/home/guest/WorkSpaceSirenes/derniere_liste");
     }
@@ -92,7 +93,7 @@ QString SirenConfig::sshUsernameForMachineType(MachineType machineType)
 {
     switch (machineType) {
         case MachineType::RaspberryClic:
-            return QStringLiteral("pi");
+            return QStringLiteral("sirenateur");
         default:
             return QStringLiteral("root");
     }
@@ -100,19 +101,16 @@ QString SirenConfig::sshUsernameForMachineType(MachineType machineType)
 
 QString SirenConfig::sshPasswordForMachineType(MachineType machineType)
 {
-    switch (machineType) {
-        case MachineType::RaspberryClic:
-            return QStringLiteral("raspberry");
-        default:
-            return QStringLiteral("");
-    }
+    // No passwords stored — auth happens via ~/.ssh/config keys.
+    Q_UNUSED(machineType)
+    return QStringLiteral("");
 }
 
 QString SirenConfig::ftpUsernameForMachineType(MachineType machineType)
 {
     switch (machineType) {
         case MachineType::RaspberryClic:
-            return QStringLiteral("pi");
+            return QStringLiteral("sirenateur");
         default:
             return QStringLiteral("guest");
     }

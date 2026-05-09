@@ -37,9 +37,26 @@ public:
 
     // Tar a directory from the source machine and untar it onto each of the
     // given targets. Targets is a JSON-encoded array of {machineType, remotePath}.
-    // Emits syncDirFinished with per-target results when done.
+    // When `mirror` is true, files on each target matching `mirrorPattern` (a
+    // shell glob like "*.mid") that don't exist on the source get rm'd before
+    // the untar — so the sync acts as a true mirror, not just additive.
+    // When `dryRun` is true (only valid with mirror), no rm and no tar happen:
+    // the backend just returns the orphan list per target so the UI can show
+    // what *would* be deleted. Pass an empty pattern when mirror is false.
+    // Emits syncDirFinished with per-target results when done; each result
+    // entry includes `removed` count and `orphans` list when mirroring was on.
     Q_INVOKABLE void syncDir(int sourceMachine, const QString &sourcePath,
-                             const QString &targetsJson, const QString &requestId);
+                             const QString &targetsJson, bool mirror,
+                             const QString &mirrorPattern, bool dryRun,
+                             const QString &requestId);
+
+    // Build a tar.gz on the backend host bundling ~/.ssh/id_rsa_sirenes(.pub)
+    // + the Host blocks from ~/.ssh/config that match the siren aliases, plus
+    // an INSTALL.sh and README.txt. The archive lands in ~/Downloads/. Used to
+    // clone SSH access onto a second control machine without redoing
+    // ssh-copy-id from scratch. Emits keysArchiveExportFinished with the
+    // archive path on success.
+    Q_INVOKABLE void exportKeysArchive(const QString &requestId);
 
 signals:
     void backendUrlChanged(const QString &url);
@@ -51,6 +68,9 @@ signals:
     // QML can JSON.parse() it directly to display per-target outcomes.
     void syncDirFinished(const QString &requestId, bool success, int tarSize,
                          const QString &resultsJson, const QString &error);
+    void keysArchiveExportFinished(const QString &requestId, bool success,
+                                   const QString &archivePath, int aliasesFound,
+                                   const QString &error);
 
 private:
     static QString machineTypeToString(int machineType);
