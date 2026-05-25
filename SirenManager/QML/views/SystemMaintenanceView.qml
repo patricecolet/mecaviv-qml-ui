@@ -75,6 +75,9 @@ Rectangle {
                 }
             } else if (requestId === "reboot") {
                 rebootStatus.text = success ? "Reboot envoyé." : ("Erreur: " + error)
+            } else if (requestId.indexOf("ls-midi-") === 0) {
+                var mid = parseInt(requestId.substring("ls-midi-".length))
+                recordMidi(mid, success, output)
             }
         }
     }
@@ -145,6 +148,95 @@ Rectangle {
     }
 
     ListModel { id: playlistsModel }
+
+    // MIDI cross-machine listing. Fires `ls -l Midi/` on every machine in
+    // parallel, collects size + filename, then renders the Maître as
+    // reference and tags the rest with ✓ (size match) / ⚠ (size differs) /
+    // ✗ (missing) / + (extra not on Maître). Lets the user spot a stale
+    // .mid sitting on one siren but not the others.
+    property var midiByMachine: ({})
+    property int midiInflight: 0
+    function listAllMidi() {
+        midiByMachine = {}
+        midiInflight = machines.length
+        midiStatus.text = "Listing " + machines.length + " machines…"
+        midiArea.text = ""
+        for (var i = 0; i < machines.length; i++) {
+            var m = machines[i]
+            var p = MachinePaths.midiPath(m.id)
+            // `ls -l` (not `-la`) skips . and ..; the cd makes the absolute
+            // path explicit in errors when Midi/ is missing on a siren.
+            SshManager.executeCommand(m.id,
+                "cd " + p + " && ls -l", "ls-midi-" + m.id)
+        }
+    }
+    function recordMidi(machineId, success, output) {
+        var entries = []
+        if (success) {
+            var lines = output.split("\n")
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim()
+                if (!line || line.charAt(0) !== '-') continue
+                var f = line.split(/\s+/)
+                if (f.length < 9) continue
+                // BusyBox ls -l: <perms> <links> <user> <group> <size>
+                //                <month> <day> <time> <name…>
+                entries.push({ name: f.slice(8).join(' '), size: parseInt(f[4]) })
+            }
+        }
+        var copy = {}
+        for (var k in midiByMachine) copy[k] = midiByMachine[k]
+        copy[machineId] = entries
+        midiByMachine = copy
+        midiInflight = Math.max(0, midiInflight - 1)
+        if (midiInflight === 0) renderMidi()
+    }
+    function renderMidi() {
+        // Maître is id=0; treat its file set as canonical and annotate
+        // others against it. Files only on a non-Maître show up tagged "+".
+        var ref = midiByMachine[0] || []
+        var refMap = {}
+        for (var i = 0; i < ref.length; i++) refMap[ref[i].name] = ref[i].size
+
+        var out = ""
+        for (var i = 0; i < machines.length; i++) {
+            var m = machines[i]
+            var entries = midiByMachine[m.id] || []
+            var label = (m.id === 0 ? " (référence)" : "")
+            out += "=== " + m.name + label + " — " + entries.length + " fichier(s) ===\n"
+            // Sort entries by name for consistent display.
+            entries.sort(function(a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0 })
+            for (var j = 0; j < entries.length; j++) {
+                var e = entries[j]
+                var sizeStr = ("         " + e.size).slice(-9)
+                var tag = ""
+                if (m.id === 0) {
+                    tag = ""
+                } else if (refMap.hasOwnProperty(e.name)) {
+                    tag = (refMap[e.name] === e.size)
+                            ? "  ✓"
+                            : "  ⚠ (Maître: " + refMap[e.name] + ")"
+                } else {
+                    tag = "  + (absent du Maître)"
+                }
+                out += sizeStr + "  " + e.name + tag + "\n"
+            }
+            // For non-Maître machines, list files present on Maître but missing here.
+            if (m.id !== 0 && ref.length > 0) {
+                var present = {}
+                for (var j = 0; j < entries.length; j++) present[entries[j].name] = true
+                var missing = []
+                for (var rname in refMap) if (!present[rname]) missing.push(rname)
+                missing.sort()
+                for (var k = 0; k < missing.length; k++) {
+                    out += "         (absent)  " + missing[k] + "  ✗\n"
+                }
+            }
+            out += "\n"
+        }
+        midiArea.text = out
+        midiStatus.text = "Listing terminé"
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -301,6 +393,45 @@ Rectangle {
                                 font.pixelSize: 12
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // ==================== MIDI DISTANTS ====================
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 280
+            color: "#2a2a2a"; border.color: "#444"; radius: 6
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 12
+                spacing: 6
+
+                RowLayout {
+                    Label { text: "MIDI DISTANTS"; color: "#888"; font.pixelSize: 11; font.bold: true }
+                    Item { Layout.fillWidth: true }
+                    Label { id: midiStatus; text: ""; color: "#777"; font.pixelSize: 10 }
+                    Button {
+                        text: "Lister tout"
+                        Layout.preferredHeight: 26
+                        onClicked: listAllMidi()
+                    }
+                }
+
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    TextArea {
+                        id: midiArea
+                        readOnly: true
+                        text: ""
+                        color: "#ccc"
+                        font.family: "Menlo"
+                        font.pixelSize: 11
+                        wrapMode: TextEdit.NoWrap
+                        background: Rectangle { color: "#111" }
                     }
                 }
             }

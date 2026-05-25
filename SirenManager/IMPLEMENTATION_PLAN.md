@@ -66,3 +66,28 @@
 - [ ] Intégration WebSocket
 - [ ] Tests complets
 
+## Retour de production (2026-05-25)
+
+Première utilisation en production confirmée : administration via interface
+considérée pratique et fiable sur le périmètre testé (Player, Maintenance,
+SystemMaintenance, PlaylistComposer, sirènes S1–S7 + Maître + Pi5).
+
+### À ajouter (manqué en prod)
+- [ ] Presets de lumière (équivalents des "Presets LED" de la `MixerView`,
+      à recroiser avec `SecondViewController.m` côté legacy pour la liste
+      exacte et les opcodes UDP)
+- [ ] Reset individuel par sirène (actuellement le reset est global ou
+      passe par `SystemMaintenanceView` ; ajouter un bouton par sirène
+      depuis `MixerView` ou `MaintenanceView`)
+
+### À corriger (bugs UX repérés en prod)
+- [ ] `SystemMaintenanceView` non scrollable : la section dmesg en bas du
+      `ColumnLayout` est hors écran et inaccessible. Envelopper le contenu
+      dans un `ScrollView` / `Flickable` (le `TextArea` MIDI distants a déjà
+      son propre ScrollView, mais le conteneur principal n'en a pas).
+
+### À valider (non testé en prod, accès matériel requis)
+- [ ] Vue Pavillons : envoi UDP réel vers `pavillon1` / `pavillon2`
+- [ ] Vue Voitures : envoi UDP réel vers `voitureA` / `voitureB` ("pchits")
+- [ ] Workflow MIDI swap voitures (cf. memory `reference_midi_swap_workflow`)
+

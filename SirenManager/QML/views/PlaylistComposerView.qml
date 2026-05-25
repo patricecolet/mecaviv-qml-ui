@@ -597,6 +597,13 @@ Rectangle {
                         rmStr = " (-" + parts.join(", -") + ")"
                     }
                     lines.push("✓ " + p.name + rmStr)
+                    // Pi5 only: the backend tries `systemctl restart m-seq.service`
+                    // after sync so the kernel prioq picks up new MIDI/playlist
+                    // content. Surface only failures — success is silent.
+                    var prioqErr = (midiR.prioqRefreshError || plR.prioqRefreshError)
+                    if (prioqErr) {
+                        lines.push("    ⚠ prioq non rafraîchie: " + prioqErr)
+                    }
                 }
             } else {
                 fail++
@@ -913,6 +920,14 @@ Rectangle {
                     text: "Sync vers sirènes"
                     Layout.preferredHeight: 32
                     onClicked: syncDialog.open()
+                }
+                Button {
+                    text: "Backup local"
+                    Layout.preferredHeight: 32
+                    onClicked: {
+                        statusLabel.text = "Backup demandé — choisis l'emplacement dans le navigateur."
+                        Qt.openUrlExternally("http://localhost:8005/api/playlists/backup?machine=linuxMaitre")
+                    }
                 }
 
                 BusyIndicator {
@@ -1544,4 +1559,5 @@ Rectangle {
         }
         onAccepted: deletePlaylist(targetName)
     }
+
 }

@@ -12697,14 +12697,14 @@ function checkIncomingModuleAPI() {
 }
 
 var ASM_CONSTS = {
-  12138788: () => {
+  12185332: () => {
     Module.qtSuspendResumeControl = ({
       resume: null,
       eventHandlers: {},
       pendingEvents: []
     });
   },
-  12138883: $0 => {
+  12185427: $0 => {
     let index = $0;
     let control = Module.qtSuspendResumeControl;
     let handler = arg => {
@@ -13308,6 +13308,17 @@ function invoke_viiii(index, a1, a2, a3, a4) {
   }
 }
 
+function invoke_vii(index, a1, a2) {
+  var sp = stackSave();
+  try {
+    getWasmTableEntry(index)(a1, a2);
+  } catch (e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
 function invoke_vi(index, a1) {
   var sp = stackSave();
   try {
@@ -13352,6 +13363,29 @@ function invoke_iii(index, a1, a2) {
   }
 }
 
+function invoke_ji(index, a1) {
+  var sp = stackSave();
+  try {
+    return getWasmTableEntry(index)(a1);
+  } catch (e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+    return 0n;
+  }
+}
+
+function invoke_v(index) {
+  var sp = stackSave();
+  try {
+    getWasmTableEntry(index)();
+  } catch (e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
 function invoke_iiiii(index, a1, a2, a3, a4) {
   var sp = stackSave();
   try {
@@ -13363,10 +13397,10 @@ function invoke_iiiii(index, a1, a2, a3, a4) {
   }
 }
 
-function invoke_viiiiii(index, a1, a2, a3, a4, a5, a6) {
+function invoke_iiiiii(index, a1, a2, a3, a4, a5) {
   var sp = stackSave();
   try {
-    getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6);
+    return getWasmTableEntry(index)(a1, a2, a3, a4, a5);
   } catch (e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;
@@ -13374,10 +13408,10 @@ function invoke_viiiiii(index, a1, a2, a3, a4, a5, a6) {
   }
 }
 
-function invoke_vii(index, a1, a2) {
+function invoke_viiiiii(index, a1, a2, a3, a4, a5, a6) {
   var sp = stackSave();
   try {
-    getWasmTableEntry(index)(a1, a2);
+    getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6);
   } catch (e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;
@@ -13407,18 +13441,6 @@ function invoke_viiiii(index, a1, a2, a3, a4, a5) {
   }
 }
 
-function invoke_ji(index, a1) {
-  var sp = stackSave();
-  try {
-    return getWasmTableEntry(index)(a1);
-  } catch (e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-    return 0n;
-  }
-}
-
 function invoke_jiijii(index, a1, a2, a3, a4, a5) {
   var sp = stackSave();
   try {
@@ -13443,10 +13465,10 @@ function invoke_jii(index, a1, a2) {
   }
 }
 
-function invoke_v(index) {
+function invoke_iij(index, a1, a2) {
   var sp = stackSave();
   try {
-    getWasmTableEntry(index)();
+    return getWasmTableEntry(index)(a1, a2);
   } catch (e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;
@@ -13535,32 +13557,10 @@ function invoke_jiii(index, a1, a2, a3) {
   }
 }
 
-function invoke_iij(index, a1, a2) {
-  var sp = stackSave();
-  try {
-    return getWasmTableEntry(index)(a1, a2);
-  } catch (e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-  }
-}
-
 function invoke_viij(index, a1, a2, a3) {
   var sp = stackSave();
   try {
     getWasmTableEntry(index)(a1, a2, a3);
-  } catch (e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_iiiiii(index, a1, a2, a3, a4, a5) {
-  var sp = stackSave();
-  try {
-    return getWasmTableEntry(index)(a1, a2, a3, a4, a5);
   } catch (e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;

@@ -53,12 +53,41 @@ app.post('/api/ssh/upload', async (req, res) => {
         console.log(`[SirenManager Backend] upload: machine=${machineType} path=${remotePath} bytes=${buffer.length} (${contentBase64 ? 'base64' : 'utf8'})`);
         await sshProxy.uploadFile(machineType, remotePath, buffer);
         console.log(`[SirenManager Backend] upload OK: ${remotePath}`);
-        res.json({ success: true });
+        const prioqRefresh = await maybeRefreshPi5Prioq(machineType, remotePath);
+        res.json({ success: true, ...prioqRefresh });
     } catch (error) {
         console.error('[SirenManager Backend] SSH error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+// Pi5's m_seq.ko caches the playlist + MIDI files in a kernel-space prioq at
+// insmod and never re-reads them, so a fresh file on disk has no effect until
+// the module reloads. `systemctl restart m-seq.service` does rmmod+insmod
+// without touching audio modules — validated 2026-05-11 to refresh the prioq
+// without triggering the warm-reboot-silent-audio HW bug.
+//
+// Best-effort: if the restart fails (sudo perms, network blip), we log and
+// return the error in the response payload but DO NOT fail the underlying
+// upload/sync — the file is on disk, the user just won't hear the change
+// until the next reboot.
+async function maybeRefreshPi5Prioq(machineType, remotePath) {
+    if (machineType !== 'raspberryClic') return {};
+    const cfg = config.machines.raspberryClic;
+    // derniere_liste is just the active-playlist pointer — the firmware handles
+    // it hot via NEWLIST UDP, no prioq invalidation needed. Only MIDI files
+    // and .ListLecture content changes require an m_seq.ko restart.
+    const hits = [cfg.midiPath, cfg.playlistPath].some(p => p && remotePath && remotePath.startsWith(p));
+    if (!hits) return {};
+    try {
+        await sshProxy.executeCommand('raspberryClic', 'sudo systemctl restart m-seq.service');
+        console.log(`[SirenManager Backend] upload: ↻ raspberryClic m-seq prioq refreshed`);
+        return { prioqRefreshed: true };
+    } catch (e) {
+        console.log(`[SirenManager Backend] upload: ✗ raspberryClic m-seq restart: ${e.message}`);
+        return { prioqRefreshed: false, prioqRefreshError: e.message };
+    }
+}
 
 // POST /api/ssh/sync-dir
 // Body: { sourceMachine, sourcePath, targets: [{ machineType, remotePath }, …],
@@ -120,8 +149,20 @@ app.post('/api/ssh/sync-dir', async (req, res) => {
                 if (!dryRun) {
                     await sshProxy.untarRemote(tgt.machineType, tgt.remotePath, tarBuffer);
                 }
-                results.push({ machine: tgt.machineType, success: true,
-                               removed, orphans, dryRun });
+                const entry = { machine: tgt.machineType, success: true,
+                                removed, orphans, dryRun };
+                if (!dryRun && tgt.machineType === 'raspberryClic') {
+                    try {
+                        await sshProxy.executeCommand('raspberryClic', 'sudo systemctl restart m-seq.service');
+                        entry.prioqRefreshed = true;
+                        console.log(`[SirenManager Backend] sync-dir: ↻ raspberryClic m-seq prioq refreshed`);
+                    } catch (e) {
+                        entry.prioqRefreshed = false;
+                        entry.prioqRefreshError = e.message;
+                        console.log(`[SirenManager Backend] sync-dir: ✗ raspberryClic m-seq restart: ${e.message}`);
+                    }
+                }
+                results.push(entry);
                 console.log(`[SirenManager Backend] sync-dir: ✓ ${tgt.machineType}${removed > 0 ? ` (-${removed})` : ''}${dryRun ? ' (dry-run)' : ''}`);
             } catch (e) {
                 results.push({ machine: tgt.machineType, success: false, error: e.message });
@@ -302,6 +343,30 @@ Si la machine cible doit utiliser une AUTRE clé, la procédure persist-key
 côté Artila doit être ré-appliquée pour snapshot la nouvelle authorized_keys
 (voir README projet, section "SSH key persistence").
 `;
+
+// GET /api/playlists/backup?machine=linuxMaitre
+// Streams a gzipped tar of the Maître's WorkSpaceSirenes/ tree (all .ListLecture
+// + ALLLIST + derniere_liste + Midi/) as an HTTP attachment. The browser shows
+// its native "Save As" dialog so the user picks where to drop the snapshot —
+// no backend-side path config needed.
+app.get('/api/playlists/backup', async (req, res) => {
+    try {
+        const machineType = req.query.machine || 'linuxMaitre';
+        const remoteRoot = '/mnt/disk/home/guest/WorkSpaceSirenes';
+        const tarBuffer = await sshProxy.tarRemote(machineType, remoteRoot);
+        const gz = require('zlib').gzipSync(tarBuffer);
+
+        const ts = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '_');
+        const filename = `sirenmanager-playlists-${ts}.tar.gz`;
+        console.log(`[SirenManager Backend] playlists/backup: streaming ${filename} (${gz.length} bytes, ${tarBuffer.length} uncompressed)`);
+        res.setHeader('Content-Type', 'application/gzip');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(gz);
+    } catch (error) {
+        console.error('[SirenManager Backend] playlists/backup error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 app.post('/api/keys/export', async (req, res) => {
     try {
