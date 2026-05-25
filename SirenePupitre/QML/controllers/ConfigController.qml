@@ -380,15 +380,21 @@ QtObject {
         
         if (componentName === "controllers") {
             return getValueAtPath(["displayConfig", "controllers", "visible"], true)
-        } else {
-            return getValueAtPath(["displayConfig", "components", componentName, "visible"], true)
         }
+        // Valeurs numériques sous le bandeau contrôleurs physiques (pas displayConfig.components.*)
+        if (componentName === "controllerValues") {
+            return getValueAtPath(["displayConfig", "controllers", "controllerValues", "visible"], true)
+        }
+        return getValueAtPath(["displayConfig", "components", componentName, "visible"], true)
     }
     
     function isSubComponentVisible(componentName, subComponentName) {
         // Forcer la réévaluation en utilisant vraiment updateCounter
         var dummy = updateCounter
-        
+        // Volant, joystick, pads, etc. : displayConfig.controllers.<sous>.visible
+        if (componentName === "controllers") {
+            return getValueAtPath(["displayConfig", "controllers", subComponentName, "visible"], true)
+        }
         return getValueAtPath(["displayConfig", "components", componentName, subComponentName, "visible"], true)
     }
     

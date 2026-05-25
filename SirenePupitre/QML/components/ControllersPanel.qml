@@ -54,9 +54,127 @@ Rectangle {
     /** Valeurs int16 affichées sous les boutons de calibration (reçues par WebSocket), une seule structure [pad0, pad1]. */
     property var padCalibDisplayValues: [0, 0]
 
+    /** Calibrage joystick : min, 0.min, 0.max, max (modes radio). */
+    property string joystickCalibrationMode: "min"  // "min" | "zero_min" | "zero_max" | "max"
+    /** Lectures brutes X/Y (même source que le paquet binaire 0x02 contrôleurs). */
+    property real joystickRawX: 0
+    property real joystickRawY: 0
+    /** Seuils affichés [min, zeroMin, zeroMax, max] — `JOYSTICK_CALIBRATION_STATE` ou config `calibration.joystick`. */
+    property var joyCalibStateX: []
+    property var joyCalibStateY: []
+    /** Valeurs filtrées (firmware) — affichage à côté des seuils ; pas d’init depuis la config. */
+    property real joystickFilteredX: 0
+    property real joystickFilteredY: 0
+    property bool joystickFilteredReceived: false
+
+    onConfigControllerChanged: {
+        if (root.configController)
+            Qt.callLater(function () { root.refreshJoystickCalibrationStateFromConfig() })
+    }
+
     function setPadCalibrationValues(values) {
         if (values && Array.isArray(values) && values.length >= 2)
             root.padCalibDisplayValues = [values[0], values[1]]
+    }
+
+    function sendJoystickCalibration(axis) {
+        if (!webSocketController || !webSocketController.connected)
+            return
+        webSocketController.sendBinaryMessage({
+            type: "JOYSTICK_CALIBRATION",
+            axis: axis,
+            mode: root.joystickCalibrationMode,
+            source: "pupitre"
+        })
+    }
+
+    function _axisToFour(raw) {
+        if (raw === undefined || raw === null)
+            return null
+        var a, b, c, d
+        if (Array.isArray(raw)) {
+            if (raw.length < 4)
+                return null
+            a = Number(raw[0])
+            b = Number(raw[1])
+            c = Number(raw[2])
+            d = Number(raw[3])
+        } else if (typeof raw === "object") {
+            a = Number(raw.min)
+            b = Number(raw.zeroMin !== undefined ? raw.zeroMin : raw.zero_min)
+            c = Number(raw.zeroMax !== undefined ? raw.zeroMax : raw.zero_max)
+            d = Number(raw.max)
+        } else {
+            return null
+        }
+        if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d))
+            return null
+        return [a, b, c, d]
+    }
+
+    function setJoystickCalibrationState(data) {
+        if (!data)
+            return
+        var xa = root._axisToFour(data.x)
+        var ya = root._axisToFour(data.y)
+        if (xa)
+            root.joyCalibStateX = xa
+        if (ya)
+            root.joyCalibStateY = ya
+    }
+
+    function refreshJoystickCalibrationStateFromConfig() {
+        if (!configController)
+            return
+        var j = configController.getValueAtPath(["calibration", "joystick"], null)
+        if (!j || typeof j !== "object")
+            return
+        var payload = {}
+        if (j.x !== undefined)
+            payload.x = j.x
+        if (j.y !== undefined)
+            payload.y = j.y
+        if (payload.x !== undefined || payload.y !== undefined)
+            root.setJoystickCalibrationState(payload)
+    }
+
+    function joyCalibSlot(axis, index) {
+        var arr = axis === "x" ? root.joyCalibStateX : root.joyCalibStateY
+        if (!arr || !Array.isArray(arr) || arr.length <= index)
+            return "—"
+        var v = arr[index]
+        if (typeof v === "number" && isFinite(v))
+            return String(Math.round(v))
+        if (typeof v === "string" && v.length) {
+            var p = parseFloat(v)
+            if (isFinite(p))
+                return String(Math.round(p))
+        }
+        return "—"
+    }
+
+    function joyCalibRowText(axis, idx) {
+        var labels = ["min", "0.min", "0.max", "max"]
+        var lab = labels[idx] !== undefined ? labels[idx] : "?"
+        return lab + " " + root.joyCalibSlot(axis, idx)
+    }
+
+    function setJoystickFilteredValues(fx, fy) {
+        var x = Number(fx)
+        var y = Number(fy)
+        if (!isFinite(x) || !isFinite(y))
+            return
+        root.joystickFilteredX = x
+        root.joystickFilteredY = y
+        root.joystickFilteredReceived = true
+    }
+
+    function joyFilteredLine(axis) {
+        if (!root.joystickFilteredReceived)
+            return (axis === "x" ? "X" : "Y") + " —"
+        var v = axis === "x" ? root.joystickFilteredX : root.joystickFilteredY
+        var s = Math.abs(v - Math.round(v)) < 1e-5 ? String(Math.round(v)) : v.toFixed(2)
+        return (axis === "x" ? "X " : "Y ") + s
     }
 
     function showControllerValues() {
@@ -450,6 +568,307 @@ Rectangle {
         }
     }
 
+    // Calibrage joystick (gauche : évite le chevauchement avec les pads à droite)
+    Row {
+        id: joystickCalibBar
+        // Indépendant de controllerValues : le calibrage doit rester visible même si les chiffres 3D sont masqués
+        visible: configController && configController.isSubComponentVisible("controllers", "joystick")
+        anchors.top: parent.top
+        anchors.topMargin: 6
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: -parent.width * 0.22
+        spacing: 10
+        z: 1000
+
+        Column {
+            id: joystickCalibControls
+            spacing: 6
+            width: implicitWidth
+
+        Text {
+            text: "Joystick"
+            color: "#88ff88"
+            font.pixelSize: 9
+            font.bold: true
+        }
+
+        Row {
+            id: joyModeRow
+            spacing: 3
+
+            Rectangle {
+                width: 34
+                height: 22
+                radius: 3
+                color: root.joystickCalibrationMode === "min" ? "#00aa00" : (jMaMin.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                border.color: "#00ff00"
+                border.width: root.joystickCalibrationMode === "min" ? 2 : 1
+                MouseArea {
+                    id: jMaMin
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.joystickCalibrationMode = "min"
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: "min"
+                    color: root.joystickCalibrationMode === "min" ? "#000000" : "#00ff00"
+                    font.pixelSize: 8
+                    font.bold: root.joystickCalibrationMode === "min"
+                }
+            }
+            Rectangle {
+                width: 38
+                height: 22
+                radius: 3
+                color: root.joystickCalibrationMode === "zero_min" ? "#00aa00" : (jMaZmin.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                border.color: "#00ff00"
+                border.width: root.joystickCalibrationMode === "zero_min" ? 2 : 1
+                MouseArea {
+                    id: jMaZmin
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.joystickCalibrationMode = "zero_min"
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: "0.min"
+                    color: root.joystickCalibrationMode === "zero_min" ? "#000000" : "#00ff00"
+                    font.pixelSize: 7
+                    font.bold: root.joystickCalibrationMode === "zero_min"
+                }
+            }
+            Rectangle {
+                width: 38
+                height: 22
+                radius: 3
+                color: root.joystickCalibrationMode === "zero_max" ? "#00aa00" : (jMaZmax.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                border.color: "#00ff00"
+                border.width: root.joystickCalibrationMode === "zero_max" ? 2 : 1
+                MouseArea {
+                    id: jMaZmax
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.joystickCalibrationMode = "zero_max"
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: "0.max"
+                    color: root.joystickCalibrationMode === "zero_max" ? "#000000" : "#00ff00"
+                    font.pixelSize: 7
+                    font.bold: root.joystickCalibrationMode === "zero_max"
+                }
+            }
+            Rectangle {
+                width: 34
+                height: 22
+                radius: 3
+                color: root.joystickCalibrationMode === "max" ? "#00aa00" : (jMaMax.containsMouse ? "#3a3a3a" : "#2a2a2a")
+                border.color: "#00ff00"
+                border.width: root.joystickCalibrationMode === "max" ? 2 : 1
+                MouseArea {
+                    id: jMaMax
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.joystickCalibrationMode = "max"
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: "max"
+                    color: root.joystickCalibrationMode === "max" ? "#000000" : "#00ff00"
+                    font.pixelSize: 8
+                    font.bold: root.joystickCalibrationMode === "max"
+                }
+            }
+        }
+
+        Row {
+            spacing: 8
+
+            Column {
+                spacing: 3
+                width: 72
+                Rectangle {
+                    width: parent.width
+                    height: 26
+                    radius: 3
+                    color: jMaCalX.containsMouse ? "#3a3a3a" : "#2a2a2a"
+                    border.color: "#00ff00"
+                    border.width: 1
+                    MouseArea {
+                        id: jMaCalX
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.sendJoystickCalibration("x")
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Calibrer X"
+                        color: "#00ff00"
+                        font.pixelSize: 9
+                        font.bold: true
+                    }
+                }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WrapAnywhere
+                    maximumLineCount: 3
+                    text: "X " + Math.round(root.joystickRawX)
+                    font.pixelSize: 10
+                    font.bold: true
+                    color: "#ccffcc"
+                }
+            }
+
+            Column {
+                spacing: 3
+                width: 72
+                Rectangle {
+                    width: parent.width
+                    height: 26
+                    radius: 3
+                    color: jMaCalY.containsMouse ? "#3a3a3a" : "#2a2a2a"
+                    border.color: "#00ff00"
+                    border.width: 1
+                    MouseArea {
+                        id: jMaCalY
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.sendJoystickCalibration("y")
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Calibrer Y"
+                        color: "#00ff00"
+                        font.pixelSize: 9
+                        font.bold: true
+                    }
+                }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WrapAnywhere
+                    maximumLineCount: 3
+                    text: "Y " + Math.round(root.joystickRawY)
+                    font.pixelSize: 10
+                    font.bold: true
+                    color: "#ccffcc"
+                }
+            }
+        }
+        }
+
+        Column {
+            id: joystickCalibThresholds
+            spacing: 4
+            anchors.verticalCenter: joystickCalibControls.verticalCenter
+
+            Text {
+                text: "Seuils"
+                color: "#88ff88"
+                font.pixelSize: 9
+                font.bold: true
+            }
+            Row {
+                spacing: 10
+                Column {
+                    spacing: 1
+                    Text {
+                        text: "X"
+                        color: "#aaffaa"
+                        font.pixelSize: 8
+                        font.bold: true
+                    }
+                    Text {
+                        text: root.joyCalibRowText("x", 0)
+                        color: "#ccffcc"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                    Text {
+                        text: root.joyCalibRowText("x", 1)
+                        color: "#ccffcc"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                    Text {
+                        text: root.joyCalibRowText("x", 2)
+                        color: "#ccffcc"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                    Text {
+                        text: root.joyCalibRowText("x", 3)
+                        color: "#ccffcc"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                }
+                Column {
+                    spacing: 1
+                    Text {
+                        text: "Y"
+                        color: "#aaffaa"
+                        font.pixelSize: 8
+                        font.bold: true
+                    }
+                    Text {
+                        text: root.joyCalibRowText("y", 0)
+                        color: "#ccffcc"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                    Text {
+                        text: root.joyCalibRowText("y", 1)
+                        color: "#ccffcc"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                    Text {
+                        text: root.joyCalibRowText("y", 2)
+                        color: "#ccffcc"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                    Text {
+                        text: root.joyCalibRowText("y", 3)
+                        color: "#ccffcc"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                }
+                Column {
+                    spacing: 1
+                    Text {
+                        text: "Filtré"
+                        color: "#aaffaa"
+                        font.pixelSize: 8
+                        font.bold: true
+                    }
+                    Text {
+                        text: root.joyFilteredLine("x")
+                        color: "#ffeeaa"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                    Text {
+                        text: root.joyFilteredLine("y")
+                        color: "#ffeeaa"
+                        font.pixelSize: 8
+                        font.family: "monospace"
+                    }
+                }
+            }
+        }
+    }
+
     // Boutons calibration pads (tout à droite)
     Row {
         id: padCalibBar
@@ -666,7 +1085,17 @@ Rectangle {
             }
         }
     }
-    
+
+    Connections {
+        target: root.configController
+        ignoreUnknownSignals: true
+        function onSettingsUpdated() {
+            root.refreshJoystickCalibrationStateFromConfig()
+        }
+    }
+
+    Component.onCompleted: root.refreshJoystickCalibrationStateFromConfig()
+
     // Fonction pour mettre à jour toutes les données
     function updateControllers(controllersData) {
         
@@ -676,9 +1105,24 @@ Rectangle {
         }
         
         if (controllersData.joystick) {
-            joystickX = (controllersData.joystick.x || 0) / 127.0
-            joystickY = (controllersData.joystick.y || 0) / 127.0
-            joystickZ = (controllersData.joystick.z || 0) / 127.0
+            var j = controllersData.joystick
+            function joyNum(v) {
+                if (typeof v === "number" && isFinite(v))
+                    return v
+                if (typeof v === "string" && v.length > 0) {
+                    var n = parseFloat(v)
+                    if (isFinite(n))
+                        return n
+                }
+                return 0
+            }
+            var jx = joyNum(j.x)
+            var jy = joyNum(j.y)
+            joystickRawX = jx
+            joystickRawY = jy
+            joystickX = jx / 127.0
+            joystickY = jy / 127.0
+            joystickZ = joyNum(j.z) / 127.0
             joystickButton = controllersData.joystick.button || false
         }
         

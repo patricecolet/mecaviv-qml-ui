@@ -320,6 +320,16 @@ Page {
             controllersPanel.setPadCalibrationValues(values)
     }
 
+    function setJoystickCalibrationStateDisplay(data) {
+        if (controllersPanel && controllersPanel.setJoystickCalibrationState)
+            controllersPanel.setJoystickCalibrationState(data)
+    }
+
+    function setJoystickFilteredDisplayValues(fx, fy) {
+        if (controllersPanel && controllersPanel.setJoystickFilteredValues)
+            controllersPanel.setJoystickFilteredValues(fx, fy)
+    }
+
     Rectangle {
         id: test2dBackground
         anchors.fill: parent

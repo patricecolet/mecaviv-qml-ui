@@ -131,6 +131,12 @@ var configData = {
       }
     ]
   },
+  "calibration": {
+    "joystick": {
+      "x": { "min": -127, "zeroMin": -8, "zeroMax": 8, "max": 127 },
+      "y": { "min": -127, "zeroMin": -8, "zeroMax": 8, "max": 127 }
+    }
+  },
   "displayConfig": {
     "components": {
       "rpm": { "visible": true },

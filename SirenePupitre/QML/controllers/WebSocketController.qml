@@ -57,6 +57,8 @@ Item {
     signal filesListReceived(var categories)  // Liste fichiers MIDI
     signal gameModeReceived(bool enabled)  // Mode jeu activé/désactivé par le serveur
     signal padCalibrationValuesReceived(var values)  // [int16, int16] pour affichage sous les boutons (pad 0 et 1)
+    signal joystickCalibrationStateReceived(var data)  // JOYSTICK_CALIBRATION_STATE : { x: [...], y: [...] }
+    signal joystickFilteredValuesReceived(real x, real y)  // JOYSTICK_FILTERED : { xy: [x, y] }
     /** Consigne chef (mode dirigé) — voir docs/CONDUCTOR_CUES_PROTOCOL.md */
     signal conductorCueReceived(var data)
     property var configController: null
@@ -679,6 +681,29 @@ Item {
                     }
                     console.log("[PAD_CALIB] Reçu values:", JSON.stringify(vals), "raw data.values:", raw !== undefined ? JSON.stringify(raw) : "undefined")
                     controller.padCalibrationValuesReceived(vals);
+                    return;
+                }
+
+                if (data.type === "JOYSTICK_CALIBRATION_STATE") {
+                    controller.joystickCalibrationStateReceived({
+                        x: data.x,
+                        y: data.y
+                    });
+                    return;
+                }
+
+                if (data.type === "JOYSTICK_FILTERED") {
+                    var arr = null;
+                    if (Array.isArray(data.xy) && data.xy.length >= 2)
+                        arr = data.xy;
+                    else if (Array.isArray(data.values) && data.values.length >= 2)
+                        arr = data.values;
+                    if (arr) {
+                        var jfx = Number(arr[0]);
+                        var jfy = Number(arr[1]);
+                        if (isFinite(jfx) && isFinite(jfy))
+                            controller.joystickFilteredValuesReceived(jfx, jfy);
+                    }
                     return;
                 }
 

@@ -194,6 +194,16 @@ Window {
                 testViewLoader.item.setPadCalibrationDisplayValues(values)
         }
 
+        onJoystickCalibrationStateReceived: function(data) {
+            if (testViewLoader.item && testViewLoader.item.setJoystickCalibrationStateDisplay)
+                testViewLoader.item.setJoystickCalibrationStateDisplay(data)
+        }
+
+        onJoystickFilteredValuesReceived: function(fx, fy) {
+            if (testViewLoader.item && testViewLoader.item.setJoystickFilteredDisplayValues)
+                testViewLoader.item.setJoystickFilteredDisplayValues(fx, fy)
+        }
+
         // Config envoyée par Pd (pour info)
         onConfigReceived: function(config) {
         }
