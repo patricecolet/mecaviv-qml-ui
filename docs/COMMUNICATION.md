@@ -342,6 +342,113 @@ Le pupitre informe PureData d'un changement local.
 
 **Note** : Ce message n'est **pas** envoyé si `source: "console"` dans le PARAM_UPDATE reçu (évite les boucles).
 
+#### PAD_CALIBRATION / PAD_CALIBRATION_VALUE (pupitre → PureData)
+
+Enregistrement des extrêmes des pads (voir implémentation côté firmware).
+
+**Pupitre → serveur** :
+
+```json
+{
+  "type": "PAD_CALIBRATION",
+  "pad": 0,
+  "mode": "min",
+  "source": "pupitre"
+}
+```
+
+- `pad` : `0` ou `1`
+- `mode` : `"min"` ou `"max"`
+
+**Serveur → pupitre** (valeurs brutes affichées sous les boutons) :
+
+```json
+{
+  "type": "PAD_CALIBRATION_VALUE",
+  "values": [1234, 5678]
+}
+```
+
+#### JOYSTICK_CALIBRATION (pupitre → PureData)
+
+Calibrage des axes X et Y du joystick : quatre points par axe (minimum, bords de la zone neutre, maximum), sur le même principe que les pads.
+
+**Pupitre → serveur** — placer le joystick dans la position voulue, choisir le mode (radio), puis cliquer **Calibrer X** ou **Calibrer Y** :
+
+```json
+{
+  "type": "JOYSTICK_CALIBRATION",
+  "axis": "x",
+  "mode": "min",
+  "source": "pupitre"
+}
+```
+
+- `axis` : `"x"` ou `"y"`
+- `mode` :
+  - `"min"` — extrémité négative de l’axe (`x.min` / `y.min`)
+  - `"zero_min"` — bord « négatif » de la zone morte autour du centre (`x.0.min` / `y.0.min`)
+  - `"zero_max"` — bord « positif » de la zone morte (`x.0.max` / `y.0.max`)
+  - `"max"` — extrémité positive de l’axe (`x.max` / `y.max`)
+
+Le message sert à indiquer **quel point** calibrer (`axis` + `mode`) pendant que l’utilisateur tient le joystick en position ; le firmware **ne persiste pas** ces réglages en mémoire non volatile. La **référence durable** des seuils est le fichier de configuration (ou une mise à jour `CONFIG_FULL` / `PARAM_CHANGED` équivalente) : c’est là que les valeurs mesurées doivent être stockées.
+
+**Serveur → pupitre** — état des seuils (affichage à côté du bloc calibrage dans `ControllersPanel.qml`) :
+
+```json
+{
+  "type": "JOYSTICK_CALIBRATION_STATE",
+  "x": [min, zeroMin, zeroMax, max],
+  "y": [min, zeroMin, zeroMax, max]
+}
+```
+
+- `x` et `y` sont des **listes de 4 nombres** dans le même ordre que la config : `min`, `zeroMin`, `zeroMax`, `max` (équivalent UI : min, 0.min, 0.max, max).
+- Le pupitre accepte aussi des **objets** du même schéma que `config.json` (`{ "min", "zeroMin", "zeroMax", "max" }`) à la place d’un tableau pour un axe.
+- Les lectures **brutes** live (X/Y sous les boutons Calibrer) viennent toujours du **flux binaire contrôleurs** (trame `0x02`, 18 octets — voir `WebSocketController.qml`).
+
+**Serveur → pupitre** — paire **filtrée** (après zone morte / remap côté firmware), affichée dans la colonne « Filtré » à côté des seuils. Une **liste de deux nombres** `[x, y]` :
+
+```json
+{
+  "type": "JOYSTICK_FILTERED",
+  "xy": [0.0, 0.0]
+}
+```
+
+- `xy[0]` = axe X, `xy[1]` = axe Y.
+- Alias accepté : `"values": [x, y]` (même ordre).
+
+##### Structure stockée dans `config.json` (rubrique `calibration`)
+
+À la racine du JSON, à côté de `sirenConfig` et `displayConfig` :
+
+```json
+"calibration": {
+  "joystick": {
+    "x": {
+      "min": -127,
+      "zeroMin": -8,
+      "zeroMax": 8,
+      "max": 127
+    },
+    "y": {
+      "min": -127,
+      "zeroMin": -8,
+      "zeroMax": 8,
+      "max": 127
+    }
+  }
+}
+```
+
+| Champ | Rôle |
+|--------|------|
+| `min` / `max` | Extrêmes négatif et positif de l’axe (échelle identique au joystick décodé depuis le `0x02`, typiquement signé −127 à +127). |
+| `zeroMin` / `zeroMax` | Bords de la **zone morte** autour du centre (équivalent « 0.min » / « 0.max » dans l’UI). |
+
+Même bloc dans `config.template.json` et, côté pupitre embarqué, dans la config fusionnée (`SirenePupitre/config.js` si utilisé comme base). D’autres entrées pourront être ajoutées sous `calibration` plus tard (ex. pads).
+
 ## 3️⃣ pedalierSirenium ↔ PureData
 
 ### Messages pedalierSirenium → PureData
