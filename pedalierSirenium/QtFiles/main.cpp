@@ -9,16 +9,17 @@
 #include <QDir>
 #include <QSurfaceFormat>
 #include <QDebug>
-#include <QtQuick3D/qquick3d.h>
 
 int main(int argc, char *argv[])
 {
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
     QGuiApplication app(argc, argv);
-    
+
     // ========== CONFIGURATION FPS GLOBAL ==========
-    QSurfaceFormat format = QQuick3D::idealSurfaceFormat();
+    // Affichage 2D pur (plus de Qt Quick 3D). On garde le cap ~30 FPS,
+    // utile sur Raspberry Pi en kiosque.
+    QSurfaceFormat format;
     format.setSwapInterval(2);  // 30 FPS max (divise par 2)
     QSurfaceFormat::setDefaultFormat(format);
     // ===============================================

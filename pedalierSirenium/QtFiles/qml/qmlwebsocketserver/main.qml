@@ -1,390 +1,152 @@
 import QtQuick
 import QtQuick.Window
-import QtQuick3D
-import QtQuick.Controls
+import QtQuick.Layouts
 
-import "./components/core"
-import "./components/ui" 
-import "./components/debug"
-import "./components/controls"
-import "./components/monitoring"
-import "./components/monitoring/midi-display"
 import "./controllers"
-import "./utils"           // ← Pour Logger.qml (local)
-import "../utils" as Utils // ← Pour VirtualKeyboard.qml (niveau supérieur)
+import "./utils"
+import "./components/play"
+import "./components/config"
 
+// Refonte 2D — Phase 1 : vue de jeu (horloge, boucle en cours, sept sirènes),
+// animée par des données simulées. Le routage du vrai flux PD arrive en Phase 2.
 Window {
     id: window
-    width: 800
-    height: 600
+    // Cible de référence : écran Raspberry Pi en kiosque, 1280×800.
+    width: 1280
+    height: 800
     visible: true
-    color: "black"
-    
-    // Police Emoji globale
-    FontLoader {
-        id: emojiFont
-        source: "qrc:/fonts/NotoEmoji-VariableFont_wght.ttf"
-        onStatusChanged: {
-            if (status === FontLoader.Ready) {
-                console.log("✅ [Global] Police Emoji chargée:", name)
-            }
-        }
-    }
-    
-    // Rendre la police accessible globalement
-    readonly property string globalEmojiFont: emojiFont.name
+    color: "#0A0D11"
+    title: "Pédalier Sirenium"
 
-    // Settings
-    Settings {
-        id: settings
-    }
+    // Réglages et journal
+    Settings { id: settings }
+    Logger { id: logger }
 
-    // Contrôleurs
-    SirenController {
-        id: sirenController
-        logger: logger
-    }
-    
-    BeatController {
-        id: beatController
-        sirenController: sirenController
-        logger: logger
-        webSocketController: wsController
-    }
-
-    PedalConfigController {
-        id: pedalConfigController
-        logger: logger
-        
-        onConfigValueChanged: function(pedalId, sirenId, controller, value, presetName) {
-            if (logger) logger.debug("PRESET", "Config changed:", pedalId, sirenId, controller, value);
-            wsController.sendMessage({
-                device: "SIREN_PEDALS",
-                pedalConfigChange: {
-                    pedalId: pedalId,
-                    sirenId: sirenId,
-                    controller: controller,
-                    value: value
-                }
-            });
-        }
-    }
-    
-    // Contrôleur MIDI
+    // Contrôleurs de logique (non couplés 3D) — connexion réelle, pas encore routée
     MidiMonitorController {
         id: midiMonitorController
         logger: logger
     }
-    
-    // Router de messages
-    MessageRouter {
-        id: messageRouter
-        logger: logger
-        sirenController: sirenController
-        beatController: beatController
-        pedalConfigController: pedalConfigController
-        tempoControl: tempoControl
-        sceneManager: sceneManager  // ← Ajouter cette ligne
-    }
-
-    // WebSocket Controller
     WebSocketController {
         id: wsController
         logger: logger
-        mainWindow: window  // Ajout de cette ligne
+        mainWindow: window
         midiMonitorController: midiMonitorController
-        onMessageReceived: function(message) {
-            if (settings.debugWebSocket) {
-                if (logger) logger.debug("WEBSOCKET", "🔍 Message reçu:", JSON.stringify(message, null, 2));
-            }
-        }
-        
-        onPathMessageReceived: function(path, value) {
-            if (settings.debugWebSocket) {
-                if (logger) logger.debug("WEBSOCKET", "Path:", JSON.stringify(path), "Value:", value);
-            }
-            messageRouter.routePathMessage(path, value);
-        }
-        
         onBatchReceived: function(batchType, data) {
-            // if (logger) logger.debug("WEBSOCKET", "📦 Batch reçu type:", batchType);
-            messageRouter.routeBatch(batchType, data);
+            if (logger) logger.debug("WEBSOCKET", "batch reçu (Phase 1, non routé):", batchType);
         }
     }
 
-    // Vue 3D principale
-    View3D {
-        id: view
+    // Données simulées (Phase 1)
+    SimulationHarness { id: sim }
+
+    // Bascule vue de jeu / configuration (F2 ou bouton dans le bandeau)
+    property bool configMode: false
+    Shortcut { sequence: "F2"; onActivated: window.configMode = !window.configMode }
+
+    ColumnLayout {
         anchors.fill: parent
-        camera: camera
-        renderMode: View3D.Overlay
-        visible: !debugPanelVisible // Masquer la vue 3D quand le panneau debug est visible
+        spacing: 0
 
-        PerspectiveCamera {
-            id: camera
-            position: Qt.vector3d(0, 200, 800)
+        // Bandeau permanent : reste visible dans les deux modes, sinon le bouton
+        // de bascule serait inaccessible depuis l'écran de config.
+        ClockBar2D {
+            Layout.fillWidth: true
+            bpm: Math.round(sim.bpm)
+            beat: sim.clockBeat
+            bar: sim.clockBar
+            beatsPerBar: sim.beatsPerBar
+            configMode: window.configMode
+            onToggleConfig: window.configMode = !window.configMode
         }
 
-        DirectionalLight {
-            eulerRotation.x: -30
-        }
+        // Corps : jeu ou config, selon le mode
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-        SirenView {
-            id: sirenView
-            sirenNodes: sirenController.sirenNodes
-            sirenController: sirenController
-            pedalConfigController: pedalConfigController
-            webSocketController: wsController
-            sirenSpecProvider: sirenSpecProvider
-            visible: !debugPanelVisible && !sirenView.scenesMode
-        }
-    }
-    
-    // Contrôle de tempo (créé séparément)
-    TempoControl {
-        id: tempoControl
-        tempo: 120
-        
-        onTempoChanged: {
-            wsController.sendTempoChange(tempo);
-        }
-    }
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+                visible: !window.configMode
 
-    // Gestionnaire de scènes
-    SceneManager {
-        id: sceneManager
-        anchors.centerIn: parent
-        logger: logger
-        webSocketController: wsController
-        visible: sirenView.scenesMode
-        z: 10001
-        
-        onSceneSelected: function(sceneId, sceneName) {
-            if (logger) logger.info("SCENES", "🎵 Scène sélectionnée depuis interface:", sceneName, "ID:", sceneId)
-            
-            // Mettre à jour currentScene dans SceneManager
-            sceneManager.currentScene = sceneId
-            
-            // Forcer la mise à jour de l'interface
-            sceneManager.scenesVersion++
-        }
-        
-        onPageChanged: function(newPage) {
-            if (logger) logger.info("SCENES", "📄 Page changée depuis interface:", newPage)
-        }
-        
-        Component.onCompleted: {
-            // Connecter le SceneManager au MessageRouter après création
-            messageRouter.sceneManager = sceneManager;
-        }
-    }
-    
-    // Contrôles en bas
-    BottomControls {
-        id: bottomControls
-        wsController: wsController
-        tempoControl: tempoControl
-        sirenView: sirenView
-        pedalConfigController: pedalConfigController
-        sceneManager: sceneManager
-        overlayContainer: overlayContainer
-        logger: logger
-        // Ajout du callback pour ouvrir/fermer le DebugPanel
-        onDebugPanelToggle: debugPanelVisible = !debugPanelVisible
-    }
-    
-    // Connexions
-    Connections {
-        target: sirenView
-        function onKnobValueChanged(pedalId, sirenId, controllerIndex, value) {
-            let controllerName = pedalConfigController.getControllerName(controllerIndex);
-            pedalConfigController.setValue(pedalId, sirenId, controllerName, value);
-        }
-    }
-    
-    // Overlay container
-    Item {
-        id: overlayContainer
-        anchors.fill: parent
-        z: 100000
+                FocusDial2D {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true      // absorbe l'espace disponible, borné
+                    Layout.maximumHeight: 260    // au-delà, le centrage interne créerait un vide disproportionné
+                    Layout.leftMargin: 32
+                    Layout.rightMargin: 32
+                    Layout.topMargin: 20
+                    Layout.bottomMargin: 12
+                    label: sim.focusState.label || "—"
+                    ringColor: sim.focusState.ringColor || "#66E4F2"
+                    progress: sim.focusState.progress || 0
+                    showHalo: sim.focusState.showHalo || false
+                    haloOpacity: sim.focusState.haloOpacity || 0
+                    sub: sim.focusState.sub || ""
+                    ticks: sim.mainBars
+                    statusWord: sim.focusState.statusWord || ""
+                    statusColor: sim.focusState.statusColor || "#3B4855"
+                    statusNote: sim.focusState.statusNote || ""
+                    mBar: sim.focusState.mBar || "—"
+                    mLen: sim.focusState.mLen || "—"
+                    mRatio: sim.focusState.mRatio || "—"
+                    mRev: sim.focusState.mRev || "—"
+                    ladderActive: sim.focusState.ladderActive || false
+                    ladderStops: sim.focusState.ladderStops || []
+                    ladderVerdict: sim.focusState.ladderVerdict || "—"
+                }
 
-        // Bouton engrenage flottant en haut à gauche
-        Button {
-            id: debugPanelGearButton
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.leftMargin: 20
-            anchors.topMargin: 20
-            width: 40
-            height: 40
-            z: 10001
-            onClicked: debugPanelVisible = !debugPanelVisible
-            ToolTip.text: debugPanelVisible ? "Fermer le panneau de debug" : "Ouvrir le panneau de debug"
-            background: Rectangle {
-                color: "#111"
-                radius: 8
-                border.color: "#444"
-                border.width: 1
+                SirenRingRow2D {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 96
+                    Layout.leftMargin: 32
+                    Layout.rightMargin: 32
+                    states: sim.ringStates
+                }
+
+                ChordCartouche2D {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 58
+                    Layout.leftMargin: 32
+                    Layout.rightMargin: 32
+                    Layout.topMargin: 12
+                    chordName: sim.chordName
+                    chordSub: sim.chordSub
+                    voicing: sim.voicing
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 14
+                    height: 1
+                    color: "#171F28"
+                }
+
+                SongMap2D {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 130
+                    Layout.leftMargin: 32
+                    Layout.rightMargin: 32
+                    Layout.topMargin: 16
+                    Layout.bottomMargin: 22
+                    compName: sim.compName
+                    compButton: sim.compButton
+                    banks: sim.banks
+                    currentBank: sim.currentBank
+                    sections: sim.sections
+                }
             }
-            contentItem: Image {
-                source: "qrc:/qml/icons/settings.png"
-                anchors.centerIn: parent
-                width: 24
-                height: 24
-                fillMode: Image.PreserveAspectFit
+
+            // Écran de configuration
+            ConfigView2D {
+                anchors.fill: parent
+                visible: window.configMode
             }
         }
     }
-    
-    // Créer le logger AVANT tout le reste
-    Logger {
-        id: logger
-        Component.onCompleted: {
-            if (logger) logger.info("INIT", "🚀 Logger initialisé dans main.qml");
-            // Retirer les logs de test
-            // logger.info("TEST", "Ceci est un message de test depuis main.qml !");
-        }
-    }
-    
-    // Panneau de debug (F12 pour toggle)
-    DebugPanel {
-        id: debugPanel
-        logger: logger
-        webSocketController: wsController
-        midiMonitorController: midiMonitorController
-        anchors.fill: parent
-        visible: debugPanelVisible
-        z: 100002
-        onCloseRequested: debugPanelVisible = false
-    }
 
-    // Provider de spécifications pour les sirènes (chargé au démarrage)
-    SirenSpecProvider {
-        id: sirenSpecProvider
-    }
-
-    // Propriété pour la visibilité du DebugPanel
-    property bool debugPanelVisible: false
-
-    // Raccourci clavier
-    Shortcut {
-        sequence: "F12"
-        onActivated: debugPanelVisible = !debugPanelVisible
-    }
-    
-    // ========== CLAVIER VIRTUEL GLOBAL ==========
-    Utils.VirtualKeyboard {  // ← Maintenant ça devrait marcher
-        id: globalVirtualKeyboard
-        visible: false
-        z: 100010  // Au-dessus de debugPanel (100002)
-        
-        // Propriétés de positionnement
-        property string position: "center"  // "top", "center", "bottom", "above-target"
-        property Item targetComponent: null  // Composant de référence pour "above-target"
-        
-        // Positionnement dynamique
-        x: {
-            switch (position) {
-                case "top":
-                case "center": 
-                case "bottom":
-                    return (parent.width - width) / 2;  // Centré
-                case "above-target":
-                    return targetComponent ? 
-                        targetComponent.mapToItem(parent, 0, 0).x + (targetComponent.width - width) / 2 : 
-                        (parent.width - width) / 2;
-                default:
-                    return (parent.width - width) / 2;
-            }
-        }
-        
-        y: {
-            switch (position) {
-                case "top":
-                    return 50;
-                case "center":
-                    return (parent.height - height) / 2;
-                case "bottom":
-                    return parent.height - height - 50;
-                case "above-target":
-                    return targetComponent ? 
-                        targetComponent.mapToItem(parent, 0, 0).y - height - 20 : 
-                        50;
-                default:
-                    return (parent.height - height) / 2;
-            }
-        }
-        
-        onOkClicked: {
-            hideKeyboard();
-        }
-    }
-    
-    // Fonctions globales pour contrôler le clavier
-    function showKeyboard(targetField, keyboardPosition = "center", referenceComponent = null) {
-        globalVirtualKeyboard.targetField = targetField;
-        globalVirtualKeyboard.position = keyboardPosition;
-        globalVirtualKeyboard.targetComponent = referenceComponent;
-        globalVirtualKeyboard.visible = true;
-    }
-    
-    function hideKeyboard() {
-        globalVirtualKeyboard.visible = false;
-        globalVirtualKeyboard.targetField = null;
-        globalVirtualKeyboard.targetComponent = null;
-    }
-    
-    // UN SEUL Component.onCompleted qui fait tout
     Component.onCompleted: {
-        if (logger) logger.info("INIT", "🚀 Component.onCompleted de main.qml exécuté");
-        
-        // Configuration des contrôleurs
-        sirenController.webSocketController = wsController;
-        beatController.webSocketController = wsController;
-        sirenController.beatController = beatController;
-        
-        // Synchroniser les sirènes
-        sirenController.sirenNodes = sirenView.sirenNodes;
-        if (logger) logger.info("INIT", "✅ Sirènes synchronisées:", sirenController.sirenNodes.length);
-        
-        // Positionner le TempoControl dans le placeholder de BottomControls
-        let placeholder = bottomControls.children[1];
-        if (placeholder) {
-            tempoControl.parent = placeholder;
-            tempoControl.anchors.centerIn = placeholder;
-        }
-        
-        // La demande du preset courant est maintenant gérée dans PedalPresetManager
-    }
-
-    // Placer juste avant BottomControls
-    SireniumMonitor {
-        id: sireniumMonitor
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: bottomControls.top
-        anchors.bottomMargin: 12
-        height: 120
-        z: 1000
-        note: midiNote
-        velocity: midiVelocity
-        
-        // Masquer quand le PedalConfigPanel est ouvert
-        visible: !sirenView.configMode  // ← AJOUTER CETTE LIGNE
-    }
-
-    // Propriétés pour le monitoring MIDI
-    property int midiNote: 0
-    property int midiVelocity: 0
-    property int midiBend: 8192
-
-    // Synchronisation simple de l'affichage avec le contrôleur (cadencée si besoin)
-    Connections {
-        target: midiMonitorController
-        function onMidiDataChanged(note, velocity, bend, channel) {
-            midiNote = note;
-            midiVelocity = velocity;
-            midiBend = bend;
-        }
+        if (logger) logger.info("INIT", "🚀 Pédalier 2D — Phase 1-4 (jeu + config simulés)");
     }
 }

@@ -25,3 +25,12 @@ target_link_libraries(qmlwebsocketserver
     Qt6::Quick
     Qt6::WebSockets
 )
+
+# L'exécutable et le dossier du module QML partagent le nom "qmlwebsocketserver".
+# Sur desktop, l'exe natif n'a pas d'extension → collision au link (EISDIR).
+# On le sort dans bin/. En WASM les artefacts portent une extension (.js/.wasm/.html),
+# pas de collision — et build_run_web.sh les attend à la racine du build, donc on n'y touche pas.
+if(NOT EMSCRIPTEN)
+    set_target_properties(qmlwebsocketserver PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+endif()
