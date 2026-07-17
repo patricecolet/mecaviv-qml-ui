@@ -280,6 +280,13 @@ re-vérifié identique octet pour octet).
 sur `unpack`/`pack`. Cycle complet retesté sans flag CLI, `.mid` identique octet pour octet à
 toutes les versions précédentes validées, zéro erreur.
 
+**`clip-io-help.pd` construit et testé** — patch d'aide manuel/interactif, dans le même dossier que
+`clip-io.pd`, suivant la convention déjà en place localement (`curve-map-help.pd` : boîtes de
+message étiquetées câblées directement sur l'abstraction, pas d'auto-séquencement). Un message par
+étape (`record`/événements/`stop`/`read`/`dump`), trois `print` pour observer les trois outlets.
+Vérifié fonctionnellement via un enrobage temporaire à déclenchement automatique (retiré après
+test, pas livré) : cycle complet correct, `.mid` produit correct, zéro erreur.
+
 Abstraction dans `mecaviv/puredata-abstractions/application.layer/clip-io.pd` (à côté de
 `harmonizer.pd`) — combine `midifile` + `pdjson` pour l'I/O d'**un** clip, selon les décisions du
 §3. Construite par génération programmatique (indices d'objets et connexions calculés et vérifiés
