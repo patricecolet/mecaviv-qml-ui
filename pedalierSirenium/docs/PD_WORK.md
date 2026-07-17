@@ -5,7 +5,10 @@ construit contre ce contrat, avec des données simulées, en parallèle. Tant qu
 ci-dessous sont émis dans ce format, les deux moitiés avancent séparément.
 
 Références : [`SCENES_SPEC.md`](SCENES_SPEC.md) (modèle scènes/clips/harmonie),
-[`PEDALIER_MAPPING.md`](PEDALIER_MAPPING.md) (contrôleurs physiques).
+[`PEDALIER_MAPPING.md`](PEDALIER_MAPPING.md) (contrôleurs physiques),
+[`PATCH_REBUILD.md`](PATCH_REBUILD.md) (implémentation PD interne — `clip-io.pd`, `pdjson`,
+`midifile` — ce que le patch fait en coulisse pour produire le contrat ci-dessous, pas le contrat
+lui-même).
 
 Transport : WebSocket `ws://localhost:10000`. JSON (texte) pour l'état ; binaire 1–3 octets pour le
 MIDI temps réel. Le QML **envoie** aussi en binaire (`sendBinaryMessage`) — ne pas casser ça.
@@ -180,6 +183,9 @@ Reprises de `SCENES_SPEC.md §8`, elles bloquent une partie du travail :
 3. **Système de couleur des notes** : le cartouche d'accord est en neutre faute de convention. Si
    les notes ont un code couleur (par hauteur/classe), le définir — il ne doit pas croiser les
    couleurs de sirènes.
+4. **Câblage de `clip-io.pd` dans le patch réel** — construit et testé isolément (headless, un seul
+   clip, `PATCH_REBUILD.md §4bis`), mais pas encore branché dans `voiceRecorder.pd`/`harmonizer.pd`
+   ni testé avec plusieurs clips dans la même session. Prochaine étape naturelle côté PD.
 
 ---
 
