@@ -190,13 +190,50 @@ n'a pas de runtime Pd (contrainte déjà notée pour toute la session, voir auss
 la cohérence structurelle (indices, connexions) est vérifiée statiquement, le rendu visuel ne l'est
 pas.
 
-## 4bis. `clip-io.pd` — construit (2026-07-17)
+## 4bis. `clip-io.pd` — construit et vérifié en conditions réelles (2026-07-17)
 
 Abstraction dans `mecaviv/puredata-abstractions/application.layer/clip-io.pd` (à côté de
 `harmonizer.pd`) — combine `midifile` + `pdjson` pour l'I/O d'**un** clip, selon les décisions du
 §3. Construite par génération programmatique (indices d'objets et connexions calculés et vérifiés
-par script avant écriture — pas de runtime Pd disponible ici pour une vérification visuelle,
-seulement une vérification structurelle statique).
+par script avant écriture) **puis réellement testée dans Pd 0.55** en mode headless
+(`pd -nogui -stderr -noaudio -nomidi`, `pd` est installé sur cette machine) : cycle complet
+`record` → événements MIDI → `stop` → `read` → `dump`, sortie confirmée **octet par octet** (`.mid`
+décodé à la main : en-tête `MThd` correct, format 0, 1 piste, 480 ticks/noire, meta-event nom de
+piste, Note On/Off avec delta-time correctement encodé, End-of-Track automatique ; `.json`
+compagnon avec les 5 champs attendus).
+
+**Trois bugs réels trouvés et corrigés grâce à ce test** (aucun n'était visible par relecture
+statique) :
+
+1. **`route` transforme un reste commençant par un symbole en message "générique"** (sélecteur =
+   ce symbole), pas en message `list`/`symbol` — `[t l l]`/`[t s s]` ne peuvent PAS convertir un
+   message générique (`error: trigger: generic messages can only be converted to 'b' or 'a'`).
+   Fixé en passant ces `trigger` à `t a a` là où le reste peut commencer par un symbole.
+2. **`[list prepend ...]` encapsule toujours sa sortie sous le sélecteur `list`**, même quand le
+   premier atome ajouté est un symbole voulu comme sélecteur (`add`, `write`, `meta`, `read`,
+   `writeBuilder`). `pdjson` (pdlua) le rejette bruyamment (`no method for 'list'`) ; `midifile` (C,
+   sans override list) le **rejette silencieusement, sans aucune erreur** — c'est ce deuxième cas
+   qui a fait perdre le plus de temps (le patch semblait tourner sans erreur, mais n'écrivait aucun
+   `.mid`). Fixé en insérant `[list trim]` après **chaque** `list prepend` menant à `pdjson` ou
+   `midifile` (10 au total) — `list trim` désencapsule le message générique depuis son enveloppe
+   `list`, déjà un idiome utilisé dans `pdjson-help.pd` lui-même.
+3. **L'ordre des outlets d'une abstraction est déterminé par la position X des objets `[outlet]`
+   dans le canvas, pas par leur ordre d'écriture dans le fichier.** `OUT_MIDI` était physiquement à
+   gauche d'`OUT_META` → les deux outlets étaient inversés côté appelant, sans erreur, juste des
+   données au mauvais endroit. Fixé en réordonnant les positions X.
+
+**Découverte annexe, importante** : `~/Documents/Pd/externals/pdjson/` contient une copie
+**indépendante** de `pdjson.pd_lua`/`pdjson-help.pd` (deken, pas un lien symbolique), antérieure à
+toutes les modifications de cette session (datée d'octobre 2025), et **prioritaire dans le chemin de
+recherche par défaut de Pd** sur le dépôt `critapec` — confirmé via `pd -verbose`. C'est cette copie
+qui a été chargée dans les deux premiers essais et qui a produit les erreurs "no method" trompeuses.
+Elle a été resynchronisée avec `critapec/pdjson/` (copie directe, pas un lien) pour que la vraie
+config Pd de cette machine profite des correctifs. **Si `pdjson` est modifié à nouveau, penser à
+resynchroniser cette copie** — les deux dossiers ne sont pas liés automatiquement.
+
+**Nom de méthode évité** : `clear` seul ne dispatch jamais vers `in_1_clear` (semble intercepté par
+Pd/pdlua avant résolution de méthode personnalisée, sans message d'erreur clair sur la cause) —
+renommé `clearBuilder`, cohérent avec `writeBuilder`.
 
 **Instanciation** : `[clip-io <clipsDir>(` — `\$1` s'substitue dans deux `makefilename` internes
 pour construire `<clipsDir>/<clipId>.mid` et `<clipsDir>/<clipId>.json`.
@@ -209,14 +246,16 @@ structure multi-piste. Le nom de piste est posé via `meta 3 <clipId>` (Sequence
 
 | Message | Effet |
 |---|---|
-| `record <clipId> <sirenId>` | `pdjson clear`, ouvre `<clipId>.mid` en écriture (480 ticks/noire), pose `meta 3 <clipId>`, mémorise le chemin `.json`, initialise les métadonnées (`id`, `siren`) |
+| `record <clipId> <sirenId>` | `pdjson clearBuilder`, ouvre `<clipId>.mid` en écriture (480 ticks/noire), pose `meta 3 <clipId>`, mémorise le chemin `.json`, initialise les métadonnées (`id`, `siren`) |
 | `[status data1 data2 deltaTicks]` (liste à 4 floats, **ticks en dernier** — voir note d'ordre ci-dessous) | Écrit un événement MIDI brut dans le clip en cours |
 | `stop <lengthTicks> <lengthBars> <isReference 0\|1>` | Complète les métadonnées, `pdjson writeBuilder` vers le `.json` mémorisé, `flush` le `.mid` (End-of-Track automatique), bang sur l'outlet status |
-| `read <clipId>` | Ouvre `<clipId>.mid` en lecture + charge `<clipId>.json` — ne sort rien tant que `dump` n'est pas envoyé (même convention que `pdjson` seul) |
-| `dump` | Sort les métadonnées (outlet 0, depuis `pdjson dump`) et les notes (outlet 1, depuis `midifile dump_notes`) |
+| `read <clipId>` | Ouvre `<clipId>.mid` en lecture + charge `<clipId>.json` — ne sort rien tant que `dump` n'est pas envoyé (même convention que `pdjson` seul) ; `midifile` sort spontanément le format/nb de pistes/résolution sur son outlet status à l'ouverture |
+| `dump` | Sort les métadonnées (outlet 0, depuis `pdjson dump`) et les notes consolidées note-on+off avec durée (outlet 1, depuis `midifile dump_notes`) |
 
-**Outlets** : 0 = métadonnées (pdjson), 1 = données MIDI (midifile), 2 = statut (bang de fin
-d'écriture côté patch, plus tout ce que `midifile` sort lui-même sur son outlet `anything`).
+**Outlets** (ordre réel côté appelant, vérifié — déterminé par la position X des `[outlet]` dans le
+patch, pas par l'ordre d'écriture, cf. bug §3 ci-dessus) : **0 = métadonnées** (pdjson), **1 =
+données MIDI** (midifile), **2 = statut** (bang de fin d'écriture côté patch, plus tout ce que
+`midifile` sort lui-même sur son outlet `anything` — format/pistes/résolution à la lecture).
 
 **Note d'ordre volontaire** : le format d'événement est `[status data1 data2 deltaTicks]`, avec le
 delta-tick **en dernière position**, pas en premier comme on l'écrirait naturellement. C'est fait
@@ -231,9 +270,10 @@ pour ce sous-chemin précis. Documenté aussi en commentaire dans le patch lui-m
 - Le câblage réel dans `voiceRecorder.pd`/`harmonizer.pd` existants (vérifié : ils n'utilisent
   aujourd'hui ni JSON ni `midifile`, stockage `text`/`sequence` — `clip-io.pd` est un nouveau bloc
   autonome, pas une modification de l'existant).
-- **Aucun test en conditions réelles dans Pd** — seule une vérification structurelle statique a été
-  faite (indices d'objets et connexions cohérents, syntaxe `pdjson.pd_lua` validée par `luac -p`).
-  À ouvrir et tester dans Pd avant tout usage en répétition/concert.
+- **Testé une fois, en local, headless, un seul clip mono-événement** (record → 1 note → stop →
+  read → dump) — pas encore testé en répétition, pas testé avec plusieurs clips séquentiels dans la
+  même session Pd, pas testé le cas `record` sans `stop` préalable ni les erreurs de chemin (dossier
+  absent, permissions).
 
 ## 5. Ce qui reste hors de ce document
 
