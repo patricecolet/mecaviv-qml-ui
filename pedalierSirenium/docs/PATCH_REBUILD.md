@@ -1,0 +1,198 @@
+# Reconstruction du patch — briques disponibles et architecture cible
+
+Doc de travail pour refaire le patch pédalier (successeur de `MidiToSiren.pd`) avec le périmètre
+resserré défini dans [`SCENES_SPEC.md` §13](SCENES_SPEC.md) : le moteur temps réel de l'instrument
+live, plus rien d'autre. Voir aussi `SCENES_SPEC.md §9-12` pour le modèle recorder/harmoniseur/clip
+que ce patch doit implémenter.
+
+**Sources vérifiées** (lues directement, pas supposées) : `~/repo/pd-externals/critapec/pdjson/`,
+`~/repo/pd-externals/critapec/midifile/`. Si ces externals évoluent, ce document doit être mis à
+jour en conséquence — il documente leur état au 2026-07-17.
+
+---
+
+## 1. Remplacer PuRestJson par pdjson
+
+`MidiToSiren.pd` utilise aujourd'hui PuRestJson (C compilé : `json-encode`, `json-decode`,
+`json-array-to-list`). Décision : passer à **pdjson**, un external maison en **pdlua**, déjà écrit
+et testé (`~/repo/pd-externals/critapec/pdjson/pdjson.pd_lua`).
+
+### Dépendances (déjà documentées dans `pdjson-help.pd`)
+
+- L'external **pdlua** (le runtime Lua pour Pd).
+- La bibliothèque Lua **lunajson** (`require 'lunajson'`).
+- Installation :
+  - macOS : `brew install lua && brew install luarocks`, puis `luarocks install lunajson`
+  - Debian/Pi : `sudo apt install lua5.4 luarocks`, puis `luarocks install lunajson`
+- **À vérifier avant le déploiement** : présence de lua5.4/luarocks/lunajson sur les machines cibles
+  (Pi, Artila) — pas seulement sur le Mac de dev.
+
+### API (méthodes sur l'inlet, `pdjson [fichier]` au constructeur)
+
+| Message | Effet |
+|---|---|
+| `read <fichier>` | Charge/recharge un JSON en mémoire |
+| `get <clé...>` | Navigue par chemin (clés string ou index numériques 0-based) ; sort la valeur, ou la sous-arborescence aplatie si c'est une table |
+| `set <clé...> <valeur>` | Modifie une valeur par chemin, crée les tables intermédiaires si besoin |
+| `dump` | Sort tout le JSON chargé, aplati en listes `[clé... valeur]` — une ligne par valeur terminale |
+| `write <fichier>` | Sérialise l'état courant vers un fichier JSON |
+| `dumpBinary` | Enveloppe l'état dans `{type:"CONFIG_FULL", config:...}`, encode, découpe en chunks binaires (4096 octets, préfixés taille totale + offset sur 4 octets) — pensé pour un envoi par canal binaire |
+
+**Déjà validé sur un cas réel** : `config.json` à côté de l'external contient une config
+`sirenConfig` avec `ambitus`/`clef`/`transposition` — la même forme que `sirenSpec.js` côté QML.
+Ce n'est pas un jouet, c'est déjà rodé sur une structure proche de la nôtre.
+
+**Portée pour ce projet** : pdjson peut porter à la fois la lecture de configuration (remplace
+PuRestJson pour ça) et potentiellement la sérialisation du contrat `scenesList`/`composition`
+(`PD_WORK.md`) avant envoi WebSocket — à confirmer si c'est le rôle qu'on lui donne ou si l'external
+clips (§3) s'en charge lui-même.
+
+### Manque identifié : pas de construction incrémentale — comblé (2026-07-17)
+
+`pdjson` n'avait que `set <chemin> <valeur>`, qui suppose de connaître le chemin complet depuis la
+racine à chaque appel — viable pour éditer une config déjà chargée, lourd pour construire à neuf un
+payload comme `scenesList` à chaque envoi (des dizaines de `set` séquentiels pour une seule scène).
+
+**Vérifié sur PuRestJson** (`~/repo/pd-externals/PuRestJson/unittests/json-encode/`, patchs
+`add-object.pd`/`add-array.pd`) : `json-encode` a l'API qui manquait — `add`/`array`/composition
+par imbrication/`clear`.
+
+**Ajouté à `pdjson.pd_lua`** (portée réduite, une seule table Lua mutable avec curseur, pas
+d'instanciation de plusieurs objets `pdjson`) :
+
+| Message | Effet |
+|---|---|
+| `add <clé> <valeur>` | Écrit une paire clé/valeur dans l'objet courant (`self.builder`, ou le sous-objet visé par `push`) |
+| `array <clé> <valeur>` (répété) | Accumule des valeurs dans un tableau sous une clé, un appel par valeur |
+| `push <clé>` | Descend dans un sous-objet à cette clé (le crée si absent), l'empile comme curseur courant |
+| `pop` | Remonte au niveau parent |
+| `clear` | Vide `self.builder` et la pile de curseurs |
+| `build` | Sérialise `self.builder` (via `table_to_json`, déjà utilisé par `write`) et le sort comme un unique atome symbole sur l'outlet |
+
+État par instance (`self.builder`/`self.builderStack`), pas une variable de module comme
+`json_data`/`jsonFileBuffer` — évite de reproduire le partage d'état inter-instances déjà présent
+ailleurs dans le fichier pour les instances multiples de `pdjson`.
+
+Syntaxe vérifiée avec `luac -p` (pas de runtime PD disponible dans cet environnement de dev — voir
+`SCENES_SPEC.md`/session notes sur la vérification statique). **À tester en conditions réelles dans
+Pd** avant de s'en servir pour sérialiser `scenesList`/`composition`.
+
+## 2. `midifile` — lecture/écriture SMF bas niveau (déjà disponible)
+
+`~/repo/pd-externals/critapec/midifile/` est un **vendoring identique** (diff vide) de
+`mrpeach/midifile`, l'external MIDI file bien établi de Martin Peach — pas quelque chose écrit pour
+ce projet, mais déjà présent et compilé (`midifile.pd_darwin`).
+
+### Méthodes exposées (vérifiées dans `midifile.c`)
+
+`read`, `write`, `rewind`, `dump`, `dump_notes`, `flush`, `meta`, `track`, `verbose`.
+
+### Usage vu dans `midifile-help.pd`
+
+- `write <fichier>.mid [ticks_par_noire]` — ouvre un fichier en écriture (défaut 90 ticks/noire).
+- Événements MIDI envoyés comme triplets bruts `[status data1 data2]` — ex. `144 60 64` = note-on
+  canal 0, note 60, vélocité 64. **Même format que le reste du patch pédalier** (pas de conversion
+  supplémentaire à inventer).
+- `track <n>` — sélectionne la piste courante.
+- `meta <type> <data...>` — événements meta (tempo, **marker** — directement ce qu'on a spécifié en
+  `SCENES_SPEC.md §11` pour structurer les fichiers sources).
+- `flush` — finalise/ferme le fichier.
+
+**Ce que ça couvre déjà, sans rien construire** : l'I/O SMF bas niveau pour `SCENES_SPEC.md §12`
+(stocker un clip comme fichier `.mid`) et pour lire les markers d'un projet Reaper (§11). Ce n'est
+**pas** l'external clips lui-même — c'est la brique sur laquelle il doit s'appuyer.
+
+**Non vérifié** : `midifile` gère-t-il nativement le pitch bend (event `E0`) ? Le README/help ne le
+montre pas explicitement dans les extraits lus — à tester, sinon prévoir une extraction manuelle des
+events `0xE_` bruts. Pertinent pour `SCENES_SPEC.md §12` (conversion bend sirène 13 bits/centre 4096
+↔ MIDI standard 14 bits/centre 8192).
+
+### Protocole d'écriture — vérifié dans `midifile.c` (2026-07-17)
+
+Le timing n'est **pas** automatique (pas de wall-clock implicite) — c'est l'appelant qui pilote tout,
+confirmé en lisant `midifile_write_delta_time`/`midifile_float`/`midifile_list` :
+
+1. `write <path> 480` — ouvre le fichier, **480 ticks/noire** pour matcher la convention déjà en
+   place dans `~/repo/mecaviv/compositions` (`MIDI_LIBRARY_PREP.md` §2) — aucune conversion de
+   résolution temporelle entre clip et compo.
+2. `track <n>` — sélectionne la piste courante avant d'écrire dessus.
+3. Avant **chaque** événement : un message `float <delta_ticks>` — en mode écriture, `midifile_float`
+   fait `x->total_time += delta_ticks` (cumulatif, pas absolu). `x->total_time` est un compteur
+   **partagé entre pistes** sur l'instance, mais chaque piste retient son propre `total_time` de
+   dernier événement (`track_chunk[track].total_time`) — donc alterner les pistes avec des `track <n>`
+   entre deux écritures reste correct, le delta par piste est recalculé indépendamment.
+4. Puis l'événement lui-même en liste brute : `144 60 64` (triplet status/data, même format que le
+   reste du patch, `midifile_list` n'ajoute pas de deltatime implicite — le `float` précédent est
+   obligatoire).
+5. `flush` — ferme le(s) fichier(s) **et écrit automatiquement l'End-of-Track de chaque piste active**
+   (`midifile_write_end_of_track`, appelé en boucle dans `midifile_flush`) : pas besoin d'envoyer
+   `meta 47` à la main.
+
+Même protocole en lecture (`read`/`track`/`float`/`dump`), dans l'autre sens — pertinent pour
+l'extraction directe depuis les compos existantes (§2 ci-dessus, `MIDI_LIBRARY_PREP.md` §3a) : un
+seul chemin d'I/O SMF à connaître pour le clip recorder et pour l'extracteur, pas deux.
+
+### Une version modifiée existe déjà — à retrouver et évaluer pendant le nettoyage
+
+`midifile` a été **recodé pour SirenePupitre** afin d'extraire les durées de note **en avance**
+(look-ahead), pour alimenter l'affichage d'anticipation (`AnticipationLine2D.qml`,
+`FallingNote2D.qml`). Localisation : le patch **`M645.pd`**, dont plusieurs copies existent dans le
+monorepo (situation qualifiée de « bordélique » par Patrice, nettoyage prévu cette semaine) :
+
+- `mecaviv/puredata-abstractions/application.layer/M645.pd` — **41 usages de `midifile`**, 3902
+  lignes. À côté de `harmonizer.pd` : probablement la version courante.
+- `mecaviv/puredata-abstractions/examples/M645-test.pd` — 0 usage, probablement obsolète/test.
+- `mecaviv/patko-scratchpad/volant/M645.pd` et
+  `mecaviv/patko-scratchpad/sirenMidiRouter/abs/inputModules/M645.pd` — 0 usage chacun, copies
+  scratch, probablement à écarter.
+
+**Pas creusé plus loin ici** — le fichier va bouger pendant le nettoyage de la semaine. À retenir :
+si cette version fait déjà du look-ahead de durée de note, elle est probablement **directement
+réutilisable** pour l'extraction MIDI du `SCENES_SPEC.md §11` (qui demande le même genre de lecture
+anticipée plutôt qu'une lecture séquentielle temps réel) — à évaluer au moment du nettoyage plutôt
+que de réécrire cette capacité depuis zéro.
+
+## 3. L'external clips — à construire
+
+Contrairement à `pdjson` et `midifile`, celui-ci n'existe pas encore. Son rôle, tel que posé dans
+`SCENES_SPEC.md §9` et `§12` : gérer les clips organisés en scènes — le pool de clips, la table des
+scènes (7 cellules `clipRef`+mode), la composition, l'arbitrage `source` — avec, pour le stockage,
+des fichiers `.mid` bruts (ligne mono, sans harmonie).
+
+**Relation avec les deux briques ci-dessus** :
+- S'appuie sur `midifile` pour l'I/O SMF réelle (lire/écrire les fichiers `.mid` des clips) —
+  pas besoin de réimplémenter un parseur/writer SMF. Protocole d'écriture/lecture vérifié ci-dessus
+  (§2, « Protocole d'écriture »).
+- S'appuie sur `pdjson` (méthodes `add`/`array`/`push`/`pop`/`clear`/`build`, §1) pour le fichier
+  `.json` compagnon de métadonnées de chaque clip.
+
+**Décisions prises (2026-07-17)** :
+
+- **Architecture** : `pdlua` ne peut pas appeler un external compilé (`midifile`, en C) comme une
+  bibliothèque interne — il ne peut que lui envoyer des messages Pd. La seule architecture
+  réalisable est donc une **abstraction `.pd`** qui instancie `midifile` + la logique clip/scène à
+  côté (vanilla/pdlua), pas un binaire qui « enveloppe » `midifile`. Ce n'était pas vraiment un
+  choix de conception, plutôt une contrainte de la plateforme.
+- **Métadonnées non-MIDI d'un clip** (référence, statut « boucle de référence », rapport de
+  longueur) : un **fichier `.json` compagnon**, écrit/lu par le patch via `pdjson` — pas édité à la
+  main. `clip_XXX.mid` (brut, `midifile`) + `clip_XXX.json` (métadonnées, `pdjson`), séparation
+  nette entre les deux formats.
+- **Migration** des `clip_XXX/loop.N.txt` existants : **différée**, hors périmètre de ce chantier —
+  l'external clips vise le nouveau matériau, la bibliothèque existante de loops sera traitée dans
+  une session future.
+
+## 4. `pdjson-help.pd` — section builder ajoutée
+
+Une démo `clear`/`add`/`push`/`add`/`pop`/`build` a été ajoutée au patch d'aide (indices d'objets
+52-63, connexions isolées du reste du patch, vérifiées programmatiquement pour ne référencer que des
+indices existants). Pas encore ouvert dans Pd pour vérification visuelle — cet environnement de dev
+n'a pas de runtime Pd (contrainte déjà notée pour toute la session, voir aussi `SCENES_SPEC.md`) ;
+la cohérence structurelle (indices, connexions) est vérifiée statiquement, le rendu visuel ne l'est
+pas.
+
+## 5. Ce qui reste hors de ce document
+
+- Le recâblage de l'harmoniseur pour recevoir plusieurs sources (`SCENES_SPEC.md §9`) — pas un
+  problème de stockage, à traiter séparément.
+- Le grand nettoyage du patch existant (`SCENES_SPEC.md §13`) — ce doc prépare le terrain du
+  nouveau patch, il ne dit pas quoi supprimer de l'ancien.

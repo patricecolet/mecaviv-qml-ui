@@ -104,6 +104,70 @@ Les touches naturelles sélectionnent les sirènes éligibles. Répartition **pa
 
 Changer de morceau (grand pédalier, CC ~61–91) remplace le jeu de scènes entier.
 
+### 7. NOUVEAU — tempo et signature éditables à l'écran (écran → PD)
+
+Exception délibérée au principe « écran en lecture seule » : tempo et signature sont modifiables
+directement sur l'écran, **dans les deux modes (jeu et config)**. Deux messages sortants —
+l'écran envoie, PD doit recevoir.
+
+**Tempo** — existe déjà côté ancien code, réutilisé tel quel :
+
+```json
+{ "device": "SIREN_LOOPER", "clock": { "bpm": 132 } }
+```
+
+**Convention à confirmer avec PD : le BPM est ancré sur la noire, toujours**, indépendamment du
+dénominateur de la signature — ce n'est pas une évidence, à vérifier que PD fait pareil. Une croche
+dure exactement la moitié d'une noire, une double-croche le quart : c'est arithmétique, pas musical
+au sens interprétatif. Vérifié sur cet exemple : à 60 BPM, une mesure de 3/4 dure 3 s (3 noires
+à 1 s) et une mesure de 6/8 dure **aussi** 3 s (6 croches à 0,5 s) — même durée réelle, la croche
+tourne deux fois plus vite. Le calcul côté écran (`SimulationHarness._tick`) applique cette règle :
+`durée d'unité = (60000 / bpm) × (4 / signatureDen)`. **Si PD ancre son BPM différemment (ex. sur
+le temps ressenti plutôt que sur la noire), il y aura un décalage silencieux entre ce que l'écran
+affiche et ce que PD joue** — à trancher avant l'intégration réelle.
+
+**Signature** — n'existait nulle part avant cette décision. Même namespace `device`/`clock` que
+le tempo. Deux réglages **indépendants**, et attention au vocabulaire — le dénominateur donne la
+**valeur** (4 = noire, 8 = croche, 16 = double-croche), le numérateur compte combien de **ces
+unités-là** remplissent la mesure. **7/8 = 7 croches, pas 7 temps.**
+
+- **numérateur** : nombre d'unités de la valeur donnée par le dénominateur, réglable par pas de 1,
+  de **1 à 21** ;
+- **dénominateur** : limité aux valeurs usuelles **4 / 8 / 16**, cyclé au tap plutôt que réglé
+  par pas.
+
+Envoyée en chaîne `"N/D"` déjà composée :
+
+```json
+{ "device": "SIREN_LOOPER", "clock": { "signature": "7/8" } }
+```
+
+PD doit à la fois **recevoir** ce message et **répondre** en échoïsant la nouvelle valeur dans le
+flux `clock` habituel, comme il le fait déjà pour `bpm` — l'écran affiche ce que PD confirme, pas
+seulement ce qu'il a demandé.
+
+#### Les vrais temps sont un champ à part : `groups`
+
+Le nombre de temps musicaux n'est **pas** le numérateur — c'est un groupage. 7/8 se joue en général
+2+2+3 (deux temps de deux croches, un de trois), pas en sept temps égaux. Ce groupage dépend de la
+pièce et se règle comme sur une horloge musicale classique (à la MIDI), il n'est pas déductible
+d'une formule unique côté écran.
+
+**PD doit fournir ce groupage explicitement**, en plus de `signature` :
+
+```json
+{ "device": "SIREN_LOOPER", "clock": { "signature": "7/8", "groups": [2, 2, 3] } }
+```
+
+`groups` est un tableau d'entiers dont la somme vaut le numérateur ; chaque entrée est la taille
+d'un temps, en unités du dénominateur. Pour une mesure simple (4/4), `groups: [1,1,1,1]`.
+
+**État actuel côté écran** : en l'absence de `groups` reçu, un calcul par défaut s'applique
+(`SimulationHarness._computeDefaultGroups`) — groupes de 3 pour les mesures composées classiques
+en /8 (6, 9, 12), sinon remplissage par paires avec un dernier groupe absorbant le reste (7/8 →
+`[2,2,3]`). **C'est un bouche-trou pour la démo, pas une vérité musicale** — dès que PD envoie
+`groups`, l'écran doit l'utiliser à la place, sans discussion.
+
 ---
 
 ## Décisions à trancher avant de patcher
@@ -129,6 +193,9 @@ Reprises de `SCENES_SPEC.md §8`, elles bloquent une partie du travail :
 | `LOOPER_SCENES.sceneLoaded` | PD → écran | existe |
 | `LOOPER_SCENES.composition` (id, name, banks, dirty) | PD → écran | **nouveau (§4, §6)** |
 | MIDI binaire (note/vél/bend) | PD → écran | existe — sonde seulement |
+| `SIREN_LOOPER.clock.bpm` | écran → PD | existe (ancien code, réutilisé — §7) |
+| `SIREN_LOOPER.clock.signature` | écran → PD | **nouveau (§7)** |
+| `SIREN_LOOPER.clock.groups` | PD → écran | **nouveau (§7)** — les vrais temps, groupés ; sans lui l'écran approxime |
 
 Côté QML, il restera à câbler ce que `SceneManager.loadScenesFromServer` jette aujourd'hui, à
 inverser la numérotation `SceneGrid` (bas 1-4 / haut 5-8 → ordre haut-bas gauche-droite), et à

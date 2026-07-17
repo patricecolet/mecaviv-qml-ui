@@ -188,3 +188,131 @@ déjà écrits : ils alimentent le second cercle « référence » et l'échelle
 - Comportement moteur exact de `stop` et `mute` (coupé ou rotation à vide → latence de reprise).
 - Rôle de `clip write` (CC 19) si l'inscription en scène est automatique.
 - Forme exacte du signal « modifié / non enregistré ».
+
+---
+
+## 9. Le recorder passe en amont de l'harmoniseur
+
+**Problème identifié (2026-07-17)** : le recorder est aujourd'hui placé **après** l'harmoniseur — il
+capture la sortie déjà voicée, pas la ligne d'origine. Un clip enregistré fige donc l'harmonie du
+moment ; la rejouer avec une autre gamme, une autre tonalité ou un autre tempo est impossible sans
+tout ré-enregistrer. Coût de développement constaté : énorme.
+
+**Solution retenue** : enregistrer **en amont** de l'harmoniseur — la ligne brute du Sirénium,
+horodatée en **temps musical fin** (frames/ticks MIDI, plus précis qu'une quantification
+mesure/temps — préserve le geste exact plutôt que de l'arrondir à la grille). L'harmonie ne se
+stocke jamais dans le clip ; elle est **réappliquée à la lecture**, à partir du bloc `harmony` de la
+scène courante (§6). C'est une **conséquence nécessaire**, pas seulement cohérente, du fait déjà
+acté que l'harmonie vit dans la scène (§1, §6) : il n'existe nulle part ailleurs dans le modèle où
+une version « déjà harmonisée » pourrait légitimement se stocker.
+
+**Conséquence sur l'harmoniseur** : il doit être **recâblé pour recevoir plusieurs entrées** — la
+ligne du Sirénium en direct, et une ou plusieurs lignes brutes rejouées (depuis un clip ou un projet
+MIDI, voir §11) — et **arbitrer une priorité** entre elles quand elles se disputent les mêmes
+sirènes. C'est structurellement le même problème que le champ `source` (`docs/PD_WORK.md §3`,
+« le dernier joué prime »), mais un cran plus tôt : pas *quelle sirène joue quoi*, mais *quelle
+entrée alimente l'harmoniseur*. **Non tranché** : est-ce la même règle de priorité, ou une autre ?
+
+## 10. Modèle actuel de l'harmoniseur — et une piste d'évolution
+
+**Modèle actuel (confirmé par Patrice)** : pas un accord assigné dynamiquement. Chaque sirène
+activée a son propre réglage d'**intervalle fixe**. La note du Sirénium se diffuse en broadcast vers
+les sirènes activées (1 → [1..7]), chacune appliquant son intervalle propre pour produire sa voix.
+
+**Piste évoquée, non décidée** : remplacer (ou compléter) l'intervalle fixe par une assignation
+dynamique par **proximité de hauteur** — le degré d'un accord va chercher la sirène dont l'ambitus
+est le plus proche, plutôt que d'être câblé sur une sirène pré-réglée. C'est une logique de
+voice-leading (minimiser les sauts), différente du modèle actuel. Intéressant, à creuser plus tard —
+pas une décision.
+
+## 11. Sources de clip — enregistrement live et extraction de projets MIDI
+
+Le pédalier devra aussi **lire des projets MIDI** (type Reaper), pour deux usages qui partagent le
+même pipeline que l'enregistrement live (§9) — une ligne brute traverse l'harmoniseur, appliqué
+**après**, séparément :
+
+- **Réinterprétation** : une ligne écrite dans un projet MIDI traverse le pédalier *comme si* le
+  Sirénium la jouait — geste **live**, pas seulement en préparation.
+- **Extraction en clip** : la même ligne, capturée dans le pool de clips — même représentation
+  qu'un clip enregistré en live (brute, sans harmonie).
+
+Ces deux usages sont probablement **le même geste** : la ligne traverse le pipeline live, et le
+geste `clip write` (CC 19, §5) la capture optionnellement en clip. Cohérent avec tout ce qui
+précède ; à confirmer explicitement avant de patcher.
+
+**Structurer les fichiers sources avec des markers MIDI** — l'événement standard *Marker*
+(meta-event SMF, exportable nativement depuis Reaper), pas un format inventé. Un marker porte :
+
+- un **point de déclenchement** (début, possiblement fin/bouclage) ;
+- un **nom**.
+
+Pas besoin d'y coder l'harmonie ou le tempo — déjà gérés ailleurs dans le modèle (tempo dynamique
+côté écran/PD, harmonie dans la scène). **Non tranché** : un marker SMF standard est **global à la
+timeline**, pas attaché à une piste. Si un projet contient plusieurs pistes candidates au même
+marker, une convention de désambiguïsation (nommage dans le texte du marker, ou autre) reste à
+définir.
+
+## 12. Stockage du clip — fichier MIDI standard
+
+**Idée retenue** : stocker un clip comme un vrai fichier `.mid` plutôt que le format texte
+`loop.N.txt` actuel.
+
+**Cohérent, pas juste plausible** : puisque l'harmonie vit dans la scène (§1, §6, §9), le clip ne
+peut être que la ligne brute mono — exactement ce qu'une piste MIDI standard encode (note on/off,
+ticks/PPQN = temps musical). Unifie enregistrement live et extraction MIDI (§11) dans un seul
+format de stockage, dans les deux sens (lecture et écriture).
+
+**Point technique à ne pas rater** : le pitch bend des sirènes est **non standard** — 13 bits,
+centre 4096 (`sirenSpec.js`, `meta.bendBits`/`meta.bendCenter`) — contre le bend MIDI standard
+(14 bits, centre 8192). Convention de conversion explicite nécessaire à l'écriture et à la lecture,
+sinon perte de précision ou décalage de centre silencieux.
+
+**Renforce l'intérêt d'un external PD dédié** à cette partie précise (enregistrement des clips
+organisés en scènes, intention de Patrice) : lire/écrire du SMF standard en C est un problème bien
+balisé (bibliothèques existantes), contrairement aux objets `text`/`sequence` de PD, natifs au
+format texte à plat.
+
+## 13. Recentrage du périmètre du patch pédalier
+
+**Contexte** : un VST (évolution récente de ComposeSiren) route désormais le MIDI reçu directement
+vers les sirènes en UDP — un chemin DAW → sirènes qui n'a plus besoin de PD. Le patch du pédalier
+n'a donc plus vocation à « tout savoir faire » (Mac, pédalier, machine Linux lisant des projets
+Reaper) : ComposeSiren couvre le rendu direct d'un DAW.
+
+**Rôle précisé du patch pédalier** : le moteur temps réel de l'instrument live — enregistrer, jouer,
+harmoniser, naviguer dans les scènes ; parler aux 5 appareils physiques (`PEDALIER_MAPPING.md`) et
+au contrat JSON (`PD_WORK.md`) qui alimente l'écran. Rien d'autre.
+
+**Test de nettoyage** (à appliquer patch par patch, lors du grand nettoyage prévu) : *est-ce que
+cette partie sert à faire tourner le pédalier comme instrument vivant, ou était-ce pour un autre
+contexte (Mac, machine Reaper, expérience passée) ?* Si non : candidat à sortir, pas à documenter.
+
+La lecture de projets MIDI (§11) **reste dans le périmètre** — pas comme lecteur DAW générique
+(ça, c'est ComposeSiren), mais comme **source de matériau** pour le pipeline live du pédalier
+(réinterprétation, extraction en clip).
+
+## 14. Nouvelles décisions ouvertes (2026-07-17)
+
+- Priorité d'arbitrage à l'**entrée** de l'harmoniseur (Sirénium live vs ligne rejouée) — même règle
+  que « le dernier joué prime » (§9, `PD_WORK.md §3`), ou une autre ?
+- Réinterprétation et extraction en clip : confirmer que c'est bien le même geste (§11).
+- Désambiguïsation des markers MIDI si plusieurs pistes candidates au même point (§11).
+- Convention de conversion du pitch bend (13 bits/centre 4096 ↔ 14 bits/centre 8192) pour le
+  stockage MIDI (§12).
+- Périmètre exact du grand nettoyage du patch (§13) — à mener avec le test proposé, résultat non
+  connu à l'avance.
+
+## 15. Réserve pour une 8ème sirène (décidé 2026-07-17, pas encore implémenté)
+
+Un 8ème instrument pourrait rejoindre l'orchestre l'année prochaine. Décision : **concevoir pour 8,
+peupler 7** — ne pas fermer la porte en codant "7" en dur comme une vérité permanente.
+
+Endroits identifiés où "7" est actuellement une constante de conception, à revoir quand ce travail
+reprendra : `sirenSpec.js` (7 entrées), les boucles et tableaux à 7 dans `LiveState`/
+`SimulationHarness` (QML), `SirenRingRow2D`/`ModulationMatrix2D` (`model: 7`), le contrat
+`sirens[]` de `scenesList` (§6), l'ordre de hauteur `S3 S4 S1 S2 S5 S6 S7` (mémoire
+`siren-pitch-order` — où s'insère S8 dépend de son ambitus, inconnu).
+
+**Non résolu** : quel contrôle physique du pédalier devient le sélecteur de S8 — un 8ème
+emplacement matériel déjà câblé, ou une des 5 touches dièses libres du clavier PK-6
+(`PEDALIER_MAPPING.md`) ? À trancher avant d'implémenter quoi que ce soit.
