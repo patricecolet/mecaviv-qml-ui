@@ -280,12 +280,29 @@ re-vérifié identique octet pour octet).
 sur `unpack`/`pack`. Cycle complet retesté sans flag CLI, `.mid` identique octet pour octet à
 toutes les versions précédentes validées, zéro erreur.
 
+**Bug de fond corrigé dans `pdjson.pd_lua` : chemin relatif mal résolu.** En préparant un dossier de
+démo committable pour `clip-io-help.pd` (pour éviter `/tmp`, cassé au premier redémarrage), test
+comparatif de `midifile` et `pdjson` sur le même chemin relatif : `midifile` le résout correctement
+par rapport au **dossier du patch appelant** ; `pdjson` le résolvait par rapport à **son propre
+dossier d'installation** (`resolvePath` utilisait `self._loadpath`, qui pointe vers l'emplacement
+du script `pdjson.pd_lua` lui-même, pas vers le patch instanciateur). Trouvé par introspection
+directe du runtime (petit external pdlua de diagnostic listant tous les champs de `self`) plutôt
+que par lecture de source, qui n'a donné aucune piste : le bon champ est **`self._canvaspath`**.
+Corrigé dans `pdjson.pd_lua` (et resynchronisé vers `~/Documents/Pd/externals/pdjson/`) — un chemin
+relatif donné à `pdjson` se résout maintenant comme celui donné à `midifile`, cohérent pour
+n'importe quel patch qui utilise les deux (pas seulement `clip-io.pd`). Revérifié : cycle complet
+`record`→`stop`→`read`→`dump` avec un dossier de clips **relatif**, `midifile` et `pdjson`
+d'accord sur l'emplacement, zéro erreur.
+
 **`clip-io-help.pd` construit et testé** — patch d'aide manuel/interactif, dans le même dossier que
 `clip-io.pd`, suivant la convention déjà en place localement (`curve-map-help.pd` : boîtes de
 message étiquetées câblées directement sur l'abstraction, pas d'auto-séquencement). Un message par
 étape (`record`/événements/`stop`/`read`/`dump`), trois `print` pour observer les trois outlets.
 Vérifié fonctionnellement via un enrobage temporaire à déclenchement automatique (retiré après
-test, pas livré) : cycle complet correct, `.mid` produit correct, zéro erreur.
+test, pas livré) : cycle complet correct, `.mid` produit correct, zéro erreur. Accompagné de
+`clip-io-demo/` (dossier committé, chemin relatif, à côté des deux patches) contenant un vrai
+`demo-clip.mid`+`.json` pré-généré — les étapes 4/5 (`read`/`dump`) fonctionnent sans avoir joué
+les étapes 1-3 avant, vérifié isolément.
 
 Abstraction dans `mecaviv/puredata-abstractions/application.layer/clip-io.pd` (à côté de
 `harmonizer.pd`) — combine `midifile` + `pdjson` pour l'I/O d'**un** clip, selon les décisions du
