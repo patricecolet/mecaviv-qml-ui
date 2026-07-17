@@ -222,6 +222,35 @@ Retesté intégralement après la reconstruction (mêmes vérifications qu'avant
 comparé octet par octet — **identique** au précédent, aucune régression). Détail de l'inventaire des
 briques et du protocole `midifile` inchangé, voir ci-dessous.
 
+**Passe 2, mise en page (2026-07-18)** : Patrice a corrigé à la main les sous-patches `record` et
+`stop` dans l'éditeur Pd, avec deux règles supplémentaires — détaillées dans la mémoire
+`pd-patching-conventions` :
+
+- **Jamais connecter une seule sortie à plusieurs destinations directement** — toujours passer par
+  un `trigger` explicite, même quand l'ordre entre les destinations n'a pas d'importance
+  fonctionnelle (rend le branchement visible plutôt qu'implicite).
+- **Lecture verticale = ordre d'exécution** : les sorties d'un `trigger`/`unpack` se déclenchant
+  droite-à-gauche, la convention adoptée place le résultat qui se déclenche en premier **en haut**
+  (ou en colonne la plus proche), et empile la suite en dessous plutôt que de laisser les câbles
+  se croiser sur tout le canevas.
+- **Types de trigger** : `b`/`f`/`s`/`l`/`a` peuvent être mélangés dans un seul `[t ...]`, mais `b`
+  (bang) et `a` (anything) restent le choix par défaut — les types plus précis seulement quand la
+  valeur réelle est nécessaire en aval (ex. `[t b l]` dans `stop` : la sortie `l` porte la vraie
+  liste vers `unpack`, la sortie `b` ne sert qu'à déclencher la suite).
+
+Les sous-patches `read` et `dump` avaient la même faute (`route`/`list split` connectés directement
+à deux destinations) — corrigés à la suite, avec `[t a a]` (les deux branches de `read` ont besoin
+de la vraie valeur du `clipId`) et `[t b b]` (les deux branches de `dump` n'ont besoin que d'un
+déclencheur). Revérifié structurellement (script nesting-aware) et en Pd réel — sortie strictement
+identique, aucune régression.
+
+**Piège trouvé au passage** : après l'édition dans l'éditeur Pd et la sauvegarde, la ligne
+`#X declare` avait disparu du fichier — pas de trace de pourquoi (version de Pd, façon dont l'UI
+réécrit le header au save, ou suppression accidentelle). Résultat : `pdjson`/`midifile` ne se
+chargeaient plus (`error: ... couldn't create`), silencieux jusqu'au test. Remise en place
+manuellement. **À surveiller à chaque sauvegarde depuis l'éditeur Pd** — pas de garantie que
+`declare` survive systématiquement à un aller-retour GUI.
+
 Abstraction dans `mecaviv/puredata-abstractions/application.layer/clip-io.pd` (à côté de
 `harmonizer.pd`) — combine `midifile` + `pdjson` pour l'I/O d'**un** clip, selon les décisions du
 §3. Construite par génération programmatique (indices d'objets et connexions calculés et vérifiés
