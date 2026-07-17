@@ -190,6 +190,51 @@ n'a pas de runtime Pd (contrainte déjà notée pour toute la session, voir auss
 la cohérence structurelle (indices, connexions) est vérifiée statiquement, le rendu visuel ne l'est
 pas.
 
+## 4bis. `clip-io.pd` — construit (2026-07-17)
+
+Abstraction dans `mecaviv/puredata-abstractions/application.layer/clip-io.pd` (à côté de
+`harmonizer.pd`) — combine `midifile` + `pdjson` pour l'I/O d'**un** clip, selon les décisions du
+§3. Construite par génération programmatique (indices d'objets et connexions calculés et vérifiés
+par script avant écriture — pas de runtime Pd disponible ici pour une vérification visuelle,
+seulement une vérification structurelle statique).
+
+**Instanciation** : `[clip-io <clipsDir>(` — `\$1` s'substitue dans deux `makefilename` internes
+pour construire `<clipsDir>/<clipId>.mid` et `<clipsDir>/<clipId>.json`.
+
+**Simplification assumée** : un clip est **mono-piste** (SMF track 0 unique) — contrairement aux
+compos existantes (SMF1, une piste par sirène), un clip ne porte qu'une ligne, donc pas besoin de la
+structure multi-piste. Le nom de piste est posé via `meta 3 <clipId>` (Sequence/Track Name).
+
+**Messages acceptés (inlet unique)** :
+
+| Message | Effet |
+|---|---|
+| `record <clipId> <sirenId>` | `pdjson clear`, ouvre `<clipId>.mid` en écriture (480 ticks/noire), pose `meta 3 <clipId>`, mémorise le chemin `.json`, initialise les métadonnées (`id`, `siren`) |
+| `[status data1 data2 deltaTicks]` (liste à 4 floats, **ticks en dernier** — voir note d'ordre ci-dessous) | Écrit un événement MIDI brut dans le clip en cours |
+| `stop <lengthTicks> <lengthBars> <isReference 0\|1>` | Complète les métadonnées, `pdjson writeBuilder` vers le `.json` mémorisé, `flush` le `.mid` (End-of-Track automatique), bang sur l'outlet status |
+| `read <clipId>` | Ouvre `<clipId>.mid` en lecture + charge `<clipId>.json` — ne sort rien tant que `dump` n'est pas envoyé (même convention que `pdjson` seul) |
+| `dump` | Sort les métadonnées (outlet 0, depuis `pdjson dump`) et les notes (outlet 1, depuis `midifile dump_notes`) |
+
+**Outlets** : 0 = métadonnées (pdjson), 1 = données MIDI (midifile), 2 = statut (bang de fin
+d'écriture côté patch, plus tout ce que `midifile` sort lui-même sur son outlet `anything`).
+
+**Note d'ordre volontaire** : le format d'événement est `[status data1 data2 deltaTicks]`, avec le
+delta-tick **en dernière position**, pas en premier comme on l'écrirait naturellement. C'est fait
+exprès : `midifile` exige le `float` (delta) *avant* la liste d'événement (§2 ci-dessus), et l'ordre
+de déclenchement naturel de `[unpack f f f f]` en Pd est droite-à-gauche — mettre `deltaTicks` en
+dernier atome le fait sortir en PREMIER de `unpack`, dans le bon ordre, sans `trigger` supplémentaire
+pour ce sous-chemin précis. Documenté aussi en commentaire dans le patch lui-même.
+
+**Ce que ce patch ne fait PAS (hors périmètre, à construire séparément)** :
+- Le pool de clips / la table des scènes à 7 cellules / l'arbitrage `source` (§3, `SCENES_SPEC.md
+  §9`) — `clip-io.pd` gère un clip à la fois, pas l'orchestration entre plusieurs.
+- Le câblage réel dans `voiceRecorder.pd`/`harmonizer.pd` existants (vérifié : ils n'utilisent
+  aujourd'hui ni JSON ni `midifile`, stockage `text`/`sequence` — `clip-io.pd` est un nouveau bloc
+  autonome, pas une modification de l'existant).
+- **Aucun test en conditions réelles dans Pd** — seule une vérification structurelle statique a été
+  faite (indices d'objets et connexions cohérents, syntaxe `pdjson.pd_lua` validée par `luac -p`).
+  À ouvrir et tester dans Pd avant tout usage en répétition/concert.
+
 ## 5. Ce qui reste hors de ce document
 
 - Le recâblage de l'harmoniseur pour recevoir plusieurs sources (`SCENES_SPEC.md §9`) — pas un
