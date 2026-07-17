@@ -190,7 +190,37 @@ n'a pas de runtime Pd (contrainte déjà notée pour toute la session, voir auss
 la cohérence structurelle (indices, connexions) est vérifiée statiquement, le rendu visuel ne l'est
 pas.
 
-## 4bis. `clip-io.pd` — construit et vérifié en conditions réelles (2026-07-17)
+## 4bis. `clip-io.pd` — construit et vérifié en conditions réelles (2026-07-17, refait 2026-07-18)
+
+**Refait le 2026-07-18** selon les conventions de patching de Patrice, pour que le patch reste
+lisible une fois ouvert (le premier jet, bien que fonctionnel, avait des câbles qui se croisent sur
+tout le canevas) :
+
+1. **`#X declare -path ... -path ... -lib pdlua`** en tête de patch — le patch trouve `midifile` et
+   `pdjson` par lui-même, plus besoin de lancer Pd avec des `-path` en ligne de commande. Vérifié
+   avec `pd -verbose` : les deux externals se chargent depuis les chemins déclarés, sans aucun flag
+   CLI. Attention, `declare -path` prend des chemins absolus (pas de `~`, pas testé) — donc
+   spécifique à cette machine tant que ces externals ne sont pas dans un chemin standard.
+2. **Un sous-patch par branche** (`record`, `stop`, `read`, `dump`, `noteevent`), reliés au niveau
+   racine par `route` puis par `send \$0.xxx`/`receive \$0.xxx` plutôt que des câbles longs — `\$0`
+   scope les canaux à l'instance courante (plusieurs `clip-io` en parallèle ne se marchent pas
+   dessus). Détail non évident : **un sous-patch n'hérite pas automatiquement du `\$1` du patch
+   parent** — il faut le lui repasser explicitement en argument d'instanciation
+   (`[pd record \$1]`), comme pour n'importe quel abstraction.
+3. **Un seul `[list trim]`, bien placé** — mais **pas un seul pour tout le patch**, un par
+   *canal de commandes* menant à chaque destination (`midifile`, `pdjson`), avec le flux
+   d'événements MIDI bruts sur un canal **séparé qui contourne le trim**. Bug trouvé en testant la
+   version « un seul trim pour tout ce qui va vers midifile » : `list trim` reconstruit
+   correctement le message générique quand le premier atome est un **symbole** (`add id valeur` →
+   sélecteur `add`, args préservés), mais avec un premier atome **flottant** (une liste
+   d'événements MIDI bruts comme `144 60 64`), il **tronque tout au premier flottant** — la ligne
+   de note enregistrée était devenue « `0 0 128 16363 0` » au lieu de la note correcte. D'où deux
+   canaux distincts : `\$0.to-midifile` (commandes, passe par `[list trim]`) et
+   `\$0.to-midifile-evt` (événements bruts, direct, aucun trim).
+
+Retesté intégralement après la reconstruction (mêmes vérifications qu'avant : cycle complet, `.mid`
+comparé octet par octet — **identique** au précédent, aucune régression). Détail de l'inventaire des
+briques et du protocole `midifile` inchangé, voir ci-dessous.
 
 Abstraction dans `mecaviv/puredata-abstractions/application.layer/clip-io.pd` (à côté de
 `harmonizer.pd`) — combine `midifile` + `pdjson` pour l'I/O d'**un** clip, selon les décisions du
