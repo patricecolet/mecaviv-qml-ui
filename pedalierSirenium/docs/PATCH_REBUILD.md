@@ -244,12 +244,41 @@ de la vraie valeur du `clipId`) et `[t b b]` (les deux branches de `dump` n'ont 
 déclencheur). Revérifié structurellement (script nesting-aware) et en Pd réel — sortie strictement
 identique, aucune régression.
 
-**Piège trouvé au passage** : après l'édition dans l'éditeur Pd et la sauvegarde, la ligne
-`#X declare` avait disparu du fichier — pas de trace de pourquoi (version de Pd, façon dont l'UI
-réécrit le header au save, ou suppression accidentelle). Résultat : `pdjson`/`midifile` ne se
-chargeaient plus (`error: ... couldn't create`), silencieux jusqu'au test. Remise en place
-manuellement. **À surveiller à chaque sauvegarde depuis l'éditeur Pd** — pas de garantie que
-`declare` survive systématiquement à un aller-retour GUI.
+**Piège trouvé au passage, confirmé répété (pas un accident isolé)** : la ligne `#X declare`
+disparaît du fichier **à chaque** aller-retour dans l'éditeur Pd sur cette machine — arrivé trois
+fois dans la même session. Casse silencieusement le chargement de `pdjson`/`midifile`
+(`error: ... couldn't create`) jusqu'au prochain test. Traiter comme acquis : `grep "#X declare"`
+et la remettre si absente, en routine avant de faire confiance à un test sur un patch rouvert dans
+l'éditeur depuis la dernière modification.
+
+**Portabilité du `declare`** (correction de Patrice) : la première version pointait vers un chemin
+absolu propre à cette machine (`/Users/patricecolet/repo/pd-externals/...`). Corrigé vers
+`~/Documents/Pd/externals/critapec` et `~/Documents/Pd/externals/pdjson` — le dossier deken
+standard que Pd lit par défaut selon l'OS. Vérifié que `~` s'expanse bien dans `declare -path`
+(pointé vers un dossier de test isolé, confirmé par `pd -verbose` que Pd a cherché le chemin
+absolu correctement résolu). Le patch dépend maintenant explicitement de cette copie déployée —
+à resynchroniser avec le dépôt git à chaque modif de `pdjson`/`midifile` (mémoire
+`pd-externals-shadowing`).
+
+**Detour `list split 3` pour `noteevent` (suggestion de Patrice) — élégant, mais mène à un vrai bug
+plus subtil.** `[list split 3]` évite le repackage `pack f f f` de `unpack f f f f`, séduisant sur
+le papier. Vérifié isolément (contenu et ordre corrects), et même vérifié « typé float » via
+`[route float]` après un `[list trim]` sur le reste — mais ça ne suffisait pas : le vrai patch
+continuait à écrire un `.mid` corrompu (`error: midifile: sysex list terminator is 0x0`,
+`deltaTicks=240=0xF0` interprété comme un octet de statut SysEx). La trace verbose de `midifile`
+lui-même (`verbose 3`) a montré que la valeur passait toujours par son gestionnaire `list`
+(`midifile_list`), jamais par `midifile_float`, **malgré** le typage apparent confirmé par
+`[route float]`. Explication : `route float` est un objet de confort qui accepte une liste à un
+seul flottant comme un vrai `float` — le dispatch strict `class_addfloat` d'un external C n'a pas
+cette tolérance. `unpack` reste le bon choix ici : ses sorties individuelles déclenchent
+réellement `class_addfloat`, vérifié par le comportement de `midifile` lui-même, pas par un test
+de confort. `noteevent` est resté sur `unpack f f f f` + `pack f f f` (le design original,
+re-vérifié identique octet pour octet).
+
+**État final vérifié** (2026-07-18, fin de session) : `declare` portable, `record`/`stop`/`read`/
+`dump` selon les règles de patching (sous-patches, trigger, alignement de colonnes), `noteevent`
+sur `unpack`/`pack`. Cycle complet retesté sans flag CLI, `.mid` identique octet pour octet à
+toutes les versions précédentes validées, zéro erreur.
 
 Abstraction dans `mecaviv/puredata-abstractions/application.layer/clip-io.pd` (à côté de
 `harmonizer.pd`) — combine `midifile` + `pdjson` pour l'I/O d'**un** clip, selon les décisions du
