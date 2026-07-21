@@ -99,6 +99,8 @@ C'est la seule chose que l'afficheur attend. Aujourd'hui `saveScene` ne route qu
     {
       "globalSceneId": 1, "page": 1, "sceneId": 1,
       "sceneName": "intro", "order": 1,
+      "tempo": 120,
+      "signature": "4/4",
       "harmony": {
         "scaleMode": "dorien",
         "root": "C",
@@ -176,7 +178,7 @@ Messages temps réel déjà en place à conserver : `sceneLoaded` (met à jour l
 | Aujourd'hui | Cible |
 |---|---|
 | `looper.scenes.txt` : `sceneId globalId page nom clipRef` (un clip) | `sceneId globalId page nom` + 7 × `(siren, clipRef, mode)` |
-| `loop.definition.txt` : matériel **et** état (isLoop, playing, loopSize) mêlés | Clip = matériel + propriétés intrinsèques ; **mode sorti dans la scène** |
+| `loop.definition.txt` : matériel **et** état (isLoop, playing, loopSize) mêlés, `tempo` par clip | Clip = matériel + propriétés intrinsèques ; **mode et tempo sortis dans la scène** (§16) |
 | `saveScene` route 4 champs | route 4 champs + l'état des 7 sirènes |
 | `clip_XXX/` en pool (déjà le cas) | inchangé — le pool existe déjà |
 
@@ -246,8 +248,8 @@ précède ; à confirmer explicitement avant de patcher.
 - un **point de déclenchement** (début, possiblement fin/bouclage) ;
 - un **nom**.
 
-Pas besoin d'y coder l'harmonie ou le tempo — déjà gérés ailleurs dans le modèle (tempo dynamique
-côté écran/PD, harmonie dans la scène). **Non tranché** : un marker SMF standard est **global à la
+Pas besoin d'y coder l'harmonie, le tempo ou la signature — déjà gérés ailleurs dans le modèle
+(tous trois dans la scène, §16). **Non tranché** : un marker SMF standard est **global à la
 timeline**, pas attaché à une piste. Si un projet contient plusieurs pistes candidates au même
 marker, une convention de désambiguïsation (nommage dans le texte du marker, ou autre) reste à
 définir.
@@ -316,3 +318,104 @@ reprendra : `sirenSpec.js` (7 entrées), les boucles et tableaux à 7 dans `Live
 **Non résolu** : quel contrôle physique du pédalier devient le sélecteur de S8 — un 8ème
 emplacement matériel déjà câblé, ou une des 5 touches dièses libres du clavier PK-6
 (`PEDALIER_MAPPING.md`) ? À trancher avant d'implémenter quoi que ce soit.
+
+## 16. Tempo et signature — propriétés de la scène (décidé 2026-07-19)
+
+**Décision : tempo et signature suivent exactement le même modèle que l'harmonie (§1, §6, §9) —
+ils vivent dans la scène, jamais dans le clip.** Ça règle l'ambiguïté du §11, qui parlait d'un
+« tempo dynamique côté écran/PD » comme si le tempo n'était pas stocké en scène ; en réalité les
+deux ne s'opposent pas :
+
+- **Valeur de départ par scène**, avec un **défaut à 120** (comme n'importe quel DAW) si rien n'est
+  réglé.
+- **Ajustable en live par-dessus**, pendant la lecture — même logique que le reste de l'état
+  courant (harmonie, modes des 7 cellules).
+- **Sauvegarder la scène sauve tout**, y compris le tempo et la signature ajustés en live — aucun
+  traitement spécial par rapport aux autres champs de l'état de la scène (§5).
+
+**Conséquence sur le stockage** : le `tempo` aujourd'hui écrit dans `loop.definition.txt` (par
+clip) est le même genre de résidu que `isLoop`/`playing` déjà identifiés en §7 — il migre vers la
+scène. Le contrat `scenesList` (§6) porte donc `tempo` et `signature` au même niveau que `harmony`,
+par scène.
+
+**Format de `signature`** : chaîne `"battements/division"` (ex. `"4/4"`, `"7/8"`), cohérent avec
+`PD_WORK.md` et le message `clock` déjà en place côté WebSocket — pas un objet `{num, den}` séparé.
+
+## 17. Grain d'horloge et décimation du bend (décidé 2026-07-21)
+
+**Deux grains, pas un.** Le patch fait cohabiter deux résolutions temporelles, et c'est délibéré :
+
+- **Placement des événements : 480 ticks/noire.** C'est la résolution des fichiers `.mid`
+  (`clip-io` écrit `write <path> 480`) et donc celle à laquelle `midifile` avance. `midiclock`
+  fournit ce grain fin par un diviseur **asservi aux tops 24 ppq reçus** (mesure de période par
+  `timer`, 20 sous-ticks par top), et non par un metro calculé depuis le tempo affiché — sans quoi
+  toute synchronisation sur une horloge MIDI externe (`source 1`) dériverait.
+- **Contenu continu : 24 pulses/noire.** Le pitch bend et les contrôleurs de modulation sont
+  décimés sur la grille de l'horloge MIDI, soit 48 valeurs/s à 120 bpm.
+
+**Pourquoi cette asymétrie** : ce qui est transitoire (l'attaque d'une note) mérite la précision ;
+ce qui est continu ne l'exploite pas, parce que **l'inertie mécanique des sirènes ne peut pas
+restituer plus vite**. Un bend à chaque tick de 480 ppq, ce serait 480 messages/noire et par sirène,
+soit 6 720 messages UDP/s pour les sept à 120 bpm — pour une différence inaudible. À 24 ppq on
+tombe à 336/s.
+
+**Le facteur limitant est le débit sortant, pas la mémoire.** Mesuré : `midifile` alloue exactement
+la taille de la piste SMF (`getbytes(chunk_length)`) et y garde les octets bruts, sans expansion.
+Un clip volontairement délirant (un bend à *chaque* tick de 480 ppq sur 4 mesures, 7 681 événements,
+30 Ko de piste) chargé dans les 7 `clip-io` ne coûte que **+224 Ko de RSS** — conforme aux 215 Ko
+de données attendus. Même extrapolé à un morceau de 10 minutes à ce régime, on reste sous 20 Mo.
+La mémoire n'est jamais la contrainte ; le réseau et le firmware Artila le sont.
+
+**Règle** : le grain fin sert à *placer* les événements, pas à en *créer*.
+
+**Implémentation de la décimation** (à faire avec le recorder, pas encore construit) : échantillonner
+sur la grille 24 ppq — garder la dernière valeur à chaque top — plutôt que de déclencher sur un
+seuil de variation, sinon un bend lent ne produit rien pendant longtemps puis saute. Ajouter un
+`[change]` derrière pour ne pas réémettre une valeur identique : grille régulière, sans redondance.
+
+Rappel du point encore ouvert (§14) : le bend des sirènes est **13 bits centré 4096**, stocké dans
+un SMF **14 bits centré 8192**. La convention de conversion reste à fixer.
+
+## 18. Énumérer scènes et compositions — `[file glob]`, pas un index écrit (2026-07-21)
+
+**Pd vanilla sait lister un dossier** depuis 0.52, avec `[file glob]` (le sous-objet se choisit à la
+création : `[file]` seul instancie `file handle`, qui n'a pas la méthode). Vérifié sur le dépôt réel :
+
+```
+[symbol <compdir>/scenes/*.json( -> [file glob] -> .../scenes/1.json 0
+                                                   .../scenes/2.json 0
+[symbol <root>/pedalier.compositions/*(            .../pedalier.compositions/12 1
+```
+
+La sortie est `<chemin> <isdirectory>` — 0 pour un fichier, 1 pour un dossier, ce qui permet de
+lister les compositions (dossiers) comme les scènes (fichiers).
+
+**Conséquence : aucun index de scènes n'est à écrire.** Ni tableau `scenes` ajouté à
+`composition.json`, ni fusion des scènes en un fichier unique. On énumère à la volée, donc pas de
+redondance à maintenir en cohérence avec les fichiers réellement présents. `composition.json` garde
+sa forme actuelle (`id`, `name`, `banks`). Utiliser `[file splitname]`/`[file splitext]` pour
+retrouver le `sceneId` depuis le nom de fichier.
+
+## 19. « Pêcher » des parties d'une autre composition (anticipé, pas implémenté)
+
+Intention annoncée par Patrice le 2026-07-21, à construire en fin de niveau composition : pouvoir
+**aller chercher des parties d'une composition existante pour les injecter dans le projet en cours**
+(une scène, un ensemble de scènes, ou du matériel).
+
+Ce n'est pas seulement une fonctionnalité future — ça contraint une décision présente :
+
+- Un `clipRef` est résolu **relativement au `clips/` de la composition ouverte** (`composition-io`
+  sort ce dossier sur son outlet 2). Une scène importée référence donc des clips qui n'existent pas
+  dans la composition d'accueil.
+- **Rien ne garantit l'unicité des noms de clips entre compositions** — `clip_A` peut exister dans
+  les deux, avec des contenus différents. Une copie naïve écraserait ou détournerait silencieusement.
+
+Deux directions possibles, à trancher avant d'écrire l'import : **copier les clips référencés** dans
+le pool d'accueil en renommant en cas de collision (`[file copy]` existe en vanilla, et la scène
+importée doit alors être réécrite avec les nouveaux noms) ; ou **rendre les identifiants de clips
+globalement uniques** dès l'enregistrement (horodatage, comme l'ancienne convention
+`clip_<timestamp>` déjà vue dans le dépôt), auquel cas la copie est sans risque et la référence
+reste valable telle quelle.
+
+La seconde est plus simple à l'import et coûte peu à l'enregistrement — mais elle rend les noms
+illisibles à l'œil, contrairement aux `clip_A`/`clip_B` actuels. À trancher avec le recorder.

@@ -347,8 +347,9 @@ resynchroniser cette copie** — les deux dossiers ne sont pas liés automatique
 Pd/pdlua avant résolution de méthode personnalisée, sans message d'erreur clair sur la cause) —
 renommé `clearBuilder`, cohérent avec `writeBuilder`.
 
-**Instanciation** : `[clip-io <clipsDir>(` — `\$1` s'substitue dans deux `makefilename` internes
-pour construire `<clipsDir>/<clipId>.mid` et `<clipsDir>/<clipId>.json`.
+**Instanciation (v3, 2026-07-19) : `[clip-io]`, sans argument.** Le dossier des clips est
+maintenant un **état runtime**, plus un argument de création — voir « v3 » ci-dessous pour la
+raison et le détail. `[clip-io <clipsDir>(` (le `\$1` d'origine) n'existe plus.
 
 **Simplification assumée** : un clip est **mono-piste** (SMF track 0 unique) — contrairement aux
 compos existantes (SMF1, une piste par sirène), un clip ne porte qu'une ligne, donc pas besoin de la
@@ -363,6 +364,7 @@ structure multi-piste. Le nom de piste est posé via `meta 3 <clipId>` (Sequence
 | `stop <lengthTicks> <lengthBars> <isReference 0\|1>` | Complète les métadonnées, `pdjson writeBuilder` vers le `.json` mémorisé, `flush` le `.mid` (End-of-Track automatique), bang sur l'outlet status |
 | `read <clipId>` | Ouvre `<clipId>.mid` en lecture + charge `<clipId>.json` — ne sort rien tant que `dump` n'est pas envoyé (même convention que `pdjson` seul) ; `midifile` sort spontanément le format/nb de pistes/résolution sur son outlet status à l'ouverture |
 | `dump` | Sort les métadonnées (outlet 0, depuis `pdjson dump`) et les notes consolidées note-on+off avec durée (outlet 1, depuis `midifile dump_notes`) |
+| `dir <chemin>` | **(v3)** Change le dossier des clips utilisé par `record`/`read`. Défaut `.` (dossier du patch appelant) tant qu'aucun `dir` n'a été envoyé. |
 
 **Outlets** (ordre réel côté appelant, vérifié — déterminé par la position X des `[outlet]` dans le
 patch, pas par l'ordre d'écriture, cf. bug §3 ci-dessus) : **0 = métadonnées** (pdjson), **1 =
@@ -375,6 +377,70 @@ exprès : `midifile` exige le `float` (delta) *avant* la liste d'événement (§
 de déclenchement naturel de `[unpack f f f f]` en Pd est droite-à-gauche — mettre `deltaTicks` en
 dernier atome le fait sortir en PREMIER de `unpack`, dans le bon ordre, sans `trigger` supplémentaire
 pour ce sous-chemin précis. Documenté aussi en commentaire dans le patch lui-même.
+
+### v3 (2026-07-19) — le dossier des clips devient un état runtime, pas un argument
+
+**Problème de fond identifié par Patrice**, en repérant `clip-io \$0` (mal typé — `\$0` est un
+entier, pas un chemin) dans `pedalier.pd` : ce n'était pas juste une coquille, mais un défaut de
+conception plus profond. Fixer `<clipsDir>` dans les arguments de création (`\$1`) suppose que le
+dossier est connu au moment où l'abstraction est instanciée — or il ne peut pas l'être si on veut
+garder le patch **portable** (chemin relatif au patch, pas absolu, cf. règle générale « pas de
+chemin absolu ») *et* que le dossier puisse varier en cours d'exécution (plusieurs sirènes/scènes
+enregistrant dans des sous-dossiers différents, par exemple) : créer dynamiquement une nouvelle
+instance d'abstraction par dossier n'est pas raisonnable.
+
+**Solution retenue** : le dossier des clips devient un **message runtime** (`dir <chemin>`) plutôt
+qu'un argument de création. Défaut `.` (résolu par rapport au dossier du patch appelant, cohérent
+avec `midifile`/`pdjson`, cf. `_canvaspath` plus haut), appliqué au chargement via `loadbang`.
+`record`/`read` demandent le dossier courant à un aller-retour `send $0.reqdir` /
+`receive $0.clipdir` avant de construire le chemin final.
+
+**Construction du chemin — trois mécanismes essayés, un retenu**, suite à une préférence explicite
+de Patrice pour éviter les externals quand un message suffit :
+
+1. `makefilename` (rejeté) — un seul spécificateur `%s` runtime supporté ; le format `%s/%s.mid`
+   avec deux valeurs runtime (dossier + id) donne `error: invalid format string ... too many
+   format specifiers`. Ne convient que si l'un des deux segments est fixé à la création (ce qui
+   est précisément ce qu'on abandonne).
+2. `pack`/`makesymbol` (rejeté) — fonctionnel, mais chaque inlet froid typé `s` exige un
+   enrobage explicite `"symbol X"` (vérifié via le patch d'aide officiel de `pack`), ce que
+   Patrice préfère éviter pour simplifier le patching.
+3. **`[list prepend]` + boîte de message à substitution `$` (retenu)** — `[list prepend]` (sans
+   arguments) accepte des valeurs brutes sur son inlet froid, pas d'enrobage symbole nécessaire ;
+   la liste `[dossier clipId]` résultante alimente une boîte `[$1/$2.mid(` qui fait la
+   concaténation par substitution de position, sans aucun external. C'est la méthode adoptée pour
+   les deux chemins (`.mid` et `.json`) dans `record` et `read`.
+
+**Nouveaux pièges trouvés en la mettant en place** (aucun visible par relecture statique, tous
+confirmés par test réel dans Pd — voir la règle générale sur le test réel) :
+
+- **`pack`/`list prepend` ont des rôles chaud/froid inversés.** Migrer un design de l'un à l'autre
+  oblige aussi à inverser l'ordre de déclenchement du `trigger` en amont : `[t b s]` (correct pour
+  `pack`, froid=dossier déjà posé, chaud=id déclenche) devient `[t s b]` pour `list prepend`
+  (chaud=id déclenche, mais le froid=dossier doit être posé **avant**, donc sortir en dernier du
+  trigger). Repéré en observant un message d'erreur trompeur (« argument number out of range » sur
+  la boîte `$1/$2`) alors que la sortie de `list prepend`, vérifiée isolément via `print`, était
+  correcte.
+- **`[t s s s s]` tronque une liste multi-atomes au premier élément.** La paire
+  `[dossier clipId]` sortant de `list prepend` perdait `clipId` en traversant ce trigger — les
+  types `s`/`f` d'un trigger convertissent en valeur unique, pas en liste. Fixé en passant à
+  `[t a a a a]` partout où une liste complète doit survivre à la traversée d'un trigger (déjà noté
+  comme règle générale, confirmé concrètement ici).
+- **Le résultat d'une boîte à substitution `$` sur un seul atome peut rester un message
+  « générique »**, pas un vrai message `symbol` — casse en arrivant sur l'inlet froid strict de
+  `[symbol]` dans le sous-patch `stop` (`error: inlet: expected 'symbol' but got
+  './defclip.json'`), alors que le même mécanisme fonctionnait sans problème pour le chemin `.mid`
+  (qui alimente l'inlet chaud, permissif, de `pack` côté `midifile`). Fixé en insérant
+  `[list prepend symbol] -> [list trim]` juste avant `send $0.jsonpath` dans `record`. Pas
+  nécessaire côté `read` (le chemin `.json` y passe par le dispatch générique de `pdjson` via
+  `[list prepend read]`, pas par un inlet strict).
+
+**Revérifié intégralement** (2026-07-19, headless `pd -nogui`) : cycle par défaut (`.`) et cycle
+avec `dir` explicite (dossier alternatif) — les deux produisent des fichiers `.mid`/`.json`
+corrects au bon endroit, zéro erreur dans les deux cas. `pedalier.pd` mis à jour (`clip-io \$0` →
+`clip-io`, argument obsolète retiré) et `clip-io-help.pd` mis à jour (`clip-io clip-io-demo` →
+`clip-io` nu + `loadbang`/`dir clip-io-demo` pour préserver le comportement « les étapes 4/5
+marchent seules » sans dépendre d'un argument de création).
 
 **Ce que ce patch ne fait PAS (hors périmètre, à construire séparément)** :
 - Le pool de clips / la table des scènes à 7 cellules / l'arbitrage `source` (§3, `SCENES_SPEC.md
@@ -393,3 +459,26 @@ pour ce sous-chemin précis. Documenté aussi en commentaire dans le patch lui-m
   problème de stockage, à traiter séparément.
 - Le grand nettoyage du patch existant (`SCENES_SPEC.md §13`) — ce doc prépare le terrain du
   nouveau patch, il ne dit pas quoi supprimer de l'ancien.
+
+## Ajouts à `pdjson` — `pushArray` et `setB`
+
+Le tableau de l'API en §1 est incomplet ; deux méthodes du constructeur s'y sont ajoutées depuis.
+Toutes deux sont documentées dans `pdjson-help.pd` (sections dédiées, en bas du patch).
+
+| Message | Effet |
+|---|---|
+| `pushArray <clé>` | Ajoute un **nouvel** objet vide au tableau à cette clé et y descend le curseur. `push` seul redescend dans *le même* objet à chaque appel — il ne peut donc pas construire une liste d'éléments distincts. `pop` referme l'élément, prêt pour le suivant. |
+| `setB <chemin...> <valeur>` | Comme `set`, mais sur le **builder** au lieu de `json_data`. Crée les tables intermédiaires ; un élément de chemin numérique est un index de tableau 0-based (donc `scenes 0` puis `scenes 1` construisent un tableau à deux éléments). |
+
+**Pourquoi `setB` compte** : `<clé...> <valeur>` est *exactement* la forme que `dump` émet. Le dump
+d'un fichier peut donc être réinjecté tel quel dans le builder, ligne par ligne, sans être retraduit
+en séquence `push`/`add` côté patch — ce qui aurait demandé un analyseur de chemin à profondeur
+variable (`tempo 120` = 2 atomes, `harmony voicing 0 degree 0` = 5). C'est ce qui rend l'agrégation
+de N fichiers de scènes en un seul `scenesList` tenable en Pd.
+
+Contrairement à `set`, `setB` **ne fait pas de `deepcopy`** : appelé une fois par ligne de dump, soit
+des centaines de fois par payload, copier l'arbre entier à chaque appel serait ruineux.
+
+**Attention au déploiement** : Pd charge `~/Documents/Pd/externals/pdjson/` (chemin par défaut), pas
+la copie git de `~/repo/pd-externals/critapec/pdjson/`. Les deux doivent être synchronisées à la
+main après chaque modification — sinon le patch tourne sur une version périmée sans le dire.
