@@ -46,7 +46,7 @@ différents — S3 en `play` dans « montée », en `mute` dans « creux », un 
 |---|---|---|---|---|
 | **play** | oui | oui | tourne | lecture normale, en boucle |
 | **stop** | non | remise au début | *à confirmer* | **pas de gel sur place** (fonction repoussée) ; la boucle repart de zéro au prochain lancement |
-| **mute** | non (ghost) | continue d'avancer | ralenti quasi-nul | ghost notes : chaque note on sort en vélocité 1, ce qui **ralentit le moteur vers une vitesse presque nulle** → silence ; le clip continue d'avancer pour rester en phase, l'unmute a une **latence de remontée en vitesse** (spin-up) |
+| **mute** | non | continue d'avancer | parqué (ghost note) | le clip avance en interne (phase) mais **n'émet plus de notes** ; une ghost note à la limite basse de l'ambitus parque le moteur (voir §3bis). Unmute = latence de spin-up |
 | **solo** | oui | oui | tourne | **réduit au silence les autres sirènes** ; solo classique |
 | **oneshot** | oui, une fois | non | tourne puis s'arrête | passe une fois, puis état « joué » |
 
@@ -60,28 +60,44 @@ vitesse au retour. Donc :
 - cette durée est une information que **l'écran** doit porter (les LEDs ne rendent pas le transitoire) ;
 - elle se lit déjà dans les RPM (`revolutionCount`) que le patch envoie.
 
-**Tranché pour `mute` (2026-07-22) : *ghost notes*.** Une ghost note est une note on de **vélocité 1**
-(0 restant le note off, convention PureData). Envoyée à une sirène, elle **ralentit son moteur vers
-une vitesse presque nulle** — la sirène s'immobilise en douceur et se tait. En `mute`,
-`siren-clip-loader` laisse le clip continuer d'avancer (pour rester en phase avec la mainloop) mais
-remplace la vélocité de chaque note on par 1 : plus aucune note n'est audible et le rotor reste
-proche du repos. L'unmute a donc une **latence de remontée en vitesse** (spin-up) — ce n'est pas un
-retour instantané.
+Reste `stop` : son comportement moteur n'est pas encore tranché.
 
-**Pourquoi la ghost note plutôt qu'un `reset`.** L'alternative pour immobiliser une sirène est de lui
-envoyer `reset`, mais `reset` **réinitialise aussi tous les contrôleurs** (vibrato, trémolo,
-enveloppe…). La ghost note amène le moteur au repos **sans toucher aux contrôleurs**, qui restent
-prêts pour la reprise.
+## 3bis. La ghost note — primitive de positionnement du moteur
+
+**Concept fondamental des sirènes, réutilisé pour plusieurs choses** (mute, démarrage de clip,
+sortie de mute, rotation…). À ne pas traiter comme un détail du mode `mute`.
+
+Une **ghost note** est une note on de **vélocité 1** (0 restant le note off, convention PureData).
+Sa propriété centrale : elle **positionne le moteur immédiatement, sans portamento** — la sirène
+saute à la vitesse cible au lieu d'y glisser. Deux usages symétriques :
+
+- **Parquer** : une ghost note à une hauteur très basse ramène le moteur vers une vitesse presque
+  nulle. **Immédiat** (contrairement à un note off, qui laisse le rotor traîner) et **sans
+  réinitialiser les contrôleurs** (contrairement à un `reset`, qui remet à zéro vibrato, trémolo,
+  enveloppe…). C'est ce qui la rend préférable aux deux alternatives pour immobiliser une sirène.
+- **Relancer** : une ghost note à une hauteur cible amène le moteur à cette vitesse instantanément —
+  pour pré-positionner le rotor au démarrage d'un clip, à la sortie du mute, ou pour la rotation,
+  avant que les vraies notes (avec portamento) prennent le relais.
+
+**Hauteur de parking = la limite basse de l'ambitus, pas zéro absolu.** On lit `notemin` de la
+sirène dans `sirenspec` (`text define $0sirenspec` dans `pd sirenspec`, champs `notemin`/`notemax`
+par sirène S1–S7) et on parque à cette limite — assez bas pour être silencieux, mais assez haut pour
+que **le retour à la bonne note soit le plus rapide possible**. Parquer à zéro rallongerait le
+spin-up inutilement.
 
 PD transmet la vélocité 1 telle quelle — c'est `composeSiren`, côté sirène, qui l'interprète comme
-la commande de ralentissement. PD reste routeur.
+une commande de positionnement sans portamento. PD reste routeur.
 
 Prérequis réglé côté décodage (`midi-status-decode`) : le **note off** (status 8) sort désormais en
-vélocité 0 (il sortait avec la vélocité brute du fichier, indistinguable d'un note on ; vélocité 0
-sur note off est la convention PureData). Les trois cas se distinguent ainsi nettement — note on
-(vél 1-127), ghost (vél 1), note off (vél 0).
+vélocité 0 (il sortait avec la vélocité brute du fichier, indistinguable d'un note on). Les trois cas
+se distinguent ainsi nettement — note on (vél 1-127), ghost (vél 1), note off (vél 0).
 
-Reste `stop` : son comportement moteur n'est pas encore tranché.
+**État d'implémentation (2026-07-22)** : le décodage note off→0 est fait. Le mode `mute` a d'abord
+été implémenté **à tort** en ghostifiant les hauteurs du clip (chaque note on à vél 1) — ce qui
+jouait la mélodie sans portamento au lieu de parquer. À refaire : `mute` doit **couper la sortie de
+notes du clip** (le clip continue d'avancer pour la phase) et **émettre une seule ghost note à
+`notemin`** pour parquer le moteur. La primitive « relancer » (pré-positionnement au démarrage) reste
+à construire.
 
 ## 4. Navigation / lecture
 
