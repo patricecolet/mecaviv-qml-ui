@@ -46,7 +46,7 @@ différents — S3 en `play` dans « montée », en `mute` dans « creux », un 
 |---|---|---|---|---|
 | **play** | oui | oui | tourne | lecture normale, en boucle |
 | **stop** | non | remise au début | *à confirmer* | **pas de gel sur place** (fonction repoussée) ; la boucle repart de zéro au prochain lancement |
-| **mute** | non | continue d'avancer | *à confirmer* | la position tourne en silence → retour synchro à l'unmute |
+| **mute** | non (ghost) | continue d'avancer | tourne | ghost notes : le clip avance, chaque note on sort en vélocité 1 → le rotor tourne sans son, retour synchro et **sans latence** à l'unmute |
 | **solo** | oui | oui | tourne | **réduit au silence les autres sirènes** ; solo classique |
 | **oneshot** | oui, une fois | non | tourne puis s'arrête | passe une fois, puis état « joué » |
 
@@ -60,9 +60,19 @@ vitesse au retour. Donc :
 - cette durée est une information que **l'écran** doit porter (les LEDs ne rendent pas le transitoire) ;
 - elle se lit déjà dans les RPM (`revolutionCount`) que le patch envoie.
 
-**À définir** : pour `stop` et `mute`, le moteur s'arrête-t-il aussi (silence = moteur coupé) ou
-reste-t-il en rotation à vide ? La réponse décide si ces modes ont une latence de reprise. Colonne
-« Moteur » à compléter.
+**Tranché pour `mute` (2026-07-22) : rotation à vide, via *ghost notes*.** Une ghost note est une
+note on de **vélocité 1** (0 restant le note off). En `mute`, `siren-clip-loader` laisse le clip
+avancer normalement mais remplace la vélocité de chaque note on par 1 : le moteur tient sa vitesse,
+aucun son n'est produit, et l'unmute reprend **sans latence** puisque le rotor n'a jamais décéléré.
+PD transmet la vélocité 1 telle quelle — c'est `composeSiren`, côté sirène, qui l'interprète comme
+« moteur oui, son non ». PD reste routeur.
+
+Deux prérequis ont été réglés côté décodage (`midi-status-decode`) : le **note off** (status 8) sort
+désormais en vélocité 0 (il sortait avec la vélocité brute du fichier, indistinguable d'un note on),
+si bien que les trois cas se distinguent nettement en sortie — note on (vél 1-127), ghost (vél 1),
+note off (vél 0).
+
+Reste `stop` : son comportement moteur n'est pas encore tranché.
 
 ## 4. Navigation / lecture
 
