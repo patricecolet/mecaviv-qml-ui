@@ -417,5 +417,17 @@ globalement uniques** dès l'enregistrement (horodatage, comme l'ancienne conven
 `clip_<timestamp>` déjà vue dans le dépôt), auquel cas la copie est sans risque et la référence
 reste valable telle quelle.
 
-La seconde est plus simple à l'import et coûte peu à l'enregistrement — mais elle rend les noms
-illisibles à l'œil, contrairement aux `clip_A`/`clip_B` actuels. À trancher avec le recorder.
+**Tranché le 2026-07-21, et implémenté** (`composition-io`, message `fetch`) :
+
+- **On pêche un clip, pas une scène.** `fetch <compoSrc> <sceneSrc> <sirène>` va chercher le clip
+  posé sur cette sirène dans une scène d'une autre composition.
+- **Il se pose sur la sirène correspondante**, jamais sur une autre : un clip enregistré sur S3 l'a
+  été dans l'ambitus de S3, le déplacer le ferait sonner faux. Un seul index de sirène suffit donc
+  au message.
+- **Copie dans le pool d'accueil, renommage seulement en cas de collision**, avec un suffixe égal à
+  l'id de la composition source (`clip_A` venu de la compo 7 → `clip_A-7`). Déterministe et
+  traçable, et repêcher le même clip ne le duplique pas puisqu'il retombe sur le même nom.
+- Le clip arrive en `mode: play`.
+
+La composition d'accueil reste donc autonome et transportable, et les noms restent lisibles tant
+qu'il n'y a pas de conflit.
