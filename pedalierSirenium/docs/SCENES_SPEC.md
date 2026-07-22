@@ -92,12 +92,24 @@ Prérequis réglé côté décodage (`midi-status-decode`) : le **note off** (st
 vélocité 0 (il sortait avec la vélocité brute du fichier, indistinguable d'un note on). Les trois cas
 se distinguent ainsi nettement — note on (vél 1-127), ghost (vél 1), note off (vél 0).
 
-**État d'implémentation (2026-07-22)** : le décodage note off→0 est fait. Le mode `mute` a d'abord
-été implémenté **à tort** en ghostifiant les hauteurs du clip (chaque note on à vél 1) — ce qui
-jouait la mélodie sans portamento au lieu de parquer. À refaire : `mute` doit **couper la sortie de
-notes du clip** (le clip continue d'avancer pour la phase) et **émettre une seule ghost note à
-`notemin`** pour parquer le moteur. La primitive « relancer » (pré-positionnement au démarrage) reste
-à construire.
+**État d'implémentation (2026-07-22)** : décodage note off→0 fait. `mute` **corrigé** : la sortie de
+notes du clip est coupée par un gate (le clip continue d'avancer pour la phase) et une **seule ghost
+note à `notemin`** (vél 1, sur la voix de la sirène) parque le moteur à l'entrée en mute. Vérifié :
+scène en `mute` → une seule `note 43 1 <voix>`, plus aucune note du clip.
+
+`notemin` est **lu au runtime dans `sirenspec`** (pas d'argument codé en dur) : `siren-clip-loader`
+construit le libellé `S<index+1>` (`makefilename S%d`) et interroge le buffer du parent via
+`text search $3sirenspec 0 1` avec le message `list S<n> notemin`, puis `text get` pour extraire la
+valeur. Ainsi une modification de `sirenspec` est prise en compte sans toucher au patch.
+
+**Syntaxe `text search` (piège vérifié)** : l'objet s'initialise avec les **numéros de colonnes** où
+il cherche (`text search <buf> 0 1` = colonnes 0 et 1), et on lui envoie les valeurs à trouver **sous
+forme de liste** (`list S3 notemin`, pas un message générique `S3 notemin` — sinon « no method for
+S3 »). Il sort le **numéro de ligne** de la première occurrence, ou **-1** si rien ne correspond ;
+`text get` récupère alors la ligne.
+
+Reste à construire, primitive « relancer » : pré-positionner le moteur à la hauteur cible (ghost note)
+au démarrage d'un clip et à la sortie du mute, avant les vraies notes à portamento.
 
 ## 4. Navigation / lecture
 
