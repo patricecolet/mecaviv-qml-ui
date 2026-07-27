@@ -1,7 +1,11 @@
 #!/bin/bash
 
 # Liste des noms de devices rtpmidid à connecter
-RTPMIDI_NAMES=("PEDALIER_SIRENIUM" "SIRENIUM" "La_Petite_Boite" "La_Grosse_Boite" "PEDALE_BOSS")
+# Devices RTP écoutés par Pure Data (leur MIDI entre sur IN 1)
+RTPMIDI_IN=("PEDALIER_SIRENIUM" "SIRENIUM" "La_Petite_Boite" "La_Grosse_Boite" "PEDALE_BOSS")
+# Devices qui reçoivent le MIDI de Pure Data (OUT 1). CB4Tech Studio2 est une
+# sortie seule : Pure Data lui envoie, il ne lui renvoie rien.
+RTPMIDI_OUT=("${RTPMIDI_IN[@]}" "CB4Tech Studio2")
 
 echo "Attente de Pure Data et rtpmidid..."
 while ! aconnect -l | grep -q "Pure Data"; do sleep 1; done
@@ -68,7 +72,7 @@ done
 # PHASE 2: Connexions rtpmidid vers Pure Data IN 1
 # Tous les devices RTP arrivent sur la même entrée, celle que lit le patch.
 echo "=== CONNEXIONS RTPMIDID VERS PURE DATA ==="
-for NAME in "${RTPMIDI_NAMES[@]}"; do
+for NAME in "${RTPMIDI_IN[@]}"; do
     # Chercher le port dans le fichier temporaire
     PORTNUM=$(grep ":$NAME$" "$TEMP_FILE" | cut -d: -f1)
     if [ -n "$PORTNUM" ]; then
@@ -85,7 +89,7 @@ done
 
 # PHASE 3: Connexions directes Pure Data OUT 1 vers rtpmidid
 echo "=== CONNEXIONS DIRECTES PURE DATA VERS RTPMIDID ==="
-for NAME in "${RTPMIDI_NAMES[@]}"; do
+for NAME in "${RTPMIDI_OUT[@]}"; do
     # Chercher le port dans le fichier temporaire
     PORTNUM=$(grep ":$NAME$" "$TEMP_FILE" | cut -d: -f1)
     if [ -n "$PORTNUM" ]; then
