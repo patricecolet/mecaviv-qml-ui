@@ -1,0 +1,13 @@
+[Unit]
+Description=Pédalier — serveur web (en-têtes COOP/COEP pour Qt WASM)
+PartOf=pedalier.target
+
+[Service]
+EnvironmentFile=%h/.config/pedalier/env
+WorkingDirectory=@PEDALIER_REPO@/pedalierSirenium/webfiles
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=pedalier.target

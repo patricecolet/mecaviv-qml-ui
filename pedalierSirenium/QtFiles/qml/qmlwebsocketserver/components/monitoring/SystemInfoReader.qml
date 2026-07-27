@@ -7,7 +7,10 @@ Item {
     property var logger
     property var currentSystemInfo: ({})
     property bool isReading: false
-    property string serverUrl: "http://192.168.1.21:8010"  // IP du Raspberry Pi
+    // Vide = URL relative, résolue sur l'origine de la page : le serveur qui sert
+    // l'application est aussi celui qui expose /api/system-info. Ne jamais remettre
+    // une IP en dur ici, elle serait compilée dans le wasm.
+    property string serverUrl: ""
     
     signal systemInfoReceived(var data)
     

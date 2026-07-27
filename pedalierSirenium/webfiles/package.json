@@ -1,6 +1,13 @@
 {
+  "name": "pedalier-sirenium-webfiles",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serveur de développement et de production du pédalier Sirenium (en-têtes COOP/COEP pour Qt WASM, logs navigateur, infos système)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "express": "^5.1.0",
-    "ws": "^8.18.3"
+    "express": "^5.1.0"
   }
 }

@@ -1,0 +1,18 @@
+# Paquets nécessaires au fonctionnement du pédalier.
+# Un par ligne, commentaires et lignes vides ignorés.
+# Installés avec `apt-get install -y`, JAMAIS `upgrade`.
+
+git
+rsync
+curl
+wget
+jq
+alsa-utils
+nodejs
+chromium-browser
+wvkbd
+# Pd 0.53 de Debian : on ne s'en sert pas au runtime (le pédalier tourne sur le
+# 0.55 compilé dans /usr/local) mais pd-lua en dépend, d'où sa présence + le hold.
+puredata
+pd-lua
+puredata-dev

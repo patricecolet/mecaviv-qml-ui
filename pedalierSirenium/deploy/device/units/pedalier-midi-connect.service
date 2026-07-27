@@ -1,0 +1,15 @@
+[Unit]
+Description=Pédalier — câblage des ports ALSA (rtpmidid → Pure Data)
+PartOf=pedalier.target
+After=pedalier-pd.service pedalier-rtpmidid.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=%h/.config/pedalier/env
+# Le script attend lui-même l'apparition des clients ALSA (aconnect -l).
+ExecStart=@PEDALIER_REPO@/pedalierSirenium/scripts/rtpmidi_connect_async.sh
+TimeoutStartSec=120
+
+[Install]
+WantedBy=pedalier.target

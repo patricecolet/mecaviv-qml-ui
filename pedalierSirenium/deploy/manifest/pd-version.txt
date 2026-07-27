@@ -1,0 +1,8 @@
+# Version de Pure Data compilée dans /usr/local (le 0.53.1 de Debian reste en
+# /usr/bin/pd comme repli). Changer cette valeur suffit à déclencher un rebuild
+# de Pd puis des externals.
+#
+# À ne pas confondre avec le chargement de pdjson : aucune version testée (0.53
+# comme 0.55) ne cherche <nom>/<nom>.pd_lua, c'est le lien à plat posé par la
+# phase externals qui le débloque, pas cette mise à jour.
+0.55-2

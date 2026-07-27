@@ -1,0 +1,12 @@
+[Unit]
+Description=Pédalier — démon RTP-MIDI (rtpmidid)
+PartOf=pedalier.target
+Before=pedalier-pd.service
+
+[Service]
+ExecStart=/usr/local/bin/rtpmidid
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=pedalier.target

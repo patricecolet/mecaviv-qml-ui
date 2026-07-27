@@ -1,0 +1,16 @@
+[Unit]
+Description=Pédalier — moteur Pure Data
+PartOf=pedalier.target
+After=pedalier-rtpmidid.service
+
+[Service]
+EnvironmentFile=%h/.config/pedalier/env
+# Le répertoire de travail EST une dépendance : les `declare -path ../…` de
+# pedalier.pd sont relatifs au dossier du patch.
+WorkingDirectory=@PD_REPO@/examples
+ExecStart=@PD_BIN@ -nogui -stderr @PD_PATCH@
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=pedalier.target

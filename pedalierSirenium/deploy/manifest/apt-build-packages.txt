@@ -1,0 +1,20 @@
+# Dépendances de compilation : Pure Data et les externals.
+# Installées seulement quand la phase pd-build ou externals a du travail.
+
+build-essential
+automake
+autoconf
+autoconf-archive
+libtool
+gettext
+libasound2-dev
+libfftw3-dev
+# tcl/tk : Pd ne compile pas sa GUI sans, même si on le lance en -nogui.
+tcl-dev
+tk-dev
+# rtpmidid
+cmake
+ninja-build
+pkg-config
+libavahi-client-dev
+libfmt-dev

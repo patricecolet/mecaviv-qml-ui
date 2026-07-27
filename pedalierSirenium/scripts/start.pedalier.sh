@@ -1,31 +1,11 @@
 #!/bin/sh
-export DISPLAY=:0
-sleep 10
-/usr/local/bin/reaper &
-sleep 3
-cd /home/sirenateur/dev/src/mecaviv/puredata-abstractions/examples
-pd -nogui MidiToSiren.pd &
-sleep 3
-
-# Lancer rtpmidid avant le serveur web et Firefox, avec log
-/usr/local/bin/rtpmidid > /tmp/rtpmidid.log 2>&1 &
-sleep 3
-
-# Lancer le script de connexion MIDI non-bloquant
-/home/sirenateur/dev/src/mecaviv/patko-scratchpad/qtQmlSockets/pedalierSirenium/scripts/rtpmidi_connect_async.sh &
-sleep 2
-
-cd /home/sirenateur/dev/src/mecaviv/patko-scratchpad/qtQmlSockets/pedalierSirenium/webfiles/
-node server.js &
-sleep 3
-#firefox -kiosk -url http://localhost:8010/qmlwebsocketserver.html &
-chromium-browser --kiosk --disable-web-security --user-data-dir=/tmp/chrome-kiosk http://localhost:8010/qmlwebsocketserver.html &
-sleep 5
-# clavier virtuel
-wvkbd-mobintl &
-
-
-
-
-
-
+# Déprécié. Le démarrage passe désormais par systemd --user, installé par
+# deploy/pedalier-ctl.sh (units pedalier-*.service + pedalier.target), et le
+# kiosque par ~/.config/autostart/pedalier-kiosk.desktop.
+#
+#   pedalier-ctl.sh start | stop | restart | status
+#
+# Ce fichier ne lance plus rien : ses chemins absolus pointaient vers une
+# arborescence qui n'existe plus (patko-scratchpad/qtQmlSockets).
+echo "start.pedalier.sh est déprécié — utiliser : pedalier-ctl.sh start" >&2
+exit 1
