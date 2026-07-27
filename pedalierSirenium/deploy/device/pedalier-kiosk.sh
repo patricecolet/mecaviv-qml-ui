@@ -44,7 +44,11 @@ fi
 
 CHROME_FLAGS=(
     --kiosk
-    --user-data-dir=/tmp/chrome-kiosk
+    # Profil persistant : dans /tmp il était effacé à chaque démarrage, donc
+    # toute autorisation accordée était redemandée au redémarrage suivant.
+    --user-data-dir="$HOME/.local/share/pedalier/chrome-kiosk"
+    # Le cache, lui, reste dans /tmp et repart propre à chaque boot : c'est ce
+    # qui évite qu'un ancien wasm soit resservi après un déploiement.
     --disk-cache-dir=/tmp/chrome-kiosk-cache
     --noerrdialogs
     --disable-infobars
