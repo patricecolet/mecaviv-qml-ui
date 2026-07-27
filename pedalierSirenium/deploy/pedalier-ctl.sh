@@ -628,8 +628,31 @@ render_unit() {
         "$1"
 }
 
+# L'ancien démarrage (crontab @reboot + cron de recâblage toutes les 5 s) doit
+# partir en même temps que le nouveau arrive : les deux en parallèle, ce sont
+# deux Pure Data et deux rtpmidid qui pilotent les mêmes sirènes.
+retire_legacy_cron() {
+    local current; current=$(crontab -l 2>/dev/null)
+    [ -z "$current" ] && return 0
+    local cleaned; cleaned=$(printf '%s\n' "$current" | grep -v -e 'start\.pedalier\.sh' -e 'rtpmidi_connect')
+    if [ "$cleaned" = "$current" ]; then
+        skip "ancien démarrage par cron (déjà retiré)"
+        return 0
+    fi
+    if [ "$DRY_RUN" = true ]; then
+        printf '%s  [simulation] retrait des lignes crontab de l'\''ancien démarrage :%s\n' "$C_DIM" "$C_RESET"
+        printf '%s\n' "$current" | grep -e 'start\.pedalier\.sh' -e 'rtpmidi_connect' | sed 's/^/    /'
+        return 0
+    fi
+    mkdir -p "$PEDALIER_DATA/legacy"
+    printf '%s\n' "$current" > "$PEDALIER_DATA/legacy/crontab.$(date +%Y%m%d-%H%M%S)"
+    printf '%s\n' "$cleaned" | crontab -
+    ok "ancien démarrage par cron retiré (sauvegarde dans $PEDALIER_DATA/legacy/)"
+}
+
 phase_autostart() {
     phase "Démarrage automatique"
+    retire_legacy_cron
 
     # La configuration est écrite une fois puis respectée : une valeur modifiée à
     # la main sur la machine ne doit pas disparaître à la mise à jour suivante.
@@ -879,6 +902,20 @@ cmd_doctor() {
     fi
     loginctl show-user "$USER" -p Linger --value 2>/dev/null | grep -q yes && ok "linger activé" || err "linger désactivé (rien ne démarrera au boot)"
     [ -f "$AUTOSTART_FILE" ] && ok "kiosque au démarrage de session" || err "kiosque non configuré"
+
+    # Deux moteurs qui pilotent les mêmes sirènes, c'est la panne la plus
+    # difficile à lire : le symptôme est une sirène qui oscille, pas un message.
+    local n_pd n_rtp
+    n_pd=$(pgrep -cf "pd -nogui.*$PD_PATCH")
+    n_rtp=$(pgrep -cx rtpmidid)
+    [ "${n_pd:-0}" -le 1 ] && ok "un seul Pure Data" || err "$n_pd Pure Data en parallèle — ils pilotent les mêmes sirènes"
+    [ "${n_rtp:-0}" -le 1 ] && ok "un seul rtpmidid" || err "$n_rtp rtpmidid en parallèle"
+    if crontab -l 2>/dev/null | grep -qe 'start\.pedalier\.sh' -e 'rtpmidi_connect'; then
+        err "l'ancien démarrage traîne encore dans la crontab (pedalier-ctl autostart le retire)"
+        crontab -l 2>/dev/null | grep -e 'start\.pedalier\.sh' -e 'rtpmidi_connect' | sed 's/^/    /'
+    else
+        ok "crontab sans ancien démarrage"
+    fi
 
     log ""
     log "${C_BOLD}Réseau et MIDI${C_RESET}"
