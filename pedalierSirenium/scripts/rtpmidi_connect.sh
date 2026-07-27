@@ -65,14 +65,15 @@ for VIRTNUM in 0 1; do
     fi
 done
 
-# PHASE 2: Connexions rtpmidid vers Pure Data IN 3
+# PHASE 2: Connexions rtpmidid vers Pure Data IN 1
+# Tous les devices RTP arrivent sur la même entrée, celle que lit le patch.
 echo "=== CONNEXIONS RTPMIDID VERS PURE DATA ==="
 for NAME in "${RTPMIDI_NAMES[@]}"; do
     # Chercher le port dans le fichier temporaire
     PORTNUM=$(grep ":$NAME$" "$TEMP_FILE" | cut -d: -f1)
     if [ -n "$PORTNUM" ]; then
-        echo "Connexion ${RTP_CLIENT}:${PORTNUM} ($NAME) -> Pure Data IN 3"
-        if aconnect "${RTP_CLIENT}:${PORTNUM}" "$PD_IN3"; then
+        echo "Connexion ${RTP_CLIENT}:${PORTNUM} ($NAME) -> Pure Data IN 1"
+        if aconnect "${RTP_CLIENT}:${PORTNUM}" "$PD_IN1"; then
             echo "✅ Connexion $NAME réussie"
         else
             echo "❌ Échec connexion $NAME"
@@ -103,7 +104,7 @@ done
 rm "$TEMP_FILE"
 
 echo "=== RÉSUMÉ DES CONNEXIONS ==="
-echo "Connexions actives vers Pure Data IN 3:"
+echo "Connexions actives vers Pure Data IN 1:"
 aconnect -l | awk -v client="$PD_CLIENT" '
     $0 ~ "client "client": .Pure Data" {inclient=1; next}
     inclient && $0 ~ "Pure Data Midi-In 3" {print "  " $0}

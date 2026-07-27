@@ -83,13 +83,14 @@ for VIRTNUM in 0 1; do
     fi
 done
 
-# PHASE 2: Connexions rtpmidid vers Pure Data IN 3
+# PHASE 2: Connexions rtpmidid vers Pure Data IN 1
+# Tous les devices RTP arrivent sur la même entrée, celle que lit le patch.
 echo "=== CONNEXIONS RTPMIDID VERS PURE DATA ==="
 for NAME in "${RTPMIDI_NAMES[@]}"; do
     PORTNUM=$(grep ":$NAME$" "$TEMP_FILE" | cut -d: -f1)
     if [ -n "$PORTNUM" ]; then
-        echo "Connexion ${RTP_CLIENT}:${PORTNUM} ($NAME) -> Pure Data IN 3"
-        if aconnect "${RTP_CLIENT}:${PORTNUM}" "$PD_IN3" 2>/dev/null; then
+        echo "Connexion ${RTP_CLIENT}:${PORTNUM} ($NAME) -> Pure Data IN 1"
+        if aconnect "${RTP_CLIENT}:${PORTNUM}" "$PD_IN1" 2>/dev/null; then
             echo "✅ Connexion $NAME réussie"
         else
             echo "⚠️  Connexion $NAME (peut-être déjà existante)"
