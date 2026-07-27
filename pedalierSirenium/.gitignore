@@ -56,3 +56,5 @@ yarn-error.log*
 # Large binary files (stored on Google Drive)
 # - qmlwebsocketserver.wasm (~36MB)
 # - Téléchargeable depuis Google Drive partagé 
+# Sauvegardes de morceaux rapatriées du pédalier (pedalier-deploy.sh songs pull)
+songs/
