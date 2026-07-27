@@ -47,7 +47,12 @@ PEDALIER_DATA="$HOME/pedalier-data"
 
 WEB_DIR="$PEDALIER_REPO/pedalierSirenium/webfiles"
 SCRIPTS_DIR="$PEDALIER_REPO/pedalierSirenium/scripts"
-UNITS=(pedalier-rtpmidid.service pedalier-pd.service pedalier-node.service pedalier-midi-connect.service)
+# Tout ce qui est installé et activé…
+UNITS=(pedalier-rtpmidid.service pedalier-pd.service pedalier-node.service
+       pedalier-midi-connect.service pedalier-midi-connect.timer)
+# …et parmi ça, ce qui doit tourner en permanence. Le câblage MIDI est un
+# oneshot rejoué par son timer : il est normalement inactif entre deux passages.
+SERVICES=(pedalier-rtpmidid.service pedalier-pd.service pedalier-node.service)
 
 SKIP_PHASES=""
 ONLY_PHASE=""
@@ -231,9 +236,11 @@ ensure_npm() {
     command -v npm >/dev/null 2>&1 && return 0
     info "npm absent — simulation de l'installation avant de décider"
     local sim; sim=$(sudo apt-get install -s npm 2>&1)
-    if printf '%s' "$sim" | grep -qE '^Remv|nodejs.*\(.*=>'; then
+    # Toute ligne Inst/Remv portant sur nodejs lui-même : le paquet npm de Debian
+    # peut vouloir réaligner le runtime, et c'est justement ce qu'on refuse.
+    if printf '%s' "$sim" | grep -qE '^(Inst|Remv) nodejs '; then
         err "apt veut modifier nodejs pour installer npm :"
-        printf '%s\n' "$sim" | grep -E '^(Remv|Inst).*nodejs' >&2
+        printf '%s\n' "$sim" | grep -E '^(Inst|Remv) nodejs ' >&2
         err "installation refusée — utiliser 'pedalier-deploy.sh node-modules' depuis le Mac"
         return 1
     fi
@@ -250,6 +257,20 @@ git_update_repo() {
     local name; name=$(basename "$dir")
 
     if [ ! -d "$dir/.git" ]; then
+        if [ -d "$dir" ] && [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
+            # Le dossier existe déjà sans être un dépôt : typiquement des
+            # artefacts de build poussés avant le premier bootstrap. On y greffe
+            # le dépôt au lieu de refuser, et checkout -f remet les fichiers
+            # suivis dans leur état attendu sans toucher au reste.
+            info "adoption du dossier existant $name ($branch)"
+            run git -C "$dir" init --quiet || return 1
+            git -C "$dir" remote get-url origin >/dev/null 2>&1 \
+                || run git -C "$dir" remote add origin "$url"
+            run git -C "$dir" fetch --quiet origin "$branch" || return 1
+            run git -C "$dir" checkout -f -B "$branch" "origin/$branch" || return 1
+            ok "$name adopté ($(git -C "$dir" rev-parse --short HEAD 2>/dev/null))"
+            return 0
+        fi
         info "clonage de $name ($branch)"
         run mkdir -p "$(dirname "$dir")" || return 1
         run git clone --branch "$branch" "$url" "$dir" || return 1
@@ -307,6 +328,34 @@ protect_song_files() {
         && ok "morceaux protégés de git ($total fichiers en skip-worktree)"
 }
 
+# Les artefacts du build Qt sont versionnés, mais sur la machine c'est le rsync
+# depuis le Mac qui fait foi. Sans skip-worktree, l'arbre serait vu comme sale en
+# permanence et plus aucune mise à jour ne passerait.
+protect_build_artifacts() {
+    local repo="$PEDALIER_REPO"
+    [ -d "$repo/.git" ] || return 0
+    local paths=(
+        pedalierSirenium/webfiles/qmlwebsocketserver.js
+        pedalierSirenium/webfiles/qmlwebsocketserver.html
+        pedalierSirenium/webfiles/qtloader.js
+        pedalierSirenium/webfiles/qtlogo.svg
+        pedalierSirenium/webfiles/config.js
+        pedalierSirenium/webfiles/qmlwebsocketserver
+    )
+    local tracked; tracked=$(git -C "$repo" ls-files -- "${paths[@]}" 2>/dev/null)
+    [ -z "$tracked" ] && return 0
+    local already total
+    already=$(git -C "$repo" ls-files -v -- "${paths[@]}" 2>/dev/null | grep -c '^S')
+    total=$(printf '%s\n' "$tracked" | wc -l | tr -d ' ')
+    if [ "${already:-0}" = "$total" ]; then
+        skip "artefacts de build hors de git ($total fichiers)"
+        return 0
+    fi
+    # shellcheck disable=SC2086
+    run_sh "git -C '$repo' update-index --skip-worktree $(printf '%s\n' "$tracked" | sed "s|^|'|;s|$|'|" | tr '\n' ' ')" \
+        && ok "artefacts de build hors de git ($total fichiers en skip-worktree)"
+}
+
 phase_repos() {
     phase "Dépôts git"
     local url dir branch
@@ -315,6 +364,7 @@ phase_repos() {
         git_update_repo "$url" "$HOME/$dir" "$branch"
     done < <(read_manifest "$MANIFEST_DIR/repos.txt")
     protect_song_files
+    protect_build_artifacts
 }
 
 # ---------------------------------------------------------------------------
@@ -615,10 +665,10 @@ phase_autostart() {
         run sudo loginctl enable-linger "$USER" && ok "linger activé (services au démarrage, sans session)"
     fi
 
-    for unit in "${UNITS[@]}"; do
-        systemctl --user is-enabled "$unit" >/dev/null 2>&1 || run systemctl --user enable "$unit" >/dev/null 2>&1
+    local u
+    for u in "${UNITS[@]}" pedalier.target; do
+        systemctl --user is-enabled "$u" >/dev/null 2>&1 || run systemctl --user enable "$u" >/dev/null 2>&1
     done
-    systemctl --user is-enabled pedalier.target >/dev/null 2>&1 || run systemctl --user enable pedalier.target >/dev/null 2>&1
 
     # Kiosque : autostart XDG, PAS ~/.config/labwc/autostart — un fichier
     # utilisateur y remplacerait l'autostart système (bureau, panneau, et le
@@ -657,7 +707,9 @@ cmd_stop() {
         # systemd : ils tiendraient les ports et empêcheraient le démarrage.
         local killed=0
         pgrep -f "pd -nogui.*$PD_PATCH" >/dev/null && { run pkill -f "pd -nogui.*$PD_PATCH"; killed=1; }
-        pgrep -f "node .*webfiles/server.js" >/dev/null && { run pkill -f "node .*webfiles/server.js"; killed=1; }
+        # Le motif doit attraper aussi bien `node /chemin/webfiles/server.js` que
+        # le `node server.js` lancé à la main depuis webfiles/.
+        pgrep -f "node .*server\.js" >/dev/null && { run pkill -f "node .*server\.js"; killed=1; }
         pgrep -x rtpmidid >/dev/null && { run pkill -x rtpmidid; killed=1; }
         [ "$killed" = 1 ] && ok "processus orphelins arrêtés" || skip "processus orphelins"
         sleep 1
@@ -813,13 +865,18 @@ cmd_doctor() {
     log ""
     log "${C_BOLD}Services${C_RESET}"
     local unit
-    for unit in "${UNITS[@]}"; do
+    for unit in "${SERVICES[@]}"; do
         local active; active=$(uctl is-active "$unit" 2>/dev/null); active=${active:-inconnu}
         case "$active" in
             active) ok "$unit" ;;
             *) err "$unit : $active" ;;
         esac
     done
+    if [ "$(uctl is-active pedalier-midi-connect.timer 2>/dev/null)" = active ]; then
+        ok "câblage MIDI rejoué toutes les 60 s (dernier passage : $(uctl show pedalier-midi-connect.service -p ExecMainExitTimestamp --value 2>/dev/null | cut -d' ' -f2-3))"
+    else
+        err "pedalier-midi-connect.timer inactif — le câblage ne sera pas repris"
+    fi
     loginctl show-user "$USER" -p Linger --value 2>/dev/null | grep -q yes && ok "linger activé" || err "linger désactivé (rien ne démarrera au boot)"
     [ -f "$AUTOSTART_FILE" ] && ok "kiosque au démarrage de session" || err "kiosque non configuré"
 

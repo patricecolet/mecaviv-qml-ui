@@ -1,0 +1,13 @@
+[Unit]
+Description=Pédalier — reprise périodique du câblage MIDI
+# Remplace le cron qui rejouait rtpmidi_connect.sh : un port RTP peut apparaître
+# longtemps après le démarrage (machine d'en face allumée plus tard, câble
+# rebranché). Le câblage est idempotent, le rejouer ne coûte rien.
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=60s
+Unit=pedalier-midi-connect.service
+
+[Install]
+WantedBy=timers.target

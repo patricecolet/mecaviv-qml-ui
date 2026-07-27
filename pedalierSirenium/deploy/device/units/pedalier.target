@@ -2,7 +2,7 @@
 Description=Pédalier Sirenium — ensemble des services
 # Cible unique pour tout démarrer, arrêter ou relancer d'un coup :
 #   systemctl --user restart pedalier.target
-Wants=pedalier-rtpmidid.service pedalier-pd.service pedalier-node.service pedalier-midi-connect.service
+Wants=pedalier-rtpmidid.service pedalier-pd.service pedalier-node.service pedalier-midi-connect.service pedalier-midi-connect.timer
 
 [Install]
 WantedBy=default.target

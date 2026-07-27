@@ -115,13 +115,14 @@ push_build() {
 
     local rsync_opts=(-a -e "ssh ${SSH_OPTS[*]}")
     [ "$DRY_RUN" = true ] && rsync_opts+=(-n)
-    remote "mkdir -p '$remote_web'"
+    run remote "mkdir -p '$remote_web'"
 
     # Le wasm est servi au moment même où on le remplace : on écrit à côté, on
     # vérifie l'empreinte, et on bascule d'un seul mv. Un transfert coupé laisse
     # l'ancien binaire intact plutôt qu'une page morte.
+    # Pas de --info=progress2 : le rsync de macOS (openrsync) ne le connaît pas.
     info "envoi du wasm ($(du -h "$WEB_DIR/$WASM" | cut -f1))"
-    rsync "${rsync_opts[@]}" --info=progress2 "$WEB_DIR/$WASM" "$USER_NAME@$HOST:$remote_web/$WASM.new" \
+    rsync "${rsync_opts[@]}" "$WEB_DIR/$WASM" "$USER_NAME@$HOST:$remote_web/$WASM.new" \
         || die "transfert interrompu — l'ancien wasm est intact"
 
     info "envoi de la glue JS, de la page et du module QML"

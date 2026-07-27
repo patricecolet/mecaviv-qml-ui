@@ -5,9 +5,11 @@ After=pedalier-pd.service pedalier-rtpmidid.service
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
+# Pas de RemainAfterExit : le timer doit pouvoir rejouer le câblage. Les ports
+# RTP n'apparaissent que lorsque la machine d'en face s'annonce sur le réseau —
+# au démarrage à froid, elle n'est pas encore là, et un branchement peut arriver
+# à n'importe quel moment ensuite.
 EnvironmentFile=%h/.config/pedalier/env
-# Le script attend lui-même l'apparition des clients ALSA (aconnect -l).
 ExecStart=@PEDALIER_REPO@/pedalierSirenium/scripts/rtpmidi_connect_async.sh
 TimeoutStartSec=120
 
