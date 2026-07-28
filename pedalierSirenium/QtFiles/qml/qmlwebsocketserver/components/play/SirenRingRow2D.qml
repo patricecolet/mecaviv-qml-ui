@@ -10,6 +10,10 @@ Item {
     // 7 entrées : { progress, halo (bool), haloOpacity, meta (string), present (0..1) }
     property var states: []
 
+    // Sirène mise en mono par la pédale key (1..7, 0 = aucune). Marquée par une
+    // forme sous l'anneau : la couleur dit déjà qui, la forme dit quoi.
+    property int selectedSiren: 0
+
     readonly property var _spec: SirenSpec.SPEC
 
     Row {
@@ -31,11 +35,25 @@ Item {
 
                 opacity: (_state.present !== undefined) ? _state.present : 1.0
 
+                // Cerclage de la sirène principale : sa propre couleur, donc rien
+                // de neuf à décoder — c'est le second cercle qui dit « c'est elle ».
+                Rectangle {
+                    anchors.centerIn: ring
+                    width: ring.width + 12
+                    height: width
+                    radius: width / 2
+                    visible: root.selectedSiren === cell.index + 1
+                    color: "transparent"
+                    border.width: 1.5
+                    border.color: cell._color
+                    opacity: 0.75
+                }
+
                 Ring2D {
                     id: ring
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: 0
-                    width: Math.min(cell.width, cell.height - 4)
+                    width: Math.min(cell.width, cell.height - 14)
                     height: width
                     lineWidth: 5
                     ringColor: cell._color

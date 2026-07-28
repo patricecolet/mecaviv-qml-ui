@@ -17,6 +17,11 @@ Item {
     // Comptage des messages WebSocket
     property int wsMessageCount: 0
     property int wsMessagesPerSecond: 0
+
+    // Réassemblage des chunks binaires "dumpBinary" (pdjson cote PD) -- porte de SirenePupitre/QML/controllers/WebSocketController.qml
+    property var binaryBuffer: null      // Buffer pour stocker les bytes
+    property int expectedSize: 0         // Taille totale attendue
+    property int receivedBytes: 0        // Nombre de bytes deja recus
     
     // Parser de messages
     property alias messageParser: parser
@@ -47,6 +52,22 @@ Item {
     
     Component.onCompleted: {
         setupMessageRoutes();
+        resolveServerUrl();
+    }
+
+    // L'adresse de config.js est figée au build : elle ne peut pas savoir sur
+    // quelle machine la page a été ouverte. On reprend l'hôte de la page, fourni
+    // par main.cpp (`pageOrigin`), en gardant le port WebSocket de config.js.
+    // Hors navigateur, pageOrigin est vide et config.js fait foi.
+    function resolveServerUrl() {
+        if (typeof pageOrigin !== "string" || pageOrigin === "") return;
+        var host = pageOrigin.replace(/^https?:\/\//, "").split(":")[0];
+        if (!host) return;
+        var port = (root.serverUrl.split(":")[2] || "10000");
+        var url = "ws://" + host + ":" + port;
+        if (url === root.serverUrl) return;
+        if (root.logger) root.logger.info("WEBSOCKET", "🌐 Serveur repris de l'hôte de la page :", url);
+        root.serverUrl = url;   // rompt la liaison à config.js, socket.url suit
     }
     
     // Configuration des routes de messages
@@ -152,6 +173,44 @@ Item {
                     const hex = Array.from(bytes).map(function(b){ return b.toString(16).padStart(2, "0"); }).join(" ");
                     root.logger.trace("WEBSOCKET", "binaire (len=" + bytes.length + "):", hex);
                 }
+                // Format binaire config (dumpBinary cote PD): [totalSize:4][offset:4][data...], >= 8 octets.
+                // Les messages MIDI bruts font 1-3 octets, donc la longueur suffit a distinguer les deux.
+                if (bytes.length >= 8) {
+                    const totalSize = bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
+                    const position = bytes[4] | (bytes[5] << 8) | (bytes[6] << 16) | (bytes[7] << 24);
+                    const dataLength = bytes.length - 8;
+
+                    if (!root.binaryBuffer || root.expectedSize !== totalSize) {
+                        root.binaryBuffer = new Array(totalSize);
+                        root.expectedSize = totalSize;
+                        root.receivedBytes = 0;
+                    }
+
+                    for (let i = 0; i < dataLength; i++) {
+                        root.binaryBuffer[position + i] = bytes[8 + i];
+                    }
+                    root.receivedBytes += dataLength;
+
+                    if (root.receivedBytes >= totalSize) {
+                        let jsonString = "";
+                        for (let j = 0; j < totalSize; j++) {
+                            jsonString += String.fromCharCode(root.binaryBuffer[j]);
+                        }
+                        try {
+                            const jsonData = JSON.parse(jsonString);
+                            if (jsonData.type === "CONFIG_FULL") {
+                                root.batchReceived("config", jsonData.config);
+                            }
+                        } catch (parseErr) {
+                            if (root.logger) root.logger.error("WEBSOCKET", "Erreur parsing config binaire:", parseErr.message);
+                        }
+                        root.binaryBuffer = null;
+                        root.expectedSize = 0;
+                        root.receivedBytes = 0;
+                    }
+                    return;
+                }
+
                 if (root.midiMonitorController && bytes.length > 0) {
                     root.midiMonitorController.applyExternalMidiBytes(bytes);
                 }
@@ -203,6 +262,10 @@ Item {
                         root.batchReceived("presets", { pedals: json.pedals });
                     }
                 } else if (json.device === "LOOPER_SCENES") {
+                    if (json.composition) {
+                        if (root.logger) root.logger.info("WEBSOCKET", "🎼 Composition reçue:", JSON.stringify(json.composition));
+                        root.batchReceived("composition", json.composition);
+                    }
                     if (json.batch === "scenesList" && json.scenes) {
                         if (root.logger) root.logger.info("WEBSOCKET", "📋 ScenesList reçu avec", json.scenes.length, "scènes");
                         root.batchReceived("scenesList", json.scenes);
@@ -224,6 +287,20 @@ Item {
                             if (root.logger) root.logger.error("WEBSOCKET", "❌ MessageRouter non disponible");
                         }
                     }
+                }
+
+                // SIRENIUM : la note jouée avant harmonisation ($0.harmoniseur.in
+                // côté PD). Flux régulier — pas de log par événement.
+                if (json.device === "SIRENIUM") {
+                    root.batchReceived("sirenium", json);
+                }
+
+                // VOICE_SELECT : la sirène que la pédale key a mise en mono
+                // ($0.loop.voice.select côté PD). siren 0 = mono désarmé.
+                // Événement rare — un log par changement est sans danger.
+                if (json.device === "VOICE_SELECT") {
+                    if (root.logger) root.logger.debug("WEBSOCKET", "🎯 Mono → sirène", json.siren, "(voix", json.voice + ")");
+                    root.batchReceived("voiceSelect", json);
                 }
 
                 // Monitoring générique: sirenPings / sirenStates / performance
@@ -319,6 +396,27 @@ Item {
         return sendMessage(configMessage);
     }
     
+    // Orchestre virtuel (composeSiren~ cote PD, mode DSP du selecteur
+    // V1/V2/DSP existant dans pedalier.pd). "cmd" est deja au format que
+    // composeSiren~ attend sur son inlet ("<id> volume|pan|dsp <valeur>") --
+    // cote PD, pedalier.pd le renvoie tel quel, sans reconstruction. Un
+    // message WebSocket = une commande.
+    function sendOrchestraCommand(cmd) {
+        return sendMessage({ device: "composeSiren", cmd: cmd });
+    }
+
+    function sendOrchestraDsp(voiceId, enabled) {
+        return sendOrchestraCommand(voiceId + " dsp " + (enabled ? 1 : 0));
+    }
+
+    function sendOrchestraVolume(voiceId, volume) {
+        return sendOrchestraCommand(voiceId + " volume " + volume);
+    }
+
+    function sendOrchestraPan(voiceId, pan) {
+        return sendOrchestraCommand(voiceId + " pan " + pan);
+    }
+
     function reconnect() {
         if (root.logger) {
             root.logger.info("WEBSOCKET", "Reconnexion vers:", serverUrl);
@@ -337,6 +435,17 @@ Item {
             device: "SIREN_LOOPER",
             clock: {
                 bpm: newTempo
+            }
+        });
+    }
+
+    // Signature rythmique — nouveau message (voir docs/PD_WORK.md §7), PD doit
+    // apprendre à le recevoir. Même namespace device/clock que le tempo.
+    function sendSignatureChange(newSignature) {
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            clock: {
+                signature: newSignature
             }
         });
     }

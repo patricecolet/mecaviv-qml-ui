@@ -33,12 +33,26 @@ Window {
         mainWindow: window
         midiMonitorController: midiMonitorController
         onBatchReceived: function(batchType, data) {
-            if (logger) logger.debug("WEBSOCKET", "batch reçu (Phase 1, non routé):", batchType);
+            switch (batchType) {
+                case "clock": liveState.applyClock(data); break;
+                case "loops": liveState.applyLoops(data); break;
+                case "scenesList": liveState.applyScenesList(data); break;
+                case "sceneLoaded": liveState.applySceneLoaded(data); break;
+                case "composition": liveState.applyComposition(data); break;
+                case "sirenium": liveState.applySirenium(data); break;
+                case "voiceSelect": liveState.applyVoiceSelect(data); break;
+                default:
+                    if (logger) logger.debug("WEBSOCKET", "batch non routé:", batchType);
+            }
         }
     }
 
-    // Données simulées (Phase 1)
+    // Données simulées, gardées en secours quand PD n'est pas connecté —
+    // utile pour le dev/la démo sans backend. `state` est ce que tous les
+    // composants d'affichage consomment ; il bascule seul selon la connexion.
     SimulationHarness { id: sim }
+    LiveState { id: liveState }
+    readonly property var state: wsController.isConnected ? liveState : sim
 
     // Bascule vue de jeu / configuration (F2 ou bouton dans le bandeau)
     property bool configMode: false
@@ -52,12 +66,36 @@ Window {
         // de bascule serait inaccessible depuis l'écran de config.
         ClockBar2D {
             Layout.fillWidth: true
-            bpm: Math.round(sim.bpm)
-            beat: sim.clockBeat
-            bar: sim.clockBar
-            beatsPerBar: sim.beatsPerBar
+            bpm: Math.round(window.state.bpm)
+            minBpm: window.state.minBpm
+            maxBpm: window.state.maxBpm
+            beat: window.state.clockBeat
+            bar: window.state.clockBar
+            beatsPerBar: window.state.beatsPerBar
+            beatGroups: window.state.beatGroups
+            signatureNum: window.state.signatureNum
+            minSignatureNum: window.state.minSignatureNum
+            maxSignatureNum: window.state.maxSignatureNum
+            signatureDen: window.state.signatureDen
             configMode: window.configMode
             onToggleConfig: window.configMode = !window.configMode
+            // Éditable partout, y compris en jeu (exception délibérée) : mise à
+            // jour locale immédiate + envoi à PD. Format déjà utilisé par
+            // l'ancien code pour le tempo ; nouveau message pour la signature.
+            // En mode simulé comme en mode live, `state` porte les mêmes
+            // mutateurs — PD écrasera avec la valeur confirmée à l'écho.
+            onBpmStep: function(delta) {
+                window.state.stepBpm(delta);
+                wsController.sendTempoChange(Math.round(window.state.bpm));
+            }
+            onSignatureNumStep: function(delta) {
+                window.state.stepSignatureNum(delta);
+                wsController.sendSignatureChange(window.state.signatureNum + "/" + window.state.signatureDen);
+            }
+            onSignatureDenCycle: {
+                window.state.cycleSignatureDen();
+                wsController.sendSignatureChange(window.state.signatureNum + "/" + window.state.signatureDen);
+            }
         }
 
         // Corps : jeu ou config, selon le mode
@@ -78,23 +116,23 @@ Window {
                     Layout.rightMargin: 32
                     Layout.topMargin: 20
                     Layout.bottomMargin: 12
-                    label: sim.focusState.label || "—"
-                    ringColor: sim.focusState.ringColor || "#66E4F2"
-                    progress: sim.focusState.progress || 0
-                    showHalo: sim.focusState.showHalo || false
-                    haloOpacity: sim.focusState.haloOpacity || 0
-                    sub: sim.focusState.sub || ""
-                    ticks: sim.mainBars
-                    statusWord: sim.focusState.statusWord || ""
-                    statusColor: sim.focusState.statusColor || "#3B4855"
-                    statusNote: sim.focusState.statusNote || ""
-                    mBar: sim.focusState.mBar || "—"
-                    mLen: sim.focusState.mLen || "—"
-                    mRatio: sim.focusState.mRatio || "—"
-                    mRev: sim.focusState.mRev || "—"
-                    ladderActive: sim.focusState.ladderActive || false
-                    ladderStops: sim.focusState.ladderStops || []
-                    ladderVerdict: sim.focusState.ladderVerdict || "—"
+                    label: window.state.focusState.label || "—"
+                    ringColor: window.state.focusState.ringColor || "#66E4F2"
+                    progress: window.state.focusState.progress || 0
+                    showHalo: window.state.focusState.showHalo || false
+                    haloOpacity: window.state.focusState.haloOpacity || 0
+                    sub: window.state.focusState.sub || ""
+                    ticks: window.state.mainBars
+                    statusWord: window.state.focusState.statusWord || ""
+                    statusColor: window.state.focusState.statusColor || "#3B4855"
+                    statusNote: window.state.focusState.statusNote || ""
+                    mBar: window.state.focusState.mBar || "—"
+                    mLen: window.state.focusState.mLen || "—"
+                    mRatio: window.state.focusState.mRatio || "—"
+                    mRev: window.state.focusState.mRev || "—"
+                    ladderActive: window.state.focusState.ladderActive || false
+                    ladderStops: window.state.focusState.ladderStops || []
+                    ladderVerdict: window.state.focusState.ladderVerdict || "—"
                 }
 
                 SirenRingRow2D {
@@ -102,18 +140,37 @@ Window {
                     Layout.preferredHeight: 96
                     Layout.leftMargin: 32
                     Layout.rightMargin: 32
-                    states: sim.ringStates
+                    states: window.state.ringStates
+                    selectedSiren: window.state.monoSiren
                 }
 
-                ChordCartouche2D {
+                // La note du sirenium et ce que l'harmoniseur en fait, sur la
+                // même ligne : source à gauche, accord produit à droite.
+                RowLayout {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 58
                     Layout.leftMargin: 32
                     Layout.rightMargin: 32
                     Layout.topMargin: 12
-                    chordName: sim.chordName
-                    chordSub: sim.chordSub
-                    voicing: sim.voicing
+                    spacing: 20
+
+                    SireniumMonitor2D {
+                        Layout.preferredWidth: 132
+                        Layout.fillHeight: true
+                        note: window.state.sireniumNote
+                        velocity: window.state.sireniumVelocity
+                        bend: window.state.sireniumBend
+                    }
+
+                    Rectangle { Layout.preferredWidth: 1; Layout.fillHeight: true; Layout.topMargin: 6; Layout.bottomMargin: 6; color: "#171F28" }
+
+                    ChordCartouche2D {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        chordName: window.state.chordName
+                        chordSub: window.state.chordSub
+                        voicing: window.state.voicing
+                    }
                 }
 
                 Rectangle {
@@ -130,11 +187,11 @@ Window {
                     Layout.rightMargin: 32
                     Layout.topMargin: 16
                     Layout.bottomMargin: 22
-                    compName: sim.compName
-                    compButton: sim.compButton
-                    banks: sim.banks
-                    currentBank: sim.currentBank
-                    sections: sim.sections
+                    compName: window.state.compName
+                    compButton: window.state.compButton
+                    banks: window.state.banks
+                    currentBank: window.state.currentBank
+                    sections: window.state.sections
                 }
             }
 
