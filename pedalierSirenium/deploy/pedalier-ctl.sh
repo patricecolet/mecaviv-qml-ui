@@ -60,12 +60,13 @@ NO_RESTART=false
 FORCE_PD=false
 
 # Fichiers de données runtime que Pd écrit dans l'arbre git de puredata-abstractions.
+# sirenspec.txt n'en fait PAS partie : c'est de la configuration, éditée en amont
+# et versionnée, elle doit descendre par git comme le reste du patch.
 SONG_PATHS=(
     examples/looper.scenes
     examples/looper.scenes.txt
     examples/pedal.presets
     examples/pedals.preset.name
-    examples/sirenspec.txt
 )
 
 usage() {
@@ -328,6 +329,34 @@ protect_song_files() {
         && ok "morceaux protégés de git ($total fichiers en skip-worktree)"
 }
 
+# Un fichier retiré de SONG_PATHS doit repasser sous git, sinon il reste figé sur
+# la machine et plus aucune mise à jour ne l'atteint — sans le moindre message.
+release_unprotected_files() {
+    [ -d "$PD_REPO/.git" ] || return 0
+    local skipped; skipped=$(git -C "$PD_REPO" ls-files -v -- examples 2>/dev/null | sed -n 's/^S //p')
+    [ -z "$skipped" ] && return 0
+
+    local path keep stale=''
+    while IFS= read -r path; do
+        [ -z "$path" ] && continue
+        keep=false
+        local p
+        for p in "${SONG_PATHS[@]}"; do
+            case "$path" in "$p"|"$p"/*) keep=true; break ;; esac
+        done
+        [ "$keep" = false ] && stale="$stale '$path'"
+    done <<< "$skipped"
+
+    [ -z "$stale" ] && return 0
+    # shellcheck disable=SC2086
+    run_sh "git -C '$PD_REPO' update-index --no-skip-worktree$stale" \
+        && ok "rendus à git :$stale"
+    # Le fichier local peut avoir divergé pendant sa protection : on le remet
+    # dans l'état du dépôt, c'est lui qui fait foi pour de la configuration.
+    # shellcheck disable=SC2086
+    run_sh "git -C '$PD_REPO' checkout --$stale"
+}
+
 # Les artefacts du build Qt sont versionnés, mais sur la machine c'est le rsync
 # depuis le Mac qui fait foi. Sans skip-worktree, l'arbre serait vu comme sale en
 # permanence et plus aucune mise à jour ne passerait.
@@ -364,6 +393,7 @@ phase_repos() {
         git_update_repo "$url" "$HOME/$dir" "$branch"
     done < <(read_manifest "$MANIFEST_DIR/repos.txt")
     protect_song_files
+    release_unprotected_files
     protect_build_artifacts
 }
 
