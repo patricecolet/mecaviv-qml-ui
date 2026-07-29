@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project context
 
-PedalierSirenium is one of several Qt6/QML applications in the `mecaviv-qml-ui` monorepo (parent at `..`). It is the 3D pedalier interface: 8 pedals × 7 sirens, rendered as a Quick3D scene, driven entirely over WebSocket. Siblings are `SirenePupitre` (per-pupitre visualizer), `SirenConsole` (central console), `SirenManager` (control panel / UDP+SSH app), and `sirenRouter` (Node.js monitoring). Cross-project protocol questions belong in `../docs/COMMUNICATION.md` and `../docs/MIDI_WEBSOCKET_API.md`.
+PedalierSirenium is one of several Qt6/QML applications in the `mecaviv-qml-ui` monorepo (parent at `..`). It is the pedalier interface: 8 pedals × 7 sirens, a 2D looper display driven entirely over WebSocket. Siblings are `SirenePupitre` (per-pupitre visualizer), `SirenConsole` (central console), `SirenManager` (control panel / UDP+SSH app), and `sirenRouter` (Node.js monitoring). Cross-project protocol questions belong in `../docs/COMMUNICATION.md` and `../docs/MIDI_WEBSOCKET_API.md`.
 
 **PureData is the source of truth at runtime.** This app has no MIDI stack of its own — `qmlmidi` was abandoned for WASM compatibility, and the Web MIDI API is only probed by an injected script in the host page (informational, not wired to QML). PD connects to `ws://localhost:10000` and pushes everything. The app never opens a MIDI port.
 
@@ -26,7 +26,9 @@ cmake --preset=wasm                                        # WASM
 
 `build_run_web.sh` hardcodes `$HOME/Qt/6.10.0/wasm_singlethread/bin/qt-cmake`. It copies `qmlwebsocketserver.{html,js,wasm}`, `qtloader.js`, and `qml/qmlwebsocketserver/config.js` into `webfiles/`, then rsyncs the QML module dir.
 
-**`QtFiles/CMakeLists.txt` does not link `Qt6::Quick3D`, so the target currently fails to link** — `main.cpp` calls `QQuick3D::idealSurfaceFormat()` for the 30 FPS `setSwapInterval(2)` config, and the link dies on `Undefined symbols: QQuick3D::idealSurfaceFormat(int)` (verified on a standalone desktop build; the root-level build hits the same thing, since the root `find_package` includes Quick3D but the subdirectory target never links it). Fix by adding `Quick3D` to the `find_package` COMPONENTS and `Qt6::Quick3D` to `target_link_libraries` — don't work around it by deleting the Quick3D include, the whole UI is a `View3D`.
+**No Quick3D here anymore.** The 2D refonte removed the last `View3D`; `QtFiles/CMakeLists.txt` links only `Core Quick WebSockets`, and nothing under `QtFiles/` imports `QtQuick3D`. Keep it that way — if a `import QtQuick3D` reappears, the WASM build will configure fine and then fail at runtime, because the module is neither linked nor deployed.
+
+The root `CMakeLists.txt` still lists `Quick3D` in its `find_package` COMPONENTS: that is for **`SirenePupitre`**, which uses it heavily (`Ring3D`, `LEDText3D`, every indicator). Don't remove it there.
 
 `webfiles/*.wasm` is gitignored (~36 MB, distributed via Google Drive). `./scripts/download_wasm.sh` fetches it. Everything else in `webfiles/` except `server.js`, `config.js`, and `package.json` is a build artifact — don't hand-edit.
 
@@ -45,7 +47,13 @@ curl -s http://localhost:8010/logs | jq .        # also /logs/stream (SSE)
 
 Serving `qmlwebsocketserver.html` as a plain static file skips the injection and the COOP/COEP headers — the page won't boot correctly.
 
-`scripts/start.pedalier.sh` is the on-device (Raspberry Pi) boot sequence: reaper → `pd -nogui MidiToSiren.pd` → rtpmidid → node → Chromium kiosk → `wvkbd-mobintl`. Its paths are absolute and machine-specific.
+## Deployment (`deploy/`)
+
+`deploy/pedalier-deploy.sh` (Mac) drives `deploy/pedalier-ctl.sh` (Pi, `sirenateur@192.168.1.21`) over SSH — see `deploy/README.md`. The Pi pulls code from git itself; the Mac only rsyncs the Qt build artifacts (the 40 MB wasm is gitignored). Same command installs from scratch and updates: every phase self-skips when nothing changed, and `--dry-run` simulates on both sides.
+
+On-device the pedalier runs under **systemd `--user`** (`pedalier.target`: rtpmidid → `pd -nogui pedalier.pd` → node → ALSA wiring, the last one replayed by a 60 s timer because RTP ports appear late), with `enable-linger` so the backend boots without a graphical session. The Chromium kiosk is a separate XDG autostart entry (`~/.config/autostart/pedalier-kiosk.desktop`) — never `~/.config/labwc/autostart`, which would replace the Pi's system autostart.
+
+`scripts/start.pedalier.sh` is now a deprecation stub, `scripts/testServerOnRasp.sh` is gone (`pedalier-deploy.sh build` replaces it). The Pi runs **Pd 0.55.2 from `/usr/local`** (Debian's 0.53 stays in `/usr/bin/pd` as a one-line fallback). `pdjson` needs the flat link `~/pd-externals/pdjson.pd_lua`: no Pd version applies the folder convention to `.pd_lua`.
 
 ## Architecture
 
@@ -77,9 +85,7 @@ Every `SirenColumn` listens to the *same* `midiDataChanged` signal and self-filt
 
 ### sirenSpec: edit the `.js`, not the `.json`
 
-`sirenSpec.json` and `sirenSpec.js` hold the same data (per-siren clef, ambitus, transpose, channel, color; `meta.bendBits: 13`, `meta.bendCenter: 4096`), both are in `data.qrc`, **but only `sirenSpec.js` is read** — `SirenSpecProvider` imports it as a JS module because JSON fetch is fragile under WASM. The `.json` is dead weight kept for documentation; changing it alone has no effect. A spec can also be pushed at runtime via `SirenSpecProvider.applySpecFromWs`.
-
-Note the bend is **13-bit, centered on 4096** (not standard MIDI 14-bit/8192) — but `MidiMonitorController` decodes incoming pitch bend as standard `(data2 << 7) | data1` and defaults `bend` to 8192. Reconcile carefully before trusting bend maths.
+`sirenSpec.json` and `sirenSpec.js` hold the same data (per-siren clef, ambitus, transpose, channel, color), both are in `data.qrc`, **but only `sirenSpec.js` is read** — `SirenSpecProvider` imports it as a JS module because JSON fetch is fragile under WASM. The `.json` is dead weight kept for documentation; changing it alone has no effect. A spec can also be pushed at runtime via `SirenSpecProvider.applySpecFromWs`.
 
 ### Config
 

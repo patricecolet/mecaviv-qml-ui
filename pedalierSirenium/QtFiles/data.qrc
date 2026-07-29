@@ -31,7 +31,6 @@
         <file>qml/qmlwebsocketserver/components/controls/PedalConfigPanel.qml</file>
         <file>qml/qmlwebsocketserver/components/controls/OrchestraControlPanel.qml</file>
         <file>qml/qmlwebsocketserver/components/controls/ControlSection.qml</file>
-        <file>qml/qmlwebsocketserver/components/controls/TempoControl.qml</file>
         <file>qml/qmlwebsocketserver/components/controls/PedalPresetManager.qml</file>
         <file>qml/qmlwebsocketserver/components/controls/SceneManager.qml</file>
         <file>qml/qmlwebsocketserver/components/controls/SceneNavigation.qml</file>

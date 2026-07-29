@@ -10,6 +10,30 @@
 #include <QSurfaceFormat>
 #include <QDebug>
 
+#ifdef Q_OS_WASM
+#include <emscripten.h>
+#endif
+
+// Origine de la page qui héberge l'application, par exemple
+// "http://192.168.1.21:8010" — vide hors navigateur.
+//
+// QML ne peut pas l'obtenir seul : sous WASM, un XMLHttpRequest vers une URL
+// relative est résolu contre l'URL du fichier QML (qrc:/...) et finit en accès
+// fichier local, refusé. C'est la seule raison d'être de ce détour par le C++ :
+// sans lui, l'adresse du serveur resterait figée dans config.js au moment du
+// build, et la page servie par le Raspberry chercherait Pure Data sur la
+// machine du navigateur.
+static QString pageOrigin()
+{
+#ifdef Q_OS_WASM
+    char *origin = static_cast<char *>(
+        emscripten_run_script_string("window.location.origin"));
+    return origin ? QString::fromUtf8(origin) : QString();
+#else
+    return QString();
+#endif
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
@@ -24,14 +48,8 @@ int main(int argc, char *argv[])
     QSurfaceFormat::setDefaultFormat(format);
     // ===============================================
     
-/*
-    QQuickView view;
-    view.setSource(QUrl(QStringLiteral("qrc:/qml/qmlwebsocketserver/main.qml")));
-    view.show();
-*/
- //   QSurfaceFormat::setDefaultFormat(QQuick3D::idealSurfaceFormat());
-
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("pageOrigin", pageOrigin());
 
     const QUrl url(u"qrc:/qml/qmlwebsocketserver/main.qml"_qs);
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
