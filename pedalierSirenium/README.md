@@ -103,9 +103,10 @@ oubli échoue silencieusement à l'exécution, pas à la compilation.
 
 ```
 WebSocket ─┬─ texte ──→ WebSocketController ──→ batchReceived ──→ switch de main.qml
-           │                                                      └→ LiveState.applyX()
-           │                                                         └→ les vues 2D s'y lient
-           └─ binaire ─→ MidiMonitorController ──→ midiDataChanged ──→ (aucun auditeur vivant)
+           │            (lissé à 40 ms par PD)                     └→ LiveState.applyX()
+           │                                                          └→ les vues 2D s'y lient
+           └─ binaire ─→ MidiMonitorController ──→ midiDataChanged ──→ LiveState.applyMidi
+                        (immédiat, non lissé)                          └→ SirenRingRow2D
 ```
 
 `LiveState.qml` est l'unique objet d'état auquel toute l'interface 2D se lie. Ajouter un type de
@@ -167,9 +168,12 @@ Un seul socket, trois canaux **asymétriques** — c'est l'asymétrie qu'il faut
 
 - **Texte entrant (JSON)** : état applicatif (boucles, scènes, voix, presets, horloge). Dispatché sur
   `json.device` : `SIREN_LOOPER`, `SIREN_PEDALS`, `LOOPER_SCENES`, `SIRENIUM`, `VOICE_SELECT`.
-- **Binaire entrant (1–3 octets)** : événements MIDI bruts. **Décodés puis abandonnés** :
-  `MidiMonitorController` émet `midiDataChanged`, mais plus aucun composant vivant n'y est abonné.
-  Les vues 2D sont pilotées uniquement par le canal JSON.
+- **Binaire entrant (1–3 octets)** : les notes harmonisées, une par sirène. `MidiMonitorController`
+  décode et émet `midiDataChanged`, que `main.qml` route vers `LiveState.applyMidi` : chaque anneau
+  de `SirenRingRow2D` affiche sa note et pulse à l'attaque. **C'est le chemin rapide** — l'inlet
+  `binary` de `websocket-server` ne traverse pas son spigot de 30 ms, donc ce canal est immédiat là
+  où le JSON est lissé à 40 ms. Les canaux sont **déjà 0-based côté PD** et correspondent à
+  `sirenSpec` sans décalage (canal 0 = S1). Vélocité 1 = note fantôme, moteur en rotation mais muet.
 - **Sortant (JSON)** : envoyé via **`socket.sendBinaryMessage(jsonString)`**. PD attend des trames
   binaires ; passer à `sendTextMessage` casse silencieusement toutes les commandes sortantes.
 
@@ -721,7 +725,8 @@ flowchart TD
   D -->|"état"| E["batchReceived → LiveState"]
   E --> H["vues 2D"]
   D -->|"octets MIDI"| F["MidiMonitorController"]
-  F -.->|"midiDataChanged — aucun auditeur"| G["(rien)"]
+  F -->|"midiDataChanged"| I["LiveState.applyMidi"]
+  I --> J["SirenRingRow2D — note + pulsation"]
 ```
 
 ## 🎛️ SireniumMonitor2D : la note source
@@ -803,8 +808,9 @@ afficheur de looper 2D. Ces composants n'existent plus, ni la couche `SirenSpecP
       `/api/system-info` et `/api/config` existent toujours côté `server.js` et répondent : plus
       aucun client QML ne les lit, à rebrancher le jour où un affichage système est voulu (sans IP
       en dur, cette fois)
-- [ ] **Canal binaire MIDI sans consommateur** — `MidiMonitorController` décode et émet
-      `midiDataChanged`, plus personne n'écoute. Le rebrancher ou assumer que tout passe par le JSON.
+- [x] ~~Canal binaire MIDI sans consommateur~~ — rebranché : PD alimente l'inlet `binary` depuis
+      `$0.to.sirens` (`pd midi.binary`), le QML l'affiche par sirène. Reste à décider si le `bend` et
+      les `ctl` doivent suivre le même chemin (seul `note` est routé aujourd'hui).
 - [ ] Quantification rythmique (24 ppq) et rendu de partition : jamais implémentés.
 
 ### 🔧 Phase 5 — Optimisation et Tests

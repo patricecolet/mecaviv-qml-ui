@@ -81,6 +81,29 @@ QtObject {
         if (data.velocity !== undefined) sireniumVelocity = data.velocity;
     }
 
+    // ---------- MIDI par sirène : ce que chacune joue, après harmonisation ----------
+    // Alimenté par le canal BINAIRE, pas par le JSON. PD pousse les notes
+    // harmonisées sur l'inlet `binary` de websocket-server, qui ne traverse pas son
+    // spigot de 30 ms : ce flux est immédiat là où le JSON est lissé à 40 ms.
+    // Canal 0 → S1 … canal 6 → S7, déjà aligné sur sirenSpec (aucun décalage).
+    // Vélocité 1 = note fantôme (moteur en rotation, muet), comme pour le sirenium.
+    property var sirenMidi: [{}, {}, {}, {}, {}, {}, {}]
+
+    function applyMidi(note, velocity, bend, channel) {
+        if (channel < 0 || channel > 6) return;
+        var arr = sirenMidi.slice();
+        var prev = arr[channel] || {};
+        arr[channel] = {
+            note: note,
+            velocity: velocity,
+            bend: bend,
+            // Compteur d'attaques plutôt qu'un signal : la vue le regarde pour
+            // pulser, et deux notes de suite à la même hauteur se voient quand même.
+            attacks: (prev.attacks || 0) + (velocity > 0 ? 1 : 0)
+        };
+        sirenMidi = arr;
+    }
+
     // ---------- mono : la sirène choisie par la pédale key ----------
     // Alimenté par PD depuis $0.loop.voice.select. siren 0 / voix -1 = mono
     // désarmé : aucune sirène ne reçoit la note du sirenium.

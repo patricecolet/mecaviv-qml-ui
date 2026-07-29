@@ -64,7 +64,11 @@ One socket, three asymmetric channels — this asymmetry is the thing to interna
 - **Inbound text** = JSON application state (loops, scenes, presets, clock, `sirenPings`). Handled in `WebSocketController.onTextMessageReceived`, dispatched by `json.device` (`SIREN_LOOPER` / `SIREN_PEDALS` / `LOOPER_SCENES` / `SIRENIUM` / `VOICE_SELECT`) into `batchReceived(batchType, data)`.
 
   `SIRENIUM` carries only `note` and `velocity` — **the bend is no longer sent**. The note places the cursor on the sirenium's ambitus (3 octaves from MIDI 48) and the velocity opens the shutter; both mappings live in `SireniumMonitor2D.qml` (`ambitusLow` / `ambitusRange`), not in PD. PD emits raw values and does not say what they mean.
-- **Inbound binary** = raw MIDI, 1 or 3 bytes, forwarded straight to `MidiMonitorController.applyExternalMidiBytes`, which decodes and re-emits `midiDataChanged`. **Nothing live listens to that signal any more**: its only subscriber is `DebugPanel.qml`, which is dead code (see Gotchas). The binary channel therefore currently ends in a no-op — the 2D views are driven entirely by the JSON channel. Decide deliberately before wiring anything new onto it.
+- **Inbound binary** = raw MIDI, 1 or 3 bytes, forwarded to `MidiMonitorController.applyExternalMidiBytes`, which decodes and emits `midiDataChanged(note, velocity, bend, channel)`. `main.qml` routes it into `LiveState.applyMidi`, which keeps one entry per siren in `sirenMidi` and feeds `SirenRingRow2D` (note at the ring centre, pulse on attack).
+
+  **This is the fast path, and that is the whole point.** PD pushes harmonised notes into the `binary` inlet of `websocket-server`, which does **not** go through that abstraction's 30 ms spigot — so this channel is immediate where the JSON one is smoothed to 40 ms. Put anything latency-sensitive here, not in the JSON.
+
+  Channels are **0-based on the PD side already** (`note <pitch> <vel> <0..6>` on `$0.to.sirens`), matching `sirenSpec` directly: channel 0 → S1 … channel 6 → S7. No off-by-one to apply — verified by measurement, don't "fix" it. Velocity 1 means a **ghost note** (motor spinning, muted), rendered at reduced opacity like the sirenium's.
 - **Outbound** = JSON, but sent via **`socket.sendBinaryMessage(jsonString)`**, marked `@CRITICAL: Ne pas changer - binaire requis` in `WebSocketController.sendMessage`. PD expects binary frames. Switching to `sendTextMessage` silently breaks every outgoing command.
 
 1-byte frames (clock `0xF8`, start/continue/stop `0xFA`/`0xFB`/`0xFC`) are currently counted and dropped in `applyExternalMidiBytes`; only 3-byte channel messages (Note On/Off, CC, Pitch Bend) update state. Clock-driven quantization is unimplemented (README Phase 4).
@@ -77,8 +81,9 @@ One socket, three asymmetric channels — this asymmetry is the thing to interna
 
 ```
 WebSocket ─┬─ text ──→ WebSocketController ──→ batchReceived ──→ main.qml switch ──→ LiveState.apply*()
-           │                                                                        └→ the 2D views bind to LiveState
-           └─ binary ─→ MidiMonitorController ──→ midiDataChanged ──→ (no live listener)
+           │            (smoothed to 40 ms by PD)                                   └→ the 2D views bind to LiveState
+           └─ binary ─→ MidiMonitorController ──→ midiDataChanged ──→ LiveState.applyMidi ──→ SirenRingRow2D
+                        (immediate, no smoothing)
 ```
 
 `LiveState.qml` is the single state object the whole 2D UI binds to; `main.qml`'s `onBatchReceived` switch maps each `batchType` onto one `applyX(data)` method (`clock`, `loops`, `scenesList`, `sceneLoaded`, `composition`, `sirenium`, `voiceSelect`). Adding a message type means: a `json.device` branch in `WebSocketController.onTextMessageReceived`, a `case` in that switch, and an `applyX` on `LiveState`. `SimulationHarness.qml` mirrors LiveState's interface so the UI stays alive without PD — keep the two in step or the simulated view drifts from the real one.

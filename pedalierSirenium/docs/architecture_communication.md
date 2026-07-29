@@ -16,12 +16,14 @@ flowchart TD
   D -->|"état"| E["batchReceived → LiveState"]
   E --> H["vues 2D"]
   D -->|"octets MIDI"| F["MidiMonitorController"]
-  F -.->|"midiDataChanged — aucun auditeur"| G["(rien)"]
+  F -->|"midiDataChanged"| I["LiveState.applyMidi → SirenRingRow2D"]
 ```
 
-> **État réel (2026-07)** : le canal JSON est le seul qui aboutisse. `MidiMonitorController` décode
-> toujours les octets et émet `midiDataChanged`, mais plus aucun composant vivant n'y est abonné ;
-> `MessageRouter` a été supprimé avec les autres orphelins. Le dispatch se fait
+> **État réel (2026-07)** : les deux canaux aboutissent. Le binaire porte les notes harmonisées par
+> sirène (`note <pitch> <vel> <canal 0..6>` depuis `$0.to.sirens`, converti en trames MIDI par
+> `pd midi.binary`) et alimente `LiveState.applyMidi` → `SirenRingRow2D`. Il ne traverse pas le
+> spigot de 30 ms de `websocket-server` : c'est le chemin rapide.
+> `MessageRouter` a été supprimé avec les autres orphelins. Le dispatch JSON se fait
 > dans `WebSocketController` sur `json.device`, puis dans le `switch` de `main.qml` vers
 > `LiveState.applyX()`.
 >

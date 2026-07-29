@@ -27,6 +27,15 @@ Window {
         id: midiMonitorController
         logger: logger
     }
+
+    // Canal binaire → LiveState. C'est le chemin rapide : les notes harmonisées
+    // arrivent sans passer par le lissage à 40 ms du canal JSON.
+    Connections {
+        target: midiMonitorController
+        function onMidiDataChanged(note, velocity, bend, channel) {
+            liveState.applyMidi(note, velocity, bend, channel);
+        }
+    }
     WebSocketController {
         id: wsController
         logger: logger
@@ -142,6 +151,7 @@ Window {
                     Layout.rightMargin: 32
                     states: window.state.ringStates
                     selectedSiren: window.state.monoSiren
+                    midi: window.state.sirenMidi
                 }
 
                 // La note du sirenium et ce que l'harmoniseur en fait, sur la

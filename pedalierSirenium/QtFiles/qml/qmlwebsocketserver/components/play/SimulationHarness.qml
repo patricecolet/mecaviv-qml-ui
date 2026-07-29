@@ -111,6 +111,11 @@ QtObject {
     property int clockBeat: 0
     property int clockBar: 1
     property var ringStates: []
+
+    // Même interface que LiveState.sirenMidi : ce que joue chaque sirène. Simulé
+    // par accord sur la gamme affichée, une attaque par mesure et par sirène.
+    property var sirenMidi: [{}, {}, {}, {}, {}, {}, {}]
+    property int _lastMidiBar: -1
     property var focusState: ({})
 
     // scénario « session » : source par sirène (index 0..6 = S1..S7)
@@ -162,6 +167,26 @@ QtObject {
 
         clockBeat = Math.floor((_bars % 1) * beatsPerBar);
         clockBar = Math.floor(_bars) + 1;
+
+        // MIDI par sirène : une attaque par mesure, pour voir la note et la
+        // pulsation vivre sans PD. Les sirènes vides restent muettes.
+        var bar = Math.floor(_bars);
+        if (bar !== _lastMidiBar) {
+            _lastMidiBar = bar;
+            var chord = [38, 45, 50, 57, 62, 69, 74];
+            var arr = [];
+            for (var m = 0; m < 7; m++) {
+                var prevM = sirenMidi[m] || {};
+                var silent = _scn[m].mode === "empty";
+                arr.push({
+                    note: chord[(m + bar) % chord.length],
+                    velocity: silent ? 0 : (m === mainLoop ? 100 : 80),
+                    bend: 8192,
+                    attacks: (prevM.attacks || 0) + (silent ? 0 : 1)
+                });
+            }
+            sirenMidi = arr;
+        }
 
         // --- états des 7 anneaux ---
         var rs = [];
