@@ -31,7 +31,7 @@ Tâches et améliorations futures pour l'ensemble du système mecaviv-qml-ui.
 
 #### pedalierSirenium
 - [ ] Finaliser le mapping note→Y sur la portée (clef + ambitus)
-- [ ] Appliquer la courbe de pitch bend (13 bits, centre 4096)
+- [ ] Appliquer la courbe de pitch bend
 - [ ] Mode historique focus (clic sur portée → affichage étendu)
 - [ ] Quantification rythmique et rendu partition (24 ppq)
 - [ ] Figures musicales complètes (ronde, blanche, noire, croche, double)

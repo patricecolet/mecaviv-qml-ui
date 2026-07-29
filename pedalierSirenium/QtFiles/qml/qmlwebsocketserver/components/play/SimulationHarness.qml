@@ -95,10 +95,9 @@ QtObject {
         { label: "S5", deg: 7 }
     ]
 
-    // --- sirenium : note source simulée, pour voir la jauge vivre sans PD ---
+    // --- sirenium : note source simulée, pour voir le curseur vivre sans PD ---
     property int sireniumNote: 62
     property int sireniumVelocity: 96
-    property real sireniumBend: 4096
 
     // --- mono : sirène désignée par la pédale key ---
     // La scène simulée est poly, donc rien n'est armé — même interface que
@@ -155,11 +154,11 @@ QtObject {
 
         var pulse = 0.3 + 0.35 * (0.5 + 0.5 * Math.sin(now / 190));
 
-        // Sirenium simulé : une note par mesure dans le mode dorien affiché,
-        // avec un vibrato lent — de quoi voir la jauge bouger sans PD.
-        var degrees = [62, 64, 65, 67, 69];
+        // Sirenium simulé : une note par mesure dans le mode dorien affiché, et
+        // un volet qui respire — de quoi voir le curseur et l'obturateur sans PD.
+        var degrees = [50, 62, 64, 67, 81];
         sireniumNote = degrees[Math.floor(_bars) % degrees.length];
-        sireniumBend = 4096 + 3600 * Math.sin(now / 420);   // balaie presque toute la course
+        sireniumVelocity = Math.round(64 + 60 * Math.sin(now / 900));
 
         clockBeat = Math.floor((_bars % 1) * beatsPerBar);
         clockBar = Math.floor(_bars) + 1;

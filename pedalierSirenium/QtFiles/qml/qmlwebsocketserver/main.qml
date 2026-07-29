@@ -155,11 +155,10 @@ Window {
                     spacing: 20
 
                     SireniumMonitor2D {
-                        Layout.preferredWidth: 132
+                        Layout.preferredWidth: 156
                         Layout.fillHeight: true
                         note: window.state.sireniumNote
                         velocity: window.state.sireniumVelocity
-                        bend: window.state.sireniumBend
                     }
 
                     Rectangle { Layout.preferredWidth: 1; Layout.fillHeight: true; Layout.topMargin: 6; Layout.bottomMargin: 6; color: "#171F28" }

@@ -71,15 +71,14 @@ QtObject {
         : "poly" + (_sceneVoiceCount ? " · " + _sceneVoiceCount + " voix" : "")
 
     // ---------- sirenium : la note source, avant harmonisation ----------
-    // Alimenté par PD depuis $0.harmoniseur.in (note immédiate, bend ~10 Hz).
+    // Alimenté par PD depuis $0.harmoniseur.in. La note place le curseur sur
+    // l'ambitus, la vélocité ouvre le volet obturateur (voir SireniumMonitor2D).
     property int sireniumNote: 0
     property int sireniumVelocity: 0
-    property real sireniumBend: 4096   // brut : 0 … 8192, repos à 4096
 
     function applySirenium(data) {
         if (data.note !== undefined) sireniumNote = data.note;
         if (data.velocity !== undefined) sireniumVelocity = data.velocity;
-        if (data.bend !== undefined) sireniumBend = data.bend;
     }
 
     // ---------- mono : la sirène choisie par la pédale key ----------
