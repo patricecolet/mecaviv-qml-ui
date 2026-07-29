@@ -7,10 +7,11 @@ Item {
     property var logger
     property var currentSystemInfo: ({})
     property bool isReading: false
-    // Vide = URL relative, résolue sur l'origine de la page : le serveur qui sert
-    // l'application est aussi celui qui expose /api/system-info. Ne jamais remettre
-    // une IP en dur ici, elle serait compilée dans le wasm.
-    property string serverUrl: ""
+    // Origine de la page, fournie par main.cpp : le serveur qui sert
+    // l'application est aussi celui qui expose /api/system-info. Ne jamais
+    // remettre une IP en dur ici, elle serait compilée dans le wasm — et une URL
+    // relative ne marche pas non plus, QML la résoudrait contre qrc:/.
+    property string serverUrl: (typeof pageOrigin === "string" && pageOrigin !== "") ? pageOrigin : ""
     
     signal systemInfoReceived(var data)
     

@@ -199,6 +199,36 @@ Rectangle {
             }
         }
 
+        Button {
+            id: orchestraTab
+            width: 110
+            height: 30
+            checked: stackLayout.currentIndex === 3
+            onClicked: stackLayout.currentIndex = 3
+            background: Rectangle {
+                color: parent.checked ? "#2a2a2a" : "#1a1a1a"
+                border.color: "#444"
+                radius: 4
+            }
+            contentItem: Row {
+                anchors.centerIn: parent
+                spacing: 5
+                Image {
+                    source: "qrc:/qml/icons/settings.png"
+                    width: 16
+                    height: 16
+                    fillMode: Image.PreserveAspectFit
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    text: "Orchestre"
+                    color: "white"
+                    font.pixelSize: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
+
         // Onglet MIDI retiré (sélection de ports obsolète en mode WASM)
 
         // Onglet de test WebMIDI retiré (obsolète côté QML/WASM)
@@ -551,7 +581,29 @@ Rectangle {
             }
         }
 
-        // Section 4 retirée (Contrôle MIDI / sélection de ports) – obsolète
+        // Section 4: Orchestre virtuel (composeSiren~ côté PD)
+        Rectangle {
+            color: "transparent"
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 15
+                spacing: 15
+
+                Text {
+                    text: "Bascule le mode DSP du pédalier (sélecteur V1/V2/DSP) et règle volume/pan par voix."
+                    color: "#888"
+                    font.pixelSize: 12
+                    wrapMode: Text.Wrap
+                    width: parent.width
+                }
+
+                OrchestraControlPanel {
+                    width: parent.width
+                    webSocketController: panelBg.webSocketController
+                }
+            }
+        }
 
         // Section 5 retirée (Test Web MIDI API) – non pertinente en QML/WASM
     }
