@@ -1,5 +1,23 @@
 # 🎛️ Configuration MIDI - PedalierSirenium
 
+> ## ⚠️ Document périmé — conservé à titre historique
+>
+> Ce document décrit une époque où le QML ouvrait ses propres ports MIDI virtuels. **Ce n'est plus le
+> cas :**
+>
+> - `qmlmidi` a été abandonné pour la compatibilité WebAssembly ; l'application **n'ouvre aucun port
+>   MIDI**. Tout le MIDI arrive de PureData par le WebSocket.
+> - L'onglet « MIDI » du Debug Panel (sélection de ports IAC/VirMIDI) a été retiré comme obsolète —
+>   et le panneau lui-même n'est plus atteignable (`DebugPanel` n'est instancié nulle part, le
+>   raccourci `F12` n'ouvre rien).
+> - Le canal binaire MIDI entrant est décodé par `MidiMonitorController` puis abandonné : aucun
+>   composant vivant n'écoute `midiDataChanged`.
+> - `webfiles/server.js` note seulement si l'API Web MIDI **existe** dans le navigateur, sans jamais
+>   appeler `requestMIDIAccess()` — l'autorisation à chaque chargement était intenable en kiosque.
+>
+> Rien de ce qui suit n'est nécessaire pour faire tourner le pédalier aujourd'hui. Voir
+> `architecture_communication.md` et le `README.md` pour l'état réel.
+
 ## 📋 Vue d'ensemble
 
 Le système MIDI de PedalierSirenium utilise des **ports virtuels** pour permettre au monitoring QML de recevoir les données MIDI sans interférer avec PureData. La configuration varie selon le système d'exploitation.

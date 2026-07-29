@@ -79,11 +79,14 @@ saute à la vitesse cible au lieu d'y glisser. Deux usages symétriques :
   pour pré-positionner le rotor au démarrage d'un clip, à la sortie du mute, ou pour la rotation,
   avant que les vraies notes (avec portamento) prennent le relais.
 
-**Hauteur de parking = la limite basse de l'ambitus, pas zéro absolu.** On lit `notemin` de la
-sirène dans `sirenspec` (`text define $0sirenspec` dans `pd sirenspec`, champs `notemin`/`notemax`
-par sirène S1–S7) et on parque à cette limite — assez bas pour être silencieux, mais assez haut pour
-que **le retour à la bonne note soit le plus rapide possible**. Parquer à zéro rallongerait le
-spin-up inutilement.
+**Hauteur de parking = une octave sous la limite basse de l'ambitus, pas zéro absolu.** On lit
+`notemin` de la sirène dans `sirenspec` (`text define $0sirenspec` dans `pd sirenspec`, champs
+`notemin`/`notemax` par sirène S1–S7) et on parque à `notemin - 12`. Rester *à* `notemin` ne suffit
+pas : c'est la note la plus grave que la sirène sait **jouer**, donc encore audible (corrigé le
+2026-07-25). Une octave dessous, le rotor tourne sans sonner.
+
+C'est un compromis assumé : plus bas = plus silencieux, mais **spin-up plus long** au retour. Une
+octave est le choix retenu ; parquer à zéro rallongerait le spin-up sans rien gagner en silence.
 
 PD transmet la vélocité 1 telle quelle — c'est `composeSiren`, côté sirène, qui l'interprète comme
 une commande de positionnement sans portamento. PD reste routeur.
@@ -94,8 +97,10 @@ se distinguent ainsi nettement — note on (vél 1-127), ghost (vél 1), note of
 
 **État d'implémentation (2026-07-22)** : décodage note off→0 fait. `mute` **corrigé** : la sortie de
 notes du clip est coupée par un gate (le clip continue d'avancer pour la phase) et une **seule ghost
-note à `notemin`** (vél 1, sur la voix de la sirène) parque le moteur à l'entrée en mute. Vérifié :
-scène en `mute` → une seule `note 43 1 <voix>`, plus aucune note du clip.
+note à `notemin - 12`** (vél 1, sur la voix de la sirène) parque le moteur à l'entrée en mute.
+Vérifié le 2026-07-22, quand la hauteur était encore `notemin` : scène en `mute` → une seule
+`note 43 1 <voix>` pour S1, plus aucune note du clip. Le `[- 12]` ajouté depuis attend une
+re-vérification sur le matériel — elle devrait donner `note 31 1 <voix>` pour S1.
 
 `notemin` est **lu au runtime dans `sirenspec`** (pas d'argument codé en dur) : `siren-clip-loader`
 construit le libellé `S<index+1>` (`makefilename S%d`) et interroge le buffer du parent via
@@ -203,13 +208,28 @@ Ainsi une scène = clips + modes de lecture + couleur harmonique + tonalité + a
 
 ### Poser l'accord — au pied
 
-- **Sélection des sirènes** : les touches naturelles du clavier (Do→S1 … Si→S7) rendent une sirène
-  **éligible** à l'accord. Même geste que la sélection de sirène habituelle.
-- **Réglage du voicing** : un **poussoir maintenu** pendant qu'on **joue l'accord** sur le clavier ;
-  l'harmoniseur extrait les intervalles, relatifs à la fondamentale.
-- **Répartition** : par **hauteur**, pas par étiquette — la note la plus grave va sur la sirène la
-  plus grave. Ordre des sirènes grave→aigu : **S3 S4 S1 S2 S5 S6 S7**. Chaque voix est repliée dans
-  l'ambitus de sa sirène (`sirenSpec`).
+Mécanique arrêtée le **2026-07-25**. Elle remplace la version antérieure, où le clavier
+sélectionnait les sirènes et où l'accord se répartissait par hauteur.
+
+- **Sélection des sirènes** : les 8 boutons ronds, **pas** le clavier. En mode poly (pédale 19 active),
+  les appuis **cumulent** les sirènes en jeu au lieu de remplacer la sélection.
+- **Réglage du voicing** : le clavier donne l'**intervalle de la dernière sirène ajoutée**. On
+  construit donc l'accord voix par voix — ajouter une sirène, jouer sa touche, recommencer. Le
+  clavier étant libéré de la sélection, c'est une octave chromatique complète.
+- **Répartition** : l'intervalle est attribué **explicitement** à une sirène, et c'est une **classe**
+  (mod 12) ; l'**octave où il sonne vient de l'ambitus de la sirène** (`sirenSpec`), pas de l'accord.
+  Une quinte posée sur S3 sonne donc environ deux octaves sous la même quinte posée sur S7. L'ancienne
+  règle « la note la plus grave va sur la sirène la plus grave » devient inutile : l'ordre des
+  registres est garanti par les ambitus, quel que soit l'intervalle attribué.
+- **Choisir les sirènes, c'est choisir le voicing.** L'écart entre les voix ne se règle pas
+  séparément : il découle de quelles sirènes sont dans l'accord.
+
+**Reste à écrire : quelle octave dans l'ambitus.** Les ambitus se chevauchent de près de trois
+octaves (S1 43-86, S5 48-94), donc « replier dans l'ambitus » ne désigne pas encore une hauteur
+unique — la quinte sur S3 existe à 43, 55 et 67. Deux candidats : « le plus grave possible », qui
+donne bien les deux octaves d'écart attendues entre S3 et S7 mais colle l'accord en bas en
+permanence ; ou « l'octave la plus proche de la note courante de la fondamentale, puis repli », qui
+laisse l'accord suivre la ligne. Chiffres et question `transpo` dans `PEDALIER_MAPPING.md`.
 - Réglable aussi sur l'**écran tactile** (précis, posé) — les deux écrivent le même `voicing` de la
   scène courante.
 
@@ -311,11 +331,6 @@ peut être que la ligne brute mono — exactement ce qu'une piste MIDI standard 
 ticks/PPQN = temps musical). Unifie enregistrement live et extraction MIDI (§11) dans un seul
 format de stockage, dans les deux sens (lecture et écriture).
 
-**Point technique à ne pas rater** : le pitch bend des sirènes est **non standard** — 13 bits,
-centre 4096 (`sirenSpec.js`, `meta.bendBits`/`meta.bendCenter`) — contre le bend MIDI standard
-(14 bits, centre 8192). Convention de conversion explicite nécessaire à l'écriture et à la lecture,
-sinon perte de précision ou décalage de centre silencieux.
-
 **Renforce l'intérêt d'un external PD dédié** à cette partie précise (enregistrement des clips
 organisés en scènes, intention de Patrice) : lire/écrire du SMF standard en C est un problème bien
 balisé (bibliothèques existantes), contrairement aux objets `text`/`sequence` de PD, natifs au
@@ -346,8 +361,6 @@ La lecture de projets MIDI (§11) **reste dans le périmètre** — pas comme le
   que « le dernier joué prime » (§9, `PD_WORK.md §3`), ou une autre ?
 - Réinterprétation et extraction en clip : confirmer que c'est bien le même geste (§11).
 - Désambiguïsation des markers MIDI si plusieurs pistes candidates au même point (§11).
-- Convention de conversion du pitch bend (13 bits/centre 4096 ↔ 14 bits/centre 8192) pour le
-  stockage MIDI (§12).
 - Périmètre exact du grand nettoyage du patch (§13) — à mener avec le test proposé, résultat non
   connu à l'avance.
 
@@ -419,9 +432,6 @@ La mémoire n'est jamais la contrainte ; le réseau et le firmware Artila le son
 sur la grille 24 ppq — garder la dernière valeur à chaque top — plutôt que de déclencher sur un
 seuil de variation, sinon un bend lent ne produit rien pendant longtemps puis saute. Ajouter un
 `[change]` derrière pour ne pas réémettre une valeur identique : grille régulière, sans redondance.
-
-Rappel du point encore ouvert (§14) : le bend des sirènes est **13 bits centré 4096**, stocké dans
-un SMF **14 bits centré 8192**. La convention de conversion reste à fixer.
 
 ## 18. Énumérer scènes et compositions — `[file glob]`, pas un index écrit (2026-07-21)
 

@@ -682,7 +682,6 @@ Les messages MIDI sont transmis en **binaire** pour minimiser la latence.
 **Encodage 14 bits** :
 ```javascript
 // Valeur pitch bend: 0-16383 (centre: 8192)
-// Pour sirènes: 13 bits, centre 4096
 
 lsb = bend & 0x7F
 msb = (bend >> 7) & 0x7F
@@ -714,14 +713,8 @@ msb = (8192 >> 7) & 0x7F = 64
 
 ### Spécifications Sirènes (sirenSpec)
 
-Les sirènes ont des paramètres pitch bend spécifiques :
-
 ```json
 {
-  "meta": {
-    "bendBits": 13,
-    "bendCenter": 4096
-  },
   "siren1": {
     "label": "S1",
     "channel": 0,
@@ -735,9 +728,6 @@ Les sirènes ont des paramètres pitch bend spécifiques :
 
 **Calcul du bend** :
 ```javascript
-// Pour sirènes : 13 bits, centre 4096, plage ±4096
-// bend = 0..8191 (0 = -100%, 4096 = 0%, 8191 = +100%)
-
 // Conversion en LSB/MSB pour MIDI
 lsb = bend & 0x7F
 msb = (bend >> 7) & 0x7F

@@ -104,8 +104,7 @@ ce projet, mais déjà présent et compilé (`midifile.pd_darwin`).
 
 **Non vérifié** : `midifile` gère-t-il nativement le pitch bend (event `E0`) ? Le README/help ne le
 montre pas explicitement dans les extraits lus — à tester, sinon prévoir une extraction manuelle des
-events `0xE_` bruts. Pertinent pour `SCENES_SPEC.md §12` (conversion bend sirène 13 bits/centre 4096
-↔ MIDI standard 14 bits/centre 8192).
+events `0xE_` bruts. Pertinent pour `SCENES_SPEC.md §12`.
 
 ### Protocole d'écriture — vérifié dans `midifile.c` (2026-07-17)
 

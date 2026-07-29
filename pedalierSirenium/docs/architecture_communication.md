@@ -13,10 +13,21 @@ flowchart TD
   A -->|"MIDI binaire 1–3 octets"| C["WebSocket (binaire)"]
   B --> D["WebSocketController"]
   C --> D
-  D -->|"état"| E["MessageRouter"]
+  D -->|"état"| E["batchReceived → LiveState"]
+  E --> H["vues 2D"]
   D -->|"octets MIDI"| F["MidiMonitorController"]
-  F --> G["SireniumMonitor / UI 3D"]
+  F -.->|"midiDataChanged — aucun auditeur"| G["(rien)"]
 ```
+
+> **État réel (2026-07)** : le canal JSON est le seul qui aboutisse. `MidiMonitorController` décode
+> toujours les octets et émet `midiDataChanged`, mais plus aucun composant vivant n'y est abonné ;
+> `MessageRouter` existe encore comme fichier mais n'est instancié nulle part. Le dispatch se fait
+> dans `WebSocketController` sur `json.device`, puis dans le `switch` de `main.qml` vers
+> `LiveState.applyX()`.
+>
+> Les messages sortants PD → QML sont par ailleurs **lissés à un par 40 ms** : `websocket-server.pd`
+> jette tout message arrivant à moins de 30 ms du précédent, et `pd webserver.spacer` (dans
+> `pedalier.pd`) sérialise la file. Ne pas supposer que deux champs liés arrivent ensemble.
 
 ## Encodage MIDI binaire
 

@@ -1,6 +1,6 @@
 # PedalierSirenium 🎵
 
-**Interface de contrôle 3D Qt6/QML pour 7 sirènes musicales via WebSocket**
+**Afficheur de looper Qt6/QML pour 7 sirènes musicales, piloté par PureData via WebSocket**
 
 [![Qt6](https://img.shields.io/badge/Qt-6.10+-green.svg)](https://www.qt.io/)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-Enabled-blue.svg)](https://webassembly.org/)
@@ -25,16 +25,18 @@
 
 ## 🎵 Vue d'ensemble
 
-PedalierSirenium est une **interface de contrôle 3D** développée en Qt6/QML pour la gestion de **7 sirènes musicales** via WebSocket. L'application offre un contrôle temps réel avec visualisation 3D, monitoring avancé et panneau de debug intégré.
+PedalierSirenium est l'**afficheur du looper** : une interface 2D Qt6/QML pour **7 sirènes musicales** et 8 pédales, entièrement pilotée par PureData via WebSocket. Elle ne décide de rien — **PureData est la source de vérité à l'exécution** ; l'application affiche l'état qu'il lui pousse.
+
+Depuis la refonte 2D, la scène Quick3D a disparu : plus de `View3D`, plus de composants 3D. La règle d'affichage retenue est **la couleur dit qui, la forme dit quoi** — la couleur reste réservée à l'identité des sirènes.
 
 ### ✨ Fonctionnalités principales
-- **🎛️ Contrôle en temps réel** : 7 sirènes via 8 pédales
-- **🎨 Interface 3D interactive** : Visualisation des états avec animations
-- **💾 Système de presets** : Sauvegarde/chargement/gestion
-- **📊 Monitoring système** : Température, performance, WebSocket en temps réel
-- **🐛 Debug panel** : Filtrage par catégories avec 11 types de logs
- - **🎬 Animations de boucles** : 4 états visuels (recording, playing, stopped, cleared)
-- **🌐 Déploiement web** : WebAssembly avec serveur Node.js
+- **🎛️ Affichage temps réel** : 7 sirènes × 8 pédales, 8 contrôleurs par croisement
+- **🎬 Boucles** : état de transport et paliers d'atterrissage par sirène
+- **🎭 Scènes et morceaux** : grille de scènes, morceau chargé, banques
+- **🎹 Sirenium** : note tenue, position du curseur sur l'ambitus, volet obturateur
+- **🌐 Déploiement web** : WebAssembly + serveur Node.js (cible de livraison)
+
+La cible finale est **WebAssembly dans un navigateur** ; les builds desktop n'existent que pour la vitesse de développement.
 
 ---
 
@@ -74,135 +76,85 @@ make
 ```
 
 ### 🎮 Utilisation
-1. **Interface 3D** : 7 sirènes avec animations temps réel
-2. **Configuration** : 8 pédales × 7 sirènes × 9 contrôleurs = 504 paramètres
-3. **Debug Panel** : `F12` ou bouton ⚙️ (monitoring, logs, performance)
-4. **Presets** : Sauvegarde/chargement dans l'interface
+1. **Vue de jeu** : boucles, scènes, morceau, sirenium — tout vient de PD
+2. **Vue de configuration** : bascule **`CFG`** en haut à droite ; matrice 8 pédales × 7 sirènes ×
+   8 contrôleurs = **448 paramètres** (`volume, vibratoSpeed, vibratoDepth, tremoloSpeed,
+   tremoloDepth, attack, release, voice`), tous en ±100 % de modulation sauf `voice` (±12 demi-tons)
+3. **Source de vérité** : `QtFiles/qml/qmlwebsocketserver/config.js` — pas cette page
+
+> Le panneau de debug n'est plus accessible (`F12` et le bouton engrenage n'ouvrent rien) : voir
+> « Ce qui est vivant, ce qui ne l'est pas ». Pour monter le niveau de log, passer par le code :
+> `logger.setAllCategories(4)`.
 
 ---
 
 ## 🏗️ Architecture
 
-### 📁 Structure du Projet
+### Le principe
+
+**PureData décide, le QML affiche.** L'application n'a aucune pile MIDI propre : PD se connecte à
+`ws://localhost:10000` et pousse tout l'état. Rien n'est calculé ici qui puisse l'être là-bas.
+
+`main.qml` câble tout à la main : pas de singleton QML, pas de type C++ enregistré. `main.cpp` est un
+`QQmlApplicationEngine` standard. Les contrôleurs reçoivent leurs collaborateurs par propriété — un
+oubli échoue silencieusement à l'exécution, pas à la compilation.
+
+### Chaîne de signal
+
 ```
-pedalierSirenium/
-├── 📄 README.md                    # Documentation principale
-├── 🔧 scripts/                     # Scripts de build et déploiement
-│   ├── build_run_web.sh           # Build WebAssembly + serveur Node.js
-│   ├── download_wasm.sh           # Téléchargement WASM depuis Google Drive
-│   ├── start.pedalier.sh          # Démarrage application pédalier
-│   ├── start.pupitre.sh           # Démarrage pupitre de contrôle
-│   ├── rtpmidi_connect.sh         # Connexion RTP-MIDI
-│   └── README_monitoring.md       # Documentation monitoring Raspberry Pi
-├── 🌐 webfiles/                    # Déploiement WebAssembly
-│   ├── qmlwebsocketserver.html    # Interface web générée
-│   ├── qmlwebsocketserver.js      # Application compilée JavaScript
-│   ├── qmlwebsocketserver.wasm    # Binaire WebAssembly (36MB)
-│   ├── qtloader.js                # Chargeur Qt pour WASM
-│   ├── server.js                  # Serveur HTTP local (port 8010)
-│   └── config.js                  # Configuration partagée
-├── 🎵 pd/                         # Patches Pure Data
-│   └── testQtSocketWidget.pd      # Test WebSocket et intégration
-└── 🏗️ QtFiles/                    # Sources Qt6/QML principales
-    ├── main.cpp                   # Point d'entrée C++
-    ├── CMakeLists.txt            # Configuration CMake
-    ├── data.qrc                  # Ressources Qt
-    └── qml/                      # Architecture QML complète
-        ├── icons/                # 19 icônes interface
-        ├── utils/                # Composants 3D réutilisables
-        └── qmlwebsocketserver/   # Application principale
-            ├── main.qml          # Window principale + View3D
-            ├── components/       # Composants UI modulaires
-            ├── controllers/      # Logique métier et communication
-            └── utils/           # Utilitaires application
+WebSocket ─┬─ texte ──→ WebSocketController ──→ batchReceived ──→ switch de main.qml
+           │                                                      └→ LiveState.applyX()
+           │                                                         └→ les vues 2D s'y lient
+           └─ binaire ─→ MidiMonitorController ──→ midiDataChanged ──→ (aucun auditeur vivant)
 ```
 
-### 📁 Détail des sous-dossiers QML
+`LiveState.qml` est l'unique objet d'état auquel toute l'interface 2D se lie. Ajouter un type de
+message, c'est : une branche `json.device` dans `WebSocketController`, un `case` dans le switch de
+`main.qml`, une méthode `applyX` sur `LiveState`. `SimulationHarness.qml` reproduit l'interface de
+`LiveState` pour que la vue vive sans PD — garder les deux en phase.
+
+### Structure du projet
+
 ```
-QtFiles/qml/
-└── qmlwebsocketserver/
-    ├── main.qml
+QtFiles/
+├── main.cpp                 # QQmlApplicationEngine + cap ~30 FPS (setSwapInterval(2))
+├── CMakeLists.txt           # Core Quick WebSockets — plus de Quick3D
+├── data.qrc                 # MANUEL : tout fichier non listé est absent à l'exécution
+└── qml/qmlwebsocketserver/
+    ├── main.qml             # fenêtre, câblage, switch onBatchReceived
     ├── Settings.qml
-    ├── config.js
-    ├── utils/
-    │   └── Logger.qml
-    ├── controllers/
-    │   ├── BeatController.qml
-    │   ├── MessageParser.qml
-    │   ├── MessageRouter.qml
-    │   ├── PedalConfigController.qml
-    │   ├── SirenController.qml
-    │   ├── WebSocketController.qml
-    │   └── MidiMonitorController.qml
-    ├── components/
-    │   ├── core/
-    │   │   ├── CategoryRow.qml
-    │   │   ├── SirenColumn.qml
-    │   │   └── SirenView.qml
-    │   ├── controls/
-    │   │   ├── ComboBox3D.qml
-    │   │   ├── ControlSection.qml
-    │   │   ├── PedalConfigPanel.qml
-    │   │   ├── PedalPresetManager.qml
-    │   │   ├── SceneButton.qml
-    │   │   ├── SceneGrid.qml
-    │   │   ├── SceneInfo.qml
-    │   │   ├── SceneManager.qml
-    │   │   ├── SceneNavigation.qml
-    │   │   ├── SceneSaveDialog.qml
-    │   │   └── TempoControl.qml
-    │   ├── debug/
-    │   │   └── DebugPanel.qml
-    │   ├── monitoring/
-    │   │   ├── PerformanceMonitor.qml
-    │   │   ├── PieChartAnimation.qml
-    │   │   ├── RevolutionCounter3D.qml
-    │   │   ├── SireniumMonitor.qml
-    │   │   ├── SirenStateMonitor.qml
-    │   │   ├── midi-display/
-    │   │   │   ├── SirenChannelMonitor3D.qml
-    │   │   │   ├── MusicalStaff3D.qml
-    │   │   │   ├── StaffClef3D.qml
-    │   │   │   ├── NoteMarker3D.qml
-    │   │   │   ├── VelocityBar3D.qml
-    │   │   │   ├── BendMeter3D.qml
-    │   │   │   ├── NoteHistoryTrail3D.qml
-    │   │   │   └── SirenSpecProvider.qml
-    │   │   └── SystemInfoReader.qml
-    │   └── ui/
-    │       ├── BottomControls.qml
-    │       ├── ConfigModeButton.qml
-    │       ├── ConnectionStatus.qml
-    │       └── ScenePageIndicator.qml
-    └── icons/ (png)
-    
-QtFiles/qml/qmlwebsocketserver/
-└── sirenSpec.json (configuration des clés/ambitus/canaux par sirène)
-
-QtFiles/qml/utils/
-└── (3D helpers)
-    ├── DigitLED3D.qml
-    ├── Knob.qml
-    ├── Knob3D.qml
-    ├── LEDSegment.qml
-    └── LEDText3D.qml
+    ├── config.js            # URL WebSocket, contrôleurs, ordre d'affichage
+    ├── sirenSpec.js         # LE fichier lu (le .json est documentaire)
+    ├── components/play/     # la vue de jeu
+    ├── components/config/   # la vue CFG
+    ├── controllers/         # WebSocketController, MidiMonitorController, MessageParser
+    └── utils/Logger.qml
+webfiles/                    # cible WASM servie par server.js (port 8010)
+deploy/                      # deploiement Mac vers Raspberry Pi
 ```
 
-### 🎛️ Couche de Contrôleurs (Business Logic)
-- **[WebSocketController](QtFiles/qml/qmlwebsocketserver/controllers/WebSocketController.qml)** : Communication WebSocket avec routage automatique
-- **[PedalConfigController](QtFiles/qml/qmlwebsocketserver/controllers/PedalConfigController.qml)** : Gestion matrice 8×7×9 avec presets
-- **[SirenController](QtFiles/qml/qmlwebsocketserver/controllers/SirenController.qml)** : Contrôle des 7 sirènes 3D
-- **[BeatController](QtFiles/qml/qmlwebsocketserver/controllers/BeatController.qml)** : Synchronisation temporelle et animations
-- **[MessageRouter](QtFiles/qml/qmlwebsocketserver/controllers/MessageRouter.qml)** : Routage intelligent des messages par batch
-- **[MessageParser](QtFiles/qml/qmlwebsocketserver/controllers/MessageParser.qml)** : Parsing JSON et aplatissement en chemins hiérarchiques
+### Ce qui est vivant, ce qui ne l'est pas
 
-### 🖼️ Interface Utilisateur 3D
-- **[SirenView](QtFiles/qml/qmlwebsocketserver/components/core/SirenView.qml)** : Vue 3D principale avec 7 sirènes
-- **[PedalConfigPanel](QtFiles/qml/qmlwebsocketserver/components/controls/PedalConfigPanel.qml)** : Matrice de configuration interactive 8×7×9
-- **[SceneManager](QtFiles/qml/qmlwebsocketserver/components/controls/SceneManager.qml)** : Interface de gestion des scènes (grille 2×4, navigation pages)
-- **[DebugPanel](QtFiles/qml/qmlwebsocketserver/components/debug/DebugPanel.qml)** : Panneau debug complet avec 3 onglets
+La refonte 2D a laissé beaucoup de code en place sans le débrancher : **22 des 41 fichiers QML sont
+orphelins**, c'est-à-dire inatteignables depuis `main.qml` (aucun chargement dynamique ne les
+rattrape non plus). Ne pas les lire comme une description de ce qui tourne.
 
----
+**Vivant** — `components/play/` : `LiveState`, `SimulationHarness`, `ClockBar2D`, `SongMap2D`,
+`SirenRingRow2D`, `Ring2D`, `FocusDial2D`, `ChordCartouche2D`, `ModeMark2D`, `SireniumMonitor2D` ;
+`components/config/` : `ConfigView2D`, `ModulationMatrix2D`, `PedalboardPortrait2D` ;
+`controllers/` : `WebSocketController`, `MidiMonitorController`, `MessageParser` ; `utils/Logger`.
+
+**Orphelin** — tout `components/controls/` (scènes, presets, panneaux de pédales), tout
+`components/monitoring/`, tout `components/ui/`, `components/debug/DebugPanel` et son
+`components/core/CategoryRow`, plus `controllers/MessageRouter` et
+`controllers/PedalConfigController`. Les composants disparus de l'ancienne interface 3D
+(`SirenView`, `SirenColumn`, `SirenController`, `BeatController`, `SirenSpecProvider`) n'existent
+plus du tout.
+
+Conséquence pratique : le **panneau de debug est inaccessible**. L'ancien raccourci `F12` et le
+bouton engrenage n'ouvrent plus rien ; la bascule visible est **`CFG`** en haut à droite, qui
+alterne vue de jeu et vue de configuration.
+
 
 ## 📡 Protocole WebSocket (hybride)
 
@@ -212,10 +164,22 @@ ws://localhost:10000
 ```
 
 ### 🧭 Canaux de transport
-- **Texte (JSON)**: monitoring et état applicatif (boucles, scènes, voix, presets, horloge agrégée).
-- **Binaire (1–3 octets)**: événements MIDI temps réel (clock 0xF8/FA/FB/FC, Note On/Off, CC, Pitch Bend).
 
-Cette séparation minimise la latence pour les événements MIDI tout en gardant un monitoring lisible et extensible.
+Un seul socket, trois canaux **asymétriques** — c'est l'asymétrie qu'il faut retenir :
+
+- **Texte entrant (JSON)** : état applicatif (boucles, scènes, voix, presets, horloge). Dispatché sur
+  `json.device` : `SIREN_LOOPER`, `SIREN_PEDALS`, `LOOPER_SCENES`, `SIRENIUM`, `VOICE_SELECT`.
+- **Binaire entrant (1–3 octets)** : événements MIDI bruts. **Décodés puis abandonnés** :
+  `MidiMonitorController` émet `midiDataChanged`, mais plus aucun composant vivant n'y est abonné.
+  Les vues 2D sont pilotées uniquement par le canal JSON.
+- **Sortant (JSON)** : envoyé via **`socket.sendBinaryMessage(jsonString)`**. PD attend des trames
+  binaires ; passer à `sendTextMessage` casse silencieusement toutes les commandes sortantes.
+
+**Débit imposé : un message par 40 ms.** L'abstraction tierce `websocket-server.pd` jette tout
+message arrivant moins de **30 ms** après le précédent (un `[spigot]` + `[delay 30]` en série sur son
+inlet texte). Le correctif est côté PD, dans `pedalier.pd` : `pd webserver.spacer` met les JSON en
+file et en libère un par tick de `$0.monitoring.jitter` (`[metro 40]`). Conséquence ici : **ne pas
+supposer que deux champs liés arrivent dans la même trame**.
 
 ### 📤 Messages envoyés par le client (JSON)
 
@@ -341,21 +305,16 @@ Remarque: PureData doit ouvrir une connexion WebSocket sur `ws://localhost:10000
 
 ### 🎼 Spécification des sirènes (sirenSpec)
 
-- But: décrire, par sirène, la clé de portée, l'ambitus (notes MIDI min/max), la transposition, la couleur, le canal, et les métadonnées de bend spécifiques au dispositif.
+- But: décrire, par sirène, la clé de portée, l'ambitus (notes MIDI min/max), la transposition, la couleur et le canal.
 - Emplacement fichier (option): `QtFiles/qml/qmlwebsocketserver/sirenSpec.json`
 - Chargement dynamique (option): via WebSocket texte
 
 Note sur le pitch bend par sirène:
-- Certaines sirènes utilisent un bend non standard codé sur 13 bits, avec centre 4096 et plage ±4096.
 - On n'impose pas d'unité “par demi‑ton” dans le spec; la conversion/maths est laissée au traitement applicatif pour garantir une transition continue entre les demi‑tons.
 
 Exemple `sirenSpec.json` minimal:
 ```json
 {
-  "meta": {
-    "bendBits": 13,
-    "bendCenter": 4096
-  },
   "siren1": {
     "label": "S1",
     "channel": 0,
@@ -380,7 +339,6 @@ Exemple chargement par WebSocket:
 {
   "device": "SIREN_SPEC",
   "spec": {
-    "meta": { "bendBits": 13, "bendCenter": 4096 },
     "siren1": { "label": "S1", "channel": 0, "clef": "treble", "ambitus": { "min": 48, "max": 84 }, "transpose": 0, "color": "#4CAF50" }
   }
 }
@@ -641,66 +599,62 @@ Les valeurs représentent des **pourcentages de modulation** de **-100 à +100**
 
 ## 📊 Monitoring & Debug
 
-### 🌡️ Informations Système
+### 🌡️ Informations système
 
-**✅ Nouveau :** Les informations système sont obtenues via des requêtes HTTP REST vers le serveur Node.js, qui lit directement les données système en temps réel.
-
-#### 🔧 API REST du serveur Node.js
-Le serveur `webfiles/server.js` expose deux endpoints pour les informations système :
+Le serveur `webfiles/server.js` expose trois endpoints REST :
 
 ```bash
-# Température CPU uniquement
-GET http://192.168.1.21:8010/api/temperature
-# Réponse: {"temperature": 45.2}
-
-# Informations système complètes (lecture directe)
-GET http://192.168.1.21:8010/api/system-info
-# Réponse: {"temperature":45.2,"cpu":33.3,"memory":38.5,"uptime":72.90,"network":"RX:663669 TX:111165"}
+GET /api/temperature   # {"temperature": 45.2}
+GET /api/system-info   # {"temperature":45.2,"cpu":33.3,"memory":38.5,"uptime":72.90,"network":"RX:… TX:…"}
+GET /api/config        # {"websocketUrl":"ws://localhost:10000"}
 ```
 
-**⚠️ Note :** Les informations de performance ne sont pas gérées par le serveur WebSocket mais par l'API REST ci-dessus.
+Les deux premiers appellent des commandes Linux : sur macOS ils répondent, mais avec des zéros. Ils
+sont utiles sur le Raspberry Pi.
 
-#### 📝 Configuration requise
-1. **Serveur Node.js** : Le serveur doit être démarré sur le Raspberry Pi
-2. **IP du serveur** : Configurer l'IP du Raspberry Pi dans `SystemInfoReader.qml`
-3. **Permissions** : Le serveur Node.js doit pouvoir exécuter les commandes système
+> **Personne ne les affiche.** Leur unique client QML, `SystemInfoReader.qml`, est orphelin et pointe
+> en dur vers `http://192.168.1.21:8010`. Les données sont donc accessibles au `curl`, et à rien
+> d'autre.
 
-#### ✅ Avantages de cette approche
-- ✅ **Accès distant** : Fonctionne depuis n'importe où via IP
-- ✅ **API REST** : Facile à tester et debugger
-- ✅ **Temps réel** : Données fraîches à chaque requête
-- ✅ **Pas de fichiers** : Plus besoin de scripts cron ou de logs
-- ✅ **Extensible** : Peut ajouter d'autres endpoints facilement
-- ✅ **Performance** : Requêtes HTTP optimisées toutes les 5 secondes
+### 🐛 Journalisation
 
-### 🐛 Système de debug
+Le **panneau de debug n'est plus atteignable** (`DebugPanel.qml` n'est instancié nulle part). Pour
+régler les niveaux, passer par le code : `logger.setAllCategories(4)`, ou catégorie par catégorie
+(`logger.levelScenes = 4`).
 
-#### 📊 Interface de Monitoring (DebugPanel)
-Le monitoring est accessible via le **DebugPanel** (`F12`) avec 3 sections :
+**Tout est à OFF par défaut**, sauf `SCENES` et `MIDI` à INFO — un `logger.debug(...)` neuf n'affiche
+donc rien tant que sa catégorie n'est pas montée. Une catégorie **inconnue** retombe silencieusement
+sur INFO, ce qui explique que des noms ad hoc (`SYSTEM`, `MONITORING`) semblent fonctionner.
 
-- **🐛 Debug** : Logs par catégories avec filtres
-- **📊 Monitoring** : État des sirènes (pings via `sirenPings`) et superposition MIDI live (note/vélocité) dans `SirenStateMonitor` + options d’affichage
-- **⚡ Performance** : Température CPU, performance système, WebSocket
+Utiliser les méthodes de confort — `logger.info/debug/warn/error/trace(category, …)` — et **pas**
+`logger.log(...)`, dont la signature est `(level, category, …)` : d'anciens appels passent les deux
+à l'envers et ne journalisent pas ce qu'ils annoncent.
 
-#### 📊 Catégories de logs
-- **WEBSOCKET** 🌐 : Communication WebSocket
-- **PRESET** 💾 : Gestion des presets
-- **KNOB** 🎛️ : Interactions avec les contrôleurs
-- **ANIMATION** 🎬 : Animations 3D et visuelles
-- **ROUTER** 🔀 : Routage des messages
-- **PARSER** 📝 : Parsing des données
-- **SCENE** 🎭 : Gestion des scènes (sauvegarde, chargement, navigation)
-- **BATCH** 📦 : Traitement des messages batch (scenesList, sceneLoaded, etc.)
-- **INIT** 🚀 : Initialisation des composants
+#### Niveaux
 
-#### 📊 Niveaux de logs
-- **0** : OFF (désactivé)
-- **1** : ERROR (erreurs uniquement)
-- **2** : WARN (avertissements et erreurs)
-- **3** : INFO (informations, avertissements et erreurs)
-- **4** : DEBUG (tout, y compris debug détaillé)
+| 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| OFF | ERROR | WARN | INFO | DEBUG | TRACE |
 
----
+#### Catégories
+
+`WEBSOCKET` 🌐 · `CLOCK` ⏰ · `VOICE` 🎤 · `ANIMATION` 🎬 · `BATCH` 📦 · `RECORDING` 🔴 ·
+`PRESET` 💾 · `KNOB` 🎛️ · `ROUTER` 🔀 · `PARSER` 📊 · `INIT` 🚀 · `SCENES` 🎭 · `MIDI` 🎛️
+
+### 🌐 Le serveur Node.js n'est pas optionnel
+
+Pour un lancement navigateur, `webfiles/server.js` est indispensable : il pose les en-têtes
+**COOP/COEP** exigés par Qt WASM et **injecte un script** qui renvoie `console.*` et les erreurs
+fenêtre vers `POST /log`. C'est le canal de debug principal en WASM :
+
+```bash
+tail -n 120 /tmp/webfiles_server.log | sed -e 's/\x1b\[[0-9;]*m//g'
+curl -s http://localhost:8010/logs | jq .        # aussi /logs/stream (SSE)
+```
+
+Servir `qmlwebsocketserver.html` en fichier statique saute l'injection et les en-têtes : la page ne
+démarre pas correctement.
+
 
 ## 🔧 Scripts & Outils
 
@@ -771,48 +725,45 @@ flowchart TD
   F --> G["SireniumMonitor / UI 3D"]
 ```
 
-## 🎛️ SireniumMonitor : Monitoring MIDI en temps réel
+## 🎛️ SireniumMonitor2D : la note source
 
-Le composant `SireniumMonitor` affiche en temps réel la note, la vélocité et le pitch bend reçus du Sirénium, sous forme de digits LED 3D colorés (basé sur `DigitLED3D`).
+`components/play/SireniumMonitor2D.qml` montre ce que joue le sirenium **avant harmonisation**. Il se
+lit à gauche du cartouche d'accord : la note source d'un côté, ce que l'harmoniseur en fait de
+l'autre.
 
-- **Affichage** :
-  - Note (2 digits, rouge)
-  - Vélocité (3 digits, turquoise)
-  - Bend (4 digits, bleu)
-- **Emplacement** :
-  - Placé juste au-dessus de la barre de contrôles (`BottomControls`) dans la fenêtre principale.
-- **Connexion** :
-  - Les propriétés `note`, `velocity` et `bend` sont mises à jour automatiquement via les messages MIDI reçus par WebSocket.
+Trois informations, sur une largeur de 156 px :
 
-### Exemple d'intégration (main.qml)
+| Élément | Source | Lecture |
+|---|---|---|
+| Nom de note + octave | `note` | convention française, Do3 = MIDI 60 |
+| Curseur sur l'ambitus | `note` | piste verticale, Do2 en bas → Do5 en haut, repères sur Do3 et Do4 |
+| Volet obturateur | `velocity` | fente qui s'ouvre depuis le centre, fermée à 0, pleine à 127 |
+
+**Le bend n'est plus lu.** C'est la note qui place le curseur : l'ambitus du sirenium fait 3 octaves
+à partir de MIDI 48, et le mapping vit ici (`ambitusLow` / `ambitusRange`), pas dans PD. Une note hors
+ambitus vient buter contre l'extrémité au lieu de disparaître ; sans note tenue, le curseur s'efface.
+
+La vélocité `1` désigne une **note fantôme** — moteur en rotation mais muet : elle reste distinguée
+par l'opacité, comme la note. Les couleurs restent neutres, la couleur étant réservée à l'identité
+des sirènes.
+
+### Alimentation
+
+Le composant est purement passif : `main.qml` le lie à `LiveState`, qui reçoit le device JSON
+`SIRENIUM` (champs `note` et `velocity`) émis par `pd sirenium.monitoring` côté PD.
+
 ```qml
-SireniumMonitor {
-    id: sireniumMonitor
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.bottom: bottomControls.top
-    anchors.bottomMargin: 12
-    height: 120
-    note: midiNote
-    velocity: midiVelocity
-    bend: midiBend
+SireniumMonitor2D {
+    Layout.preferredWidth: 156
+    Layout.fillHeight: true
+    note: window.state.sireniumNote
+    velocity: window.state.sireniumVelocity
 }
 ```
 
-### Connexion aux données MIDI
-Dans le contrôleur WebSocket ou le handler de réception MIDI, mettez à jour les propriétés :
-```qml
-// Exemple générique
-onMidiMessageReceived: function(note, velocity, bend) {
-    midiNote = note;
-    midiVelocity = velocity;
-    midiBend = bend;
-}
-```
+`window.state` est soit `LiveState` (PD connecté), soit `SimulationHarness` (sans PD) — les deux
+exposent la même interface.
 
-Le composant permet ainsi un monitoring visuel élégant et immédiat de l'activité MIDI du Sirénium.
-
----
 
 ## 📋 TODO — Communication hybride (JSON + MIDI binaire)
 
@@ -830,52 +781,47 @@ Le composant permet ainsi un monitoring visuel élégant et immédiat de l'activ
 - [x] JSON monitoring (`sirenPings`/`sirenStates`) routé via `monitoringDataReceived`
 - [x] Affichage du nom de note dans `SireniumMonitor` (entre NOTE et VEL) pour le debug
 
-### 🧩 Phase 3 — Monitoring par sirène (portée 3D dans SirenView)
-- [x] Intégrer `midi-display/` dans `SirenView` via `SirenChannelMonitor3D` (1 panneau par sirène)
-- [x] Câblage MIDI par canal vers chaque `SirenColumn` (`applyMidi(note, velocity, bend, channel)`)
-- [x] Utiliser `sirenSpec` (clé, ambitus, transpose, canal, couleur) via `SirenSpecProvider` (WASM-safe)
-- [ ] Afficher la note sur la portée avec `MusicalStaff3D` + `NoteMarker3D` (mapping vertical précis clef/ambitus; bend 13 bits centre=4096)
-- [x] Afficher la vélocité (`VelocityBar3D`) et le pitch bend (`BendMeter3D`, centre=4096)
-- [ ] Mode historique focus (clic sur la portée):
-  - [ ] Masquer les autres portées, afficher une portée étendue paramétrable (`measuresCount`)
-  - [ ] Alimenter l’historique (tampon borné) et rendu par `NoteHistoryTrail3D`
-  - [ ] Porte de sortie claire: clic de retour, bouton fermer, touche Esc
-- [ ] Prise en compte de l’horloge (24 ppq) pour la quantification et l’alignement temporel (figures simples + triolets)
-- [ ] `SireniumMonitor` reste dédié au résumé; exception temporaire: affichage du nom de note (debug)
+### 🧩 Phase 3 — Refonte 2D (faite, remplace l'ancienne Phase 3 « portée 3D »)
 
-#### Prochaines étapes immédiates (Phase 3)
-- Finaliser le mapping note→Y sur la portée selon `clef` et `ambitus` (transposition incluse)
-- Appliquer la courbe de `pitch bend` (13 bits, centre 4096) au déplacement continu du `NoteMarker3D`
+L'ancienne feuille de route visait un monitoring par sirène en 3D (`SirenChannelMonitor3D`,
+`MusicalStaff3D`, `NoteMarker3D`, `VelocityBar3D`, `BendMeter3D`, `NoteHistoryTrail3D`, dans
+`SirenView` / `SirenColumn`). **Tout cela a été abandonné et supprimé** : le pédalier est devenu un
+afficheur de looper 2D. Ces composants n'existent plus, ni la couche `SirenSpecProvider`.
 
-#### Retours d’expérience (V1 clé de sol en texture)
-- Tentative V1: `Shape` 2D → `Texture` → quad 3D (clé de sol) → trop fragile sous WASM (alpha/blend, primitives `#Plane` non dispo).
-- Effets observés: bande opaque, besoins d’offsets énormes (mismatch d’échelle), erreurs `alphaMode/transparencyMode` dépendant des matériaux.
-- Décision: retirer la clé de sol (temporaire) et basculer vers V2 (SDF/shader) pour un rendu net et robuste sans quad texturé.
+- [x] Suppression de la scène Quick3D et de tous les composants 3D
+- [x] `LiveState` comme état unique, `SimulationHarness` en miroir pour tourner sans PD
+- [x] Vue de jeu 2D : boucles, paliers, scènes, morceau, cartouche d'accord
+- [x] Vue de configuration (bascule `CFG`) : matrice de modulation, pédalier en portrait
+- [x] Sirenium : curseur sur l'ambitus (note) et volet obturateur (vélocité)
+- [x] Retrait de Quick3D du projet (`find_package`, `main.cpp`, dernier import)
 
-### 🎼 Phase 4 — Partition Interactive
-- [ ] Intégrer la quantification (24 ppq) et produire des données `{bar, beat, pos, duration, figure, triplet?}` par sirène
-- [ ] Rendu des figures simples (ronde, blanche, noire, croche, double) + triolets basiques
-- [ ] Groupes de croches (beams) simples par temps
-- [ ] Interaction tactile: bascule focus historique, réglage `measuresCount`, navigation mesures
+### 🧹 Dette connue
+
+- [ ] **22 fichiers QML orphelins** — voir « Ce qui est vivant, ce qui ne l'est pas ». Décider pour
+      chacun : rebrancher ou supprimer.
+- [ ] **Panneau de debug inaccessible** — `DebugPanel` n'est instancié nulle part alors qu'il a reçu
+      de nouvelles fonctions (onglet Orchestre). Choisir où le rouvrir maintenant que `CFG` occupe
+      le coin haut droit.
+- [ ] **Canal binaire MIDI sans consommateur** — `midiDataChanged` n'a plus d'auditeur vivant.
+      Le rebrancher ou assumer que tout passe par le JSON.
+- [ ] **`SystemInfoReader` orphelin et IP en dur** (`192.168.1.21`) alors que les endpoints REST
+      existent et répondent.
+- [ ] Quantification rythmique (24 ppq) et rendu de partition : jamais implémentés.
 
 ### 🔧 Phase 5 — Optimisation et Tests
-- [ ] Latence et charge: validation hot‑path (binaire), cadencement UI, coûts rendu 3D
-- [ ] Compatibilité: tests Linux/macOS/Web
-- [ ] Doc finale: captures, exemples JSON (sirenSpec, notation), guide d’intégration
+- [ ] Latence et charge : cadencement UI, effet du lissage à 40 ms sur la fraîcheur affichée
+- [ ] Compatibilité : tests Linux/macOS/Web
+- [ ] Doc finale : captures, exemples JSON, guide d'intégration
 
 ---
 
 ## ✅ Statut du Projet
 
-- ✅ **Interface 3D** : Vue des 7 sirènes avec animations
-- ✅ **Contrôle en temps réel** : 504 paramètres configurables
-- ✅ **Système de presets** : Sauvegarde/chargement/gestion
+- ✅ **Interface 2D** : vue de jeu + vue de configuration, plus aucune 3D
+- ✅ **Affichage temps réel** : 448 paramètres (8 pédales × 7 sirènes × 8 contrôleurs)
 - ✅ **Gestion des scènes** : 64 scènes (8 pages × 8 scènes)
-- ✅ **Monitoring système** : Température, CPU, RAM, WebSocket
-- ✅ **Debug panel** : Interface complète avec filtres
-- ✅ **Déploiement web** : WebAssembly avec serveur Node.js
-- ✅ **Documentation** : README complet avec exemples
-
----
-
-**🎵 PedalierSirenium** - Interface de contrôle 3D pour sirènes musicales via WebSocket 
+- ✅ **Sirenium** : curseur sur l'ambitus et volet obturateur
+- ✅ **Déploiement web** : WebAssembly + serveur Node.js
+- ✅ **Déploiement Pi** : `deploy/pedalier-deploy.sh`, systemd `--user`
+- ⚠️ **Monitoring système** : endpoints REST présents, aucun affichage vivant
+- ⚠️ **Panneau de debug** : présent dans l'arbre, inatteignable à l'exécution

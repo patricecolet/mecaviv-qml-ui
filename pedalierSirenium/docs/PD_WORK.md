@@ -37,7 +37,9 @@ Cible :
 - **Clip = matériel nu** : `loop.N.txt` + propriétés intrinsèques (taille, rapport, statut de
   référence). Plus de mode dedans.
 - **Scène = couche** : 7 cellules `(clipRef, mode)` + bloc `harmony`. Pool de clips partagé (déjà en
-  place sous forme de dossiers `clip_XXX/`).
+  place — fichiers à plat `clip_XXX.mid` + `clip_XXX.json`, **pas** de dossier par clip ; la sirène
+  d'origine est un champ (`siren`) dans le `.json`, pas une partie du chemin — un `clipId` donné est
+  donc lié à une seule sirène, celle qui l'a enregistré).
 
 ### 2. Enrichir `scenesList` — l'état des 7 sirènes par scène
 
