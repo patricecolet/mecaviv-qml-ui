@@ -21,7 +21,7 @@ flowchart TD
 
 > **État réel (2026-07)** : le canal JSON est le seul qui aboutisse. `MidiMonitorController` décode
 > toujours les octets et émet `midiDataChanged`, mais plus aucun composant vivant n'y est abonné ;
-> `MessageRouter` existe encore comme fichier mais n'est instancié nulle part. Le dispatch se fait
+> `MessageRouter` a été supprimé avec les autres orphelins. Le dispatch se fait
 > dans `WebSocketController` sur `json.device`, puis dans le `switch` de `main.qml` vers
 > `LiveState.applyX()`.
 >

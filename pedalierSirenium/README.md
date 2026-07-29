@@ -133,27 +133,25 @@ webfiles/                    # cible WASM servie par server.js (port 8010)
 deploy/                      # deploiement Mac vers Raspberry Pi
 ```
 
-### Ce qui est vivant, ce qui ne l'est pas
+### Tout ce qui reste est vivant
 
-La refonte 2D a laissé beaucoup de code en place sans le débrancher : **22 des 41 fichiers QML sont
-orphelins**, c'est-à-dire inatteignables depuis `main.qml` (aucun chargement dynamique ne les
-rattrape non plus). Ne pas les lire comme une description de ce qui tourne.
+La refonte 2D avait laissé une cinquantaine de fichiers en place sans les débrancher. **Les 25
+orphelins ont été supprimés** (2026-07) : tout `components/controls/`, `components/monitoring/`,
+`components/ui/`, `components/debug/`, `components/core/`, plus `controllers/MessageRouter`,
+`controllers/PedalConfigController` et `qml/utils/` (`Knob`, `MusicUtils`, `VirtualKeyboard`). Les
+composants de l'ancienne interface 3D (`SirenView`, `SirenColumn`, `SirenController`,
+`BeatController`, `SirenSpecProvider`) avaient déjà disparu avant.
 
-**Vivant** — `components/play/` : `LiveState`, `SimulationHarness`, `ClockBar2D`, `SongMap2D`,
-`SirenRingRow2D`, `Ring2D`, `FocusDial2D`, `ChordCartouche2D`, `ModeMark2D`, `SireniumMonitor2D` ;
-`components/config/` : `ConfigView2D`, `ModulationMatrix2D`, `PedalboardPortrait2D` ;
-`controllers/` : `WebSocketController`, `MidiMonitorController`, `MessageParser` ; `utils/Logger`.
+Il reste **19 fichiers QML**, tous atteignables depuis `main.qml`. Le wasm est passé de 31,5 à
+26,7 Mo au passage (les icônes et textures 3D inutilisées ont quitté `data.qrc` en même temps).
 
-**Orphelin** — tout `components/controls/` (scènes, presets, panneaux de pédales), tout
-`components/monitoring/`, tout `components/ui/`, `components/debug/DebugPanel` et son
-`components/core/CategoryRow`, plus `controllers/MessageRouter` et
-`controllers/PedalConfigController`. Les composants disparus de l'ancienne interface 3D
-(`SirenView`, `SirenColumn`, `SirenController`, `BeatController`, `SirenSpecProvider`) n'existent
-plus du tout.
+Conséquence : il n'y a **plus de panneau de debug**. L'ancien raccourci `F12` et le bouton engrenage
+n'ouvraient déjà plus rien ; la seule bascule est **`CFG`** en haut à droite, qui alterne vue de jeu
+et vue de configuration. Pour régler les niveaux de log, passer par le code
+(`logger.setAllCategories(4)`).
 
-Conséquence pratique : le **panneau de debug est inaccessible**. L'ancien raccourci `F12` et le
-bouton engrenage n'ouvrent plus rien ; la bascule visible est **`CFG`** en haut à droite, qui
-alterne vue de jeu et vue de configuration.
+Si un besoin de panneau revient, le code supprimé reste dans l'historique — le commit
+« enregistrer l'état du panneau de debug avant suppression » le fige juste avant.
 
 
 ## 📡 Protocole WebSocket (hybride)
@@ -720,9 +718,10 @@ flowchart TD
   A -->|"MIDI binaire 1–3 octets"| C["WebSocket (binaire)"]
   B --> D["WebSocketController"]
   C --> D
-  D -->|"état"| E["MessageRouter"]
+  D -->|"état"| E["batchReceived → LiveState"]
+  E --> H["vues 2D"]
   D -->|"octets MIDI"| F["MidiMonitorController"]
-  F --> G["SireniumMonitor / UI 3D"]
+  F -.->|"midiDataChanged — aucun auditeur"| G["(rien)"]
 ```
 
 ## 🎛️ SireniumMonitor2D : la note source
@@ -797,15 +796,15 @@ afficheur de looper 2D. Ces composants n'existent plus, ni la couche `SirenSpecP
 
 ### 🧹 Dette connue
 
-- [ ] **22 fichiers QML orphelins** — voir « Ce qui est vivant, ce qui ne l'est pas ». Décider pour
-      chacun : rebrancher ou supprimer.
-- [ ] **Panneau de debug inaccessible** — `DebugPanel` n'est instancié nulle part alors qu'il a reçu
-      de nouvelles fonctions (onglet Orchestre). Choisir où le rouvrir maintenant que `CFG` occupe
-      le coin haut droit.
-- [ ] **Canal binaire MIDI sans consommateur** — `midiDataChanged` n'a plus d'auditeur vivant.
-      Le rebrancher ou assumer que tout passe par le JSON.
-- [ ] **`SystemInfoReader` orphelin et IP en dur** (`192.168.1.21`) alors que les endpoints REST
-      existent et répondent.
+- [x] ~~22 fichiers QML orphelins~~ — supprimés, ainsi que `qml/utils/` (25 au total)
+- [x] ~~Panneau de debug inaccessible~~ — supprimé plutôt que rebranché ; le code reste dans
+      l'historique si le besoin revient
+- [x] ~~`SystemInfoReader` orphelin~~ — supprimé. Les endpoints REST `/api/temperature`,
+      `/api/system-info` et `/api/config` existent toujours côté `server.js` et répondent : plus
+      aucun client QML ne les lit, à rebrancher le jour où un affichage système est voulu (sans IP
+      en dur, cette fois)
+- [ ] **Canal binaire MIDI sans consommateur** — `MidiMonitorController` décode et émet
+      `midiDataChanged`, plus personne n'écoute. Le rebrancher ou assumer que tout passe par le JSON.
 - [ ] Quantification rythmique (24 ppq) et rendu de partition : jamais implémentés.
 
 ### 🔧 Phase 5 — Optimisation et Tests
