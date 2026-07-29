@@ -2,10 +2,6 @@
 // Usage in QML: import "../sirenSpec.js" as SirenSpec; SirenSpec.SPEC
 
 var SPEC = {
-  meta: {
-    bendBits: 13,
-    bendCenter: 4096
-  },
   siren1: {
     label: "S1",
     channel: 0,
@@ -34,7 +30,7 @@ var SPEC = {
     label: "S4",
     channel: 3,
     clef: "bass",
-    ambitus: { min: 30, max: 79 },
+    ambitus: { min: 36, max: 79 },
     transpose: 0,
     color: "#66E4F2"
   },
