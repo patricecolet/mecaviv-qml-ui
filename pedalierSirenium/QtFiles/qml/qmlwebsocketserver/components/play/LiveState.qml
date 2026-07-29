@@ -181,6 +181,9 @@ QtObject {
         if (!data) return;
         _activeSceneId = data.sceneId || data.id || data.globalSceneId || -1;
         if (data.page !== undefined) currentBank = data.page;
+        // La scène porte sa sirène principale : charger une scène la change sans
+        // qu'on touche à la pédale key, donc sans VOICE_SELECT (0 = aucune).
+        if (data.siren !== undefined) monoSiren = data.siren;
         _rebuildSections();
         _applyHarmonyFromActiveScene();
     }
