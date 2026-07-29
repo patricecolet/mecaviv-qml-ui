@@ -61,31 +61,33 @@ On-device the pedalier runs under **systemd `--user`** (`pedalier.target`: rtpmi
 
 One socket, three asymmetric channels — this asymmetry is the thing to internalize:
 
-- **Inbound text** = JSON application state (loops, scenes, presets, clock, `sirenPings`). Handled in `WebSocketController.onTextMessageReceived`, dispatched by `json.device` (`SIREN_LOOPER` / `SIREN_PEDALS` / `LOOPER_SCENES`) into `batchReceived(batchType, data)`.
-- **Inbound binary** = raw MIDI, 1 or 3 bytes, forwarded straight to `MidiMonitorController.applyExternalMidiBytes`. This is the hot path — it is deliberately log-free (per-event logs are TRACE only, with a 1000 ms aggregate summary instead). Keep it cheap.
+- **Inbound text** = JSON application state (loops, scenes, presets, clock, `sirenPings`). Handled in `WebSocketController.onTextMessageReceived`, dispatched by `json.device` (`SIREN_LOOPER` / `SIREN_PEDALS` / `LOOPER_SCENES` / `SIRENIUM` / `VOICE_SELECT`) into `batchReceived(batchType, data)`.
+
+  `SIRENIUM` carries only `note` and `velocity` — **the bend is no longer sent**. The note places the cursor on the sirenium's ambitus (3 octaves from MIDI 48) and the velocity opens the shutter; both mappings live in `SireniumMonitor2D.qml` (`ambitusLow` / `ambitusRange`), not in PD. PD emits raw values and does not say what they mean.
+- **Inbound binary** = raw MIDI, 1 or 3 bytes, forwarded straight to `MidiMonitorController.applyExternalMidiBytes`, which decodes and re-emits `midiDataChanged`. **Nothing live listens to that signal any more**: its only subscriber is `DebugPanel.qml`, which is dead code (see Gotchas). The binary channel therefore currently ends in a no-op — the 2D views are driven entirely by the JSON channel. Decide deliberately before wiring anything new onto it.
 - **Outbound** = JSON, but sent via **`socket.sendBinaryMessage(jsonString)`**, marked `@CRITICAL: Ne pas changer - binaire requis` in `WebSocketController.sendMessage`. PD expects binary frames. Switching to `sendTextMessage` silently breaks every outgoing command.
 
 1-byte frames (clock `0xF8`, start/continue/stop `0xFA`/`0xFB`/`0xFC`) are currently counted and dropped in `applyExternalMidiBytes`; only 3-byte channel messages (Note On/Off, CC, Pitch Bend) update state. Clock-driven quantization is unimplemented (README Phase 4).
+
+**Messages arrive throttled to one per 40 ms, by design on the PD side.** The `websocket-server.pd` abstraction (third-party, vendored in `puredata-abstractions/application.layer/`) silently drops any message arriving less than **30 ms** after the previous one — a `[spigot]` + `[delay 30]` wired in series on its text inlet, inside `pd HOWTO-SEND` despite that name. Two JSON built in the same PD bang used to lose one. The fix lives on our side, not in the vendored patch: `pd webserver.spacer` in `pedalier.pd` queues outgoing JSON and releases one per tick of `$0.monitoring.jitter` (`[metro 40]`). Consequence to keep in mind here: a burst of state from PD is spread over time, so **don't assume two related fields land in the same frame**.
 
 ### Signal chain
 
 `main.qml` wires everything by hand; there are no QML singletons and no C++ types registered — `main.cpp` is a stock `QQmlApplicationEngine` loading `qrc:/qml/qmlwebsocketserver/main.qml`. Controllers are plain `Item`/`QtObject` instances that receive their collaborators as properties (`logger`, `webSocketController`, …), so a missing assignment fails silently at runtime rather than at compile time.
 
 ```
-WebSocket ─┬─ text ──→ WebSocketController ──→ batchReceived ──→ MessageRouter ──→ SirenController / BeatController
-           │                                                                      PedalConfigController / SceneManager / TempoControl
-           └─ binary ─→ MidiMonitorController ──→ midiDataChanged ──→ SirenView ──→ SirenColumn.applyMidi
+WebSocket ─┬─ text ──→ WebSocketController ──→ batchReceived ──→ main.qml switch ──→ LiveState.apply*()
+           │                                                                        └→ the 2D views bind to LiveState
+           └─ binary ─→ MidiMonitorController ──→ midiDataChanged ──→ (no live listener)
 ```
 
-`MessageParser`'s route-registration system (`registerRoute` / `createRouteGroup`, set up in `WebSocketController.setupMessageRoutes`) is largely **vestigial** — the text handler dispatches directly on `json.device` instead, and `MessageRouter.routePathMessage` only logs. Add new message types to the `onTextMessageReceived` dispatch and `MessageRouter.routeBatch`, not to the parser routes.
+`LiveState.qml` is the single state object the whole 2D UI binds to; `main.qml`'s `onBatchReceived` switch maps each `batchType` onto one `applyX(data)` method (`clock`, `loops`, `scenesList`, `sceneLoaded`, `composition`, `sirenium`, `voiceSelect`). Adding a message type means: a `json.device` branch in `WebSocketController.onTextMessageReceived`, a `case` in that switch, and an `applyX` on `LiveState`. `SimulationHarness.qml` mirrors LiveState's interface so the UI stays alive without PD — keep the two in step or the simulated view drifts from the real one.
 
-### MIDI → siren fan-out
-
-Every `SirenColumn` listens to the *same* `midiDataChanged` signal and self-filters: `if (channel !== (sphereId - 1)) return;` (`SirenColumn.qml:283`). So **MIDI channel 0 drives S1 … channel 6 drives S7**, and the `channel` field in `sirenSpec` must agree with `sphereId - 1` or a siren goes deaf.
+**Most of the old controller layer is gone or orphaned.** `SirenView`, `SirenColumn`, `SirenController`, `BeatController` and `SirenSpecProvider` no longer exist — the 2D refonte deleted them. `MessageRouter`, `PedalConfigController` and `SceneManager` still exist as files but are **instantiated nowhere**. `MessageParser`'s route-registration system (`registerRoute` / `createRouteGroup`) is vestigial: the text handler dispatches directly on `json.device`. Grep before believing any of these names.
 
 ### sirenSpec: edit the `.js`, not the `.json`
 
-`sirenSpec.json` and `sirenSpec.js` hold the same data (per-siren clef, ambitus, transpose, channel, color), both are in `data.qrc`, **but only `sirenSpec.js` is read** — `SirenSpecProvider` imports it as a JS module because JSON fetch is fragile under WASM. The `.json` is dead weight kept for documentation; changing it alone has no effect. A spec can also be pushed at runtime via `SirenSpecProvider.applySpecFromWs`.
+`sirenSpec.json` and `sirenSpec.js` hold the same data (per-siren clef, ambitus, transpose, channel, color), both are in `data.qrc`, **but only `sirenSpec.js` is read** — the 2D components import it directly as a JS module (`import "../../sirenSpec.js" as SirenSpec`, in `LiveState`, `SongMap2D`, `SirenRingRow2D`, `ModulationMatrix2D`, `SimulationHarness`) because JSON fetch is fragile under WASM. The `.json` is dead weight kept for documentation; changing it alone has no effect. There is no longer any runtime spec push — `SirenSpecProvider` and its `applySpecFromWs` are gone.
 
 ### Config
 
@@ -96,10 +98,10 @@ The real matrix is **8 pedals × 7 sirens × 8 controllers = 448** values (`volu
 ## Gotchas
 
 - **`data.qrc` is manual.** New QML/JS/shader/icon files are not auto-discovered; add a `<file>` entry or you get a runtime "module not installed"/blank view. `data.qrc` also reaches outside the project for shared fonts (`../../fonts/`).
-- **Logging is off by default.** In `Logger.qml` every category defaults to level 0 (OFF) except `SCENES` and `MIDI` (INFO) — so a new `logger.debug(...)` prints nothing until the category is raised (F12 → Debug tab, or `logger.setAllCategories(4)`). An *unknown* category name silently defaults to INFO, which is why ad-hoc categories like `SYSTEM`/`MONITORING` appear to work.
+- **Logging is off by default.** In `Logger.qml` every category defaults to level 0 (OFF) except `SCENES` and `MIDI` (INFO) — so a new `logger.debug(...)` prints nothing until the category is raised. The Debug Panel that used to do that is dead code (see below), so raise it in code: `logger.setAllCategories(4)`, or the per-category `logger.levelScenes = 4`. An *unknown* category name silently defaults to INFO, which is why ad-hoc categories like `SYSTEM`/`MONITORING` appear to work.
 - **Use the convenience methods** (`logger.info/debug/warn/error/trace(category, …)`), not `logger.log(...)`. `log()` takes `(level, category, …)` and some existing callers pass `("WEBSOCKET", "INFO", …)` reversed — those lines don't log what they claim.
-- **Two live sources of doc rot.** `README.md` documents `GET /api/temperature` and `/api/system-info` on `webfiles/server.js`; **those endpoints do not exist there** — yet `SystemInfoReader.qml` calls `http://192.168.1.21:8010/api/system-info` against a hardcoded Pi IP. System-info monitoring only works against some other server. `docs/MIDI_CONFIGURATION.md` describes a Debug Panel "MIDI" tab for IAC/VirMIDI port selection that was removed as obsolete under WASM (`DebugPanel.qml:202`).
-- The Debug Panel (F12, or the gear button top-left) has three tabs: Debug / Monitoring / Performance. It hides the `View3D` while open (`visible: !debugPanelVisible`).
+- **A whole branch of the UI is dead code.** `DebugPanel.qml` is **instantiated nowhere** — and neither are `BottomControls.qml`, `ConnectionStatus.qml`, `ConfigModeButton.qml` or `OrchestraControlPanel.qml`, whose only references sit inside those same orphans. The 2D refonte replaced them with the `CFG` toggle top-right (game view ↔ config view); the old `F12` / gear shortcut no longer opens anything. Don't trust these files as a description of what runs, and expect broken references inside them: `CategoryRow.qml` had to be written from scratch in 2026-07 because `DebugPanel` used a type that never existed in the tree. Re-wiring the panel is a real task, not a one-liner.
+- `README.md` documents `GET /api/temperature` and `/api/system-info` on `webfiles/server.js`; **those endpoints do not exist there** — yet `SystemInfoReader.qml` calls `http://192.168.1.21:8010/api/system-info` against a hardcoded Pi IP. System-info monitoring only works against some other server. `docs/MIDI_CONFIGURATION.md` describes a Debug Panel "MIDI" tab that was removed as obsolete under WASM — and the panel itself is now unreachable anyway.
 - Frame rate is intentionally capped at ~30 FPS via `setSwapInterval(2)` in `main.cpp`.
 
 ## Conventions
