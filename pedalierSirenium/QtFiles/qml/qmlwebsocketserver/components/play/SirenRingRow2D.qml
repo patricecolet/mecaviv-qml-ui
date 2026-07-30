@@ -59,18 +59,31 @@ Item {
 
                 opacity: (_state.present !== undefined) ? _state.present : 1.0
 
-                // Cerclage de la sirène principale : sa propre couleur, donc rien
-                // de neuf à décoder — c'est le second cercle qui dit « c'est elle ».
+                readonly property bool _isMain: root.selectedSiren === cell.index + 1
+
+                // La sirène en jeu se repère à deux formes, pas à une teinte : un
+                // disque plein derrière l'anneau, plus un second cercle autour. Le
+                // seul cerclage se confondait avec l'anneau de progression, qui est
+                // de la même couleur — la couleur dit qui, la forme dit quoi.
                 Rectangle {
                     anchors.centerIn: ring
-                    width: ring.width + 12
+                    width: ring.width - 4
                     height: width
                     radius: width / 2
-                    visible: root.selectedSiren === cell.index + 1
+                    visible: cell._isMain
+                    color: cell._color
+                    opacity: 0.18
+                }
+
+                Rectangle {
+                    anchors.centerIn: ring
+                    width: ring.width + 14
+                    height: width
+                    radius: width / 2
+                    visible: cell._isMain
                     color: "transparent"
-                    border.width: 1.5
+                    border.width: 2
                     border.color: cell._color
-                    opacity: 0.75
                 }
 
                 // Pulsation d'attaque : un cercle qui s'écarte brièvement à chaque
