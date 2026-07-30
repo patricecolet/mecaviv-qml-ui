@@ -106,10 +106,12 @@ Item {
                 // aux deux extrémités de l'ambitus il vient affleurer le bout.
                 y: Math.max(0, Math.min(gauge.height - height,
                                         gauge.height * (1 - root._cursorFrac) - height / 2))
-                width: 11; height: 2
-                radius: 1
+                // Franchement plus épais que la piste : c'est l'information qu'on
+                // vient chercher du regard, elle ne doit pas se confondre avec elle.
+                width: 15; height: 4
+                radius: 2
                 color: "#FFFFFF"
-                opacity: root._sounding ? 1.0 : 0.35
+                opacity: root._sounding ? 1.0 : 0.7
                 visible: root.velocity > 0   // sans note tenue, aucune hauteur à montrer
                 Behavior on y { NumberAnimation { duration: 60 } }
             }

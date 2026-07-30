@@ -127,11 +127,13 @@ Item {
                             anchors.horizontalCenter: parent.horizontalCenter
                             text: cell._noteText
                             color: "#FFFFFF"
-                            opacity: cell._sounding ? 1.0 : 0.45
+                            // La fantôme reste distinguée, mais lisible : à 0.45 elle
+                            // se combinait à l'opacité de la cellule et virait au gris.
+                            opacity: cell._sounding ? 1.0 : 0.75
                             font.family: "monospace"
-                            font.pixelSize: Math.max(9, ring.width * 0.11)
+                            font.pixelSize: Math.max(11, ring.width * 0.14)
                             font.bold: true
-                            height: Math.max(9, ring.width * 0.11) * 1.3
+                            height: Math.max(11, ring.width * 0.14) * 1.3
                         }
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
