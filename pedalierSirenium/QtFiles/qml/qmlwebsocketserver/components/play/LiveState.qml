@@ -99,9 +99,9 @@ QtObject {
             bend: bend,
             // Compteur d'attaques plutôt qu'un signal : la vue le regarde pour
             // pulser, et deux notes de suite à la même hauteur se voient quand même.
-            // Seuil à 1 et non 0 : une note fantôme (parking d'une sirène au
-            // chargement d'une scène) ne doit pas faire pulser l'anneau.
-            attacks: (prev.attacks || 0) + (velocity > 1 ? 1 : 0)
+            // Toute note compte, vélocité 1 comprise : une fantôme est un événement
+            // de jeu comme un autre, elle ne doit pas être filtrée ici.
+            attacks: (prev.attacks || 0) + (velocity > 0 ? 1 : 0)
         };
         sirenMidi = arr;
     }
