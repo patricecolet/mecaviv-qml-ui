@@ -47,6 +47,9 @@ Item {
                 readonly property var _midi: (root.midi && root.midi[index]) ? root.midi[index] : ({})
                 readonly property int _velocity: cell._midi.velocity !== undefined ? cell._midi.velocity : 0
                 readonly property bool _sounding: cell._velocity > 1   // 1 = note fantôme, moteur muet
+                // La note fantôme reste VISIBLE, en atténué : une sirène parquée est
+                // prête, moteur en rotation à cette hauteur, et c'est une information
+                // de jeu. Seule l'opacité distingue « ça sonne » de « c'est prêt ».
                 readonly property string _noteText: cell._velocity > 0
                     ? root._names[((cell._midi.note % 12) + 12) % 12] + " " + (Math.floor(cell._midi.note / 12) - 2)
                     : ""
