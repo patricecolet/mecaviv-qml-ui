@@ -4,7 +4,12 @@ PartOf=pedalier.target
 Before=pedalier-pd.service
 
 [Service]
-ExecStart=/usr/local/bin/rtpmidid
+# --control : sans lui rtpmidid tente /var/run/rtpmidid/control.sock, dossier
+# qu'un service --user ne peut pas créer — la socket n'existe donc pas et
+# `rtpmidid-cli status` n'a personne à qui parler. %t vaut /run/user/<uid>,
+# écrivable par le service. C'est le seul moyen de savoir quels pairs RTP sont
+# réellement connectés au lieu de le déduire des sockets UDP.
+ExecStart=/usr/local/bin/rtpmidid --control %t/rtpmidid.sock
 Restart=on-failure
 RestartSec=2
 

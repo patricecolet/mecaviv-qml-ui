@@ -6,7 +6,9 @@
 RTPMIDI_IN=("PEDALIER_SIRENIUM" "SIRENIUM" "La_Petite_Boite" "La_Grosse_Boite" "PEDALE_BOSS")
 # Devices qui reçoivent le MIDI de Pure Data (OUT 1). CB4Tech Studio2 est une
 # sortie seule : Pure Data lui envoie, il ne lui renvoie rien.
-RTPMIDI_OUT=("${RTPMIDI_IN[@]}" "CB4Tech Studio2")
+# SIRENIUM est absent de cette liste : c'est une source, on n'a rien à lui
+# transmettre — et le retour Pure Data → SIRENIUM refermait une boucle inutile.
+RTPMIDI_OUT=("PEDALIER_SIRENIUM" "La_Petite_Boite" "La_Grosse_Boite" "PEDALE_BOSS" "CB4Tech Studio2")
 
 # Fonction pour attendre avec timeout
 wait_for_service() {
