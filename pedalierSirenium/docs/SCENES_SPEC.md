@@ -566,7 +566,13 @@ Deux points de mécanique à ne pas défaire :
 ### `$0-dirs` — le dossier courant
 
 Deux lignes, `racine <chemin>` et `compo <chemin>`, écrites par `pd dirs` sur `$0.setdir` et
-`$0.compdir-set`. Tout le patch y accède par une abstraction :
+`$0.compdir-set`. **La racine est rendue absolue à l'entrée** (`[file patchpath]` puis
+`[file normalize]`, quand le chemin reçu est relatif) : `[file mkdir]` résout un chemin relatif
+depuis le répertoire de travail de Pd alors que pdjson le résout depuis le dossier du patch, si bien
+qu'un `dir ../…` ne marchait que si Pd était lancé depuis le bon dossier — depuis l'interface
+graphique il tentait d'écrire à la racine du disque. Tout le reste du patch travaille en absolu.
+
+Tout le patch accède aux deux dossiers par une abstraction :
 
 ```
 [dir-prefix <$0 du parent> <racine|compo>]
