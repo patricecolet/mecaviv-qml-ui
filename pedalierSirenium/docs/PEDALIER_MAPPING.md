@@ -112,12 +112,15 @@ des 7 boucles. Une boucle rangée est un **clip** (`set.clip.slot`, stockage `$0
 | 10 – 16 | **Stop / play** de la sirène 1 à 7 |
 | 17 | Stop / play de **toutes** les sirènes |
 
-Un bouton par sirène, sans mode : c'est le geste direct pour jouer avec les clips, et il colle aux
-sept cellules d'une scène. Ces boutons portaient auparavant la *présélection* de sirène ; celle-ci
-vit désormais entièrement sur le clavier (voir plus bas).
+Un bouton par sirène : c'est le geste direct pour jouer avec les clips. Ces boutons portaient
+auparavant la *présélection* de sirène ; celle-ci vit désormais sur le clavier (voir plus bas).
 
-Les pédales ne couvrent que `play` et `stop`. Les trois autres modes d'une cellule — `mute`, `solo`,
-`oneshot` — restent à l'écran.
+**C'est du transport, pas de l'édition** : une boucle arrêtée est arrêtée, pas « non enregistrée ».
+Le fichier de scène n'est pas touché. Vérifié dans le patch le 2026-07-31 — ni `siren-clip-loader`
+ni `siren-loop-state` n'écrivent de scène, et les seuls `commit.mode` / `commit.clip` vont dans
+l'autre sens : ils appliquent la scène au loader quand on la charge.
+
+`mute`, `solo` et `oneshot` sont des modes secondaires, traités plus tard.
 
 ### Pédales de commande — CC 18 à 25, de gauche à droite (décidé le 2026-07-31)
 
@@ -148,7 +151,8 @@ présélectionnée suivante » n'a plus d'objet dès que chaque sirène a son bo
 
 | Plage CC | Contrôle | Effet | Sous-patch |
 |---|---|---|---|
-| **26 – 37** | Clavier PK-6 (*pédales de notes*) — **les sept touches blanches**, do à si | `- 26` → `route 0 2 4 5 7 9 11` → sélection de sirène 1-7 → `$0.loop.voice.select` | `pedals.piano` |
+| **26 – 37** | Clavier PK-6 — **les sept touches blanches**, do à si | `- 26` → `route 0 2 4 5 7 9 11` → sélection de sirène 1-7 → `$0.loop.voice.select` | `pedals.piano` |
+| **27, 29, 32, 34, 36** | Clavier PK-6 — **les cinq touches noires** | mode poly sur l'une, sélection de la voix sur une autre — **règle à discuter**. Trois restent libres, plus la huitième blanche (38). | à construire |
 | **43 – 46** | 4 interrupteurs montés sur les pédales d'expression | combinés au numéro de pédale (voir plus bas) | `pedals.modulators` |
 | **47 – 49** | 3 pédales d'expression (continues) | `$0.modulation.pedal` | `pedals.modulators` |
 | **53 – 60** | 8 boutons du petit boîtier | `- 50` → charge une scène → `$0.looper.scene.select.json` | `pedals.littlebox.buttons` |
