@@ -488,3 +488,148 @@ reste valable telle quelle.
 
 La composition d'accueil reste donc autonome et transportable, et les noms restent lisibles tant
 qu'il n'y a pas de conflit.
+
+---
+
+## 20. Le contrat depuis l'écran — éditer les scènes (implémenté 2026-07-31)
+
+Sens inverse du §6 : l'écran tactile écrit, PureData exécute. Entrée par
+`pd looperScenes.get` (chaîné derrière `composeSiren.get` dans `pd websocket`), qui traduit vers
+`sceneEdit` sur `composition-io`. Les cinq commandes d'édition passent par `compdir-guard` : sans
+composition ouverte, elles ne font rien.
+
+```json
+{"device":"LOOPER_SCENES","action":"sceneNew"}
+{"device":"LOOPER_SCENES","action":"sceneLoad","n":3}
+{"device":"LOOPER_SCENES","action":"sceneDelete","n":3}
+{"device":"LOOPER_SCENES","action":"sceneRename","n":3,"name":"refrain"}
+{"device":"LOOPER_SCENES","action":"sceneCopy","src":2,"dst":5}
+{"device":"LOOPER_SCENES","action":"sceneCellCopy","src":2,"dst":5,"siren":3}
+```
+
+- `n`, `src`, `dst` sont des **positions de scène** (1..N), pas des numéros de bouton : `sceneId` et
+  `page` en sont dérivés côté PD (`((pos-1)%8)+1` et `floor((pos-1)/8)+1`).
+- **Supprimer décale les suivantes** (décidé 2026-07-31). Les fichiers sont réécrits *et*
+  renumérotés dans leur contenu — `order`, `sceneId`, `page`, `globalSceneId`. Conséquence assumée :
+  toutes les scènes après la suppression **changent de bouton**, donc le pied ne les retrouve plus
+  au même endroit. C'est le prix de « pas de trou dans la timeline ».
+- `sceneLoad` ne va pas à `composition-io` mais à `$0.scene.select`, qui met aussi à jour
+  `$0.looper.scene.id` — le même chemin que les boutons du petit boîtier.
+- **Les espaces dans un nom passent** (« partie A ») : vérifié de bout en bout, pdjson → buffer
+  `text` → message → fichier → retour dans `scenesList`. Aucune substitution à faire ;
+  `WebSocketController.sceneRename` se contente d'un `trim`.
+- Une scène neuve n'écrit **pas** `signature` : `"4 4"` fait deux atomes, `setB` n'en prend qu'un.
+  Elle hérite donc de la signature courante. `tempo` est écrit (120).
+- Après chaque édition, PD republie `scenesList` tout seul (`$0.scenes.refresh`) — l'écran n'a rien
+  à redemander.
+
+Le mapping bouton→scène reste **positionnel** : les scènes occupent les N premières positions, comme
+les compositions occupent les N premiers boutons du gros boîtier (voir `PEDALIER_MAPPING.md`).
+
+## 21. L'état vit dans des buffers texte
+
+Trois tables portent l'état de `composition-io`. Aucune n'est écrite sur disque : ce sont des
+projections en mémoire, ce qui ne contredit pas le §18.
+
+### `$0-scenes` — la carte du morceau
+
+Une ligne par scène, dans l'ordre du morceau ; **la position est le numéro de ligne**, `order`,
+`sceneId` et `page` s'en déduisent. La ligne porte les 14 atomes des cellules : champ `2j` = mode
+de la sirène `j`, champ `2j+1` = son clipRef.
+
+Le nom de scène n'y est pas : c'est la seule valeur qui peut contenir des espaces, donc la seule
+qui interdise « la valeur est le dernier atome ». Aucun verbe ne le lit ; il vit dans les fichiers
+et dans le payload `scenesList`.
+
+**Les verbes d'édition ne l'écrivent jamais.** Ils le lisent, écrivent le fichier, et déclenchent
+`$0.scenes.refresh` qui le reconstruit — une seule direction, donc pas de divergence possible avec
+le disque. `pd open` déclenche aussi un refresh en fin d'ouverture, pour que le buffer soit prêt
+avant toute commande. `pd new` et `pd delete` lisent `[text size $0-scenes]` ; `pd cell` lit la
+cellule source avec `[text get $0-scenes]`.
+
+### `$0-champs` — la disposition de la ligne, écrite une fois
+
+`[text define -k $0-champs]`, une ligne par champ dans l'ordre : `0 mode`, `0 clipRef`, … `6
+clipRef` — sirène 0-based et clé, telles que `dump` les émet. **Le numéro de ligne est le numéro de
+champ.** `pd champ` y cherche le chemin reçu, `pd cell` y cherche `<j> mode` ; la disposition n'est
+donc décrite qu'à un endroit, et comme donnée ouvrable. Le `-k` la fait vivre dans le fichier du
+patch : ni `loadbang` ni message pour la remplir.
+
+Deux points de mécanique à ne pas défaire :
+
+- `pd champ` filtre sur `sirens` **avant** la recherche. Sans ce filtre, `text search` avec deux
+  champs déclarés crie sur les clés plus courtes (`tempo`, `harmony root`).
+- Un `[spigot]` piloté par `[>= 0]` garde l'écriture. Le silence de la recherche ne filtre que la
+  branche du champ ; la branche de la valeur, elle, part quand même et `text set` écrirait au
+  dernier champ connu.
+
+### `$0-dirs` — le dossier courant
+
+Deux lignes, `racine <chemin>` et `compo <chemin>`, écrites par `pd dirs` sur `$0.setdir` et
+`$0.compdir-set`. Tout le patch y accède par une abstraction :
+
+```
+[dir-prefix <$0 du parent> <racine|compo>]
+```
+
+Elle préfixe son entrée avec le dossier demandé ; un bang rend le dossier seul. Tant qu'aucune
+composition n'est ouverte, la ligne `compo` n'existe pas et `dir-prefix` ne rend rien — ce qui vaut
+mieux que de construire `/scenes/scene_N.json` à la racine du disque. `compdir-guard` reste
+par-dessus et garde les cinq commandes d'édition.
+
+### Remplir les buffers : `[scenes-scan]`
+
+`[scenes-scan <dossier de composition>]` énumère `scenes/scene_*.json` et en sort le contenu champ
+par champ : à gauche `<i> <chemin...> <valeur>`, au milieu l'index de la scène (juste avant son
+premier champ), à droite « fini ». Elle porte son propre `pdjson`.
+
+`scenesList` s'en sert pour deux choses à la fois : remplir `$0-scenes` (`vider`, `ligne <i>`,
+`champ …` vers `$0.scenes.buf`) et alimenter le constructeur du payload. **Elle prend le dossier
+sur son entrée**, donc on peut la pointer sur n'importe quelle composition : c'est ce qui rend la
+pêche du §19 possible sans deuxième lecteur.
+
+Ce qui reste décrit à part : les valeurs par défaut d'une ligne neuve, dans `pd ligne`
+(`empty null` × 7). Les tirer de `$0-champs` demanderait une deuxième colonne et une boucle pour la
+relire.
+
+## 22. `value` ou table : la forme de la donnée décide
+
+Le critère n'est pas le nombre d'objets, c'est : la donnée est-elle isolée, ou appartient-elle à un
+ensemble qu'on veut pouvoir lire en entier ?
+
+**Isolée → `value`.** Les 9 variables internes de `siren-loop-state.pd` sont des scalaires lus sur
+place, correctement scopés `$0`/`$2`. En table, chaque lecture coûterait une boîte de plus —
+`text get` réclame un numéro de ligne sur son entrée chaude là où `value` se contente d'un bang — et
+le défaut que les buffers corrigent (de l'état invisible, dépendant de l'ordre de remplissage)
+n'existe pas : un `[value $0-x]` est nommé et se lit à tout moment.
+
+**Associée → table.** L'état de lecture des sirènes est publié comme un ensemble :
+`siren-clip-loader` diffuse `<index> <état>` sur `$0.loader.state`. `pd loop.states`, dans
+`pedalier.pd`, en tient un `[text define -k $0.loopstates]` d'une ligne par sirène ; chaque
+`siren-state-snapshot` y lit la sienne. L'état du looper entier se lit donc dans un objet, au lieu
+d'être recopié dans sept caches privés.
+
+Le `-k` sert à ce que les sept lignes existent au chargement : `text set` sur une ligne inexistante
+ajoute *à la fin*, pas à l'index demandé — écrire la sirène 6 dans une table vide créerait la
+ligne 0.
+
+**Le signe qui ne trompe pas :** une donnée déjà diffusée et recopiée dans plusieurs caches privés
+est une table qui s'ignore.
+
+## 23. Piloter l'horloge pour tester
+
+`midiclock` démarre en **source interne** (`; $1.source 0` dans son loadbang), et son horloge
+interne n'est jamais démarrée : rien n'envoie `play`. Son inlet, dans `pedalier.pd`, ne reçoit que
+`tempo` et `signature` depuis `$0.scene.broadcast` — `source`, `play` et `stop` ne sont routés de
+nulle part. **Le transport reste donc à câbler.**
+
+Pour tester la chaîne complète sans instrument, deux ports MIDI virtuels suffisent :
+
+```
+pd -nogui -noaudio -midiindev 3 -nomidiout  -open pedalier.pd     # écoute
+pd -nogui -noaudio -nomidiin  -midioutdev 3 -open leurre.pd       # 250 puis 248 toutes les 20.83 ms
+```
+
+et un `source 1` envoyé à l'inlet de `midiclock` pour ouvrir la vanne du MIDI externe. La sortie
+WebSocket publie alors `clock` puis `loops`, ce qui permet de vérifier de bout en bout l'état des
+sept sirènes.
