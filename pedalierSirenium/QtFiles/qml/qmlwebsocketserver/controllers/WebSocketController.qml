@@ -323,7 +323,13 @@ Item {
             root.connectionStatus = root.getStatusText();
             root.statusColor = root.getStatusColor();
             root.socketStatusChanged(socket.status, socket.errorString);
-            
+
+            // PD redémarre sous la page à chaque déploiement (restart systemd).
+            // Sans retentative la socket reste fermée, et main.qml bascule sur le
+            // harnais de simulation : l'écran passe en démo et n'en revient jamais
+            // sans recharger la page. On retente tant qu'on n'est pas ouvert.
+            reconnectTimer.running = (socket.status !== WebSocket.Open);
+
             if (root.logger) {
                 if (socket.status === WebSocket.Open) {
                     root.logger.info("WEBSOCKET", "Connecté à", root.serverUrl);
@@ -417,6 +423,22 @@ Item {
         return sendOrchestraCommand(voiceId + " pan " + pan);
     }
 
+    // Retentative tant que la socket n'est pas ouverte. Se rallume tout seul par
+    // onStatusChanged, s'éteint dès que PD répond — et `isConnected` repasse à
+    // vrai, ce qui remet main.qml sur LiveState. À la réouverture, onStatusChanged
+    // redemande déjà le preset et la liste des scènes : la vue se repeuple seule.
+    property int reconnectDelayMs: 2000
+    Timer {
+        id: reconnectTimer
+        interval: root.reconnectDelayMs
+        repeat: true
+        running: false
+        onTriggered: {
+            if (socket.status === WebSocket.Open) { running = false; return; }
+            root.reconnect();
+        }
+    }
+
     function reconnect() {
         if (root.logger) {
             root.logger.info("WEBSOCKET", "Reconnexion vers:", serverUrl);
@@ -505,6 +527,39 @@ Item {
             device: "LOOPER_SCENES",
             action: "getScenesList"
         });
+    }
+
+    // --- Gestion des scènes (page tactile → pd looperScenes.get → sceneEdit) ---
+    // `n`, `src` et `dst` sont des positions de scène (1..N), pas des index de
+    // bouton : la banque est dérivée côté PD. Après chaque édition PD republie
+    // `scenesList` tout seul, rien à redemander ici.
+    function sceneNew() {
+        if (logger) logger.info("SCENES", "🌐 sceneNew");
+        return sendMessage({ device: "LOOPER_SCENES", action: "sceneNew" });
+    }
+    function sceneLoad(n) {
+        if (logger) logger.info("SCENES", "🌐 sceneLoad", n);
+        return sendMessage({ device: "LOOPER_SCENES", action: "sceneLoad", n: n });
+    }
+    function sceneDelete(n) {
+        if (logger) logger.info("SCENES", "🌐 sceneDelete", n);
+        return sendMessage({ device: "LOOPER_SCENES", action: "sceneDelete", n: n });
+    }
+    // Les espaces passent : vérifié de bout en bout le 2026-07-31, un symbole
+    // Pd les garde et le nom revient intact dans scenesList.
+    function sceneRename(n, name) {
+        var clean = String(name).trim();
+        if (logger) logger.info("SCENES", "🌐 sceneRename", n, clean);
+        return sendMessage({ device: "LOOPER_SCENES", action: "sceneRename", n: n, name: clean });
+    }
+    function sceneCopy(src, dst) {
+        if (logger) logger.info("SCENES", "🌐 sceneCopy", src, "→", dst);
+        return sendMessage({ device: "LOOPER_SCENES", action: "sceneCopy", src: src, dst: dst });
+    }
+    function sceneCellCopy(src, dst, siren) {
+        if (logger) logger.info("SCENES", "🌐 sceneCellCopy", src, "→", dst, "S" + siren);
+        return sendMessage({ device: "LOOPER_SCENES", action: "sceneCellCopy",
+                             src: src, dst: dst, siren: siren });
     }
 
     // Nouvelles fonctions de monitoring
