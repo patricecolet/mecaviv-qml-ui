@@ -133,9 +133,15 @@ au démarrage d'un clip et à la sortie du mute, avant les vraies notes à porta
   chaque passe de `scenesList`, si le buffer est vide, `composition-io` crée la scène 1. Une
   composition neuve naît donc avec `scenes/scene_1.json`, et supprimer la dernière scène revient à
   la remettre à blanc plutôt qu'à laisser le morceau sans scène.
-- Enregistrer une boucle sur une sirène (CC 25 rec/play) crée un **clip** dans le pool.
-- Le clip est **inscrit immédiatement dans la scène courante** (cellule de cette sirène = ce clip,
-  mode `play`).
+- **Une seule pédale rec/play** (CC 18 depuis le 2026-07-31), et elle enregistre **toutes les sirènes
+  en jeu dans l'harmoniseur** — pas une sirène désignée. C'est l'harmoniseur amont (§9) qui décide
+  qui joue quoi ; `rec` capture le résultat de cette répartition. Un appui peut donc créer jusqu'à
+  **sept clips d'un coup**, un par sirène alimentée, chacun inscrit dans sa cellule.
+- Chaque clip créé est **inscrit immédiatement dans la scène courante** (cellule de cette sirène =
+  ce clip, mode `play`).
+- Détail à régler à l'implémentation : une sirène assignée par l'harmoniseur mais qui n'a rien joué
+  pendant la prise n'a pas de matière — sa cellule est laissée telle quelle plutôt que remplie d'un
+  clip vide.
 - **La permanence demande de sauver le morceau.** Tant que la composition n'est pas enregistrée,
   l'état courant diffère du disque → **état « modifié / non enregistré »**, que l'écran doit
   signaler discrètement.
