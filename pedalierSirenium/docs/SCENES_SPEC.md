@@ -128,6 +128,11 @@ au démarrage d'un clip et à la sortie du mute, avant les vraies notes à porta
 
 ## 5. Enregistrement et persistance
 
+- **Une scène existe toujours** (décidé le 2026-07-31), pour qu'on puisse enregistrer sans rien
+  préparer. La règle est le pendant de « une composition est toujours ouverte » (§22) : à la fin de
+  chaque passe de `scenesList`, si le buffer est vide, `composition-io` crée la scène 1. Une
+  composition neuve naît donc avec `scenes/scene_1.json`, et supprimer la dernière scène revient à
+  la remettre à blanc plutôt qu'à laisser le morceau sans scène.
 - Enregistrer une boucle sur une sirène (CC 25 rec/play) crée un **clip** dans le pool.
 - Le clip est **inscrit immédiatement dans la scène courante** (cellule de cette sirène = ce clip,
   mode `play`).
@@ -267,20 +272,29 @@ capture la sortie déjà voicée, pas la ligne d'origine. Un clip enregistré fi
 moment ; la rejouer avec une autre gamme, une autre tonalité ou un autre tempo est impossible sans
 tout ré-enregistrer. Coût de développement constaté : énorme.
 
-**Solution retenue** : enregistrer **en amont** de l'harmoniseur — la ligne brute du Sirénium,
-horodatée en **temps musical fin** (frames/ticks MIDI, plus précis qu'une quantification
-mesure/temps — préserve le geste exact plutôt que de l'arrondir à la grille). L'harmonie ne se
-stocke jamais dans le clip ; elle est **réappliquée à la lecture**, à partir du bloc `harmony` de la
-scène courante (§6). C'est une **conséquence nécessaire**, pas seulement cohérente, du fait déjà
-acté que l'harmonie vit dans la scène (§1, §6) : il n'existe nulle part ailleurs dans le modèle où
-une version « déjà harmonisée » pourrait légitimement se stocker.
+**Solution retenue (décidée le 2026-07-31) : deux harmoniseurs, le point de captation entre les
+deux.**
 
-**Conséquence sur l'harmoniseur** : il doit être **recâblé pour recevoir plusieurs entrées** — la
-ligne du Sirénium en direct, et une ou plusieurs lignes brutes rejouées (depuis un clip ou un projet
-MIDI, voir §11) — et **arbitrer une priorité** entre elles quand elles se disputent les mêmes
-sirènes. C'est structurellement le même problème que le champ `source` (`docs/PD_WORK.md §3`,
-« le dernier joué prime »), mais un cran plus tôt : pas *quelle sirène joue quoi*, mais *quelle
-entrée alimente l'harmoniseur*. **Non tranché** : est-ce la même règle de priorité, ou une autre ?
+- Un **harmoniseur en amont** de l'enregistrement. C'est lui qui choisit la ou les sirènes et qui
+  harmonise. Ce qui part dans le clip est donc déjà réparti et déjà harmonisé.
+- Un **second harmoniseur en aval**, appliqué à la lecture — **reporté, pas abandonné**. C'est lui
+  qui rendra plus tard un clip rejouable dans une autre gamme.
+
+Pourquoi celle-là plutôt que « enregistrer la ligne brute et réappliquer l'harmonie à la lecture » :
+c'est le chemin le plus court. L'harmoniseur existe et sait déjà sélectionner et harmoniser ; on
+déplace un point de captation au lieu d'inventer un format de clip « ligne brute » et toute la
+machinerie de réapplication. En attendant le second harmoniseur, un clip garde la gamme dans
+laquelle il a été joué.
+
+**Ce que ça change dans le patch, et qui n'était pas écrit** : aujourd'hui la relecture d'un clip
+**contourne l'harmoniseur** — la sortie de `clip-io` part directement sur `$0.to.sirens`, le même
+bus que l'harmoniseur alimente, si bien que deux producteurs se partagent ce bus. Avec le second
+harmoniseur, la relecture devra entrer **dans** l'harmoniseur aval au lieu d'arriver à côté.
+
+**Reste alors à trancher, le jour où le second harmoniseur arrive** : quand il reçoit à la fois la
+ligne live et une ou plusieurs lignes rejouées, qui gagne ? C'est structurellement le même problème
+que le champ `source` (`docs/PD_WORK.md §3`, « le dernier joué prime »), mais un cran plus tôt : pas
+*quelle sirène joue quoi*, mais *quelle entrée alimente l'harmoniseur*.
 
 ## 10. Modèle actuel de l'harmoniseur — et une piste d'évolution
 
