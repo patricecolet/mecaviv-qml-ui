@@ -601,14 +601,14 @@
       <text x="178.084" y="48.2">toutes</text>
     </g>
     <g style="font-size:2.1px;text-anchor:middle">
-      <text x="30.147" y="85.3">clear all</text>
-      <text x="51.313" y="85.3">clip write</text>
-      <text x="72.480" y="85.3">clip play/stop</text>
-      <text x="93.647" y="85.3">tempo</text>
-      <text x="114.813" y="85.3">reset</text>
-      <text x="135.980" y="85.3">boucle suiv.</text>
-      <text x="157.147" y="85.3">stop</text>
-      <text x="178.313" y="85.3">rec / play</text>
+      <text x="30.147" y="85.3">rec / play</text>
+      <text x="51.313" y="85.3">clip play/stop</text>
+      <text x="72.480" y="85.3">scene write</text>
+      <text x="93.647" y="85.3">scene clear</text>
+      <text x="114.813" y="85.3">new scene</text>
+      <text x="135.980" y="85.3">duplicate scene</text>
+      <text x="157.147" y="85.3">tempo</text>
+      <text x="178.313" y="85.3">reset</text>
     </g>
     <g style="font-size:2.8px;text-anchor:middle">
       <text x="23.468" y="140">S1</text>
@@ -631,6 +631,6 @@
        xml:space="preserve"
        style="font-size:3.2px;line-height:1.45;fill:#000000"
        x="15.1"
-       y="164"><tspan sodipodi:role="line" x="15.1" style="font-weight:bold">Boutons ronds 10–17 — sélection de sirène</tspan><tspan sodipodi:role="line" x="15.1">10→S1 … 16→S7, 17 = toutes. LED jaune de présélection sur les mêmes numéros.</tspan><tspan sodipodi:role="line" x="15.1"> </tspan><tspan sodipodi:role="line" x="15.1" style="font-weight:bold">Pédales de commande 18–25 — de gauche à droite</tspan><tspan sodipodi:role="line" x="15.1">18   clear all loops</tspan><tspan sodipodi:role="line" x="15.1">19   clip write — rôle à retrancher si l'inscription en scène est automatique</tspan><tspan sodipodi:role="line" x="15.1">20   clip play / stop</tspan><tspan sodipodi:role="line" x="15.1">21   tempo — non confirmé (la feuille laisse la case vide)</tspan><tspan sodipodi:role="line" x="15.1">22   reset de la sirène courante  ·  appui long 3 s : toutes les sirènes</tspan><tspan sodipodi:role="line" x="15.1">23   boucle présélectionnée suivante</tspan><tspan sodipodi:role="line" x="15.1">24   stop de la boucle courante, immédiat, jamais quantizé  ·  appui long : efface</tspan><tspan sodipodi:role="line" x="15.1">25   rec / play, quantizé au début de mesure  ·  appui long : efface</tspan><tspan sodipodi:role="line" x="15.1"> </tspan><tspan sodipodi:role="line" x="15.1" style="font-weight:bold">Clavier PK-6 26–38 — les touches naturelles sélectionnent une sirène</tspan><tspan sodipodi:role="line" x="15.1">Do 26→S1, Ré 28→S2, Mi 30→S3, Fa 31→S4, Sol 33→S5, La 35→S6, Si 37→S7</tspan><tspan sodipodi:role="line" x="15.1">Les 5 dièses et le Do aigu (38) tombent à côté du route : six touches disponibles.</tspan><tspan sodipodi:role="line" x="15.1">Maintenir un poussoir en jouant un accord règle le voicing de la scène.</tspan><tspan sodipodi:role="line" x="15.1"> </tspan><tspan sodipodi:role="line" x="15.1">Tout passe en Control Change, jamais en notes. Les LEDs repartent en ctlout sur le canal 9.</tspan><tspan sodipodi:role="line" x="15.1" style="font-style:italic;fill:#606060">Fonctions : docs/PEDALIER_MAPPING.md et docs/LOOPER_STATE_MACHINE.md — 25 juillet 2026.</tspan></text>
+       y="164"><tspan sodipodi:role="line" x="15.1" style="font-weight:bold">Boutons ronds 10–17 — stop / play par sirène, 17 = toutes</tspan><tspan sodipodi:role="line" x="15.1">10→S1 … 16→S7, 17 = toutes. LED jaune de présélection sur les mêmes numéros.</tspan><tspan sodipodi:role="line" x="15.1"> </tspan><tspan sodipodi:role="line" x="15.1" style="font-weight:bold">Pédales de commande 18–25 — de gauche à droite</tspan><tspan sodipodi:role="line" x="15.1">18   rec / play</tspan><tspan sodipodi:role="line" x="15.1">19   clip write — rôle à retrancher si l'inscription en scène est automatique</tspan><tspan sodipodi:role="line" x="15.1">20   scene write</tspan><tspan sodipodi:role="line" x="15.1">21   tempo — non confirmé (la feuille laisse la case vide)</tspan><tspan sodipodi:role="line" x="15.1">22   reset de la sirène courante  ·  appui long 3 s : toutes les sirènes</tspan><tspan sodipodi:role="line" x="15.1">23   boucle présélectionnée suivante</tspan><tspan sodipodi:role="line" x="15.1">24   stop de la boucle courante, immédiat, jamais quantizé  ·  appui long : efface</tspan><tspan sodipodi:role="line" x="15.1">25   rec / play, quantizé au début de mesure  ·  appui long : efface</tspan><tspan sodipodi:role="line" x="15.1"> </tspan><tspan sodipodi:role="line" x="15.1" style="font-weight:bold">Clavier PK-6 26–37 — les sept touches blanches sélectionnent une sirène</tspan><tspan sodipodi:role="line" x="15.1">Do 26→S1, Ré 28→S2, Mi 30→S3, Fa 31→S4, Sol 33→S5, La 35→S6, Si 37→S7</tspan><tspan sodipodi:role="line" x="15.1">Les 5 dièses et le Do aigu (38) tombent à côté du route : six touches disponibles.</tspan><tspan sodipodi:role="line" x="15.1">Maintenir un poussoir en jouant un accord règle le voicing de la scène.</tspan><tspan sodipodi:role="line" x="15.1"> </tspan><tspan sodipodi:role="line" x="15.1">Tout passe en Control Change, jamais en notes. Les LEDs repartent en ctlout sur le canal 9.</tspan><tspan sodipodi:role="line" x="15.1" style="font-style:italic;fill:#606060">Fonctions : docs/PEDALIER_MAPPING.md et docs/LOOPER_STATE_MACHINE.md — 25 juillet 2026.</tspan></text>
   </g>
 </svg>

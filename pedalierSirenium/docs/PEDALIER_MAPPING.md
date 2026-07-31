@@ -6,8 +6,9 @@ pour allumer ses LEDs.
 > **Attention — deux couches à ne pas confondre.**
 > Les **numéros de contrôleur** sont du matériel : ils sont figés, ils identifient un objet
 > physique. Les **fonctions** qui leur sont associées plus bas sont du *design*. Une partie a été
-> refondue le **25 juillet 2026** — voir « Refonte » juste en dessous, qui **prime** sur les
-> sections « Fonctions actuelles » et « Entrées » plus bas, conservées comme état antérieur.
+> refondue le **25 juillet 2026**, puis à nouveau le **31 juillet 2026**. C'est la section
+> **« Entrées »** qui fait foi : elle porte la décision la plus récente. « Refonte » et « Fonctions
+> actuelles » sont conservées comme état antérieur, avec les points qu'elles gardent de valables.
 
 Le dessin annoté `pedalierSirenium.svg` (même dossier) porte ces fonctions sur la surface physique.
 
@@ -17,12 +18,15 @@ Le dessin annoté `pedalierSirenium.svg` (même dossier) porte ces fonctions sur
 
 - **Jeu à 7 sirènes.** Le rond 17 reste donc `toutes` ; la réserve « concevoir pour 8 » de la
   mi-juillet est mise de côté pour cette surface.
-- **Le clavier ne sélectionne plus les sirènes.** Il devient la surface d'accord : une octave
-  chromatique de 13 touches, vélocité, un CC indépendant par touche. La sélection de sirène vit
-  entièrement sur les 8 boutons ronds, qui eux ont des LEDs.
+- ~~**Le clavier ne sélectionne plus les sirènes.**~~ **Renversé le 2026-07-31.** Cette refonte
+  libérait le clavier pour en faire la surface d'accord et déplaçait la sélection sur les 8 boutons
+  ronds. La décision du 31 juillet fait l'inverse : la sélection reste sur les **touches blanches du
+  clavier** (26-37, ce que le patch fait déjà), et les boutons ronds passent au **transport**
+  stop/play. **Reste sans domicile : la surface d'accord** — c'était tout l'objet de libérer le
+  clavier, et il n'est plus libre.
 - **Mode poly — piste en réflexion, pas figée** (Patrice, 2026-07-25 : « c'est possible que je change
-  d'avis »). Sur la pédale 19 (l'ancien `clip write`, dont les specs disaient déjà qu'il fait
-  peut-être doublon avec l'inscription automatique en scène). Pédale active : les appuis sur les
+  d'avis »). Elle occupait la pédale 19, que la rangée du 31 juillet réattribue à `clip play/stop`
+  global : cette piste n'a donc plus de pédale non plus. Pédale active : les appuis sur les
   ronds **cumulent** les sirènes en jeu au lieu de remplacer la sélection ; le clavier donne
   l'**intervalle de la dernière sirène ajoutée**. Ne rien implémenter là-dessus sans revalider.
 - **L'intervalle est une classe** (mod 12). L'octave où il sonne vient de l'**ambitus de la
@@ -69,7 +73,8 @@ Soit environ **59 contrôles** et **54 LEDs**. Trois faits qui comptent pour le 
 
 - **Le pédalier a autant de LEDs que de contrôles.** Chaque bouton peut s'éclairer. C'est une
   surface de retour entière, sous les pieds, en plus de l'écran.
-- **La Grosse Boîte a 31 boutons** (61–91) — de quoi lancer 31 compositions.
+- **La Grosse Boîte a 31 boutons** (61–91), dont **29 lancent une composition** (61–89) : le 30e
+  (CC 90) est le bouton d'inventaire (voir plus bas), le 31e (CC 91) n'est branché à rien.
 - **Les LED pedal 18–25 existent en matériel mais PureData ne les allume pas** : `led.pedal.board`
   envoie vers `midi.pedalier.sirenium-r.old`, un nom que personne ne reçoit. Huit LEDs disponibles.
 - **La BOSS expose 4 pédales continues (47–50)**, mais `pedals.modulators` n'en route que trois
@@ -100,45 +105,61 @@ des 7 boucles. Une boucle rangée est un **clip** (`set.clip.slot`, stockage `$0
 
 ## Entrées — du pédalier vers PureData
 
-### Sélection de sirène — CC 10 à 17
+### Transport par sirène — CC 10 à 17 (décidé le 2026-07-31)
 
 | CC | Fonction |
 |---|---|
-| 10 – 16 | Sirènes 1 à 7 (présélection — **LED jaune**) |
-| 17 | Toutes les sirènes |
+| 10 – 16 | **Stop / play** de la sirène 1 à 7 |
+| 17 | Stop / play de **toutes** les sirènes |
 
-Traité par `pedals.stop`, qui retire 9 pour retrouver le numéro de sirène et émet `pedal.stop` /
-`pedal.stop.all`.
+Un bouton par sirène, sans mode : c'est le geste direct pour jouer avec les clips, et il colle aux
+sept cellules d'une scène. Ces boutons portaient auparavant la *présélection* de sirène ; celle-ci
+vit désormais entièrement sur le clavier (voir plus bas).
 
-### Pédales de commande — CC 18 à 25, de gauche à droite
+Les pédales ne couvrent que `play` et `stop`. Les trois autres modes d'une cellule — `mute`, `solo`,
+`oneshot` — restent à l'écran.
 
-| CC | Fonction | Appui long (3000 ms) |
-|---|---|---|
-| 18 | Clear all loops | |
-| 19 | Clip write | |
-| 20 | Clip play / stop | |
-| 21 | Tempo (`led.pedal.tempo` ; case vide dans la feuille) | |
-| 22 | Reset de la sirène courante | → reset de **toutes** les sirènes |
-| 23 | Boucle présélectionnée suivante | |
-| 24 | Stop de la boucle courante | → **clear** de la boucle courante, *après confirmation* |
-| 25 | Rec / play de la boucle courante | |
+### Pédales de commande — CC 18 à 25, de gauche à droite (décidé le 2026-07-31)
 
-Ces huit CC sont traités par `pedals.rec/play` (nommé d'après sa fonction principale, mais il filtre
-toute la plage 18-25).
+| CC | Fonction |
+|---|---|
+| 18 | **Rec / play** |
+| 19 | Clip play / stop (**global** — tous les clips) |
+| 20 | Scene write |
+| 21 | Scene clear |
+| 22 | New scene |
+| 23 | Duplicate scene |
+| 24 | Tempo |
+| 25 | Reset de la sirène courante |
 
-**Deux appuis longs de 3 s existent, et l'un d'eux demande une confirmation.** C'est une mécanique
-temporelle avec un état intermédiaire — elle a besoin d'un retour visuel, sans quoi l'interprète ne
-sait ni que le compte à rebours court, ni qu'une confirmation est attendue.
+**L'ordre est celui de la portée croissante** : niveau clip (18-19), niveau scène (20-23), global
+(24-25). Le geste le plus fréquent est sur la pédale la plus atteignable.
+
+`scene clear` vide la scène **en mémoire** ; c'est `scene write` qui valide. Tant qu'on n'a pas
+écrit, le geste est réversible — d'où l'absence de confirmation malgré le voisinage des deux
+pédales. Voir `SCENES_SPEC.md` §5 : le patch écrit aujourd'hui chaque édition immédiatement, ce
+modèle-là reste à construire.
+
+Deux fonctions ont disparu de cette rangée, volontairement : « clear all loops » est devenue
+`scene clear` (vider le *pool* est de l'entretien, sa place est à l'écran), et « boucle
+présélectionnée suivante » n'a plus d'objet dès que chaque sirène a son bouton.
 
 ### Autres entrées
 
 | Plage CC | Contrôle | Effet | Sous-patch |
 |---|---|---|---|
-| **26 – 42** | Clavier PK-6 (*pédales de notes*) | `- 26` → `route 0 2 4 5 7 9 11` → sélection de sirène 1-7 → `$0.loop.voice.select` | `pedals.piano` |
+| **26 – 37** | Clavier PK-6 (*pédales de notes*) — **les sept touches blanches**, do à si | `- 26` → `route 0 2 4 5 7 9 11` → sélection de sirène 1-7 → `$0.loop.voice.select` | `pedals.piano` |
 | **43 – 46** | 4 interrupteurs montés sur les pédales d'expression | combinés au numéro de pédale (voir plus bas) | `pedals.modulators` |
 | **47 – 49** | 3 pédales d'expression (continues) | `$0.modulation.pedal` | `pedals.modulators` |
 | **53 – 60** | 8 boutons du petit boîtier | `- 50` → charge une scène → `$0.looper.scene.select.json` | `pedals.littlebox.buttons` |
-| **~91 +** | Boutons du gros boîtier | lance une composition (`moses 91` ; plage exacte à confirmer) | `pedals.bigbox.buttons` |
+| **61 – 89** | 29 boutons du gros boîtier | `- 61` → `compoSelect <n>`, **0-based** → ouvre la n-ième composition | `pedals.bigbox.buttons` |
+| **90** | 30e bouton du gros boîtier | **inventaire** : tant qu'on appuie, les LEDs 61+ des boutons qui portent une composition s'allument | `pedals.bigbox.buttons` → `led.compo.available` |
+| **91** | 31e bouton du gros boîtier | rien | — |
+
+**Le rang du bouton n'est pas le nom de la composition.** `composition-io` remplit sa table par
+`file glob <racine>/*` : les compositions occupent donc toujours les **N premiers** boutons, dans
+l'ordre alphabétique du nom de dossier — aujourd'hui `comp_12` = bouton 1, `comp_7` = bouton 2.
+C'est ce que le bouton 90 rend visible.
 
 ### Le clavier sélectionne les sirènes (état antérieur — supprimé par la refonte)
 
