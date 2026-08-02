@@ -6,6 +6,7 @@ import "./controllers"
 import "./utils"
 import "./components/play"
 import "./components/config"
+import "./components/scenes"
 
 // Refonte 2D — Phase 1 : vue de jeu (horloge, boucle en cours, sept sirènes),
 // animée par des données simulées. Le routage du vrai flux PD arrive en Phase 2.
@@ -50,6 +51,7 @@ Window {
                 case "composition": liveState.applyComposition(data); break;
                 case "sirenium": liveState.applySirenium(data); break;
                 case "voiceSelect": liveState.applyVoiceSelect(data); break;
+                case "outputDevice": liveState.applyOutputDevice(data); break;
                 default:
                     if (logger) logger.debug("WEBSOCKET", "batch non routé:", batchType);
             }
@@ -66,6 +68,45 @@ Window {
     // Bascule vue de jeu / configuration (F2 ou bouton dans le bandeau)
     property bool configMode: false
     Shortcut { sequence: "F2"; onActivated: window.configMode = !window.configMode }
+
+    // Gestion des scènes : troisième état du corps, ouvert depuis la carte du
+    // morceau. Pas de bouton dédié dans le bandeau — la porte, c'est la carte.
+    property bool scenesMode: false
+
+    // Maintenance : la machine, pas l'instrument. Bouton SYS dans le bandeau.
+    property bool maintenanceMode: false
+
+    // Le clic ne décide pas de la sortie : il la demande. C'est l'écho de PD
+    // qui met le bouton à jour, sinon l'écran mentirait dès que PD refuse.
+    function _setOutput(dev) {
+        if (wsController.isConnected) wsController.sendOutputDevice(dev);
+        else sim.applyOutputDevice(dev);
+    }
+
+    // Les éditions partent vers PD quand il est là, et restent locales sinon :
+    // sans ça, la page serait inutilisable pour la régler hors connexion.
+    // `window.state` porte les deux, comme pour le tempo et la signature.
+    function _sceneEdit(op, a, b, c) {
+        if (wsController.isConnected) {
+            switch (op) {
+                case "new":    return wsController.sceneNew();
+                case "load":   return wsController.sceneLoad(a);
+                case "rename": return wsController.sceneRename(a, b);
+                case "delete": return wsController.sceneDelete(a);
+                case "copy":   return wsController.sceneCopy(a, b);
+                case "cell":   return wsController.sceneCellCopy(a, b, c);
+            }
+        } else {
+            switch (op) {
+                case "new":    return sim.simNewScene();
+                case "load":   return sim.simLoadScene(a);
+                case "rename": return sim.simRenameScene(a, b);
+                case "delete": return sim.simDeleteScene(a);
+                case "copy":   return sim.simCopyScene(a, b);
+                case "cell":   return sim.simCopyCell(a, b, c);
+            }
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -87,7 +128,15 @@ Window {
             maxSignatureNum: window.state.maxSignatureNum
             signatureDen: window.state.signatureDen
             configMode: window.configMode
-            onToggleConfig: window.configMode = !window.configMode
+            maintenanceMode: window.maintenanceMode
+            onToggleConfig: {
+                window.configMode = !window.configMode;
+                if (window.configMode) window.maintenanceMode = false;
+            }
+            onToggleMaintenance: {
+                window.maintenanceMode = !window.maintenanceMode;
+                if (window.maintenanceMode) { window.configMode = false; window.scenesMode = false; }
+            }
             // Éditable partout, y compris en jeu (exception délibérée) : mise à
             // jour locale immédiate + envoi à PD. Format déjà utilisé par
             // l'ancien code pour le tempo ; nouveau message pour la signature.
@@ -115,7 +164,7 @@ Window {
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 0
-                visible: !window.configMode
+                visible: !window.configMode && !window.scenesMode && !window.maintenanceMode
 
                 FocusDial2D {
                     Layout.fillWidth: true
@@ -201,13 +250,39 @@ Window {
                     banks: window.state.banks
                     currentBank: window.state.currentBank
                     sections: window.state.sections
+                    onOpenRequested: window.scenesMode = true
                 }
             }
 
             // Écran de configuration
             ConfigView2D {
                 anchors.fill: parent
-                visible: window.configMode
+                visible: window.configMode && !window.scenesMode && !window.maintenanceMode
+            }
+
+            // Page de maintenance
+            MaintenanceView2D {
+                anchors.fill: parent
+                visible: window.maintenanceMode
+                outputDevice: window.state.outputDevice
+                connected: wsController.isConnected
+                onOutputRequested: function(dev) { window._setOutput(dev); }
+                onReconnectRequested: wsController.reconnect()
+            }
+
+            // Gestion des scènes
+            SceneManager2D {
+                anchors.fill: parent
+                visible: window.scenesMode
+                sections: window.state.sections
+                compName: window.state.compName
+                onClosed: window.scenesMode = false
+                onNewScene: window._sceneEdit("new")
+                onLoadScene: function(n) { window._sceneEdit("load", n); }
+                onRenameScene: function(n, name) { window._sceneEdit("rename", n, name); }
+                onDeleteScene: function(n) { window._sceneEdit("delete", n); }
+                onCopyScene: function(src, dst) { window._sceneEdit("copy", src, dst); }
+                onCopyCell: function(src, dst, siren) { window._sceneEdit("cell", src, dst, siren); }
             }
         }
     }

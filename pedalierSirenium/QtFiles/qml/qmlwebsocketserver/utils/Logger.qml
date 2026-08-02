@@ -7,7 +7,9 @@ QtObject {
     property int globalLevel: 0  // OFF par défaut
     
     // Propriétés individuelles pour chaque catégorie
-    property int levelWebSocket: 0
+    // INFO : sans ça, tout ce que PD répond est muet dans /logs et on ne peut pas
+    // distinguer « la commande n'est pas partie » de « PD l'a ignorée ».
+    property int levelWebSocket: 3
     property int levelClock: 0
     property int levelVoice: 0
     property int levelAnimation: 0

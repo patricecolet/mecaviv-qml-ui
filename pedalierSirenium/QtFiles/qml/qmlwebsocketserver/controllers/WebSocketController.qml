@@ -250,6 +250,12 @@ Item {
                     if (json.loops) {
                         root.batchReceived("loops", json.loops);
                     }
+                    // Écho de la sortie choisie (v1/v2/dsp). PD la persiste dans
+                    // `.sortie`, donc c'est lui qui dit la vérité au démarrage,
+                    // pas la dernière valeur cliquée ici.
+                    if (json.output) {
+                        root.batchReceived("outputDevice", json.output);
+                    }
                 } else if (json.device === "SIREN_PEDALS") {
                     if (json.presetList) {
                         root.batchReceived("presetList", json.presetList);
@@ -472,6 +478,17 @@ Item {
         });
     }
     
+    // Sortie des sirènes : v1 (UDP), v2 (MIDI) ou dsp. PD la reçoit sur
+    // `$0.siren.output.device` et la persiste ; il renvoie `output` en écho.
+    function sendOutputDevice(dev) {
+        if (logger) logger.info("SYSTEM", "🌐 sortie sirènes →", dev);
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "outputDevice",
+            output: dev
+        });
+    }
+
     // Fonction utilitaire pour recharger la configuration manuellement
     function reloadConfiguration() {
         configLoaded = false;

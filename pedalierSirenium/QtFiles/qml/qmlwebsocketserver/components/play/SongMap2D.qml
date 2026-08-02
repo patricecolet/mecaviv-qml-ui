@@ -12,10 +12,19 @@ Item {
     property int compButton: 0
     property int banks: 1
     property int currentBank: 1
-    // sections : [{ btn, name, modes:[7], current (bool), past (bool) }]
+    // sections : [{ id, btn, name, modes:[7], cells:[7], current (bool), past (bool) }]
     property var sections: []
 
+    // La carte est un affichage, pas un lanceur — mais c'est la porte d'entrée
+    // de la page de gestion : on touche le morceau, on tombe sur ses scènes.
+    signal openRequested()
+
     readonly property var _spec: SirenSpec.SPEC
+
+    MouseArea {
+        anchors.fill: parent
+        onClicked: root.openRequested()
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -27,7 +36,11 @@ Item {
 
             ColumnLayout {
                 spacing: 5
-                Text { text: "MORCEAU — GRAND PÉDALIER"; color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5 }
+                RowLayout {
+                    spacing: 10
+                    Text { text: "MORCEAU — GRAND PÉDALIER"; color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5 }
+                    Text { text: "· toucher pour gérer les scènes"; color: "#2A3742"; font.family: "monospace"; font.pixelSize: 9 }
+                }
                 RowLayout {
                     spacing: 10
                     Text { text: root.compName; color: "#C7D2DC"; font.family: "monospace"; font.pixelSize: 22; font.bold: true }

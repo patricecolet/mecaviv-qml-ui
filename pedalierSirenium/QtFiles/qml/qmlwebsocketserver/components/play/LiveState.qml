@@ -119,6 +119,16 @@ QtObject {
         if (data.voice !== undefined) monoVoice = data.voice;
     }
 
+    // ---------- maintenance : la sortie des sirènes ----------
+    // PD la persiste dans `.sortie` et la renvoie en écho ; ici on ne fait que
+    // refléter ce qu'il annonce, jamais ce qu'on a cliqué.
+    property string outputDevice: "v1"
+
+    function applyOutputDevice(data) {
+        if (data === undefined || data === null) return;
+        outputDevice = String(data);
+    }
+
     // ---------- sorties temps réel (recalculées à chaque tick) ----------
     property int clockBeat: 0
     property int clockBar: 1

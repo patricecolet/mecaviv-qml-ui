@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const os = require('os');
+const net = require('net');
 const app = express();
 const port = parseInt(process.env.WEB_PORT || '8010', 10);
 
@@ -80,6 +81,9 @@ function serveWithInjection(filePath, res) {
             out = INJECTION_SNIPPET + html;
         }
         res.setHeader('Content-Type', 'text/html');
+        // Comme pour le wasm : sans ça, le kiosque ressert la page injectée
+        // d'avant le déploiement et on debug une version qui n'existe plus.
+        res.setHeader('Cache-Control', 'no-cache');
         res.send(out);
     });
 }
@@ -170,6 +174,62 @@ async function readSystemInfo() {
     systemInfoCache = { at: now, data };
     return data;
 }
+
+// L'adresse du serveur WebSocket suit celle par laquelle la page a été demandée.
+// Sans ça, le `ws://localhost:10000` de config.js est compilé dans le wasm : la
+// page servie par le Raspberry ferait chercher Pure Data sur la machine du
+// navigateur, et changer l'IP du Pi imposerait un rebuild.
+app.get('/api/config', (req, res) => {
+    const wsPort = parseInt(process.env.WS_PORT || '10000', 10);
+    const host = (req.hostname || 'localhost');
+    res.json({ websocketUrl: `ws://${host}:${wsPort}` });
+});
+
+// État du lien RTP-MIDI. On parle directement à la socket de contrôle de
+// rtpmidid plutôt que d'appeler `rtpmidid-cli` : le binaire n'est pas exécutable
+// par tout le monde et ce droit-là est un réglage manuel qu'un redéploiement ne
+// remet pas. La socket, elle, est créée par le service --user lui-même.
+const RTPMIDID_SOCKET = process.env.RTPMIDID_SOCKET ||
+    path.join(process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid ? process.getuid() : 1000}`, 'rtpmidid.sock');
+
+function readRtpStatus() {
+    return new Promise((resolve) => {
+        const done = (v) => { try { sock.destroy(); } catch (e) {} resolve(v); };
+        const timer = setTimeout(() => done({ available: false, peers: [] }), 1500);
+        let buf = '';
+        const sock = net.connect(RTPMIDID_SOCKET);
+        sock.on('error', () => { clearTimeout(timer); done({ available: false, peers: [] }); });
+        sock.on('connect', () => sock.write(JSON.stringify({ method: 'status', params: [] }) + '\n'));
+        sock.on('data', (chunk) => {
+            buf += chunk.toString();
+            // La réponse tient en un objet JSON ; on attend qu'il soit complet.
+            try {
+                const parsed = JSON.parse(buf);
+                clearTimeout(timer);
+                const router = (parsed.result && parsed.result.router) || [];
+                done({
+                    available: true,
+                    // Les entrées sans nom ni statut sont les moitiés ALSA
+                    // internes du routeur : elles doublent chaque pair sans rien
+                    // dire de plus. Et on ne garde du nom que le pair distant,
+                    // le côté local étant toujours nous.
+                    peers: router
+                        .filter((r) => r.name && r.status)
+                        .map((r) => ({
+                            name: r.name.split('<->').pop().trim(),
+                            status: r.status,
+                            recv: r.stats ? r.stats.recv : 0,
+                            sent: r.stats ? r.stats.sent : 0
+                        }))
+                });
+            } catch (e) { /* pas encore complet */ }
+        });
+    });
+}
+
+app.get('/api/rtp', async (req, res) => {
+    res.json(await readRtpStatus());
+});
 
 app.get('/api/temperature', async (req, res) => {
     res.json({ temperature: await readTemperature() });

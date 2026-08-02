@@ -68,6 +68,11 @@ QtObject {
         return groups;
     }
 
+    // Sans PD, le clic est la seule vérité disponible : le harnais garde la
+    // valeur choisie pour que la page reste utilisable hors connexion.
+    property string outputDevice: "v1"
+    function applyOutputDevice(dev) { outputDevice = String(dev); }
+
     property int mainBars: 4
     property int mainLoop: 2          // S3 (index) = boucle de référence
     property int focusIndex: 4        // S5 enregistre (boucle secondaire)
@@ -77,13 +82,91 @@ QtObject {
     readonly property int compButton: 12
     readonly property int banks: 3
     readonly property int currentBank: 1
-    readonly property var sections: [
-        { btn: 1, name: "intro",  modes: ["play","empty","play","empty","empty","empty","oneshot"], past: true },
-        { btn: 2, name: "montée", modes: ["play","play","play","stop","play","empty","play"], past: true },
-        { btn: 4, name: "plein",  modes: ["play","play","play","play","play","mute","play"], current: true },
-        { btn: 5, name: "creux",  modes: ["stop","mute","solo","play","stop","empty","stop"] },
-        { btn: 7, name: "coda",   modes: ["play","stop","empty","empty","mute","play","oneshot"] }
-    ]
+    // Mutable, contrairement au reste du harnais : la page de gestion des scènes
+    // doit pouvoir vivre sans PD, sinon on ne peut pas la régler. Les mêmes six
+    // opérations que `pd scene.edit`, avec la même règle de décalage.
+    property var sections: _seed()
+
+    function _seed() {
+        var raw = [
+            ["intro",  ["play","empty","play","empty","empty","empty","oneshot"], ["clip_A",null,"clip_C",null,null,null,"clip_D"]],
+            ["montée", ["play","play","play","stop","play","empty","play"],        ["clip_A","clip_B","clip_C","clip_E","clip_F",null,"clip_D"]],
+            ["plein",  ["play","play","play","play","play","mute","play"],         ["clip_A","clip_B","clip_C","clip_E","clip_F","clip_G","clip_D"]],
+            ["creux",  ["stop","mute","solo","play","stop","empty","stop"],        ["clip_A","clip_B","clip_C","clip_E","clip_F",null,"clip_D"]],
+            ["coda",   ["play","stop","empty","empty","mute","play","oneshot"],    ["clip_A","clip_B",null,null,"clip_F","clip_G","clip_H"]]
+        ];
+        var out = [];
+        for (var i = 0; i < raw.length; i++) out.push(_mk(i + 1, raw[i][0], raw[i][1], raw[i][2]));
+        out[2].current = true;
+        out[0].past = true;
+        out[1].past = true;
+        return out;
+    }
+
+    function _mk(id, name, modes, clips) {
+        var cells = [];
+        for (var s = 0; s < 7; s++) cells.push({ mode: modes[s], clipRef: clips ? clips[s] : null });
+        return { id: id, btn: ((id - 1) % 8) + 1, name: name, modes: modes.slice(),
+                 cells: cells, current: false, past: false };
+    }
+
+    function _renumber(list) {
+        for (var i = 0; i < list.length; i++) { list[i].id = i + 1; list[i].btn = (i % 8) + 1; }
+        return list;
+    }
+
+    function _at(list, id) {
+        for (var i = 0; i < list.length; i++) if (list[i].id === id) return i;
+        return -1;
+    }
+
+    function simNewScene() {
+        var l = sections.slice();
+        l.push(_mk(l.length + 1, "nouvelle",
+                   ["empty","empty","empty","empty","empty","empty","empty"], null));
+        sections = _renumber(l);
+    }
+    function simRenameScene(id, name) {
+        var l = sections.slice(); var i = _at(l, id);
+        if (i >= 0) l[i] = Object.assign({}, l[i], { name: name });
+        sections = l;
+    }
+    function simDeleteScene(id) {
+        var l = sections.slice(); var i = _at(l, id);
+        if (i >= 0) l.splice(i, 1);
+        sections = _renumber(l);
+    }
+    function simCopyScene(src, dst) {
+        var l = sections.slice(); var a = _at(l, src), b = _at(l, dst);
+        if (a < 0 || b < 0) return;
+        var copy = _mk(l[b].id, l[a].name, l[a].modes,
+                       l[a].cells.map(function(c) { return c.clipRef; }));
+        copy.current = l[b].current;
+        l[b] = copy;
+        sections = l;
+    }
+    function simCopyCell(src, dst, siren) {
+        var l = sections.slice(); var a = _at(l, src), b = _at(l, dst);
+        if (a < 0 || b < 0 || siren < 1 || siren > 7) return;
+        var cell = l[a].cells[siren - 1];
+        var tgt = Object.assign({}, l[b]);
+        tgt.cells = l[b].cells.slice();
+        tgt.modes = l[b].modes.slice();
+        tgt.cells[siren - 1] = { mode: cell.mode, clipRef: cell.clipRef };
+        tgt.modes[siren - 1] = cell.mode;
+        l[b] = tgt;
+        sections = l;
+    }
+    function simLoadScene(id) {
+        var l = sections.slice();
+        var seen = false;
+        for (var i = 0; i < l.length; i++) {
+            l[i] = Object.assign({}, l[i], { current: l[i].id === id, past: false });
+            if (l[i].current) seen = true;
+            else if (!seen) l[i].past = true;
+        }
+        sections = l;
+    }
 
     // --- harmonie de la scène courante (statique en Phase 1/3) ---
     readonly property string chordName: "Do dorien"

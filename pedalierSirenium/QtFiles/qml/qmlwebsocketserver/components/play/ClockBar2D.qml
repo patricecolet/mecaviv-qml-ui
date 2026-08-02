@@ -32,6 +32,7 @@ Rectangle {
     property int maxSignatureNum: 21
     property int signatureDen: 4
     property bool configMode: false
+    property bool maintenanceMode: false
 
     // Index du groupe (temps) qui contient l'unité brute courante.
     readonly property int _activeGroupIndex: {
@@ -44,6 +45,7 @@ Rectangle {
     }
 
     signal toggleConfig()
+    signal toggleMaintenance()
     signal bpmStep(int delta)
     signal signatureNumStep(int delta)
     signal signatureDenCycle()
@@ -170,8 +172,8 @@ Rectangle {
 
     Row {
         id: rightMetrics
-        // s'arrête avant le bouton de bascule, jamais sous lui
-        anchors.right: toggleBtn.left
+        // s'arrête avant le premier bouton, jamais sous lui
+        anchors.right: sysBtn.left
         anchors.rightMargin: 26
         anchors.verticalCenter: parent.verticalCenter
         spacing: 26
@@ -186,6 +188,26 @@ Rectangle {
             Text { text: "MESURE"; color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5 }
             Text { text: root.bar.toString(); color: "#C7D2DC"; font.family: "monospace"; font.pixelSize: 20; font.bold: true }
         }
+    }
+
+    // Accès maintenance : à côté de CFG, jamais en overlay non plus. Séparé de
+    // la config parce qu'on n'y va pas pour les mêmes raisons — l'une règle
+    // l'instrument, l'autre la machine.
+    Rectangle {
+        id: sysBtn
+        anchors.right: toggleBtn.left
+        anchors.rightMargin: 8
+        anchors.verticalCenter: parent.verticalCenter
+        width: 44; height: 30; radius: 4
+        color: root.maintenanceMode ? "#1D2732" : "#151D26"
+        border.color: "#212B36"; border.width: 1
+        Text {
+            anchors.centerIn: parent
+            text: "SYS"
+            color: root.maintenanceMode ? "#66E4F2" : "#64737F"
+            font.family: "monospace"; font.pixelSize: 10; font.letterSpacing: 1
+        }
+        MouseArea { anchors.fill: parent; onClicked: root.toggleMaintenance() }
     }
 
     // bouton de bascule jeu/config — dans le bandeau, jamais en overlay
