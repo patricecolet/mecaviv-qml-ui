@@ -8,6 +8,10 @@ EnvironmentFile=%h/.config/pedalier/env
 # Le répertoire de travail EST une dépendance : les `declare -path ../…` de
 # pedalier.pd sont relatifs au dossier du patch.
 WorkingDirectory=@PD_REPO@/examples
+# Les sockets UDP vers les sirènes sont ouvertes une seule fois, au chargement
+# du patch : démarrer avant que eth0 ait son adresse condamne la sortie V1 pour
+# toute la session. Le script n'échoue jamais, il attend au plus 30 s.
+ExecStartPre=@PEDALIER_REPO@/pedalierSirenium/deploy/device/wait-network.sh
 ExecStart=@PD_BIN@ -nogui -stderr @PD_PATCH@
 Restart=on-failure
 RestartSec=2
