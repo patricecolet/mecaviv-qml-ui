@@ -25,8 +25,8 @@ Le dessin annoté `pedalierSirenium.svg` (même dossier) porte ces fonctions sur
   stop/play. **Reste sans domicile : la surface d'accord** — c'était tout l'objet de libérer le
   clavier, et il n'est plus libre.
 - **Mode poly — piste en réflexion, pas figée** (Patrice, 2026-07-25 : « c'est possible que je change
-  d'avis »). Elle occupait la pédale 19, que la rangée du 31 juillet réattribue à `clip play/stop`
-  global : cette piste n'a donc plus de pédale non plus. Pédale active : les appuis sur les
+  d'avis »). Elle occupait la pédale 19, que la rangée du 31 juillet réattribue à
+  `scene play/stop` + `scene clear` : cette piste n'a donc plus de pédale non plus. Pédale active : les appuis sur les
   ronds **cumulent** les sirènes en jeu au lieu de remplacer la sélection ; le clavier donne
   l'**intervalle de la dernière sirène ajoutée**. Ne rien implémenter là-dessus sans revalider.
 - **L'intervalle est une classe** (mod 12). L'octave où il sonne vient de l'**ambitus de la
@@ -75,8 +75,10 @@ Soit environ **59 contrôles** et **54 LEDs**. Trois faits qui comptent pour le 
   surface de retour entière, sous les pieds, en plus de l'écran.
 - **La Grosse Boîte a 31 boutons** (61–91), dont **29 lancent une composition** (61–89) : le 30e
   (CC 90) est le bouton d'inventaire (voir plus bas), le 31e (CC 91) n'est branché à rien.
-- **Les LED pedal 18–25 existent en matériel mais PureData ne les allume pas** : `led.pedal.board`
-  envoie vers `midi.pedalier.sirenium-r.old`, un nom que personne ne reçoit. Huit LEDs disponibles.
+- **Les LED pedal 18–25 existent en matériel** et le chemin est ouvert depuis le 2026-08-01 :
+  huit `send` visaient `midi.pedalier.sirenium-r` sans `$0` — un vestige de `MidiToSiren.pd`, seul
+  patch à porter le receive de ce nom — et sont passés sur `$0.midi.pedalier.sirenium-r`. Reste
+  `led.pedal.board`, laissé volontairement sur `.old` (voir plus bas). Huit LEDs disponibles.
 - **La BOSS expose 4 pédales continues (47–50)**, mais `pedals.modulators` n'en route que trois
   (`route 47 48 49`). Une pédale d'expression est libre.
 
@@ -88,7 +90,8 @@ Soit environ **59 contrôles** et **54 LEDs**. Trois faits qui comptent pour le 
   (8 naturelles, 5 dièses), une octave chromatique. La feuille les appelle *pédales de notes*.
 - **8 pédales de commande** — poussoirs situés au-dessus du clavier, numérotés **de gauche à
   droite** en CC 18 → 25.
-- **7 boutons de sirène** — un par sirène, avec LED jaune de présélection.
+- **7 boutons de sirène** — un par sirène, avec LED jaune. Ils portent le stop / play depuis le
+  2026-07-31 ; la présélection qu'ils assuraient est passée sur le clavier.
 - **Petit boîtier** — 8 boutons, **charge les scènes** (`pedals.littlebox.buttons`).
 - **Gros boîtier** — **lance des compositions entières** (`pedals.bigbox.buttons`).
 - **3 pédales d'expression** — la première porte 2 interrupteurs, les deux autres 1 chacune.
@@ -107,13 +110,18 @@ des 7 boucles. Une boucle rangée est un **clip** (`set.clip.slot`, stockage `$0
 
 ### Transport par sirène — CC 10 à 17 (décidé le 2026-07-31)
 
-| CC | Fonction |
-|---|---|
-| 10 – 16 | **Stop / play** de la sirène 1 à 7 |
-| 17 | Stop / play de **toutes** les sirènes |
+| CC | Appui court | Appui long (400 ms) |
+|---|---|---|
+| 10 – 16 | **Stop / play** de la sirène 1 à 7 | **Delete** du clip de cette sirène |
+| 17 | Stop / play de **toutes** les sirènes | — |
 
 Un bouton par sirène : c'est le geste direct pour jouer avec les clips. Ces boutons portaient
 auparavant la *présélection* de sirène ; celle-ci vit désormais sur le clavier (voir plus bas).
+
+`pedals.stop/play` traduit le CC en **numéro de voix** (`text search $0.voices 6` →
+`text get $0.voices 1`) et envoie `<voix> <0|1>` sur `$0.pedal.stop`. Le tri court/long se fait
+ensuite **dans chaque `siren-clip-loader`**, qui filtre sur sa propre voix puis passe par
+`pedal-press-duration` sans argument, donc au seuil par défaut de 400 ms.
 
 **C'est du transport, pas de l'édition** : une boucle arrêtée est arrêtée, pas « non enregistrée ».
 Le fichier de scène n'est pas touché. Vérifié dans le patch le 2026-07-31 — ni `siren-clip-loader`
@@ -124,28 +132,70 @@ l'autre sens : ils appliquent la scène au loader quand on la charge.
 
 ### Pédales de commande — CC 18 à 25, de gauche à droite (décidé le 2026-07-31)
 
-| CC | Fonction |
-|---|---|
-| 18 | **Rec / play** |
-| 19 | Clip play / stop (**global** — tous les clips) |
-| 20 | Scene write |
-| 21 | Scene clear |
-| 22 | New scene |
-| 23 | Duplicate scene |
-| 24 | Tempo |
-| 25 | Reset de la sirène courante |
+Trois pédales portent **deux fonctions**, séparées par la durée d'appui. Le seuil est l'argument de
+`pedal-press-duration` et diffère d'une pédale à l'autre : plus le geste est destructif, plus il
+faut tenir longtemps.
 
-**L'ordre est celui de la portée croissante** : niveau clip (18-19), niveau scène (20-23), global
+| CC | Appui court | Appui long | Seuil | Envoi PD |
+|---|---|---|---|---|
+| 18 | **Rec / play** | — | — | `$0.pedal.play.rec` |
+| 19 | **Scene play / stop** | **Scene clear** | 3 s | `$0.scene.play.stop` / `$0.scene.clear` |
+| 20 | **Scene next** | — | — | `$0.scene.next` |
+| 21 | **Scene write** | **Scene duplicate** | 2 s | `$0.scene.write` / `$0.scene.duplicate` |
+| 22 | **New scene** | — | — | `$0.scene.new` |
+| 23 | libre | — | — | — |
+| 24 | **Tap tempo** | — | — | `$0.tempo.tap` |
+| 25 | **Reset** de toutes les sirènes | — | — | `$0.siren.reset all` |
+
+**L'ordre est celui de la portée croissante** : niveau clip (18-19), niveau scène (20-22), global
 (24-25). Le geste le plus fréquent est sur la pédale la plus atteignable.
 
-`scene clear` vide la scène **en mémoire** ; c'est `scene write` qui valide. Tant qu'on n'a pas
-écrit, le geste est réversible — d'où l'absence de confirmation malgré le voisinage des deux
-pédales. Voir `SCENES_SPEC.md` §5 : le patch écrit aujourd'hui chaque édition immédiatement, ce
-modèle-là reste à construire.
+`scene clear` vide la scène **en mémoire** ; c'est `scene write` (CC 21) qui valide. Tant qu'on n'a
+pas écrit, le geste est réversible. Voir `SCENES_SPEC.md` §5 : le patch écrit aujourd'hui chaque
+édition immédiatement, ce modèle-là reste à construire.
+
+CC 18 envoie le **numéro de voix** de la sirène présélectionnée, pas son numéro de sirène : il lit
+`$0.loop.voice.select` tel quel, parce que c'est ce que les sept `siren-clip-loader` attendent sur
+leur `route $4`. Sans sirène sélectionnée la valeur est `-1`, qui ne matche aucun loader — le
+message part mais ne fait rien. Même espace de valeurs que `$0.pedal.stop` des boutons sirène.
+
+CC 25 part **au relâché** (`sel 0`), pas à l'appui, contrairement aux autres.
 
 Deux fonctions ont disparu de cette rangée, volontairement : « clear all loops » est devenue
 `scene clear` (vider le *pool* est de l'entretien, sa place est à l'écran), et « boucle
 présélectionnée suivante » n'a plus d'objet dès que chaque sirène a son bouton.
+
+### Annoncer l'appui long — `pedal-press-duration` et `led-blink`
+
+Un seuil de 2 ou 3 secondes n'est pas tenable sans retour : rien ne dit au pied s'il faut continuer
+d'appuyer. `pedal-press-duration` porte donc **trois sorties** :
+
+| Sortie | Émet | Quand |
+|---|---|---|
+| 0 `court` | bang | au relâché, si le seuil n'est pas atteint |
+| 1 `long` | bang | **au seuil, pied encore au sol** — pas au relâché |
+| 2 `attente` | `1` puis `0` | `1` à l'appui, `0` dès que `court` ou `long` est sorti |
+
+`attente` est faite pour piloter la LED de la pédale. Le seuil est l'argument de création (défaut
+400 ms, garde-fou `moses 100` : un argument absent ou aberrant laisse le défaut).
+
+`led-blink` transforme ce `1` / `0` en clignotement à 120 ms, **valeur 127** comme le reste du
+patch, avec un **timeout de 10 s** armé à l'allumage et annulé par le `0`. Dans tous les cas —
+geste abandonné, `attente` perdu, expiration — la dernière valeur émise est `0` : la LED ne peut pas
+rester allumée.
+
+La chaîne complète, sur CC 19 comme sur CC 21 :
+
+```
+inlet → [pedal-press-duration 3000] ─[2 attente]→ [led-blink] → [$1 19] → s $0.midi.pedalier.sirenium-r
+                                    ├[0 court]→ s $0.scene.play.stop
+                                    └[1 long] → s $0.scene.clear
+```
+
+Vérifié par test headless sur le sous-patch extrait du fichier : un appui de 300 ms fait clignoter
+deux fois puis émet `scene.play.stop` ; un appui tenu fait clignoter pendant les 3 s, éteint, puis
+émet `scene.clear`. Le clignotement s'arrête **au seuil**, pas au relâché — le pied sait qu'il peut
+lever.
 
 ### Autres entrées
 
@@ -211,7 +261,16 @@ combinaison pédale + interrupteurs. Ses 56 valeurs (7 sirènes × 8 paramètres
 
 ## Sorties — LEDs, de PureData vers le pédalier
 
-Envoyées en `ctlout` **canal 9**. Pour une sirène `N` de 1 à 7 :
+Envoyées en `ctlout` **canal 9**, via le bus `$0.midi.pedalier.sirenium-r`.
+
+**L'ordre des atomes est `<valeur> <numéro de CC>`, pas l'inverse.** Le receive du bus fait
+`list append 9` puis `ctlout`, qui attend `valeur, contrôleur, canal`. C'est pour ça que tous les
+producteurs existants — `led.siren.selected` / `playing` / `recording`, `led.pedal.selection`,
+`led.compo.available`, `initLED` — passent par un `swap` avant leur `pack` : ils construisent le CC
+en premier et le renvoient en second. Une boîte `19 $1` envoie donc le CC 1 avec la valeur 19 ; il
+faut écrire `$1 19`. L'erreur est silencieuse, aucun message ne la signale.
+
+Pour une sirène `N` de 1 à 7 :
 
 | État | CC | Plage | Sous-patch |
 |---|---|---|---|
@@ -229,10 +288,46 @@ Le matériel compte **22 LEDs**, et pas trois par sirène : une **jaune** (10-16
 l'inventaire de la feuille, et c'est ce que Patrice confirme.
 
 Or `led.siren.playing` fait `+ 17`, donc écrit sur **18-24** : « sirène 3 en lecture » allume la LED
-de la pédale `clip play/stop`. Et `led.pedal.board` revendique la même plage pour les huit pédales
+de la pédale `scene next`. Et `led.pedal.board` revendique la même plage pour les huit pédales
 (vérifié dans le patch : messages `$1 22`, `$1 23`, `$1 24`, `$1 25`). Les deux se battent sur 18-25
 — c'est très probablement pourquoi la sortie de `led.pedal.board` a été renvoyée vers
 `midi.pedalier.sirenium-r.old`, un nom que personne ne reçoit, plutôt que tranchée.
+
+**Tranché le 2026-08-01, sur le dessin de `pedalierSirenium.svg`** : la plage 18-25 appartient aux
+huit pédales de commande, une LED par fonction. Ce qui suppose deux déplacements :
+
+- `led.siren.playing` (`+ 17` → 18-24) **quitte cette plage**. L'état du clip descend sur la LED
+  rouge de la sirène, 26-32, avec `led.siren.recording` : **clignotement = enregistrement, continu =
+  lecture**, éteint sinon. Une seule LED pour trois états, ce que le matériel impose de toute façon.
+- La LED jaune (10-16) garde la présélection, seule, comme aujourd'hui.
+
+Le retour des huit pédales passe par les sous-patchs de fonction, pas par `led.pedal.board`.
+
+### Table de transitions de `siren-loop-state`
+
+Mesurée le 2026-08-01 en headless, en instrumentant les cinq sorties de l'abstraction
+(`record`, `playgate`, `stopclip`, `erase`, `state`) et en lui envoyant ses verbes entrecoupés de
+`bar`. Les quatre états sont ceux que `$0.loader.state` diffuse et que `$0.loopstates` mémorise,
+une ligne par sirène.
+
+| État de départ | `recplay` | `stop` | `delete` |
+|---|---|---|---|
+| **0** vide | → **1** *au `bar` suivant*, `record` | rien | rien |
+| **1** enregistre | → **2** *au `bar` suivant*, `stopclip`, `playgate 1` | → **3** immédiat, `stopclip` | → **0** immédiat, `erase` |
+| **2** joue | → **1** *au `bar` suivant*, `record` | → **3** immédiat, `playgate 0` | → **0** immédiat, `erase` |
+| **3** arrêté | → **2** **immédiat**, `playgate 1` | rien | → **0** immédiat, `erase` |
+
+Trois choses qui ne se lisent pas dans le patch :
+
+- **`recplay` est quantisé, `stop` et `delete` ne le sont pas.** `pd recplay` ne fait que poser un
+  `$0-pending` ; c'est le `bar` qui applique. Un `recplay` sans horloge ne produit donc rien du
+  tout — c'est ce qui rend le sous-patch muet quand on le teste sans envoyer de mesures.
+- **Sauf depuis l'état 3** : relancer une boucle arrêtée part **tout de suite**, sans attendre la
+  mesure. Asymétrie voulue ou non, elle est réelle.
+- **L'état 1 est bien « en cours d'enregistrement »**, pas « contient un enregistrement » : le
+  `record` part à l'entrée dans l'état, et c'est le `recplay` suivant qui ferme le clip avec
+  `stopclip <ticks> <mesures> …`. C'est donc **l'état 1 qui doit faire clignoter la LED rouge, et
+  l'état 2 l'allumer en continu** ; 0 et 3 l'éteignent.
 
 **PD a trois états par sirène pour deux LEDs physiques : il y en a un de trop.** À trancher avant
 toute logique à modes, parce qu'un mode invisible au pied n'est pas utilisable : le décompte avant
@@ -252,16 +347,20 @@ la seule surface de retour.
 
 ## `led.pedal.board` — numérotation juste, sortie débranchée
 
-Ce sous-patch associe les huit fonctions aux CC 18-25, et **la feuille de référence le confirme
-exactement**. Sa numérotation est bonne.
+Ce sous-patch associe huit fonctions aux CC 18-25, et sa numérotation est bonne — mais **ce sont
+les fonctions d'avant le 2026-07-31**. Les noms de retour LED disent encore l'ancienne rangée :
+`rec.play`, `tempo` et `reset` restent valables, `clip.play.stop`, `clip.write`, `clear.loops`,
+`next` et `stop` nomment des fonctions qui n'existent plus. Les renommer est le préalable à tout
+câblage de la nouvelle rangée, sans quoi le retour au pied dira autre chose que la pédale.
 
-En revanche son unique sortie part vers `s midi.pedalier.sirenium-r.old`, **un nom que personne ne
-reçoit** : le retour LED des pédales de commande ne part donc jamais. Le chemin vivant est
-`midi.pedalier.sirenium-r`, alimenté par `led.siren.selected` / `playing` / `recording`,
-`led.pedal.selection`, `led.pedal.preselection`, `initLED` et `tempo.to.led`.
+Son unique sortie part vers `s midi.pedalier.sirenium-r.old`, **un nom que personne ne reçoit**, et
+elle y reste : la rebrancher allumerait les LEDs avec les fonctions d'avant la refonte. C'est
+maintenant le **seul** envoi orphelin du fichier — les sept autres qui visaient
+`midi.pedalier.sirenium-r` sans `$0` ont été recollés sur le bus vivant le 2026-08-01.
 
-Autrement dit : les LEDs **par sirène** fonctionnent, celles **des huit pédales de commande** sont
-mortes. À vérifier sur le matériel avant d'en conclure quoi que ce soit.
+Le retour LED des pédales de commande passe désormais **par les sous-patchs de fonction**, pas par
+`led.pedal.board` : `pd scene.play.stop.del` (CC 19) et `pd $0.scene.write.duplicate` (CC 21)
+prennent la troisième sortie de `pedal-press-duration` et l'envoient sur le bus.
 
 ---
 
@@ -310,9 +409,27 @@ d'écrire la règle de repli — et avant de conclure quoi que ce soit sur la ha
   est la plage du clavier — copier-coller qui a vieilli. Son `moses 91` indique une plage autour de
   91, mais le nombre de boutons et la correspondance bouton ↔ composition restent à établir.
 - ~~**CC 21** : `led.pedal.board` dit *tempo*, la feuille laisse la case vide.~~ Tranché le
-  2026-07-25 : le tap tempo est conservé.
-- **Confirmation du clear** (CC 24, appui long) : la mécanique existe côté feuille, mais on ignore
-  quel geste confirme et ce qui est censé l'annoncer.
+  2026-07-25 : le tap tempo est conservé — il est passé en **CC 24** avec la nouvelle rangée.
+- ~~**Confirmation du `scene clear`** : on ignore quel geste confirme et ce qui est censé
+  l'annoncer.~~ Tranché et câblé le 2026-08-01 : le geste est l'**appui long de 3 s sur CC 19**,
+  l'annonce est le clignotement de la LED de la pédale. Le geste reste réversible tant que
+  `scene write` (CC 21) n'a pas validé.
+- **Les sept envois de la rangée n'ont aucun receive** : `$0.scene.play.stop`, `$0.scene.clear`,
+  `$0.scene.next`, `$0.scene.write`, `$0.scene.duplicate`, `$0.scene.new`, `$0.tempo.tap`. Le côté
+  pédale est fini et mesuré ; ce qui manque est l'aval, c'est-à-dire les commandes de scène
+  elles-mêmes — voir `SCENES_SPEC.md`. Seul `$0.pedal.play.rec` est branché des deux bouts.
+- **Cinq pédales n'ont aucun retour LED** : 18, 20, 22, 24, 25 n'ont pas d'appui long, donc pas de
+  sortie `attente`. Leur donner un flash bref à l'appui demande de choisir une durée.
+- **`led.siren.recording` n'a pas de source.** Son `r led.main.pedals` — sans `$0`, encore un nom
+  de l'époque `MidiToSiren.pd` — n'a d'émetteur nulle part. L'état par sirène qu'il lui faut existe
+  déjà dans `$0.loopstates` (`pd loop.states`, alimenté par `$0.loader.state`) : voir la table de
+  transitions ci-dessous. Le câblage est mécanique, rien ne le bloque plus.
+- **`compo.save.json`** ← `$0.compo.save` : conservé, destiné à une pédale libre — CC 23 est la
+  seule de la rangée.
+- **Les trois états par sirène pour deux LEDs physiques** : `led.siren.playing` fait `+ 17` et
+  écrit sur 18-24, la rangée des pédales de commande, qui porte maintenant le retour d'appui long
+  de CC 19 et CC 21. Le conflit décrit plus haut n'est plus théorique — il faut trancher lequel des
+  deux occupe 18-25.
 
 ---
 
