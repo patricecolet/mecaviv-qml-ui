@@ -2,8 +2,13 @@
 
 # Version non-bloquante du script de connexion MIDI
 # Liste des noms de devices rtpmidid à connecter
-# Devices RTP écoutés par Pure Data (leur MIDI entre sur IN 1)
+# Devices RTP écoutés par Pure Data. Ils n'entrent PAS directement dans Pure
+# Data : ils passent tous par le port virtuel ci-dessous, qui les fusionne en un
+# seul flux. Branchés en direct, plusieurs pairs rtpmidid sur la même entrée de
+# Pure Data ne délivrent pas (mesuré sur le Pi le 2026-08-02).
 RTPMIDI_IN=("PEDALIER_SIRENIUM" "SIRENIUM" "La_Petite_Boite" "La_Grosse_Boite" "PEDALE_BOSS")
+# Le hub d'entrée : les pairs RTP écrivent dedans, Pure Data le lit sur IN 1.
+HUB_NAME="Virtual Raw MIDI 0-0"
 # Devices qui reçoivent le MIDI de Pure Data (OUT 1). CB4Tech Studio2 est une
 # sortie seule : Pure Data lui envoie, il ne lui renvoie rien.
 # SIRENIUM est absent de cette liste : c'est une source, on n'a rien à lui
@@ -89,19 +94,33 @@ for VIRTNUM in 0 1; do
     fi
 done
 
-# PHASE 2: Connexions rtpmidid vers Pure Data IN 1
-# Tous les devices RTP arrivent sur la même entrée, celle que lit le patch.
-echo "=== CONNEXIONS RTPMIDID VERS PURE DATA ==="
+# Le hub d'entrée, c'est le premier de ces ports virtuels : il vient donc d'être
+# relié à Pure Data IN 1 par la boucle ci-dessus.
+HUB_CLIENT=$(aconnect -l | awk -v n="$HUB_NAME" '/client [0-9]+: ./ {if (index($0, n)) print $2}' | tr -d ':')
+HUB="${HUB_CLIENT}:0"
+
+# PHASE 2: Connexions rtpmidid vers le hub virtuel
+# Tous les devices RTP écrivent dans le même port virtuel, que Pure Data lit sur
+# son IN 1. En branchant les pairs directement sur Pure Data, le second
+# abonnement est accepté (« already subscribed ») mais rien n'arrive.
+echo "=== CONNEXIONS RTPMIDID VERS LE HUB VIRTUEL ==="
+if [ -z "$HUB_CLIENT" ]; then
+    echo "❌ hub '$HUB_NAME' introuvable — snd-virmidi n'est pas chargé ?"
+fi
 for NAME in "${RTPMIDI_IN[@]}"; do
     PORTNUM=$(grep ":$NAME$" "$TEMP_FILE" | cut -d: -f1)
-    if [ -n "$PORTNUM" ]; then
-        echo "Connexion ${RTP_CLIENT}:${PORTNUM} ($NAME) -> Pure Data IN 1"
-        if aconnect "${RTP_CLIENT}:${PORTNUM}" "$PD_IN1" 2>/dev/null; then
+    if [ -n "$PORTNUM" ] && [ -n "$HUB_CLIENT" ]; then
+        # Un passage précédent a pu poser le branchement direct : il doublerait
+        # le chemin par le hub, donc chaque note arriverait deux fois.
+        aconnect -d "${RTP_CLIENT}:${PORTNUM}" "$PD_IN1" 2>/dev/null \
+            && echo "🔌 ancien branchement direct de $NAME retiré"
+        echo "Connexion ${RTP_CLIENT}:${PORTNUM} ($NAME) -> $HUB ($HUB_NAME)"
+        if aconnect "${RTP_CLIENT}:${PORTNUM}" "$HUB" 2>/dev/null; then
             echo "✅ Connexion $NAME réussie"
         else
             echo "⚠️  Connexion $NAME (peut-être déjà existante)"
         fi
-    else
+    elif [ -z "$PORTNUM" ]; then
         echo "❌ Port '$NAME' non trouvé"
     fi
 done
