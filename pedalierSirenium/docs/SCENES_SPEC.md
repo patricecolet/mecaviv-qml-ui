@@ -235,12 +235,27 @@ sélectionnait les sirènes et où l'accord se répartissait par hauteur.
 - **Choisir les sirènes, c'est choisir le voicing.** L'écart entre les voix ne se règle pas
   séparément : il découle de quelles sirènes sont dans l'accord.
 
-**Reste à écrire : quelle octave dans l'ambitus.** Les ambitus se chevauchent de près de trois
-octaves (S1 43-86, S5 48-94), donc « replier dans l'ambitus » ne désigne pas encore une hauteur
-unique — la quinte sur S3 existe à 43, 55 et 67. Deux candidats : « le plus grave possible », qui
-donne bien les deux octaves d'écart attendues entre S3 et S7 mais colle l'accord en bas en
-permanence ; ou « l'octave la plus proche de la note courante de la fondamentale, puis repli », qui
-laisse l'accord suivre la ligne. Chiffres et question `transpo` dans `PEDALIER_MAPPING.md`.
+**Quelle octave dans l'ambitus — tranché le 2026-08-22, et construit.** Les ambitus se chevauchent
+de près de trois octaves (S1 43-86, S5 48-94), donc « replier dans l'ambitus » ne désignait pas une
+hauteur unique : la quinte sur S3 existe à 43, 55 et 67. **Règle retenue : projection absolue sur
+`notemin`** — la classe de hauteur sonne à sa première occurrence au-dessus de la limite basse de la
+sirène, `notemin + ((note − notemin) mod 12)`. Le résultat ne dépend que de la classe, jamais de la
+note courante de la fondamentale : aucun saut d'octave en cours de phrase, ce qui compte sur un rotor
+qui a de l'inertie. C'est cohérent avec le fait que **les voix d'accord tiennent leur note** pendant
+que la fondamentale se promène ; la projection ne serait pas tenable si elles suivaient la ligne,
+elle écraserait la mélodie dans une octave.
+
+Écart réel entre les sirènes, à corriger dans la tête : S3 `notemin` 36 et S7 `notemin` 48, soit
+**une** octave d'écart, pas deux comme l'annonçait une version antérieure de ce paragraphe. Une
+quinte donne 43 sur S3, 43 sur S1, 55 sur S7.
+
+**Où ça vit** : `harmoniseur.pd`, sous-patch `pd processVoice` → `pd octavePerSiren`, qui passe de
+`note → +transpo → +octave` à `note → +octave → repli → +transpo`. `notemin` est lu au runtime dans
+`sirenspec` par un `pd siren.notemin` calqué sur le `pd siren.transpo` voisin. Le repli est placé
+**avant** `transpo` parce que `transpo` est une compensation mécanique de sortie — elle suit
+`speed.ratio` (S1 `transpo 24 / ratio 100`, S5 `transpo 36 / ratio 25`) — et non une transposition
+musicale ; l'ambitus `notemin`/`notemax` est donc exprimé en hauteur musicale d'entrée. La question
+`transpo` vs `transpose` de `PEDALIER_MAPPING.md` reste ouverte pour le `.js`.
 - Réglable aussi sur l'**écran tactile** (précis, posé) — les deux écrivent le même `voicing` de la
   scène courante.
 
