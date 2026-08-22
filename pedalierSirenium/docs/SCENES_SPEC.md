@@ -235,26 +235,41 @@ sélectionnait les sirènes et où l'accord se répartissait par hauteur.
 - **Choisir les sirènes, c'est choisir le voicing.** L'écart entre les voix ne se règle pas
   séparément : il découle de quelles sirènes sont dans l'accord.
 
-**Quelle octave dans l'ambitus — encore ouvert, mais deux choses sont maintenant sues.** Les ambitus
-se chevauchent de près de trois octaves (S1 43-86, S5 48-94), donc « replier dans l'ambitus » ne
-désigne pas une hauteur unique : la quinte sur S3 existe à 43, 55 et 67.
+**Quelle octave dans l'ambitus — tranché et construit le 2026-08-22.** Les ambitus se chevauchent de
+près de trois octaves (S1 43-86, S5 48-94), donc « replier dans l'ambitus » ne désigne pas une
+hauteur unique : la quinte sur S3 existe à 43, 55 et 67.
 
-**La projection absolue sur `notemin` est écartée — essayée et mesurée le 2026-08-22.** Ramener
+**Ce qui est en place : une garde, pas une projection.** `pd garde.ambitus`, dans
+`harmoniseur.pd` → `pd processVoice` → `pd octavePerSiren`, ne touche la note que si elle sort de
+l'ambitus de sa sirène :
+
+    note < notemin  →  notemin + ((12 − ((notemin − note) mod 12)) mod 12)
+    note > notemax  →  notemax − ((12 − ((note − notemax) mod 12)) mod 12)
+    entre les deux  →  inchangée
+
+**Et seulement pour une voix harmonisée.** Un unisson porte la ligne : on ne la déforme pas, même
+hors ambitus. Le degré est relu dans `$1.voices` (champ 2) à partir du numéro de voix, par le même
+patron `text search` / `text get` que `pd siren.transpo` applique à `sirenspec` — donc aucun canal
+nouveau, la table reste la source unique.
+
+Mesuré en headless (sirène 1, ambitus 43-86, voix harmonisée) : 60 → 60, 30 → 54, 90 → 78 ; en
+unisson sur la sirène 3 (36-77), 30 → 30 et 90 → 90.
+
+**La projection absolue sur `notemin` a été essayée le même jour, et écartée.** Ramener
 inconditionnellement la note à `notemin + ((note − notemin) mod 12)` enferme toute voix dans
 l'octave au-dessus de la limite basse : sur une alto (`notemin` 43) une ligne de sirenium autour de
-67 sortait deux octaves trop bas. Le point d'insertion naturel (`pd octavePerSiren`, dans
-`pd processVoice`) traite **toutes** les voix, la fondamentale comprise — une projection y écrase
-donc la mélodie, quoi qu'on veuille pour les seules voix d'accord.
+67 sortait deux octaves trop bas. `pd octavePerSiren` traite **toutes** les voix, la fondamentale
+comprise — une projection y écrase donc la mélodie, quoi qu'on veuille pour les seules voix
+d'accord. C'est ce constat qui a fait retenir la garde.
 
-**Le patch fait déjà un repli, et il sonne juste** : `$1.currentVoiceOctave`, calculé dans
-`pd getVoices` (un `moses 1` qui sort `0` ou `-12`) et ajouté dans `pd octavePerSiren`. Toute
-reprise du sujet part de là — de ce qui lui manque face aux ambitus réels — et non d'un mécanisme
-neuf posé à côté.
+`$1.currentVoiceOctave` (calculé dans `pd getVoices` par un `moses 1` sur ce même champ 2 : `-12`
+pour la fondamentale, `0` pour les voix d'accord) est **conservé tel quel** — il place la
+fondamentale une octave sous l'accord, ce qui est une question distincte de l'ambitus.
 
 Écart réel entre les sirènes, à corriger dans la tête : S3 `notemin` 36 et S7 `notemin` 48, soit
 **une** octave d'écart, pas deux comme l'annonçait une version antérieure de ce paragraphe.
 
-Ordre à respecter le jour où on y revient : le repli se fait **avant** l'addition de `transpo`, qui
+Ordre dans la chaîne : la garde est placée **entre** `+currentVoiceOctave` et `+transpo`. `transpo`
 est une compensation mécanique de sortie — elle suit `speed.ratio` (S1 `transpo 24 / ratio 100`,
 S5 `transpo 36 / ratio 25`) — et non une transposition musicale ; l'ambitus `notemin`/`notemax` est
 donc exprimé en hauteur musicale d'entrée. La question `transpo` vs `transpose` de
