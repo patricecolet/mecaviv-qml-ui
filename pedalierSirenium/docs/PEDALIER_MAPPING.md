@@ -364,6 +364,40 @@ prennent la troisième sortie de `pedal-press-duration` et l'envoient sur le bus
 
 ---
 
+## Couper les sirènes — `$0.siren.reset` (par sirène depuis le 2026-08-22)
+
+Un seul verbe coupe les sirènes, quelle que soit la sortie active (V1/UDP, V2/MIDI, DSP). Il prend
+soit `all`, soit **un numéro de sirène**.
+
+    $0.siren.reset all      →  les sept
+    $0.siren.reset 3        →  la sirène 3 seule
+
+**C'est le numéro de la sirène (1-7), jamais celui de la voix.** Les deux ne coïncident pas : les
+voix sont numérotées 0-6 dans l'ordre des hauteurs, si bien que la voix 0 est la sirène 3 et la
+voix 2 la sirène 1 (`$0.voices` champ 6, et `sirenspec` colonne `voice`). Se tromper de convention
+ici coupe la mauvaise sirène sans rien signaler.
+
+Le numéro 1-7 est déjà la bonne clé aux trois destinations, sans table de correspondance :
+
+| Sortie | Reçoit | Où |
+|---|---|---|
+| UDP | `reset <n>` sur `$0toUDP` | `pd udp.commands` — générique depuis le début, `list prepend reset` passe ce qu'il reçoit |
+| MIDI | CC 123 puis CC 121 sur le canal `<n>`, puis note `1 1 <n>` | `pd midiOut` — le canal MIDI *est* le numéro de sirène |
+| DSP | `<n> reset` sur `$0.composeSiren` | `pd siren.dsp` — l'index des `composeSiren~` (`alto 1` … `piccolo 7`) *est* le numéro de sirène |
+
+**L'ordre CC-puis-note est délibéré côté MIDI** : envoyée d'abord, la note de parking serait coupée
+par le CC 123 (all notes off) qui la suit. C'est pour ça que la branche du numéro passe par un
+`[t f f]` explicite plutôt que par deux câbles.
+
+Mécaniquement, le tri se fait sur la **sortie de rejet** du `route all` de chaque destination : `all`
+sort à gauche et déclenche l'énumération des sept, un float sort à droite et vaut pour lui seul.
+Ajouter une clé à l'un de ces `route` décalerait donc la sortie qui porte le numéro.
+
+**À reprendre pour le sirenium.** Le reset du sirenium n'est pas branché sur ce verbe aujourd'hui ;
+c'est le point d'entrée à utiliser quand on s'en occupera, plutôt qu'un canal parallèle.
+
+---
+
 ## L'ambitus des sirènes existe en trois copies
 
 Le repli d'un intervalle dans l'ambitus d'une sirène s'appuie sur des valeurs qui vivent à trois
