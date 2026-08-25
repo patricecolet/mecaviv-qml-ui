@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Genere l'image de partition NVS du pupitre depuis nvs/pupitre-test.csv.
+# Genere l'image de partition NVS du pupitre depuis nvs/gyrophone-pad.csv.
 #
-# Sortie : bin/pupitre-test.nvs.bin (20 Ko = taille de la partition nvs de NiDMI).
+# Sortie : bin/gyrophone-pad.nvs.bin (20 Ko = taille de la partition nvs de NiDMI).
 # Le binaire est versionne dans git ; ce script sert a le regenerer apres une
 # modification du CSV ou des JSON de pins.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CSV="${1:-$HERE/nvs/pupitre-test.csv}"
+CSV="${1:-$HERE/nvs/gyrophone-pad.csv}"
 OUT="$HERE/bin/$(basename "${CSV%.csv}").nvs.bin"
 SIZE=0x5000   # doit correspondre a la partition nvs de NiDMI (voir README)
 

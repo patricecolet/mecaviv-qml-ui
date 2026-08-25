@@ -66,12 +66,12 @@ est effectivement dans ce dossier.
 | `bin/nidmi-s3-usbnet.bootloader.bin` | bootloader, flashé à `0x0` |
 | `bin/nidmi-s3-usbnet.partitions.bin` | table de partitions, `0x8000` |
 | `bin/nidmi-s3-usbnet.app.bin` | application, `0x10000` (slot `app0`) |
-| `bin/pupitre-test.nvs.bin` | **configuration** du pupitre, `0x9000` (20 Ko) |
+| `bin/gyrophone-pad.nvs.bin` | **configuration** du pupitre, `0x9000` (20 Ko) |
 | `bin/VERSION` | provenance des binaires ci-dessus |
-| `nvs/pupitre-test.csv` | source de l'image NVS |
+| `nvs/gyrophone-pad.csv` | source de l'image NVS |
 | `nvs/pins/*.json` | une config par broche, référencée par le CSV |
 | `scripts/flash.sh` | flashe firmware + NVS sur la carte |
-| `scripts/build-nvs.sh` | régénère `pupitre-test.nvs.bin` depuis le CSV |
+| `scripts/build-nvs.sh` | régénère `gyrophone-pad.nvs.bin` depuis le CSV |
 
 ## Mise en service d'une carte
 
@@ -90,7 +90,7 @@ broche, les réglages OSC et le nom réseau. Ici elle n'est pas saisie à la mai
 web puis oubliée — elle est **décrite dans `nvs/`, versionnée, et régénérable** :
 
 ```
-nvs/pupitre-test.csv + nvs/pins/*.json  ──build-nvs.sh──▶  bin/pupitre-test.nvs.bin (20 Ko)
+nvs/gyrophone-pad.csv + nvs/pins/*.json  ──build-nvs.sh──▶  bin/gyrophone-pad.nvs.bin (20 Ko)
                                                                       │ flash.sh @0x9000
                                                                       ▼
                                                             carte configurée au 1er boot

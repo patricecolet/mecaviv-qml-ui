@@ -1,0 +1,12 @@
+# Provenance des binaires de ce dossier — a mettre a jour a chaque copie depuis NiDMI.
+firmware_version  = v0.2.0-rc1-4-g46afd54-dirty   (chaine embarquee : le binaire a ete
+                    compile depuis l'arbre de travail, dont le contenu est celui du
+                    commit ci-dessous)
+firmware_variant  = usbmidi-on+usbnet
+source_repo       = https://github.com/patricecolet/NiDMI  (branche feat/usb-net, commit ec3d3cd)
+build_command     = ./scripts/nidmi.sh build --board s3 --variant on --usb-net --ota
+partition_table   = tools/nidmi_s3_ota_dual_littlefs.csv
+built_at          = 2026-08-25
+
+nvs_image         = gyrophone-pad.nvs.bin (genere par scripts/build-nvs.sh depuis
+                    nvs/gyrophone-pad.csv ; capture depuis la carte de reference)

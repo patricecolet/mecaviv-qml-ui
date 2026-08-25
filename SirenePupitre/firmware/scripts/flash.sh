@@ -23,7 +23,7 @@ OFF_APP=0x10000           # slot app0
 FW_BOOTLOADER="$BIN/nidmi-s3-usbnet.bootloader.bin"
 FW_PARTITIONS="$BIN/nidmi-s3-usbnet.partitions.bin"
 FW_APP="$BIN/nidmi-s3-usbnet.app.bin"
-NVS_IMAGE="$BIN/pupitre-test.nvs.bin"
+NVS_IMAGE="$BIN/gyrophone-pad.nvs.bin"
 
 DO_FW=true
 DO_NVS=true
