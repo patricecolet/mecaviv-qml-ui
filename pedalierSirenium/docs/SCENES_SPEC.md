@@ -124,7 +124,36 @@ au démarrage d'un clip et à la sortie du mute, avant les vraies notes à porta
   bas. `order` suit ce parcours ; il est donc dérivable du bouton, pas besoin d'un champ séparé.
   *(Corriger côté QML : `SceneGrid` numérote aujourd'hui le bas 1-4 et le haut 5-8, à inverser.)*
 - **Banque** : `changeScenePage` prolonge la carte au-delà de 8 sections. Une composition n'a pas
-  forcément 8 banques.
+  forcément 8 banques. **Toujours pas construit au 2026-08-25** : le petit pédalier fait CC−50 →
+  scène 1..8, `banks` vaut 1 en dur, et rien n'atteint la banque 2. Le découpage lui-même est
+  correct — `sceneEdit new` écrit `sceneId = ((N-1)%8)+1` et `page = floor((N-1)/8)+1`, donc la
+  9e scène est bien la 1re de la banque 2 — il ne manque que le geste pour changer de page.
+
+### Trois règles d'ergonomie, arrêtées le 2026-08-25
+
+Le principe commun : **la navigation ne refuse jamais**. Un geste qui désigne une scène absente
+la crée plutôt que d'échouer, et rien ne laisse la numérotation trouée.
+
+- **Une scène est toujours chargée**, pas seulement présente sur disque. À la fin de chaque scan,
+  si aucune scène n'est active (`$0.looper.scene.id` à 0), le pédalier charge la scène 1. C'est le
+  pendant, côté lecture, du « une scène existe toujours » du §5 — qui ne garantissait que le
+  fichier. Ouvrir une composition remet le looper hors scène, pour que la sienne se charge.
+- **Créer une scène y amène.** `$0.scene.new` arme un drapeau ; le scan qui suit la création charge
+  la nouvelle. Un seul chemin de création : la pédale et l'écran passent tous deux par
+  `$0.scene.new`, plus personne n'envoie `sceneEdit new` en direct.
+- **Un bouton au-delà de la dernière scène crée la suivante**, pas celle de son numéro. Bouton 7
+  avec deux scènes → la 3 est créée et chargée. La numérotation reste donc dense, ce qui est la
+  condition pour qu'une banque n'ait pas de trou au milieu.
+
+Conséquence sur le rebouclage : `next` se règle sur le **nombre** de scènes, plus sur l'existence
+du fichier suivant. L'ancien montage testait `scene_(N+1).json` et retombait sur 1 à l'échec — un
+trou dans la numérotation le bloquait donc pour de bon sur la scène 1.
+
+**Origine des trous, pour mémoire.** `saveScene` écrit `scene_<cur.scene>.json`, et `cur.scene`
+valait 0 tant qu'aucune scène n'était chargée : d'où un `scene_0.json` fantôme. Or `sceneEdit new`
+numérote avec `text size` — le *nombre* de fichiers `scene_*.json`, pas leur maximum — donc le
+fantôme décalait tout : une seule vraie scène, et la suivante s'appelait `scene_3`. Deux gardes
+maintenant : la scène chargée au boot (plus de `cur.scene` à 0) et un `[moses 1]` dans `saveScene`.
 
 ## 5. Enregistrement et persistance
 

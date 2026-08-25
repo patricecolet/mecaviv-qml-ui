@@ -65,7 +65,11 @@ One socket, three asymmetric channels — this asymmetry is the thing to interna
 
   **This is the fast path, and that is the whole point.** PD pushes harmonised notes into the `binary` inlet of `websocket-server`, which does **not** go through that abstraction's 30 ms spigot — so this channel is immediate where the JSON one is smoothed to 40 ms. Put anything latency-sensitive here, not in the JSON.
 
-  Channels are **0-based on the PD side already** (`note <pitch> <vel> <0..6>` on `$0.to.sirens`), matching `sirenSpec` directly: channel 0 → S1 … channel 6 → S7. No off-by-one to apply — verified by measurement, don't "fix" it. Velocity 1 means a **ghost note** (motor spinning, muted), rendered at reduced opacity like the sirenium's.
+  **Two bases meet here, and the conversion is on the PD side.** The `channel` field of `note <pitch> <vel> <channel>` on `$0.to.sirens` is the **siren number, 1..7** — that is what `[noteout]` wants, what `composeSiren~ 1..7` and `udpSend 1..7` are numbered on, and what `pd filter` and `pd captation` decrement before indexing. What crosses the socket is 0-based, because `pd midi.binary` does `[- 1]` then `[+ 144]`; QML then reads `status & 0x0F` and indexes `sirenMidi` directly, so channel 0 → S1 … channel 6 → S7.
+
+  Until 2026-08-22 this paragraph claimed the PD side was already 0-based and told you not to "fix" it. It was wrong, and it cost a real bug: `[+ 144]` on a 1-based channel shifted every ring by one and dropped S7 (`applyMidi` rejects `channel > 6`). If you doubt it, measure — don't trust this file, and don't trust a `#X text` in the patch either.
+
+  Velocity 1 means a **ghost note** (motor spinning, muted), rendered at reduced opacity like the sirenium's.
 - **Outbound** = JSON, but sent via **`socket.sendBinaryMessage(jsonString)`**, marked `@CRITICAL: Ne pas changer - binaire requis` in `WebSocketController.sendMessage`. PD expects binary frames. Switching to `sendTextMessage` silently breaks every outgoing command.
 
 1-byte frames (clock `0xF8`, start/continue/stop `0xFA`/`0xFB`/`0xFC`) are currently counted and dropped in `applyExternalMidiBytes`; only 3-byte channel messages (Note On/Off, CC, Pitch Bend) update state. Clock-driven quantization is unimplemented (README Phase 4).
@@ -84,6 +88,8 @@ WebSocket ─┬─ text ──→ WebSocketController ──→ batchReceived �
 ```
 
 `LiveState.qml` is the single state object the whole 2D UI binds to; `main.qml`'s `onBatchReceived` switch maps each `batchType` onto one `applyX(data)` method (`clock`, `loops`, `scenesList`, `sceneLoaded`, `composition`, `sirenium`, `voiceSelect`). Adding a message type means: a `json.device` branch in `WebSocketController.onTextMessageReceived`, a `case` in that switch, and an `applyX` on `LiveState`. `SimulationHarness.qml` mirrors LiveState's interface so the UI stays alive without PD — keep the two in step or the simulated view drifts from the real one.
+
+**`sections` is the shape both must produce, field for field**: `{ id, btn, name, modes:[7], cells:[{mode, clipRef}]×7, current, past }`. `id` is the global position (1..N) — `SceneManager2D` passes it straight to load/rename/delete/copy, so a missing `id` makes every one of those buttons send `undefined`, silently. `cells` carries the `clipRef` the scene panel shows next to the mode. Until 2026-08-25 `LiveState._rebuildSections` produced neither: it kept only `modes` and dropped the `clipRef` PD had actually sent. That is the failure mode to expect here — PD's payload is fine, the QML side quietly narrows it. Compare against `SimulationHarness._mk` before believing a field is absent upstream.
 
 **The old controller layer is gone.** `SirenView`, `SirenColumn`, `SirenController`, `BeatController`, `SirenSpecProvider`, `MessageRouter`, `PedalConfigController` and `SceneManager` no longer exist — the 2D refonte deleted the first five, the 2026-07 orphan sweep the rest. Only `WebSocketController`, `MidiMonitorController` and `MessageParser` remain, and `MessageParser`'s route-registration system (`registerRoute` / `createRouteGroup`) is vestigial: the text handler dispatches directly on `json.device`. Grep before believing any name you read in an older doc.
 

@@ -140,8 +140,17 @@ QtObject {
         { label: "×2", mul: 2 }, { label: "×4", mul: 4 }, { label: "×8", mul: 8 }
     ]
     function _ratioLabel(mul) {
-        for (var i = 0; i < _ratios.length; i++) if (_ratios[i].mul === mul) return _ratios[i].label;
-        return "×" + mul;
+        for (var i = 0; i < _ratios.length; i++)
+            if (Math.abs(_ratios[i].mul - mul) < 1e-6) return _ratios[i].label;
+        // Un rapport non canonique tombe d'une division réelle (5 mesures / 3) :
+        // sans arrondi il s'affiche avec quatorze décimales.
+        return "×" + (Math.round(mul * 100) / 100);
+    }
+    // Sous l'anneau, un rapport bâtard ne dit rien à personne ; la longueur, si.
+    function _lenLabel(mul, bars) {
+        for (var i = 0; i < _ratios.length; i++)
+            if (Math.abs(_ratios[i].mul - mul) < 1e-6) return _ratios[i].label;
+        return bars > 0 ? bars + " mes." : _ratioLabel(mul);
     }
 
     // Ordre de hauteur fixe, grave → aigu (voir mémoire siren-pitch-order) —
@@ -231,17 +240,24 @@ QtObject {
             var isCurrent = (id === _activeSceneId);
             if (isCurrent) seenCurrent = true;
             var modes = ["empty","empty","empty","empty","empty","empty","empty"];
+            var cells = [];
+            for (var k = 0; k < 7; k++) cells.push({ mode: "empty", clipRef: null });
             if (Array.isArray(sc.sirens)) {
                 for (var j = 0; j < sc.sirens.length; j++) {
                     var se = sc.sirens[j];
                     var idx = (se.siren || 0) - 1;
-                    if (idx >= 0 && idx < 7) modes[idx] = se.mode || "empty";
+                    if (idx >= 0 && idx < 7) {
+                        modes[idx] = se.mode || "empty";
+                        cells[idx] = { mode: modes[idx], clipRef: se.clipRef || null };
+                    }
                 }
             }
             out.push({
+                id: id,
                 btn: sc.sceneId || sc.page && ((id - 1) % 8) + 1 || (i % 8) + 1,
                 name: sc.sceneName || sc.name || "",
                 modes: modes,
+                cells: cells,
                 current: isCurrent,
                 past: !isCurrent && !seenCurrent
             });
@@ -325,9 +341,9 @@ QtObject {
             } else if (s.transport === "playing" && s.ratio) {
                 var len = mainBars / s.ratio;
                 e.progress = len > 0 ? (_bars % len) / len : 0;
-                e.meta = (mainLoopSiren === i) ? "REF" : _ratioLabel(s.ratio);
+                e.meta = (mainLoopSiren === i) ? "REF" : _lenLabel(s.ratio, s.loopSize);
             } else if (s.transport === "stopped") {
-                e.progress = 0; e.meta = s.ratio ? _ratioLabel(s.ratio) : ""; e.present = 0.7;
+                e.progress = 0; e.meta = s.ratio ? _lenLabel(s.ratio, s.loopSize) : ""; e.present = 0.7;
             } else {
                 e.present = 0.45;
             }
