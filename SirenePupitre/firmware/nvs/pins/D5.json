@@ -1,0 +1,1 @@
+{"pinLabel":"D5","role":"led","rtpMidiEnabled":true,"midiMessageType":"Note","midiMode":"rtp","midiNote":61,"midiChannel":1,"midiCc":7,"ledMode":"pwm","ledPolarity":"low","oscEnabled":true,"oscAddress":"/pad1/led","oscFormat":"raw","dbgEnabled":false,"name":"LED 1"}

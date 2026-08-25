@@ -1,1 +1,0 @@
-{"pinLabel":"D0","role":"potentiometer","midiMessageType":"cc","midiCc":7,"midiChannel":1,"midiCcRangeMin":0,"midiCcRangeMax":127,"oscEnabled":true,"oscAddress":"/pupitre/fader","name":"Fader"}

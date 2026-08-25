@@ -1,0 +1,1 @@
+{"pinLabel":"D7","role":"led","rtpMidiEnabled":true,"midiMessageType":"Note","midiMode":"rtp","midiNote":62,"midiChannel":1,"midiCc":7,"ledMode":"pwm","ledPolarity":"low","oscEnabled":true,"oscAddress":"/pad2/led","oscFormat":"float","dbgEnabled":false,"name":"LED 2"}

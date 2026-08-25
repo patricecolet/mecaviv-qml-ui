@@ -1,1 +1,1 @@
-{"pinLabel":"D2","role":"velostat","midiMessageType":"note","midiNote":60,"midiChannel":1,"oscEnabled":true,"oscAddress":"/pupitre/pad1","name":"Pad 1"}
+{"pinLabel":"D2","role":"button","rtpMidiEnabled":true,"midiMessageType":"Note","midiMode":"rtp","midiNote":60,"midiChannel":1,"midiVelocity":100,"midiCc":7,"midiCcOnOffMin":127,"midiCcOnOffMax":127,"midiPc":1,"btnMode":"pulse","btnPulseTiming":"press","btnPullMode":"pullup","oscEnabled":true,"oscAddress":"/joystick/bouton","oscFormat":"float","dbgEnabled":false,"name":"Bouton 1"}

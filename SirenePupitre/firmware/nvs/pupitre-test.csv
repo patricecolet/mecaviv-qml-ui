@@ -1,7 +1,8 @@
-# NVS "pupitre-test" — configuration NiDMI du pupitre SirenePupitre.
+# NVS "pupitre" — configuration NiDMI du pupitre SirenePupitre.
 #
-# Namespace "nidmi" : c'est celui que lit le firmware NiDMI (Preferences).
-# Genere par ./scripts/build-nvs.sh -> bin/pupitre-test.nvs.bin (20 Ko, partition nvs @0x9000).
+# CAPTUREE depuis la carte de reference le 2026-08-25 (GET /api/pins/list renvoie
+# les chaines NVS telles quelles, la copie est donc fidele a l octet pres).
+# Regenerer l image : ./scripts/build-nvs.sh
 #
 # ATTENTION mdns_name / rtp_name : toutes les cartes flashees avec cette image
 # porteront le meme nom et se collisionneront sur le Wi-Fi. Sans effet par USB
@@ -10,18 +11,21 @@
 key,type,encoding,value
 nidmi,namespace,,
 nvs_schema,data,u32,1
-mdns_name,data,string,pupitre
-rtp_name,data,string,pupitre
+mdns_name,data,string,nidmi
+rtp_name,data,string,nidmi
 touch_enabled,data,u8,0
+rt_slice,data,u8,8
 osc_target,data,string,sta
 osc_port,data,u32,8000
 osc_broadcast,data,u8,0
 osc_out_all,data,u8,1
-# --- Mapping des controles du pupitre (message 0x02 CONTROLLERS) ---
-# Cablage PROVISOIRE : a confirmer sur la carte reelle. Voir README.md.
-pin_D0,file,string,pins/D0.json
-pin_D1,file,string,pins/D1.json
+osc_interface,data,string,ap
+# --- Controles du pupitre (message 0x02 CONTROLLERS) ---
 pin_D2,file,string,pins/D2.json
-pin_D3,file,string,pins/D3.json
-pin_D4,file,string,pins/D4.json
-pin_D8,file,string,pins/D8.json
+pin_D5,file,string,pins/D5.json
+pin_D7,file,string,pins/D7.json
+pin_A0,file,string,pins/A0.json
+pin_A1,file,string,pins/A1.json
+pin_A3,file,string,pins/A3.json
+pin_A4,file,string,pins/A4.json
+pin_A8,file,string,pins/A8.json

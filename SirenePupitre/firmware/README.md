@@ -100,21 +100,35 @@ nvs/pupitre-test.csv + nvs/pins/*.json  ──build-nvs.sh──▶  bin/pupitre
 `esp_idf_nvs_partition_gen`). C'est la seule dépendance supplémentaire, et elle n'est nécessaire
 que pour *régénérer* l'image — pas pour flasher.
 
-### Mapping actuel — **provisoire**
+### Mapping — capturé depuis la carte de référence
 
-Le câblage ci-dessous est un **jeu de test à confirmer sur la carte réelle** : il couvre les
-contrôles du message binaire `0x02 CONTROLLERS` (voir `../STRUCTURE_BINAIRE_0x02.md`), mais les
-numéros de broches n'ont pas été relevés sur le pupitre monté.
+Relevé le 2026-08-25 sur la carte du pupitre. `GET /api/pins/list` renvoie les chaînes NVS telles
+quelles : les fichiers de `nvs/pins/` en sont la copie exacte, vérifiée à l'octet près.
 
-| Broche | GPIO | Contrôle | Composant NiDMI | MIDI |
-|---|---|---|---|---|
-| D0 | 1 | Fader | `potentiometer` | CC 7, canal 1 |
-| D1 | 2 | Pédale | `potentiometer` | CC 11, canal 1 |
-| D2 | 3 | Pad 1 | `velostat` | Note 60 + key pressure |
-| D3 | 4 | Pad 2 | `velostat` | Note 62 + key pressure |
-| D4 | 5 | Bouton 1 | `button` | Note 36 |
-| D8 | 7 | Joystick X (Y=GPIO 8, Z=GPIO 9) | `joystick3` | CC 16 / 17 / 18 |
+| Broche | Nom | Composant | MIDI (canal 1) | Adresse OSC | Sens |
+|---|---|---|---|---|---|
+| `A8` | joystick | `joystick3` | CC 1 / CC 2 / CC 3 (X/Y/Z) | `/joystick` | sortie |
+| `A0` | pedale | `potentiometer` | CC 11 | `/pedale` | sortie |
+| `A1` | slider | `potentiometer` | CC 7 | `/slider` | sortie |
+| `A3` | pad1 | `velostat` | note 61 + key pressure | `/pad1` | sortie |
+| `A4` | pad2 | `velostat` | note 62 + key pressure | `/pad2` | sortie |
+| `D2` | Bouton 1 | `button` | note 60, vél. 100 | `/joystick/bouton` | sortie |
+| `D5` | LED 1 | `led` | note 61 | `/pad1/led` | **entrée** |
+| `D7` | LED 2 | `led` | note 62 | `/pad2/led` | **entrée** |
 
+Les LED sont des **entrées** : elles réagissent à ce que Pd leur envoie. Pads et LED partagent
+volontairement leurs notes (61, 62), de sorte qu'une frappe allume la LED correspondante — d'où
+l'intérêt de piloter les LED en OSC (`/pad1/led`) plutôt qu'en MIDI, pour éviter la boucle.
+
+Le firmware ajoute lui-même le suffixe d'axe aux composants multi-axes : l'adresse `/joystick`
+de `A8` produit `/joystick/x`, `/joystick/y` et `/joystick/z`.
+
+`A0` est déclarée mais la pédale n'est pas câblée : le firmware la détecte comme pin flottante et
+coupe son envoi MIDI/OSC au démarrage. C'est le comportement attendu, pas une erreur de config.
+
+L'image porte aussi les réglages système de la carte, dont `rt_slice = 8` — le nombre de composants
+traités par cycle de la tâche temps réel. Avec ces 8 composants, cela ramène la revisite de chacun
+de 20 à 10 ms, soit ~5 ms de moins sur la latence d'une frappe (défaut NiDMI : 4).
 
 Pour changer le mapping : éditer le JSON de la broche dans `nvs/pins/`, relancer
 `./scripts/build-nvs.sh`, puis `./scripts/flash.sh --nvs-only`.
