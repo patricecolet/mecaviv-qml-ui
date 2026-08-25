@@ -1,0 +1,9 @@
+# Provenance des binaires de ce dossier — a mettre a jour a chaque copie depuis NiDMI.
+firmware_version  = v0.1.0-5-gc510695-dirty
+firmware_variant  = usbmidi-on+usbnet
+source_repo       = https://github.com/patricecolet/NiDMI  (branche feat/usb-net, commit c510695 + modifs locales)
+build_command     = ./scripts/nidmi.sh build --board s3 --variant on --usb-net --ota
+partition_table   = tools/nidmi_s3_ota_dual_littlefs.csv
+built_at          = 2026-08-25
+
+nvs_image         = pupitre-test.nvs.bin (genere par scripts/build-nvs.sh depuis nvs/pupitre-test.csv)

@@ -1,0 +1,1 @@
+{"pinLabel":"D8","role":"joystick3","midiMessageType":"cc","midiMessageTypeX":"cc","midiMessageTypeY":"cc","midiMessageTypeZ":"cc","X_midiCc":16,"Y_midiCc":17,"Z_midiCc":18,"midiChannel":1,"oscEnabled":true,"oscAddress":"/pupitre/joystick","name":"Joystick","additionalPins":{"joyYPin":8,"joyZPin":9}}

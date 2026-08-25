@@ -1,0 +1,1 @@
+{"pinLabel":"D1","role":"potentiometer","midiMessageType":"cc","midiCc":11,"midiChannel":1,"midiCcRangeMin":0,"midiCcRangeMax":127,"oscEnabled":true,"oscAddress":"/pupitre/pedale","name":"Pedale"}
