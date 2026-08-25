@@ -2,7 +2,7 @@
 firmware_version  = v0.2.0-rc1-dirty   (chaine embarquee : le binaire a ete compile
                     depuis l'arbre de travail, dont le contenu est celui du commit ci-dessous)
 firmware_variant  = usbmidi-on+usbnet
-source_repo       = https://github.com/patricecolet/NiDMI  (branche feat/usb-net, commit efe36b0)
+source_repo       = https://github.com/patricecolet/NiDMI  (branche feat/usb-net, commit 46afd54)
 build_command     = ./scripts/nidmi.sh build --board s3 --variant on --usb-net --ota
 partition_table   = tools/nidmi_s3_ota_dual_littlefs.csv
 built_at          = 2026-08-25
