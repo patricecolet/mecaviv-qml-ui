@@ -1,0 +1,9 @@
+# PCM ALSA vers la sortie fixe du pedalier (voir
+# ~/.config/pipewire/pipewire.conf.d/10-pedalier-sink.conf).
+# Pd ouvre ce device une fois pour toutes : il existe toujours, meme casque
+# eteint, donc plus de boucle xrun au demarrage.
+pcm.pedalier {
+    type pipewire
+    playback_node "pedalier-out"
+    hint { show on description "Pedalier (sortie fixe)" }
+}

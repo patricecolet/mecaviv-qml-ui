@@ -720,9 +720,32 @@ retire_legacy_cron() {
     ok "ancien démarrage par cron retiré (sauvegarde dans $PEDALIER_DATA/legacy/)"
 }
 
+# Sortie audio fixe. Pd ouvre son PCM ALSA une fois au demarrage et ne le rouvre
+# jamais : si la cible n'est pas la a cet instant -- casque Bluetooth eteint --
+# il boucle sur « alsa xrun recovery apparently failed » et cesse de traiter ses
+# messages, WebSocket compris. Le pedalier entier devient alors inutilisable, pas
+# seulement muet. Ces trois fichiers posent un sink qui existe toujours, dans
+# lequel Pd ecrit, et que PipeWire renvoie vers la sortie reelle du moment.
+install_audio_routing() {
+    local pwdir="$HOME/.config/pipewire/pipewire.conf.d"
+    local changed=0 f
+    run mkdir -p "$pwdir"
+    for f in 10-pedalier-sink.conf 20-pedalier-loopback.conf; do
+        install_file "$pwdir/$f" "$(cat "$DEVICE_DIR/audio/$f")" && changed=1
+    done
+    install_file "$HOME/.asoundrc" "$(cat "$DEVICE_DIR/audio/asoundrc")" && changed=1
+    if [ "$changed" = 1 ]; then
+        run systemctl --user restart pipewire wireplumber pipewire-pulse
+        ok "routage audio installe (sink fixe + PCM ALSA « pedalier »)"
+    else
+        skip "routage audio"
+    fi
+}
+
 phase_autostart() {
     phase "Démarrage automatique"
     retire_legacy_cron
+    install_audio_routing
 
     # La configuration est écrite une fois puis respectée : une valeur modifiée à
     # la main sur la machine ne doit pas disparaître à la mise à jour suivante.
