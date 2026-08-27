@@ -12,6 +12,9 @@ WorkingDirectory=@PD_REPO@/examples
 # du patch : démarrer avant que eth0 ait son adresse condamne la sortie V1 pour
 # toute la session. Le script n'échoue jamais, il attend au plus 30 s.
 ExecStartPre=@PEDALIER_REPO@/pedalierSirenium/deploy/device/wait-network.sh
+# Meme raison, pour le son : Pd ouvre son PCM une fois et ne le rouvre jamais.
+# Le casque Bluetooth met quelques secondes a etre joint au demarrage a froid.
+ExecStartPre=@PEDALIER_REPO@/pedalierSirenium/deploy/device/wait-audio.sh
 # PD_AUDIO_OPTS vient de ~/.config/pedalier/env, jamais ecrase par le deploiement :
 # c'est un reglage de machine. Vide, Pd prend la premiere carte ALSA -- sur ce Pi
 # c'est VirMIDI, qui n'est pas une sortie audio, donc rien ne s'entend.

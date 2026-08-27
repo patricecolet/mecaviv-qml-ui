@@ -73,6 +73,24 @@ vouloir aligner `nodejs` sur la version de la distribution, ce qui casserait le
 node 18 en place. En cas de refus, `pedalier-deploy.sh node-modules` pousse
 `node_modules/` depuis le Mac (express est du JS pur, portable vers aarch64).
 
+**Pd ouvre sa sortie audio une seule fois, au chargement du patch.** Si aucune
+sortie réelle n'existe à cet instant — le casque Bluetooth met quelques secondes
+à être joint au démarrage à froid — il boucle sur
+`alsa xrun recovery apparently failed` et cette boucle le monopolise : il cesse
+de répondre au WebSocket, et le pédalier entier devient inutilisable, pas
+seulement muet. `wait-audio.sh`, en `ExecStartPre`, attend un sink PipeWire
+pendant 30 s au plus, puis laisse Pd démarrer de toute façon — le MIDI et le
+WebSocket, eux, ne dépendent pas du son. Même contrat que `wait-network.sh`,
+qui attend l'adresse IP pour la même raison : les sockets UDP vers les sirènes
+sont ouvertes une fois pour toutes.
+
+**Pas de montage audio intermédiaire.** Un sink null permanent doublé d'un
+`module-loopback` vers le casque a été essayé pour que Pd ait toujours une
+cible : ni le `target.object` du loopback ni le `playback_node` d'un
+`~/.asoundrc` n'ont été honorés par wireplumber, qui a rebranché la capture sur
+le *monitor* du casque — donc un larsen. Pd écrit directement sur `default`,
+c'est-à-dire la sortie du moment.
+
 **Pure Data 0.55.2 est compilé dans `/usr/local`**, le 0.53 de Debian reste en
 `/usr/bin/pd`. Repli d'une ligne dans `~/.config/pedalier/env` :
 `PEDALIER_PD_BIN=/usr/bin/pd`.
