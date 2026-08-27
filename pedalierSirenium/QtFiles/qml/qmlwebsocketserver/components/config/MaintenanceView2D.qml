@@ -67,11 +67,27 @@ Item {
             root.btConnecting = false;
             root._poll();
         };
-        x.open("POST", "/api/bluetooth/connect");
+        x.open("POST", root._base() + "/api/bluetooth/connect");
         x.setRequestHeader("Content-Type", "application/json");
         x.send("{}");
     }
     property bool rtpAvailable: false
+
+    // Le QML est charge depuis qrc:/, donc une URL relative est prise par Qt pour
+    // un fichier local et refusee : « XMLHttpRequest: Using GET on a local file
+    // is disabled by default ». C'est pour ca que temperature, CPU, memoire et
+    // RTP sont restes a « — » depuis toujours. Il faut une URL absolue, et
+    // l'hote vient de la page servie (pageOrigin, pose par main.cpp) — jamais
+    // une adresse en dur.
+    property int apiPort: 8010
+
+    function _base() {
+        if (typeof pageOrigin === "string" && pageOrigin !== "") {
+            var host = pageOrigin.replace(/^https?:\/\//, "").split(":")[0];
+            if (host) return "http://" + host + ":" + apiPort;
+        }
+        return "http://localhost:" + apiPort;
+    }
 
     function _get(url, onOk) {
         var x = new XMLHttpRequest();
@@ -80,7 +96,7 @@ Item {
             try { onOk(JSON.parse(x.responseText)); }
             catch (e) { /* serveur absent : les champs restent à — */ }
         };
-        x.open("GET", url);
+        x.open("GET", root._base() + url);
         x.send();
     }
 
