@@ -62,11 +62,16 @@ FORCE_PD=false
 # Fichiers de données runtime que Pd écrit dans l'arbre git de puredata-abstractions.
 # sirenspec.txt n'en fait PAS partie : c'est de la configuration, éditée en amont
 # et versionnée, elle doit descendre par git comme le reste du patch.
-SONG_PATHS=(
+# Fichiers que le patch réécrit lui-même sur la machine : les morceaux, et la
+# configuration que le pédalier enregistre depuis son interface (clic). Ils sont
+# suivis par git, donc un pull les écraserait et un arbre sale bloquerait toute
+# mise à jour du dépôt — d'où le skip-worktree posé par protect_runtime_files.
+RUNTIME_PATHS=(
     examples/looper.scenes
     examples/looper.scenes.txt
     examples/pedal.presets
     examples/pedals.preset.name
+    examples/config.json
 )
 
 usage() {
@@ -336,23 +341,23 @@ git_update_repo() {
 
 # Les clips, scènes et presets sont écrits par Pd DANS l'arbre git. Sans ça,
 # chaque mise à jour entre en conflit avec ce qui a été joué sur le pédalier.
-protect_song_files() {
+protect_runtime_files() {
     [ -d "$PD_REPO/.git" ] || return 0
-    local tracked; tracked=$(git -C "$PD_REPO" ls-files -- "${SONG_PATHS[@]}" 2>/dev/null)
+    local tracked; tracked=$(git -C "$PD_REPO" ls-files -- "${RUNTIME_PATHS[@]}" 2>/dev/null)
     [ -z "$tracked" ] && return 0
 
-    local already; already=$(git -C "$PD_REPO" ls-files -v -- "${SONG_PATHS[@]}" 2>/dev/null | grep -c '^S' || true)
+    local already; already=$(git -C "$PD_REPO" ls-files -v -- "${RUNTIME_PATHS[@]}" 2>/dev/null | grep -c '^S' || true)
     local total; total=$(printf '%s\n' "$tracked" | wc -l | tr -d ' ')
     if [ "$already" = "$total" ]; then
-        skip "protection des morceaux ($total fichiers)"
+        skip "protection des fichiers écrits par le patch ($total fichiers)"
         return 0
     fi
     # shellcheck disable=SC2086
     run_sh "git -C '$PD_REPO' update-index --skip-worktree $(printf '%s\n' "$tracked" | sed "s|^|'|;s|$|'|" | tr '\n' ' ')" \
-        && ok "morceaux protégés de git ($total fichiers en skip-worktree)"
+        && ok "fichiers écrits par le patch protégés de git ($total en skip-worktree)"
 }
 
-# Un fichier retiré de SONG_PATHS doit repasser sous git, sinon il reste figé sur
+# Un fichier retiré de RUNTIME_PATHS doit repasser sous git, sinon il reste figé sur
 # la machine et plus aucune mise à jour ne l'atteint — sans le moindre message.
 release_unprotected_files() {
     [ -d "$PD_REPO/.git" ] || return 0
@@ -364,7 +369,7 @@ release_unprotected_files() {
         [ -z "$path" ] && continue
         keep=false
         local p
-        for p in "${SONG_PATHS[@]}"; do
+        for p in "${RUNTIME_PATHS[@]}"; do
             case "$path" in "$p"|"$p"/*) keep=true; break ;; esac
         done
         [ "$keep" = false ] && stale="$stale '$path'"
@@ -432,7 +437,7 @@ phase_repos() {
         [ -z "$url" ] && continue
         git_update_repo "$url" "$HOME/$dir" "$branch"
     done < <(read_manifest "$MANIFEST_DIR/repos.txt")
-    protect_song_files
+    protect_runtime_files
     release_unprotected_files
     protect_build_artifacts
 }
@@ -909,7 +914,7 @@ cmd_songs_save() {
 
     local existing=()
     local p
-    for p in "${SONG_PATHS[@]}" ; do
+    for p in "${RUNTIME_PATHS[@]}" ; do
         [ -e "$PD_REPO/$p" ] && existing+=("$p")
     done
     existing+=("examples/MANIFEST.txt")
@@ -1002,8 +1007,8 @@ cmd_doctor() {
             err "$d non cloné"
         fi
     done < <(read_manifest "$MANIFEST_DIR/repos.txt")
-    local protected; protected=$(git -C "$PD_REPO" ls-files -v -- "${SONG_PATHS[@]}" 2>/dev/null | grep -c '^S')
-    [ "${protected:-0}" -gt 0 ] && ok "morceaux protégés de git ($protected fichiers)" || warn "morceaux NON protégés (git pull peut les écraser)"
+    local protected; protected=$(git -C "$PD_REPO" ls-files -v -- "${RUNTIME_PATHS[@]}" 2>/dev/null | grep -c '^S')
+    [ "${protected:-0}" -gt 0 ] && ok "fichiers écrits par le patch protégés de git ($protected)" || warn "fichiers écrits par le patch NON protégés (git pull peut les écraser)"
 
     log ""
     log "${C_BOLD}Application web${C_RESET}"
