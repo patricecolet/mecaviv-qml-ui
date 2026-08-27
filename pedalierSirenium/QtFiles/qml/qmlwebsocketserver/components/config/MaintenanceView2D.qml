@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 
 // Page de maintenance : ce qui touche à la machine plutôt qu'à la musique.
 // La sortie des sirènes d'abord — c'est le seul réglage qui change ce qu'on
@@ -50,6 +51,26 @@ Item {
 
     // Lien RTP-MIDI : ce que rtpmidid dit de ses pairs.
     property var rtpPeers: []
+
+    // Casque Bluetooth, lu par le meme poll que le reste de la machine.
+    property bool btConnected: false
+    property string btName: ""
+    property int btBattery: -1
+    property bool btConnecting: false
+
+    function _connectHeadset() {
+        if (btConnecting) return;
+        btConnecting = true;
+        var x = new XMLHttpRequest();
+        x.onreadystatechange = function() {
+            if (x.readyState !== XMLHttpRequest.DONE) return;
+            root.btConnecting = false;
+            root._poll();
+        };
+        x.open("POST", "/api/bluetooth/connect");
+        x.setRequestHeader("Content-Type", "application/json");
+        x.send("{}");
+    }
     property bool rtpAvailable: false
 
     function _get(url, onOk) {
@@ -74,6 +95,11 @@ Item {
             root.rtpAvailable = d.available === true;
             root.rtpPeers = d.peers || [];
         });
+        _get("/api/bluetooth", function(d) {
+            root.btConnected = d.connected === true;
+            root.btName = d.name || "";
+            root.btBattery = (d.battery === null || d.battery === undefined) ? -1 : d.battery;
+        });
     }
 
     Timer {
@@ -84,9 +110,21 @@ Item {
         onTriggered: root._poll()
     }
 
-    ColumnLayout {
+    Flickable {
         anchors.fill: parent
-        anchors.margins: 28
+        contentWidth: width
+        contentHeight: colonne.implicitHeight + 56
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        // Au doigt, la page doit pouvoir defiler : elle a grandi avec le clic
+        // et le casque, et le bas passait sous le bord de l'ecran.
+        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+    ColumnLayout {
+        id: colonne
+        width: parent.width - 56
+        x: 28
+        y: 28
         spacing: 24
 
         Text {
@@ -160,40 +198,38 @@ Item {
                 color: "#C7D2DC"; font.family: "monospace"; font.pixelSize: 14
             }
             Text {
-                text: bt.connected ? bt.deviceName : "non connecté"
+                text: root.btConnected ? root.btName : "non connecté"
                 color: "#64737F"; font.family: "monospace"; font.pixelSize: 13
             }
             Text {
-                visible: bt.connected
-                text: bt.battery >= 0 ? bt.battery + " %" : "charge inconnue"
-                color: bt.battery < 0 ? "#3B4855"
-                     : bt.battery <= 20 ? "#E4665A"
-                     : bt.battery <= 50 ? "#E4C15A" : "#7ED08A"
+                visible: root.btConnected
+                text: root.btBattery >= 0 ? root.btBattery + " %" : "charge inconnue"
+                color: root.btBattery < 0 ? "#3B4855"
+                     : root.btBattery <= 20 ? "#E4665A"
+                     : root.btBattery <= 50 ? "#E4C15A" : "#7ED08A"
                 font.family: "monospace"; font.pixelSize: 14; font.bold: true
             }
 
             // Le casque s'allume souvent apres le pedalier : le bouton evite
             // d'avoir a ouvrir un terminal pour le rejoindre.
             Rectangle {
-                visible: !bt.connected
+                visible: !root.btConnected
                 width: 118; height: 30; radius: 4
-                color: bt.connecting ? "#1D2732" : "#151D26"
+                color: root.btConnecting ? "#1D2732" : "#151D26"
                 border.color: "#212B36"; border.width: 1
                 Text {
                     anchors.centerIn: parent
-                    text: bt.connecting ? "connexion…" : "connecter"
+                    text: root.btConnecting ? "connexion…" : "connecter"
                     color: "#64737F"
                     font.family: "monospace"; font.pixelSize: 11
                 }
                 MouseArea {
                     anchors.fill: parent
-                    enabled: !bt.connecting
-                    onClicked: bt.connectHeadset()
+                    enabled: !root.btConnecting
+                    onClicked: root._connectHeadset()
                 }
             }
         }
-
-        BluetoothReader { id: bt }
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -364,6 +400,6 @@ Item {
             }
         }
 
-        Item { Layout.fillHeight: true }
+    }
     }
 }
