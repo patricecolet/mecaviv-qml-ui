@@ -154,22 +154,42 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
-            visible: bt.connected
 
             Text {
                 text: "Casque"
                 color: "#C7D2DC"; font.family: "monospace"; font.pixelSize: 14
             }
             Text {
-                text: bt.deviceName
+                text: bt.connected ? bt.deviceName : "non connecté"
                 color: "#64737F"; font.family: "monospace"; font.pixelSize: 13
             }
             Text {
+                visible: bt.connected
                 text: bt.battery >= 0 ? bt.battery + " %" : "charge inconnue"
                 color: bt.battery < 0 ? "#3B4855"
                      : bt.battery <= 20 ? "#E4665A"
                      : bt.battery <= 50 ? "#E4C15A" : "#7ED08A"
                 font.family: "monospace"; font.pixelSize: 14; font.bold: true
+            }
+
+            // Le casque s'allume souvent apres le pedalier : le bouton evite
+            // d'avoir a ouvrir un terminal pour le rejoindre.
+            Rectangle {
+                visible: !bt.connected
+                width: 118; height: 30; radius: 4
+                color: bt.connecting ? "#1D2732" : "#151D26"
+                border.color: "#212B36"; border.width: 1
+                Text {
+                    anchors.centerIn: parent
+                    text: bt.connecting ? "connexion…" : "connecter"
+                    color: "#64737F"
+                    font.family: "monospace"; font.pixelSize: 11
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: !bt.connecting
+                    onClicked: bt.connectHeadset()
+                }
             }
         }
 

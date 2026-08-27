@@ -38,6 +38,29 @@ Item {
         xhr.send();
     }
 
+    // Reconnecter un casque allume apres le demarrage. Le serveur choisit parmi
+    // les peripheriques deja appaires : rien a lui passer.
+    signal connectFinished(bool ok)
+    property bool connecting: false
+
+    function connectHeadset() {
+        if (connecting) return;
+        connecting = true;
+        var base = apiHost !== "" ? "http://" + apiHost : "";
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            root.connecting = false;
+            var ok = false;
+            try { ok = JSON.parse(xhr.responseText).ok === true; } catch (e) {}
+            root.connectFinished(ok);
+            root.refresh();
+        };
+        xhr.open("POST", base + "/api/bluetooth/connect");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.send("{}");
+    }
+
     Timer {
         interval: root.intervalMs
         running: true

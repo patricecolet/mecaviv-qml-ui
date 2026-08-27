@@ -258,6 +258,32 @@ app.get('/api/bluetooth', async (req, res) => {
     res.json(await readBluetoothAudio());
 });
 
+// Reconnecter le casque quand on l'allume apres le demarrage. Aucun parametre :
+// le serveur ne connecte que ce qui est deja appaire, choisi parmi les
+// peripheriques declares Audio Sink. Rien d'arbitraire ne peut etre joint
+// depuis la page.
+app.post('/api/bluetooth/connect', async (req, res) => {
+    try {
+        const { stdout: paired } = await execFile('bluetoothctl', ['devices', 'Paired']);
+        const macs = paired.split('\n')
+            .filter(l => l.startsWith('Device '))
+            .map(l => l.trim().split(' ')[1]);
+        for (const mac of macs) {
+            const { stdout: info } = await execFile('bluetoothctl', ['info', mac]);
+            if (!/UUID: Audio Sink/.test(info)) continue;
+            if (/Connected: yes/.test(info)) return res.json({ ok: true, mac, already: true });
+            try {
+                await execFile('bluetoothctl', ['--timeout', '15', 'connect', mac]);
+            } catch (e) { /* le casque est peut-etre encore eteint */ }
+            const after = await readBluetoothAudio();
+            return res.json({ ok: after.connected, mac, state: after });
+        }
+        res.json({ ok: false, reason: 'aucun casque appaire' });
+    } catch (e) {
+        res.json({ ok: false, reason: e.message });
+    }
+});
+
 app.get('/api/rtp', async (req, res) => {
     res.json(await readRtpStatus());
 });
