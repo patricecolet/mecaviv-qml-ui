@@ -212,6 +212,8 @@ phase_deps() {
     phase "Paquets système"
     local missing; missing=$(apt_missing "$MANIFEST_DIR/apt-packages.txt")
 
+    ensure_bluetooth_battery
+
     if [ -z "$missing" ] && [ "$(stamp_age_days apt.stamp)" -lt 7 ]; then
         skip "paquets système"
         return 0
@@ -229,6 +231,27 @@ phase_deps() {
 
     stamp_write apt.stamp "$(date -Iseconds)"
     ok "paquets système à jour"
+}
+
+# BlueZ n'expose le niveau de batterie d'un peripherique (org.bluez.Battery1)
+# qu'en mode experimental. Sans ca, `bluetoothctl info` ne dit rien de la charge
+# du casque -- et le reglage vit dans /etc, donc hors du depot : il se perdrait
+# a la reinstallation de la machine si le deploiement ne le reposait pas.
+ensure_bluetooth_battery() {
+    local f=/etc/bluetooth/main.conf
+    [ -f "$f" ] || { skip "bluez absent"; return 0; }
+    if grep -qE '^Experimental = true' "$f"; then
+        skip "bluez: batterie des peripheriques (deja active)"
+        return 0
+    fi
+    run sudo cp "$f" "$f.bak-$(date +%Y%m%d)"
+    if grep -qE '^#Experimental' "$f"; then
+        run sudo sed -i 's|^#Experimental = false|Experimental = true|' "$f"
+    else
+        run sudo sed -i '/^\[General\]/a Experimental = true' "$f"
+    fi
+    run sudo systemctl restart bluetooth \
+        && ok "bluez: batterie des peripheriques activee (Experimental)"
 }
 
 # npm est absent de l'image et son paquet Debian peut vouloir aligner nodejs sur

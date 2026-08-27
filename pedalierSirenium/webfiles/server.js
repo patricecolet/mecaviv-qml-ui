@@ -4,6 +4,9 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const os = require('os');
 const net = require('net');
+// bluetoothctl est le seul appel a un binaire externe de ce serveur : la charge
+// du casque n'existe nulle part ailleurs que dans BlueZ.
+const execFile = require('util').promisify(require('child_process').execFile);
 const app = express();
 const port = parseInt(process.env.WEB_PORT || '8010', 10);
 
@@ -226,6 +229,34 @@ function readRtpStatus() {
         });
     });
 }
+
+// Casque Bluetooth : nom et niveau de batterie, via bluetoothctl. La batterie
+// n'est exposee par BlueZ (org.bluez.Battery1) que si `Experimental = true`
+// dans /etc/bluetooth/main.conf -- la phase deps du deploiement s'en charge.
+// Rend `connected: false` quand rien n'est appaire ou connecte : l'ecran masque
+// alors la ligne au lieu d'afficher un tiret de plus.
+async function readBluetoothAudio() {
+    try {
+        const { stdout: devs } = await execFile('bluetoothctl', ['devices', 'Connected']);
+        const line = devs.split('\n').find(l => l.startsWith('Device '));
+        if (!line) return { connected: false };
+        const [, mac, ...nameParts] = line.trim().split(' ');
+        const name = nameParts.join(' ');
+        let battery = null;
+        try {
+            const { stdout: info } = await execFile('bluetoothctl', ['info', mac]);
+            const m = info.match(/Battery Percentage:.*\((\d+)\)/);
+            if (m) battery = parseInt(m[1], 10);
+        } catch (e) { /* le peripherique ne rapporte pas sa charge */ }
+        return { connected: true, name, mac, battery };
+    } catch (e) {
+        return { connected: false };
+    }
+}
+
+app.get('/api/bluetooth', async (req, res) => {
+    res.json(await readBluetoothAudio());
+});
 
 app.get('/api/rtp', async (req, res) => {
     res.json(await readRtpStatus());

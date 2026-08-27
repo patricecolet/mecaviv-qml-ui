@@ -149,6 +149,32 @@ Item {
 
         Rectangle { Layout.fillWidth: true; height: 1; color: "#171F28" }
 
+        // Casque Bluetooth — la ligne n'apparaît que s'il est connecté, sinon
+        // c'est un tiret de plus à lire pour rien.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            visible: bt.connected
+
+            Text {
+                text: "Casque"
+                color: "#C7D2DC"; font.family: "monospace"; font.pixelSize: 14
+            }
+            Text {
+                text: bt.deviceName
+                color: "#64737F"; font.family: "monospace"; font.pixelSize: 13
+            }
+            Text {
+                text: bt.battery >= 0 ? bt.battery + " %" : "charge inconnue"
+                color: bt.battery < 0 ? "#3B4855"
+                     : bt.battery <= 20 ? "#E4665A"
+                     : bt.battery <= 50 ? "#E4C15A" : "#7ED08A"
+                font.family: "monospace"; font.pixelSize: 14; font.bold: true
+            }
+        }
+
+        BluetoothReader { id: bt }
+
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 10

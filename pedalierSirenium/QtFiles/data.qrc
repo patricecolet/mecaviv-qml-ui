@@ -25,6 +25,7 @@
         <file>qml/qmlwebsocketserver/components/config/ModulationMatrix2D.qml</file>
         <file>qml/qmlwebsocketserver/components/config/ConfigView2D.qml</file>
         <file>qml/qmlwebsocketserver/components/config/MaintenanceView2D.qml</file>
+        <file>qml/qmlwebsocketserver/components/config/BluetoothReader.qml</file>
 
         <!-- Controllers -->
         <file>qml/qmlwebsocketserver/controllers/MessageParser.qml</file>
