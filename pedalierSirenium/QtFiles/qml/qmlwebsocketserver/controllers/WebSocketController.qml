@@ -253,6 +253,9 @@ Item {
                     // Écho de la sortie choisie (v1/v2/dsp). PD la persiste dans
                     // `.sortie`, donc c'est lui qui dit la vérité au démarrage,
                     // pas la dernière valeur cliquée ici.
+                    if (json.clic) {
+                        root.batchReceived("clic", json.clic);
+                    }
                     if (json.output) {
                         root.batchReceived("outputDevice", json.output);
                     }
@@ -343,6 +346,8 @@ Item {
                     root.requestCurrentPreset();
                     // Demander la liste des scènes dès la connexion
                     root.requestScenesList();
+                    // Et l'état du clic, que PD ne diffuse qu'au changement
+                    root.requestClic();
                 } else if (socket.status === WebSocket.Error) {
                     root.logger.error("WEBSOCKET", "Erreur:", socket.errorString);
                 } else if (socket.status === WebSocket.Closed) {
@@ -486,6 +491,48 @@ Item {
             device: "SIREN_LOOPER",
             action: "outputDevice",
             output: dev
+        });
+    }
+
+    // Choix de la sirène au doigt, sur l'écran tactile : exactement ce que fait
+    // la touche piano du pédalier. PD reçoit le numéro de sirène (1..7), retrouve
+    // sa voix dans `$0.voices` et pousse la ligne sur `$0.loop.voice.select` ;
+    // -1 désarme le mono. Comme pour la sortie, l'écran ne décide pas — il
+    // demande, et attend l'écho VOICE_SELECT pour se mettre à jour.
+    function sendVoiceSelect(siren) {
+        if (logger) logger.info("SYSTEM", "👆 sirène choisie →", siren);
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "voiceSelect",
+            siren: siren
+        });
+    }
+
+    // Bascule du transport de scene — le meme geste que l'appui court sur CC 19.
+    // PD decide : il lit son propre transport, lance ou coupe, et renvoie l'etat
+    // dans le JSON d'horloge. L'ecran ne fait que demander.
+    function sendScenePlayStop() {
+        if (logger) logger.info("SYSTEM", "\u25B6 bascule transport de scene");
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "scenePlayStop"
+        });
+    }
+
+    // L'etat du clic n'est diffuse qu'au changement : une page qui se connecte
+    // apres le boot ne le connaitrait pas. Elle le demande donc a l'ouverture.
+    function requestClic() {
+        return sendMessage({ device: "SIREN_LOOPER", action: "clicGet" });
+    }
+
+    // Clic audible. PD applique, persiste dans config.json et renvoie l'echo.
+    function sendClic(enable, volume) {
+        if (logger) logger.info("SYSTEM", "\U0001F514 clic \u2192", enable ? "on" : "off", volume);
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "clic",
+            enable: enable ? 1 : 0,
+            volume: volume
         });
     }
 

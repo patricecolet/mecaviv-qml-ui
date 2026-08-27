@@ -45,6 +45,52 @@ VIDE ──rec/play (court)──► ENREGISTRE ──rec/play (court, en fin de
 | JOUE | stop court | arrête | **immédiat, jamais quantizé** (confirmé par Patrice) |
 | tout état non-vide | rec/play long **ou** stop long | efface, retour à VIDE | immédiat |
 
+## 2bis. Réenregistrer une boucle qui joue, et ce que la vanne veut dire (2026-08-27)
+
+**Il n'y a pas d'overdub, et pas de cinquième état.** Appuyer sur rec/play depuis JOUE
+**remplace le contenu** : la lecture s'arrête, l'enregistrement démarre sur la même sirène.
+
+```
+JOUE ──rec/play (court)──► ENREGISTRE
+```
+
+Deux raisons, et la seconde est la plus structurante :
+
+1. Une instance de `midifile` n'a qu'un fichier ouvert — on *pourrait* lire et écrire en parallèle,
+   on ne le fera pas.
+2. **Une sirène ne peut pas recevoir deux sources.** C'est du MIDI vers un instrument monophonique,
+   pas de l'audio qu'on mélange : il n'y a rien à superposer. Superposer supposerait deux sirènes.
+
+Donc la vanne suit l'état sans exception :
+
+| état | pulse vers `clip-io` | enregistre |
+|---|---|---|
+| VIDE | non | non |
+| ENREGISTRE | non | oui |
+| ARRÊTÉ | non | non |
+| JOUE | **oui** | non |
+
+C'est la définition d'ARRÊTÉ du §1 lue dans l'autre sens : « un clip existe, mais rien ne pousse le
+pulse ». La vanne **est** la différence entre ARRÊTÉ et JOUE — elle se dérive de l'état, et n'est
+jamais écrite par une transition particulière.
+
+**Le piège que ça a coûté (2026-08-26)** : les quatre états sont bien implémentés
+(`$0-state` : 0 VIDE, 1 ENREGISTRE, 2 JOUE, 3 ARRÊTÉ) et `pd recplay` route correctement dessus.
+Le défaut était ailleurs, et sur une seule variable : `pd recplay` ouvrait la vanne lui-même,
+avant même que la transition ait lieu, et la branche d'enregistrement ne la refermait jamais. Un
+enregistrement partait donc avec le robinet ouvert : `pulse480` déversé dans `midifile` qui venait
+de passer en écriture, fin de fichier atteinte en boucle sur un clip d'une mesure, **stack
+overflow**. Trouvé en isolant le `[spigot]` qui porte la vanne, puis remonté jusqu'à `pd recplay`.
+
+## 2ter. Changement de scène — quantizé, comme le reste (2026-08-26)
+
+Appliquer une scène (`sirens <j> mode <v>` sur `$0.scene.broadcast`) **doit se faire sur la mesure**,
+pas de but en blanc. C'est aujourd'hui la seule entrée qui force l'état hors machine, et c'est par
+là que le `bar` est court-circuité.
+
+Les seules transitions immédiates restent celles du §2 : `stop`, les appuis longs qui effacent,
+et `ARRÊTÉ → JOUE`. Tout le reste, changement de scène compris, attend le début de mesure.
+
 ## 3. Le concept de "mainloop"
 
 La toute première boucle enregistrée n'a rien à quoi se synchroniser — elle **devient** la

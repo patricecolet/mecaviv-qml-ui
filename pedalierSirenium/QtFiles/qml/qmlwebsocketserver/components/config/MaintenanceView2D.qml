@@ -12,6 +12,22 @@ Item {
     signal outputRequested(string dev)
     signal reconnectRequested()
 
+    // Clic audible : l'interrupteur est dans le bandeau, le niveau se règle ici
+    // — on l'ajuste une fois, ce n'est pas un geste de jeu.
+    property bool clicEnabled: false
+    property int clicVolume: 100
+    signal clicVolumeRequested(int volume)
+
+    // Paliers en dB, parce que c'est ce que le musicien lit. La valeur envoyée
+    // reste l'échelle PureData, où 100 vaut 0 dB.
+    readonly property var _clicLevels: [
+        { label: "-24", value: 76 },
+        { label: "-12", value: 88 },
+        { label: "-6",  value: 94 },
+        { label: "-3",  value: 97 },
+        { label: "0",   value: 100 }
+    ]
+
     readonly property var _outputs: [
         { id: "v1",  label: "V1",  sub: "UDP" },
         { id: "v2",  label: "V2",  sub: "MIDI" },
@@ -127,6 +143,62 @@ Item {
                 // Le changement de sortie remet les sirènes à zéro côté PD : le
                 // dire, sinon le silence qui suit passe pour une panne.
                 text: "Changer de sortie remet les sirènes à zéro."
+                color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+            }
+        }
+
+        Rectangle { Layout.fillWidth: true; height: 1; color: "#171F28" }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 10
+
+            Text {
+                text: "Niveau du clic"
+                color: "#C7D2DC"; font.family: "monospace"; font.pixelSize: 14
+            }
+
+            RowLayout {
+                spacing: 10
+                Repeater {
+                    model: root._clicLevels
+                    delegate: Rectangle {
+                        id: vcell
+                        required property var modelData
+                        readonly property bool active: modelData.value === root.clicVolume
+                        width: 84; height: 52; radius: 5
+                        color: vcell.active ? "#1D2732" : "#111820"
+                        border.color: vcell.active ? "#66E4F2" : "#212B36"
+                        border.width: 1
+                        opacity: root.clicEnabled ? 1.0 : 0.45
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 1
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: vcell.modelData.label
+                                color: vcell.active ? "#66E4F2" : "#64737F"
+                                font.family: "monospace"; font.pixelSize: 18; font.bold: true
+                            }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "dB"
+                                color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9
+                            }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: root.clicVolumeRequested(vcell.modelData.value)
+                        }
+                    }
+                }
+            }
+
+            Text {
+                // L'interrupteur reste dans le bandeau : le dire, sinon on cherche
+                // ici de quoi couper le clic.
+                text: root.clicEnabled ? "Le clic s'allume et s'éteint depuis le bandeau (♪)."
+                                       : "Clic éteint — l'interrupteur est dans le bandeau (♪)."
                 color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
             }
         }

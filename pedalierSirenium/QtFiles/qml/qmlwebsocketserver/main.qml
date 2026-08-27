@@ -52,6 +52,7 @@ Window {
                 case "sirenium": liveState.applySirenium(data); break;
                 case "voiceSelect": liveState.applyVoiceSelect(data); break;
                 case "outputDevice": liveState.applyOutputDevice(data); break;
+                case "clic": liveState.applyClic(data); break;
                 default:
                     if (logger) logger.debug("WEBSOCKET", "batch non routé:", batchType);
             }
@@ -81,6 +82,16 @@ Window {
     function _setOutput(dev) {
         if (wsController.isConnected) wsController.sendOutputDevice(dev);
         else sim.applyOutputDevice(dev);
+    }
+
+    // Taper une sirène la choisit, comme la touche piano du pédalier ; retaper
+    // celle qui est déjà choisie la désarme. Le doigt n'a pas de relâchement,
+    // alors c'est le même geste qui arme et désarme — -1 est la valeur que PD
+    // attend pour ça, `pd pedal.play.rec` la route déjà.
+    function _pickSiren(n) {
+        var v = (window.state.monoSiren === n) ? -1 : n;
+        if (wsController.isConnected) wsController.sendVoiceSelect(v);
+        else sim.applyVoiceSelect({ siren: v > 0 ? v : 0 });
     }
 
     // Les éditions partent vers PD quand il est là, et restent locales sinon :
@@ -150,6 +161,15 @@ Window {
                 window.state.stepSignatureNum(delta);
                 wsController.sendSignatureChange(window.state.signatureNum + "/" + window.state.signatureDen);
             }
+            transportRunning: window.state.transportRunning
+            clicEnabled: window.state.clicEnabled
+            onClicToggle: {
+                if (wsController.isConnected)
+                    wsController.sendClic(!window.state.clicEnabled, window.state.clicVolume);
+            }
+            onTransportToggle: {
+                if (wsController.isConnected) wsController.sendScenePlayStop();
+            }
             onSignatureDenCycle: {
                 window.state.cycleSignatureDen();
                 wsController.sendSignatureChange(window.state.signatureNum + "/" + window.state.signatureDen);
@@ -201,6 +221,7 @@ Window {
                     states: window.state.ringStates
                     selectedSiren: window.state.monoSiren
                     midi: window.state.sirenMidi
+                    onSirenTapped: function(n) { window._pickSiren(n); }
                 }
 
                 // La note du sirenium et ce que l'harmoniseur en fait, sur la
@@ -268,6 +289,11 @@ Window {
                 connected: wsController.isConnected
                 onOutputRequested: function(dev) { window._setOutput(dev); }
                 onReconnectRequested: wsController.reconnect()
+                clicEnabled: window.state.clicEnabled
+                clicVolume: window.state.clicVolume
+                onClicVolumeRequested: function(v) {
+                    if (wsController.isConnected) wsController.sendClic(window.state.clicEnabled, v);
+                }
             }
 
             // Gestion des scènes

@@ -31,6 +31,10 @@ Rectangle {
     property int minSignatureNum: 1
     property int maxSignatureNum: 21
     property int signatureDen: 4
+    // Transport de scene, tel que PD l'annonce — l'ecran ne decide pas, il demande.
+    property bool transportRunning: false
+    // Clic audible, tel que PD l'annonce.
+    property bool clicEnabled: false
     property bool configMode: false
     property bool maintenanceMode: false
 
@@ -44,6 +48,8 @@ Rectangle {
         return Math.max(beatGroups.length - 1, 0);
     }
 
+    signal transportToggle()
+    signal clicToggle()
     signal toggleConfig()
     signal toggleMaintenance()
     signal bpmStep(int delta)
@@ -142,10 +148,32 @@ Rectangle {
     Row {
         anchors.centerIn: parent
         spacing: 6
+
+        // Lance ou coupe la scene. Accompagne le metronome parce que c'est le
+        // meme objet : ce bouton est ce qui fait avancer les temps a sa droite.
+        Rectangle {
+            id: transportBtn
+            anchors.verticalCenter: parent.verticalCenter
+            width: 34; height: 26; radius: 4
+            color: root.transportRunning ? "#1D2732" : "#151D26"
+            border.color: root.transportRunning ? "#66E4F2" : "#212B36"
+            border.width: 1
+            Text {
+                anchors.centerIn: parent
+                text: root.transportRunning ? "\u25A0" : "\u25B6"
+                color: root.transportRunning ? "#66E4F2" : "#64737F"
+                font.pixelSize: 12
+            }
+            MouseArea { anchors.fill: parent; onClicked: root.transportToggle() }
+        }
+
+        Item { width: 8; height: 1 }
+
         Repeater {
             model: root.beatGroups
             delegate: Rectangle {
                 id: groupCell
+                anchors.verticalCenter: parent.verticalCenter
                 required property int index
                 required property var modelData   // taille du groupe, en unités
                 readonly property bool isFirst: index === 0
@@ -167,6 +195,26 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        Item { width: 8; height: 1 }
+
+        // Le clic audible, à droite du métronome : c'est le même objet, l'un
+        // se voit et l'autre s'entend.
+        Rectangle {
+            id: clicBtn
+            anchors.verticalCenter: parent.verticalCenter
+            width: 34; height: 26; radius: 4
+            color: root.clicEnabled ? "#1D2732" : "#151D26"
+            border.color: root.clicEnabled ? "#66E4F2" : "#212B36"
+            border.width: 1
+            Text {
+                anchors.centerIn: parent
+                text: "\u266A"
+                color: root.clicEnabled ? "#66E4F2" : "#64737F"
+                font.pixelSize: 13
+            }
+            MouseArea { anchors.fill: parent; onClicked: root.clicToggle() }
         }
     }
 

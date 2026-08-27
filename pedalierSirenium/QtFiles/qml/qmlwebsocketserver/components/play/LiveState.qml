@@ -130,6 +130,24 @@ QtObject {
     }
 
     // ---------- sorties temps réel (recalculées à chaque tick) ----------
+    // Transport annonce par PD : `start`/`continue` = en marche, `stop` = arrete.
+    // Sans lui, l'accumulateur local ci-dessous continuait de compter les temps
+    // pendant que PD etait a l'arret — l'ecran affichait un metronome qui tourne
+    // alors que rien ne sonnait.
+    property string transport: "stop"
+    readonly property bool transportRunning: transport !== "stop"
+
+    // Clic audible, tenu par PD et persiste dans son config.json. L'ecran
+    // demande, PD applique et renvoie l'echo — comme pour la sortie des sirenes.
+    property bool clicEnabled: false
+    property int clicVolume: 100
+
+    function applyClic(data) {
+        if (!data) return;
+        if (data.enable !== undefined) clicEnabled = data.enable > 0;
+        if (data.volume !== undefined) clicVolume = data.volume;
+    }
+
     property int clockBeat: 0
     property int clockBar: 1
     property var ringStates: []
@@ -181,6 +199,7 @@ QtObject {
         }
         // `beat`/`bar` bruts de PD resynchronisent l'accumulateur local ;
         // entre deux messages, _tick() continue d'interpoler depuis là.
+        if (data.transport !== undefined) transport = String(data.transport);
         if (data.beat !== undefined) clockBeat = data.beat;
         if (data.bar !== undefined) clockBar = data.bar;
         _bars = (clockBar - 1) + (clockBeat / Math.max(beatsPerBar, 1));
@@ -311,7 +330,7 @@ QtObject {
         var quarterMs = 60000 / Math.max(bpm, 1);
         var unitMs = quarterMs * (4 / Math.max(signatureDen, 1));
         var barMs = unitMs * Math.max(beatsPerBar, 1);
-        _bars += dt / barMs;
+        if (transportRunning) _bars += dt / barMs;
 
         var pulse = 0.3 + 0.35 * (0.5 + 0.5 * Math.sin(now / 190));
 

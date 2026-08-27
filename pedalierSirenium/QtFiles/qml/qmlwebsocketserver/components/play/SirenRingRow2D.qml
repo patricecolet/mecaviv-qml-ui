@@ -12,9 +12,14 @@ Item {
     // 7 entrées : { progress, halo (bool), haloOpacity, meta (string), present (0..1) }
     property var states: []
 
-    // Sirène mise en mono par la pédale key (1..7, 0 = aucune). Marquée par une
+    // Sirène mise en mono par la pédale key ou par le doigt (1..7, 0 = aucune),
+    // telle que PD l'annonce. Marquée par une
     // forme sous l'anneau : la couleur dit déjà qui, la forme dit quoi.
     property int selectedSiren: 0
+
+    // Sirène choisie au doigt (1..7). La vue ne décide de rien : elle signale,
+    // main.qml demande à PD, et `selectedSiren` suit l'écho.
+    signal sirenTapped(int siren)
 
     // 7 entrées : { note, velocity, attacks } — ce que chaque sirène joue, reçu
     // par le canal binaire (immédiat, non lissé). Voir LiveState.applyMidi.
@@ -156,6 +161,13 @@ Item {
                             font.pixelSize: Math.max(8, ring.width * 0.09)
                         }
                     }
+                }
+
+                // Dernière de la cellule, donc au-dessus de l'anneau : le doigt
+                // touche la cellule entière, jamais un trait de cinq pixels.
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: root.sirenTapped(cell.index + 1)
                 }
             }
         }

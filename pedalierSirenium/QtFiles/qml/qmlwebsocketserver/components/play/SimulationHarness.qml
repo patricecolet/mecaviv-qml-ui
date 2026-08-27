@@ -182,15 +182,30 @@ QtObject {
     property int sireniumNote: 62
     property int sireniumVelocity: 96
 
-    // --- mono : sirène désignée par la pédale key ---
-    // La scène simulée est poly, donc rien n'est armé — même interface que
-    // LiveState pour que main.qml bascule sans changer un binding.
+    // --- mono : sirène désignée par la pédale key ou par le doigt ---
+    // La scène simulée est poly, donc rien n'est armé au départ — même interface
+    // que LiveState pour que main.qml bascule sans changer un binding, y compris
+    // `applyVoiceSelect` : sans PD, c'est le tap lui-même qui met la sirène.
     readonly property bool monoMode: false
-    readonly property int monoSiren: 0
-    readonly property int monoVoice: -1
+    property int monoSiren: 0
+    property int monoVoice: -1
     readonly property bool monoArmed: monoSiren > 0
 
+    function applyVoiceSelect(data) {
+        if (!data) return;
+        if (data.siren !== undefined) monoSiren = data.siren;
+        if (data.voice !== undefined) monoVoice = data.voice;
+    }
+
     // --- sorties, réévaluées à chaque tick ---
+    // Meme interface que LiveState. Sans PD il n'y a pas de transport a suivre :
+    // la demonstration tourne, sinon la vue simulee serait figee.
+    readonly property bool transportRunning: true
+
+    // Meme interface que LiveState ; sans PD le clic est simplement eteint.
+    readonly property bool clicEnabled: false
+    readonly property int clicVolume: 100
+
     property int clockBeat: 0
     property int clockBar: 1
     property var ringStates: []
