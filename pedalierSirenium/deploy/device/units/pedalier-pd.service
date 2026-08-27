@@ -12,7 +12,12 @@ WorkingDirectory=@PD_REPO@/examples
 # du patch : démarrer avant que eth0 ait son adresse condamne la sortie V1 pour
 # toute la session. Le script n'échoue jamais, il attend au plus 30 s.
 ExecStartPre=@PEDALIER_REPO@/pedalierSirenium/deploy/device/wait-network.sh
-ExecStart=@PD_BIN@ -nogui -stderr @PD_PATCH@
+# PD_AUDIO_OPTS vient de ~/.config/pedalier/env, jamais ecrase par le deploiement :
+# c'est un reglage de machine. Vide, Pd prend la premiere carte ALSA -- sur ce Pi
+# c'est VirMIDI, qui n'est pas une sortie audio, donc rien ne s'entend.
+# Le DSP est allume par le patch lui-meme (loadbang -> `; pd dsp 1`), pas ici :
+# ainsi il l'est aussi quand on ouvre pedalier.pd a la main.
+ExecStart=@PD_BIN@ -nogui -stderr $PD_AUDIO_OPTS @PD_PATCH@
 Restart=on-failure
 RestartSec=2
 
