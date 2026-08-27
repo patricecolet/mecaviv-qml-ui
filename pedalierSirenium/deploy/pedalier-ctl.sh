@@ -585,19 +585,31 @@ build_critapec_external() {
 install_siren_resources() {
     local dir="$HOME/dev/src/ComposeSiren"
     local link=/usr/share/ComposeSiren
+    local url=git@github.com:patricecolet/ComposeSiren.git
+    # La branche compte : les données corrigées de juin 2026 — réindexation des
+    # partiels qui supprime l'artefact de crossfade — n'existent que sur
+    # feat/siren-udp-bridge. La branche par défaut porte encore les données
+    # d'origine, qui se chargent sans erreur et cliquent à chaque transition.
+    local branch=feat/siren-udp-bridge
 
     if [ ! -d "$dir/.git" ]; then
         info "clonage des données de sirène (ComposeSiren, ~600 Mo)"
         run mkdir -p "$(dirname "$dir")" || return 0
         if ! run git clone --depth 1 --filter=blob:none --sparse \
-                 git@github.com:patricecolet/ComposeSiren.git "$dir"; then
+                 --branch "$branch" "$url" "$dir"; then
             warn "clonage de ComposeSiren échoué — pas de son de sirène en mode DSP"
             return 0
         fi
         run git -C "$dir" sparse-checkout set Resources || return 0
-        ok "données de sirène clonées"
+        ok "données de sirène clonées ($branch)"
     else
-        skip "données de sirène"
+        local current; current=$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null)
+        if [ "$current" != "$branch" ]; then
+            warn "données de sirène sur '$current', attendu '$branch'"
+            warn "  correctif : rm -rf '$dir' puis rejouer la phase externals"
+        else
+            git_update_repo "$url" "$dir" "$branch"
+        fi
     fi
 
     if [ ! -e "$link" ]; then
