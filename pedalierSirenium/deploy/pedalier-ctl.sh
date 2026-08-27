@@ -541,6 +541,72 @@ pdjson_loads() {
     ! printf '%s' "$out" | grep -q "couldn't create"
 }
 
+# Compile un external de critapec. Meme logique pour tous : on recompile si le
+# binaire manque, si Pd a change de version, ou si une source est plus recente
+# que lui. Les sources sont a la racine (midifile) ou sous src/ (c-siren~).
+build_critapec_external() {
+    local name="$1"
+    local dir="$EXTERNALS_DIR/critapec/$name"
+    local binary="$dir/$name.pd_linux"
+    local pd_version; pd_version=$(stamp_read pd.version)
+
+    [ -d "$dir" ] || { warn "$name absent de critapec — dépôt à jour ?"; return 0; }
+
+    local need_build=false
+    if [ ! -f "$binary" ]; then
+        need_build=true
+    elif [ -n "$pd_version" ] && ! stamp_matches externals.builtfor "$pd_version"; then
+        need_build=true
+        info "version de Pd changée — recompilation de $name"
+    elif [ -n "$(find "$dir" \( -name '*.c' -o -name '*.cpp' -o -name '*.h' \) -newer "$binary" 2>/dev/null | head -1)" ]; then
+        need_build=true
+    fi
+
+    if [ "$need_build" != true ]; then
+        skip "$name"
+        return 0
+    fi
+
+    local missing; missing=$(apt_missing "$MANIFEST_DIR/apt-build-packages.txt")
+    apt_install "$missing" || warn "dépendances de compilation incomplètes"
+    # PDINCLUDEDIR : compiler contre les en-têtes du Pd réellement utilisé.
+    run_sh "cd '$dir' && make clean >/dev/null 2>&1; make PDINCLUDEDIR=/usr/local/include/pd" \
+        && ok "$name compilé" || warn "compilation de $name échouée"
+}
+
+# Les données de c-siren~ — courbes d'amplitude et de fréquence relevées sur les
+# vraies sirènes, 575 Mo — vivent dans le dépôt ComposeSiren. Clone superficiel
+# et partiel : seul le dossier Resources est matérialisé.
+#
+# Le chemin d'installation n'est pas négociable : c-siren~ porte
+# /usr/share/ComposeSiren/Resources/ en dur comme défaut Linux, et rien dans le
+# patch ne lui envoie de message `resources`. Un lien depuis ce chemin système
+# vers le clone évite d'écrire un chemin de machine dans pedalier.pd.
+install_siren_resources() {
+    local dir="$HOME/dev/src/ComposeSiren"
+    local link=/usr/share/ComposeSiren
+
+    if [ ! -d "$dir/.git" ]; then
+        info "clonage des données de sirène (ComposeSiren, ~600 Mo)"
+        run mkdir -p "$(dirname "$dir")" || return 0
+        if ! run git clone --depth 1 --filter=blob:none --sparse \
+                 git@github.com:patricecolet/ComposeSiren.git "$dir"; then
+            warn "clonage de ComposeSiren échoué — pas de son de sirène en mode DSP"
+            return 0
+        fi
+        run git -C "$dir" sparse-checkout set Resources || return 0
+        ok "données de sirène clonées"
+    else
+        skip "données de sirène"
+    fi
+
+    if [ ! -e "$link" ]; then
+        run sudo ln -s "$dir" "$link" && ok "$link → $dir"
+    else
+        skip "lien $link"
+    fi
+}
+
 phase_externals() {
     phase "Externals Pure Data"
     local pd_version; pd_version=$(stamp_read pd.version)
@@ -553,28 +619,9 @@ phase_externals() {
         run git -C "$critapec" submodule update --init --recursive || warn "sous-modules critapec non initialisés"
     fi
 
-    # midifile : recompilé si une source a bougé ou si Pd a changé de version.
-    local mf="$critapec/midifile"
-    local binary="$mf/midifile.pd_linux"
-    local need_build=false
-    if [ ! -f "$binary" ]; then
-        need_build=true
-    elif [ -n "$pd_version" ] && ! stamp_matches externals.builtfor "$pd_version"; then
-        need_build=true
-        info "version de Pd changée — recompilation des externals"
-    elif [ -n "$(find "$mf" -maxdepth 1 -name '*.c' -newer "$binary" 2>/dev/null)" ]; then
-        need_build=true
-    fi
-
-    if [ "$need_build" = true ]; then
-        local missing; missing=$(apt_missing "$MANIFEST_DIR/apt-build-packages.txt")
-        apt_install "$missing" || warn "dépendances de compilation incomplètes"
-        # PDINCLUDEDIR : compiler contre les en-têtes du Pd réellement utilisé.
-        run_sh "cd '$mf' && make clean >/dev/null 2>&1; make PDINCLUDEDIR=/usr/local/include/pd" \
-            && ok "midifile compilé" || warn "compilation de midifile échouée"
-    else
-        skip "midifile"
-    fi
+    build_critapec_external midifile
+    build_critapec_external "c-siren~"
+    install_siren_resources
 
     # pdlua vient du paquet Debian, mais son dossier d'installation est invisible
     # pour le Pd de /usr/local : on en garde une copie dans ~/pd-externals.
