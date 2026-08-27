@@ -408,8 +408,25 @@ protect_build_artifacts() {
         && ok "artefacts de build hors de git ($total fichiers en skip-worktree)"
 }
 
+# Les artefacts de build sont versionnes ET reecrits par le rsync depuis le Mac.
+# Le skip-worktree les cache a `git status`, mais pas a `git merge` : des qu'un
+# commit les touche -- c'est-a-dire a chaque build -- la mise a jour echoue avec
+# « local changes would be overwritten ». On les rend a git et on les remet dans
+# l'etat du depot avant de tirer ; le rsync qui suit reposera la bonne version.
+release_build_artifacts_for_pull() {
+    local repo="$PEDALIER_REPO"
+    [ -d "$repo/.git" ] || return 0
+    local skipped; skipped=$(git -C "$repo" ls-files -v | awk '/^S/ {print $2}')
+    [ -z "$skipped" ] && return 0
+    # shellcheck disable=SC2086
+    git -C "$repo" update-index --no-skip-worktree $skipped 2>/dev/null || true
+    # shellcheck disable=SC2086
+    git -C "$repo" checkout -- $skipped 2>/dev/null || true
+}
+
 phase_repos() {
     phase "Dépôts git"
+    release_build_artifacts_for_pull
     local url dir branch
     while read -r url dir branch; do
         [ -z "$url" ] && continue
