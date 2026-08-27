@@ -73,6 +73,16 @@ vouloir aligner `nodejs` sur la version de la distribution, ce qui casserait le
 node 18 en place. En cas de refus, `pedalier-deploy.sh node-modules` pousse
 `node_modules/` depuis le Mac (express est du JS pur, portable vers aarch64).
 
+**Le son des sirènes en mode DSP dépend de `c-siren~` et de ses données.**
+L'external est compilé par la phase `externals` depuis `critapec` ; ses données
+— 575 Mo de courbes relevées sur les vraies sirènes — viennent d'un clone
+superficiel et partiel de `ComposeSiren`, relié depuis
+`/usr/share/ComposeSiren/Resources/`, chemin que `c-siren~` porte en dur comme
+défaut Linux. Sur disque ça ne coûte que 62 Mo : les fichiers sont creux.
+Symptôme quand il manque quelque chose : `c-siren~ $2 ... couldn't create` au
+chargement, puis les sept `composeSiren~` sans oscillateur — le `switch~`
+s'allume, le volume et le pan arrivent, et rien ne sort.
+
 **Pd ouvre sa sortie audio une seule fois, au chargement du patch.** Si aucune
 sortie réelle n'existe à cet instant — le casque Bluetooth met quelques secondes
 à être joint au démarrage à froid — il boucle sur
