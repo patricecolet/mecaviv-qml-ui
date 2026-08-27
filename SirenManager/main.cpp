@@ -3,7 +3,11 @@
 #include <QQmlContext>
 #include <QDir>
 #include <QStandardPaths>
+#include <QQuickStyle>
 #include <QtQml>
+#ifdef BUNDLED_BACKEND
+#include <QProcess>
+#endif
 #include "src/UdpController.h"
 #include "src/SshController.h"
 #include "src/PlaylistManager.h"
@@ -18,6 +22,30 @@ int main(int argc, char *argv[])
     app.setApplicationVersion("1.0.0");
     app.setOrganizationName("Mecaviv");
     app.setOrganizationDomain("mecaviv.com");
+
+    // Style Controls explicite : sans ça, macOS utilise le style natif qui rend
+    // les boutons "nus" (sans background/contentItem custom) illisibles sur le
+    // thème sombre (texte clair sur bezel clair — cf. onglet SYSTÈME). Fusion est
+    // intégré (pas de plugin séparé à déployer) et respecte la palette ; les
+    // boutons déjà stylés ailleurs gardent leur apparence.
+    QQuickStyle::setStyle(QStringLiteral("Fusion"));
+
+#ifdef BUNDLED_BACKEND
+    // Démarre le backend Node embarqué (exécutable autonome placé à côté de
+    // l'app dans le bundle). Le backend fournit le proxy SSH (HTTP 8005) requis
+    // par les vues SystemMaintenance / PlaylistComposer. Il résout son
+    // config.json relativement à son propre exécutable (cf. backend/server.js).
+    auto *backend = new QProcess(&app);
+    backend->setProcessChannelMode(QProcess::MergedChannels);
+    backend->setProgram(QCoreApplication::applicationDirPath() + "/sirenmanager-backend");
+    backend->start();
+    // Ne laisse jamais d'orphelin : on tue le backend à la fermeture de l'app.
+    QObject::connect(&app, &QGuiApplication::aboutToQuit, backend, [backend]() {
+        backend->terminate();
+        if (!backend->waitForFinished(3000))
+            backend->kill();
+    });
+#endif
 
     // Enregistrer les types QML
     qmlRegisterType<UdpController>("SirenManager", 1, 0, "UdpController");

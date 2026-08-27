@@ -1,0 +1,6 @@
+# Environnement de compilation, telecharge : 460 Mo, jamais dans git.
+# `build-app.sh` le reconstruit avec aqtinstall.
+macos1013/Qt/
+macos1013/.venv/
+*.log
+.DS_Store

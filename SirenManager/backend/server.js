@@ -7,7 +7,17 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const SshProxy = require('./ssh-proxy');
-const config = require('./config.json');
+// En binaire packagé (pkg), on privilégie un config.json éditable placé à côté
+// de l'exécutable (dans le bundle .app) ; en dev, on garde le fichier local.
+const config = (() => {
+    if (process.pkg) {
+        const external = path.join(path.dirname(process.execPath), 'config.json');
+        if (fs.existsSync(external)) {
+            return JSON.parse(fs.readFileSync(external, 'utf8'));
+        }
+    }
+    return require('./config.json');
+})();
 
 const app = express();
 app.use(cors());
