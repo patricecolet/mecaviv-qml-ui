@@ -29,23 +29,28 @@ public:
 
     // UDP Command methods (Q_INVOKABLE for QML)
     Q_INVOKABLE void sendCommand(unsigned char cmd, const QByteArray &data = QByteArray());
-    Q_INVOKABLE void sendCommandToMachine(MachineType machine, unsigned char cmd, const QByteArray &data = QByteArray());
+    Q_INVOKABLE void sendCommandToMachine(int machine, unsigned char cmd, const QByteArray &data = QByteArray());
     
     // Convenience methods for common commands
-    Q_INVOKABLE void sendAskSynchro(MachineType machine = MachineType::LinuxMaitre);
-    Q_INVOKABLE void sendNewList(MachineType machine, int listIndex);
-    Q_INVOKABLE void sendBoucle(MachineType machine, bool enabled);
-    Q_INVOKABLE void sendST(MachineType machine, bool state);
-    Q_INVOKABLE void sendIsSynchro(MachineType machine, bool state);
-    Q_INVOKABLE void sendSeqSelected(MachineType machine, int slotIndex);
-    Q_INVOKABLE void reprendreAtIndex(MachineType machine, int slotIndex, int measure);
-    Q_INVOKABLE void sendStop(MachineType machine);
-    Q_INVOKABLE void sendReset(MachineType machine);
-    Q_INVOKABLE void sendReverse(MachineType machine, bool enabled);
-    Q_INVOKABLE void setSpeed(MachineType machine, int speed);
-    Q_INVOKABLE void setTranspo(MachineType machine, int transpo);
-    Q_INVOKABLE void setVolume(MachineType machine, int volume);
-    Q_INVOKABLE void setMute(MachineType machine, bool muted);
+    // NB: les paramètres « machine » sont exposés en `int` (et non en enum
+    // MachineType) car Qt5/QML ne sait pas marshaler un enum class non
+    // enregistré comme argument de Q_INVOKABLE ("Unknown method parameter
+    // type: MachineType") — l'appel échouait alors silencieusement. QML passe
+    // déjà des int (linuxMaitre = 0). Le cast en MachineType se fait en interne.
+    Q_INVOKABLE void sendAskSynchro(int machine = 0);  // 0 = LinuxMaitre
+    Q_INVOKABLE void sendNewList(int machine, int listIndex);
+    Q_INVOKABLE void sendBoucle(int machine, bool enabled);
+    Q_INVOKABLE void sendST(int machine, bool state);
+    Q_INVOKABLE void sendIsSynchro(int machine, bool state);
+    Q_INVOKABLE void sendSeqSelected(int machine, int slotIndex);
+    Q_INVOKABLE void reprendreAtIndex(int machine, int slotIndex, int measure);
+    Q_INVOKABLE void sendStop(int machine);
+    Q_INVOKABLE void sendReset(int machine);
+    Q_INVOKABLE void sendReverse(int machine, bool enabled);
+    Q_INVOKABLE void setSpeed(int machine, int speed);
+    Q_INVOKABLE void setTranspo(int machine, int transpo);
+    Q_INVOKABLE void setVolume(int machine, int volume);
+    Q_INVOKABLE void setMute(int machine, bool muted);
     Q_INVOKABLE void setVolumeGeneral(int volume);
 
     // Maintenance view
@@ -53,7 +58,7 @@ public:
     Q_INVOKABLE void sendSetVolet(int sirenIdx, int value);     // sirenIdx 1..7
     Q_INVOKABLE void sendTranspoGlobal(int value);              // -64..+63
     Q_INVOKABLE void sendClicLatency(int value);
-    Q_INVOKABLE void sendChangeVolet(MachineType siren, int valveIdx);  // valveIdx 0..3
+    Q_INVOKABLE void sendChangeVolet(int siren, int valveIdx);  // valveIdx 0..3
 
     // Mixer view
     Q_INVOKABLE void sendSirenVolume(int sirenIdx, int value);  // sirenIdx 1..7, value 0..127

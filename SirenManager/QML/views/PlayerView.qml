@@ -68,11 +68,31 @@ Rectangle {
         return arr
     }
 
+    // Le backend Node embarqué (proxy SSH) démarre en parallèle de l'app et
+    // peut ne pas encore écouter 8005 au tout premier fetch — les requêtes
+    // échoueraient alors silencieusement et les slots resteraient vides. On
+    // retente donc tant que le pointeur derniere_liste n'a pas répondu.
+    property bool playlistLoaded: false
+
     function fetchPlaylistFilenames() {
         // Step 1: read derniere_liste pointer; step 2 (in onDownloadFinished)
         // pulls the actual .ListLecture and parses it.
         SshManager.downloadFile(linuxMaitre,
             MachinePaths.derniereListePath(linuxMaitre), "player-load-pointer")
+    }
+
+    Timer {
+        id: bootRetryTimer
+        interval: 800
+        repeat: true
+        running: false
+        property int attempts: 0
+        onTriggered: {
+            if (root.playlistLoaded || attempts >= 10) { running = false; return }
+            attempts++
+            UdpManager.sendAskSynchro(root.linuxMaitre)
+            root.fetchPlaylistFilenames()
+        }
     }
 
     Component.onCompleted: {
@@ -87,13 +107,17 @@ Rectangle {
         UdpManager.sendAskSynchro(linuxMaitre)
         // Fetch real .mid filenames in parallel (best-effort; needs SSH).
         fetchPlaylistFilenames()
+        // Filet de sécurité contre la course backend pas-encore-prêt.
+        bootRetryTimer.running = true
     }
 
     Connections {
         target: SshManager
         function onDownloadFinished(requestId, success, content, error) {
             if (requestId === "player-load-pointer") {
-                if (!success) return  // best-effort, silent
+                if (!success) return  // best-effort, silent (retry via bootRetryTimer)
+                // Backend joignable : on arrête de retenter la course de boot.
+                root.playlistLoaded = true
                 var m = content.match(/<string>([^<]+)<\/string>/)
                 if (!m) return
                 SshManager.downloadFile(linuxMaitre, m[1].trim(), "player-load-playlist")
@@ -260,11 +284,22 @@ Rectangle {
                 }
 
                 ScrollView {
+                    id: slotsScroll
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    // Sans clip, un ScrollView laisse son contenu déborder par
+                    // dessus les éléments du dessus (TabBar + bandeau timing)
+                    // au lieu de le rogner — d'où les slots qui "montaient"
+                    // jusqu'au menu. On rogne et on borne la largeur pour que
+                    // la GridLayout calcule une hauteur correcte et ne scrolle
+                    // que verticalement.
+                    clip: true
+                    contentWidth: availableWidth
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                     GridLayout {
                         id: slotsGrid
+                        width: slotsScroll.availableWidth
                         columns: 6
                         rowSpacing: 10
                         columnSpacing: 10

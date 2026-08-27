@@ -203,24 +203,26 @@ void UdpController::sendCommand(unsigned char cmd, const QByteArray &data)
     sendPacket(packet);
 }
 
-void UdpController::sendCommandToMachine(MachineType machine, unsigned char cmd, const QByteArray &data)
+void UdpController::sendCommandToMachine(int machine, unsigned char cmd, const QByteArray &data)
 {
+    // `machine` arrive en int depuis QML (cf. UdpController.h) ; cast unique ici.
+    MachineType mt = static_cast<MachineType>(machine);
     // Legacy AppDelegate.m:116-123 uses different send ports per machine:
     //   Linux Maître → 8001, individual sirens S1–S7 → 1234.
-    QString ip = SirenConfig::ipAddressForMachineType(machine);
+    QString ip = SirenConfig::ipAddressForMachineType(mt);
     setAddress(ip);
-    int sendPort = (machine == MachineType::LinuxMaitre) ? 8001 : 1234;
+    int sendPort = (mt == MachineType::LinuxMaitre) ? 8001 : 1234;
     setPort(sendPort);
-    m_targetMachine = machine;
+    m_targetMachine = mt;
     sendCommand(cmd, data);
 }
 
-void UdpController::sendAskSynchro(MachineType machine)
+void UdpController::sendAskSynchro(int machine)
 {
     sendCommandToMachine(machine, UdpCommands::ASKSYNCHRO);
 }
 
-void UdpController::sendNewList(MachineType machine, int listIndex)
+void UdpController::sendNewList(int machine, int listIndex)
 {
     // Wire convention from the legacy SireneControlMac
     // (MaintenanceViewController.m:139): the byte at offset 3 is `listIndex+2`.
@@ -232,35 +234,35 @@ void UdpController::sendNewList(MachineType machine, int listIndex)
     sendCommandToMachine(machine, UdpCommands::NEWLIST, data);
 }
 
-void UdpController::sendBoucle(MachineType machine, bool enabled)
+void UdpController::sendBoucle(int machine, bool enabled)
 {
     QByteArray data;
     data.append(static_cast<char>(enabled ? 1 : 0));
     sendCommandToMachine(machine, UdpCommands::BOUCLE, data);
 }
 
-void UdpController::sendST(MachineType machine, bool state)
+void UdpController::sendST(int machine, bool state)
 {
     QByteArray data;
     data.append(static_cast<char>(state ? 1 : 0));
     sendCommandToMachine(machine, UdpCommands::ST, data);
 }
 
-void UdpController::sendIsSynchro(MachineType machine, bool state)
+void UdpController::sendIsSynchro(int machine, bool state)
 {
     QByteArray data;
     data.append(static_cast<char>(state ? 1 : 0));
     sendCommandToMachine(machine, UdpCommands::ISSYNCHRO, data);
 }
 
-void UdpController::sendSeqSelected(MachineType machine, int slotIndex)
+void UdpController::sendSeqSelected(int machine, int slotIndex)
 {
     QByteArray data;
     data.append(static_cast<char>(slotIndex));
     sendCommandToMachine(machine, UdpCommands::SEQSELECTED, data);
 }
 
-void UdpController::reprendreAtIndex(MachineType machine, int slotIndex, int measure)
+void UdpController::reprendreAtIndex(int machine, int slotIndex, int measure)
 {
     // Legacy opcode 0x36: resume from given measure inside given slot.
     // Wire layout after framing: [0x36, 10, BCC, slot, m_be32(4), pad×2]
@@ -273,45 +275,45 @@ void UdpController::reprendreAtIndex(MachineType machine, int slotIndex, int mea
     sendCommandToMachine(machine, 0x36, data);
 }
 
-void UdpController::sendStop(MachineType machine)
+void UdpController::sendStop(int machine)
 {
     sendCommandToMachine(machine, UdpCommands::STOP);
 }
 
-void UdpController::sendReset(MachineType machine)
+void UdpController::sendReset(int machine)
 {
     sendCommandToMachine(machine, UdpCommands::RESET);
 }
 
-void UdpController::sendReverse(MachineType machine, bool enabled)
+void UdpController::sendReverse(int machine, bool enabled)
 {
     QByteArray data;
     data.append(static_cast<char>(enabled ? 1 : 0));
     sendCommandToMachine(machine, UdpCommands::REVERSE, data);
 }
 
-void UdpController::setSpeed(MachineType machine, int speed)
+void UdpController::setSpeed(int machine, int speed)
 {
     QByteArray data;
     data.append(static_cast<char>(speed));
     sendCommandToMachine(machine, UdpCommands::SETSPEED, data);
 }
 
-void UdpController::setTranspo(MachineType machine, int transpo)
+void UdpController::setTranspo(int machine, int transpo)
 {
     QByteArray data;
     data.append(static_cast<char>(transpo));
     sendCommandToMachine(machine, UdpCommands::TRANSPO, data);
 }
 
-void UdpController::setVolume(MachineType machine, int volume)
+void UdpController::setVolume(int machine, int volume)
 {
     QByteArray data;
     data.append(static_cast<char>(volume));
     sendCommandToMachine(machine, UdpCommands::VOLUME, data);
 }
 
-void UdpController::setMute(MachineType machine, bool muted)
+void UdpController::setMute(int machine, bool muted)
 {
     QByteArray data;
     data.append(static_cast<char>(muted ? 1 : 0));
@@ -322,7 +324,7 @@ void UdpController::setVolumeGeneral(int volume)
 {
     QByteArray data;
     data.append(static_cast<char>(volume));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOLUMEGENE, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::VOLUMEGENE, data);
 }
 
 void UdpController::sendSetKEB(int sirenIdx, int speed)
@@ -332,7 +334,7 @@ void UdpController::sendSetKEB(int sirenIdx, int speed)
     data.append(static_cast<char>(sirenIdx));
     data.append(static_cast<char>((speed >> 8) & 0xFF));
     data.append(static_cast<char>(speed & 0xFF));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SETKEB, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::SETKEB, data);
 }
 
 void UdpController::sendSetVolet(int sirenIdx, int value)
@@ -342,7 +344,7 @@ void UdpController::sendSetVolet(int sirenIdx, int value)
     data.append(static_cast<char>(sirenIdx));
     data.append(static_cast<char>((value >> 8) & 0xFF));
     data.append(static_cast<char>(value & 0xFF));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SETVOLET, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::SETVOLET, data);
 }
 
 void UdpController::sendTranspoGlobal(int value)
@@ -350,7 +352,7 @@ void UdpController::sendTranspoGlobal(int value)
     // Legacy encodes as (64 + signed value); receiver subtracts 64.
     QByteArray data;
     data.append(static_cast<char>((64 + value) & 0xFF));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::TRANSPO, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::TRANSPO, data);
 }
 
 void UdpController::sendClicLatency(int value)
@@ -360,10 +362,10 @@ void UdpController::sendClicLatency(int value)
     QByteArray data;
     data.append(static_cast<char>(0x0A));
     data.append(static_cast<char>(value));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SET_CLIC_LAT, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::SET_CLIC_LAT, data);
 }
 
-void UdpController::sendChangeVolet(MachineType siren, int valveIdx)
+void UdpController::sendChangeVolet(int siren, int valveIdx)
 {
     // Legacy sends "Z000<mask>" UTF-8 directly to the target siren on port 1234.
     // After framing the wire shape is [Z, 10, BCC, '0', mask, 0, 0, 0, 0, 0],
@@ -381,7 +383,7 @@ void UdpController::sendSirenVolume(int sirenIdx, int value)
     QByteArray data;
     data.append(static_cast<char>(sirenIdx));
     data.append(static_cast<char>(qBound(0, value, 127)));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOLUME, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::VOLUME, data);
 }
 
 void UdpController::sendVolumeAll(QList<int> values)
@@ -392,7 +394,7 @@ void UdpController::sendVolumeAll(QList<int> values)
         int v = (i < values.size()) ? values[i] : 0;
         data.append(static_cast<char>(qBound(0, v, 127)));
     }
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOLUMEGENE, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::VOLUMEGENE, data);
 }
 
 void UdpController::sendMute(int sirenIdx, bool muted)
@@ -402,7 +404,7 @@ void UdpController::sendMute(int sirenIdx, bool muted)
     QByteArray data;
     data.append(static_cast<char>(sirenIdx));
     data.append(static_cast<char>(muted ? 1 : 0));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::MUTE, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::MUTE, data);
 }
 
 void UdpController::sendSourdine(int sirenIdx, int type, int value)
@@ -412,7 +414,7 @@ void UdpController::sendSourdine(int sirenIdx, int type, int value)
     data.append(static_cast<char>(sirenIdx));
     data.append(static_cast<char>(type));
     data.append(static_cast<char>(value));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SOURDINE, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::SOURDINE, data);
 }
 
 void UdpController::sendLED(int ch, int numSourdine, int value)
@@ -421,14 +423,14 @@ void UdpController::sendLED(int ch, int numSourdine, int value)
     data.append(static_cast<char>(ch));
     data.append(static_cast<char>(numSourdine));
     data.append(static_cast<char>(value));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::LED, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::LED, data);
 }
 
 void UdpController::sendLEDTrompe(int value)
 {
     QByteArray data;
     data.append(static_cast<char>(value));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::LEDTROMPE, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::LEDTROMPE, data);
 }
 
 void UdpController::sendVoletActif(int sirenIdx, int mask)
@@ -437,7 +439,7 @@ void UdpController::sendVoletActif(int sirenIdx, int mask)
     QByteArray data;
     data.append(static_cast<char>(sirenIdx));
     data.append(static_cast<char>(mask & 0x0F));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOLETACTIF, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::VOLETACTIF, data);
 }
 
 void UdpController::sendLumiere(int side, int proj, int value)
@@ -447,7 +449,7 @@ void UdpController::sendLumiere(int side, int proj, int value)
     data.append(static_cast<char>(side));
     data.append(static_cast<char>(proj));
     data.append(static_cast<char>(value));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::TOURELLE, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::TOURELLE, data);
 }
 
 void UdpController::sendMidiIn(int channel, int status, int data1, int data2)
@@ -459,7 +461,7 @@ void UdpController::sendMidiIn(int channel, int status, int data1, int data2)
     data.append(static_cast<char>(status));
     data.append(static_cast<char>(data1));
     data.append(static_cast<char>(data2));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::MIDIIN, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::MIDIIN, data);
 }
 
 void UdpController::sendSirSelect(int sirenIdx, bool selected)
@@ -468,21 +470,21 @@ void UdpController::sendSirSelect(int sirenIdx, bool selected)
     QByteArray data;
     data.append(static_cast<char>(sirenIdx));
     data.append(static_cast<char>(selected ? 1 : 0));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::SIRSELECT, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::SIRSELECT, data);
 }
 
 void UdpController::sendDefret(bool active)
 {
     QByteArray data;
     data.append(static_cast<char>(active ? 1 : 0));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::DEFRET, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::DEFRET, data);
 }
 
 void UdpController::sendAutomating(bool active)
 {
     QByteArray data;
     data.append(static_cast<char>(active ? 1 : 0));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::AUTOMATING, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::AUTOMATING, data);
 }
 
 void UdpController::sendVoiture(int carIdx, int directionByte)
@@ -491,7 +493,7 @@ void UdpController::sendVoiture(int carIdx, int directionByte)
     QByteArray data;
     data.append(static_cast<char>(carIdx));
     data.append(static_cast<char>(directionByte));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::VOITURE, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::VOITURE, data);
 }
 
 void UdpController::sendTourelle(int side, int sub, int value)
@@ -503,14 +505,14 @@ void UdpController::sendTourelle(int side, int sub, int value)
     data.append(static_cast<char>(side));
     data.append(static_cast<char>(sub));
     data.append(static_cast<char>(value));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::TOURELLE, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::TOURELLE, data);
 }
 
 void UdpController::sendPchit(bool active)
 {
     QByteArray data;
     data.append(static_cast<char>(active ? 1 : 0));
-    sendCommandToMachine(MachineType::LinuxMaitre, UdpCommands::PCHIIT, data);
+    sendCommandToMachine(static_cast<int>(MachineType::LinuxMaitre), UdpCommands::PCHIIT, data);
 }
 
 void UdpController::onUdpReadyRead()

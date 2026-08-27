@@ -156,9 +156,28 @@ Rectangle {
         markDirty(b)
     }
 
+    // Le backend Node embarqué (proxy SSH) démarre en parallèle de l'app ; au
+    // tout premier refresh il peut ne pas encore écouter 8005, l'erreur est
+    // silencieuse et la liste resterait vide. On retente jusqu'à la 1re réponse.
+    property bool catalogLoaded: false
+
+    Timer {
+        id: bootRetryTimer
+        interval: 800
+        repeat: true
+        running: false
+        property int attempts: 0
+        onTriggered: {
+            if (root.catalogLoaded || attempts >= 10) { running = false; return }
+            attempts++
+            root.refreshPlaylists()
+        }
+    }
+
     Component.onCompleted: {
         makeEmptySlots()
         refreshPlaylists()
+        bootRetryTimer.running = true
     }
 
     // Path of the actual playlist file, resolved from `derniere_liste`. Empty
@@ -825,6 +844,8 @@ Rectangle {
                     statusLabel.text = "Erreur lecture playlists: " + error
                     return
                 }
+                // Backend joignable : on arrête le retry de course au boot.
+                root.catalogLoaded = true
                 var rawFiles = output.split("\n")
                     .map(function (s) { return s.trim() })
                     .filter(function (s) { return s.length > 0 })

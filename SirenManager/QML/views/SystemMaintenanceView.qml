@@ -321,10 +321,20 @@ Rectangle {
             }
         }
 
-        // ==================== DMESG ====================
-        Rectangle {
+        // ========= DMESG / PLAYLISTS / MIDI (redimensionnables) =========
+        // SplitView vertical : l'utilisateur répartit la hauteur entre les
+        // trois panneaux à contenu long. dmesg (lignes noyau longues, NoWrap)
+        // prend la part par défaut ; les poignées permettent de l'agrandir
+        // quand la fenêtre est trop courte pour tout afficher.
+        SplitView {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            orientation: Qt.Vertical
+
+        // ==================== DMESG ====================
+        Rectangle {
+            SplitView.fillHeight: true
+            SplitView.minimumHeight: 120
             color: "#2a2a2a"; border.color: "#444"; radius: 6
 
             ColumnLayout {
@@ -358,8 +368,8 @@ Rectangle {
 
         // ==================== PLAYLISTS ====================
         Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 200
+            SplitView.preferredHeight: 180
+            SplitView.minimumHeight: 70
             color: "#2a2a2a"; border.color: "#444"; radius: 6
 
             ColumnLayout {
@@ -400,8 +410,8 @@ Rectangle {
 
         // ==================== MIDI DISTANTS ====================
         Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 280
+            SplitView.preferredHeight: 240
+            SplitView.minimumHeight: 70
             color: "#2a2a2a"; border.color: "#444"; radius: 6
 
             ColumnLayout {
@@ -436,6 +446,7 @@ Rectangle {
                 }
             }
         }
+        } // SplitView (DMESG / PLAYLISTS / MIDI)
     }
 
     // ==================== EXPORT KEYS ARCHIVE ====================
