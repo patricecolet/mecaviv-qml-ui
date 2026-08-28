@@ -1,6 +1,6 @@
 # NVS "pupitre" — configuration NiDMI du pupitre SirenePupitre.
 #
-# CAPTUREE depuis la carte de reference le 2026-08-25 (GET /api/pins/list renvoie
+# CAPTUREE depuis la carte de reference le 2026-08-28 (GET /api/pins/list renvoie
 # les chaines NVS telles quelles, la copie est donc fidele a l octet pres).
 # Regenerer l image : ./scripts/build-nvs.sh
 #
@@ -15,11 +15,11 @@ mdns_name,data,string,nidmi
 rtp_name,data,string,nidmi
 touch_enabled,data,u8,0
 rt_slice,data,u8,8
-osc_target,data,string,sta
+osc_target,data,string,ap+usb
 osc_port,data,u32,8000
-osc_broadcast,data,u8,0
+osc_broadcast,data,u8,1
 osc_out_all,data,u8,1
-osc_interface,data,string,ap
+osc_interface,data,string,ap+usb
 # --- Controles du pupitre (message 0x02 CONTROLLERS) ---
 pin_D2,file,string,pins/D2.json
 pin_D5,file,string,pins/D5.json
