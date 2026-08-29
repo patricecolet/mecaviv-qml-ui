@@ -83,16 +83,25 @@ Symptôme quand il manque quelque chose : `c-siren~ $2 ... couldn't create` au
 chargement, puis les sept `composeSiren~` sans oscillateur — le `switch~`
 s'allume, le volume et le pan arrivent, et rien ne sort.
 
-**Pd ouvre sa sortie audio une seule fois, au chargement du patch.** Si aucune
-sortie réelle n'existe à cet instant — le casque Bluetooth met quelques secondes
-à être joint au démarrage à froid — il boucle sur
-`alsa xrun recovery apparently failed` et cette boucle le monopolise : il cesse
-de répondre au WebSocket, et le pédalier entier devient inutilisable, pas
-seulement muet. `wait-audio.sh`, en `ExecStartPre`, attend un sink PipeWire
-pendant 30 s au plus, puis laisse Pd démarrer de toute façon — le MIDI et le
-WebSocket, eux, ne dépendent pas du son. Même contrat que `wait-network.sh`,
-qui attend l'adresse IP pour la même raison : les sockets UDP vers les sirènes
-sont ouvertes une fois pour toutes.
+**Pd sort le son par JACK, c'est-à-dire par PipeWire** (`-jack`, lancé sous
+`pw-jack` par `run-pd.sh`, qui met la libjack de PipeWire sur le chemin du
+linker). Il pilotait auparavant un PCM ALSA lui-même, et sur un casque
+Bluetooth un à-coup au démarrage à froid le laissait boucler indéfiniment sur
+`alsa xrun recovery apparently failed` : cette boucle le monopolise, il cesse
+de répondre au WebSocket, et le pédalier entier devient inutilisable — pas
+seulement muet. En client PipeWire, c'est PipeWire qui tient le lien et en
+absorbe la latence variable. Le repli ALSA reste documenté dans `env`, et il y
+faut désigner la sortie par son **nom** (`-audiooutdev default`, traduit à
+chaque lancement) : l'index de `default` vaut le nombre de cartes ALSA
+énumérées à cet instant, ce qui n'est pas une constante.
+
+`wait-audio.sh`, en `ExecStartPre`, attend un sink PipeWire pendant 30 s au
+plus, puis laisse Pd démarrer de toute façon : il ne protège plus d'un blocage
+mais d'un mauvais branchement — `-jackconnect` relie Pd aux ports de lecture
+existants au moment du démarrage, et on veut que ce soit le casque. Même
+contrat que `wait-network.sh`, qui attend l'adresse IP pour une raison
+comparable : les sockets UDP vers les sirènes sont ouvertes une fois pour
+toutes.
 
 **Pas de montage audio intermédiaire.** Un sink null permanent doublé d'un
 `module-loopback` vers le casque a été essayé pour que Pd ait toujours une

@@ -8,6 +8,8 @@ curl
 wget
 jq
 alsa-utils
+# Fournit la libjack de PipeWire et le lanceur pw-jack, dont Pd a besoin en -jack.
+pipewire-jack
 nodejs
 chromium-browser
 wvkbd

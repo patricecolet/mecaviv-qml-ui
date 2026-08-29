@@ -489,8 +489,11 @@ migrate_finalize() {
 phase_pd_build() {
     phase "Pure Data"
     local target; target=$(read_manifest "$MANIFEST_DIR/pd-version.txt" | head -1)
+    # L'estampille porte aussi le backend : passer de --disable-jack a
+    # --enable-jack ne change pas la version, et sans ca la phase se sauterait.
+    local stamp="$target+jack"
 
-    if [ "$FORCE_PD" != true ] && stamp_matches pd.version "$target" && [ -x "$PEDALIER_PD_BIN" ]; then
+    if [ "$FORCE_PD" != true ] && stamp_matches pd.version "$stamp" && [ -x "$PEDALIER_PD_BIN" ]; then
         skip "Pure Data $target ($($PEDALIER_PD_BIN -version 2>&1 | head -1))"
         return 0
     fi
@@ -509,7 +512,7 @@ phase_pd_build() {
     fi
 
     run_sh "cd '$PD_SRC' && ./autogen.sh" || die "autogen.sh a échoué"
-    run_sh "cd '$PD_SRC' && ./configure --prefix=/usr/local --enable-alsa --disable-jack --disable-portaudio" \
+    run_sh "cd '$PD_SRC' && ./configure --prefix=/usr/local --enable-alsa --enable-jack --disable-portaudio" \
         || die "configure a échoué"
     run_sh "cd '$PD_SRC' && make -j$(nproc)" || die "compilation de Pd échouée"
 
@@ -521,7 +524,7 @@ phase_pd_build() {
     run_sh "cd '$PD_SRC' && sudo make install" || die "make install a échoué"
 
     hash -r
-    stamp_write pd.version "$target"
+    stamp_write pd.version "$stamp"
     if [ -x "$PEDALIER_PD_BIN" ]; then
         ok "Pure Data installé : $("$PEDALIER_PD_BIN" -version 2>&1 | head -1)"
     else
@@ -794,14 +797,17 @@ phase_autostart() {
         install_file "$ENV_FILE" "$(sed "s|@HOME@|$HOME|g" "$DEVICE_DIR/env.example")" \
             && ok "configuration créée : $ENV_FILE"
     else
-        # Exception à la règle du « jamais écrasé » : un index de sortie audio figé
-        # est désormais connu pour bloquer Pd au démarrage à froid (l'index de
-        # `default` bouge avec le nombre de cartes ALSA présentes). On le remplace
-        # par le nom, que run-pd.sh résout à chaque lancement.
-        if grep -qE '^PD_AUDIO_OPTS=.*-audiooutdev[[:space:]]+[0-9]+' "$ENV_FILE"; then
-            run sed -i -E 's/(-audiooutdev[[:space:]]+)[0-9]+/\1default/' "$ENV_FILE"
-            ok "sortie audio désignée par son nom : -audiooutdev default"
+        # Exception à la règle du « jamais écrasé », et une seule fois : piloter un
+        # PCM ALSA sur du Bluetooth expose Pd à une boucle de xrun dont il ne
+        # revient jamais, qui le coupe du WebSocket. En JACK c'est PipeWire qui
+        # tient le lien. L'estampille garantit qu'un choix manuel ultérieur
+        # (repli ALSA) ne sera pas réécrit au déploiement suivant.
+        if ! stamp_matches audio.backend jack \
+           && grep -q '^PD_AUDIO_OPTS=.*-alsa' "$ENV_FILE"; then
+            run sed -i 's|^PD_AUDIO_OPTS=.*|PD_AUDIO_OPTS="-jack -noadc"|' "$ENV_FILE"
+            ok "sortie audio confiée à JACK/PipeWire"
         fi
+        stamp_write audio.backend jack
         local candidate; candidate=$(sed "s|@HOME@|$HOME|g" "$DEVICE_DIR/env.example")
         if [ "$candidate" != "$(cat "$ENV_FILE")" ]; then
             install_file "$ENV_FILE.new" "$candidate" >/dev/null

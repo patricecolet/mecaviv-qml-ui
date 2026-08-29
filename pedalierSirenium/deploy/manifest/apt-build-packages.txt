@@ -8,6 +8,8 @@ autoconf-archive
 libtool
 gettext
 libasound2-dev
+# JACK : Pd parle a PipeWire par cette API plutot que de piloter un PCM ALSA.
+libjack-jackd2-dev
 libfftw3-dev
 # tcl/tk : Pd ne compile pas sa GUI sans, même si on le lance en -nogui.
 tcl-dev

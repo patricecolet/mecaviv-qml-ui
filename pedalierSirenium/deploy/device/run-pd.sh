@@ -1,6 +1,14 @@
 #!/bin/sh
-# Lance Pure Data en traduisant le NOM de la sortie audio en index, au demarrage.
+# Lance Pure Data, en JACK de preference, sinon en traduisant le NOM de la sortie
+# ALSA en index au demarrage.
 #
+# En JACK, Pd est un client de PipeWire : c'est PipeWire qui tient le lien avec le
+# casque Bluetooth et en absorbe la latence variable. Pd ne peut donc plus partir
+# en boucle sur `alsa xrun recovery apparently failed` -- boucle qui le monopolise
+# et le coupe du WebSocket, rendant le pedalier entier inutilisable.
+#
+# Le repli ALSA ci-dessous reste pour une machine sans PipeWire. Il porte son
+# propre piege :
 # `-audiooutdev` veut un numero, et ce numero est une position dans une liste qui
 # bouge : `-alsaadd default` ajoute le PCM de PipeWire en queue d'enumeration,
 # donc son index vaut le nombre de peripheriques ALSA presents a cet instant.
@@ -24,6 +32,14 @@ index_de_default() {
 }
 
 case " $opts " in
+    *" -jack "*)
+        # PipeWire fournit l'API JACK, mais Debian laisse sa libjack hors du chemin
+        # du linker : pw-jack l'y met, le temps du lancement.
+        if command -v pw-jack >/dev/null 2>&1; then
+            exec pw-jack "$PD_BIN" -nogui -stderr $opts "$@"
+        fi
+        echo "run-pd: pw-jack absent, Pd ne trouvera pas la libjack de PipeWire" >&2
+        ;;
     *" -audiooutdev default "*)
         n=$(index_de_default) || n=""
         if [ -n "$n" ]; then
