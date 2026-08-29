@@ -297,6 +297,10 @@ Window {
                     if (!wsController.isConnected) return;
                     if (wsController.sendSirensST(on)) maintenance.stEnabled = on;
                 }
+                onResetOnStopRequested: function(on) {
+                    if (!wsController.isConnected) return;
+                    if (wsController.sendSirensResetOnStop(on)) maintenance.resetOnStop = on;
+                }
                 clicEnabled: window.state.clicEnabled
                 clicVolume: window.state.clicVolume
                 onClicVolumeRequested: function(v) {

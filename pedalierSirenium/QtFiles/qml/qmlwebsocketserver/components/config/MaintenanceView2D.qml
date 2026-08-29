@@ -17,6 +17,11 @@ Item {
     // chaque bascule. Un redemarrage de PD peut donc la desynchroniser.
     property bool stEnabled: false
     signal stRequested(bool on)
+    // Arreter un clip laisse sinon la sirene sur sa derniere note, moteur
+    // tournant. PD coupe par defaut ; on peut le lui interdire pour garder
+    // le bourdon.
+    property bool resetOnStop: true
+    signal resetOnStopRequested(bool on)
 
     // Clic audible : l'interrupteur est dans le bandeau, le niveau se règle ici
     // — on l'ajuste une fois, ce n'est pas un geste de jeu.
@@ -296,6 +301,25 @@ Item {
                     }
 
                     Rectangle {
+                        width: 156; height: 30; radius: 3
+                        color: root.resetOnStop ? "#1D2732" : "#111820"
+                        border.color: rsArea.pressed ? "#66E4F2"
+                                    : (root.resetOnStop ? "#2F5F3A" : "#212B36")
+                        border.width: 1
+                        Text {
+                            anchors.centerIn: parent
+                            text: root.resetOnStop ? "coupe à l'arrêt" : "laisse sonner"
+                            color: root.resetOnStop ? "#7FD98B" : "#64737F"
+                            font.family: "monospace"; font.pixelSize: 11
+                        }
+                        MouseArea {
+                            id: rsArea
+                            anchors.fill: parent
+                            onClicked: root.resetOnStopRequested(!root.resetOnStop)
+                        }
+                    }
+
+                    Rectangle {
                         width: 132; height: 30; radius: 3
                         color: root.stEnabled ? "#1D2732" : "#111820"
                         border.color: stArea.pressed ? "#66E4F2"
@@ -316,6 +340,10 @@ Item {
                 }
                 Text {
                     text: "connecter UDP : si les sirènes ont été allumées après le pédalier"
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+                }
+                Text {
+                    text: "coupe à l'arrêt : une boucle stoppée laisse sinon sa sirène sonner"
                     color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
                 }
             }

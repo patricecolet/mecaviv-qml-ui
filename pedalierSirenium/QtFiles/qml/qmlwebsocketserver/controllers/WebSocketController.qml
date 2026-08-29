@@ -541,6 +541,17 @@ Item {
         });
     }
 
+    // Couper ou non la sirene quand son clip s'arrete. PD tient l'etat dans un
+    // spigot ouvert par defaut ; l'ecran ne fait que le fermer ou le rouvrir.
+    function sendSirensResetOnStop(on) {
+        if (logger) logger.info("SYSTEM", "\u2702 coupure a l'arret " + (on ? "active" : "desactivee"));
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "sirensResetOnStop",
+            state: on ? 1 : 0
+        });
+    }
+
     // L'etat du clic n'est diffuse qu'au changement : une page qui se connecte
     // apres le boot ne le connaitrait pas. Elle le demande donc a l'ouverture.
     function requestClic() {
