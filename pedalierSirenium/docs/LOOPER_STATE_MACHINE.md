@@ -122,6 +122,58 @@ propositions discutées :
 - Un buffer d'état de scène (à construire dans le nouveau système — voir §5) qui retient
   explicitement quelle sirène porte la mainloop actuelle, sa longueur, et son offset zéro.
 
+## 3bis. Où en sont vraiment la phase et la longueur (2026-08-29)
+
+**La préservation d'offset du §3 est implémentée.** `pd phase`, appelé depuis `demarre.rec`,
+capture `(globalbarcount − mainloop-startbar) mod longueur-mainloop` au démarrage de
+l'enregistrement. `commit.boucle` la range dans le 4ᵉ atome de `stopclip`, que `pd stop` de
+`clip-io` écrit dans le `.json` du clip sous la clé `offset_ticks`. Le loader la relit avec les
+trois autres champs (`route length_ticks length_bars is_reference offset_ticks`) dans
+`value $0-offsetticks`, et `loop.playgate` cale le curseur à `(g − s − P) mod L` au lieu de 0 —
+`g` compteur global de mesures, `s` origine de mainloop, `P` la phase du clip, `L` sa longueur.
+L'origine se simplifie dans la soustraction, d'où l'absence de division par la longueur de
+mainloop. Le `[mod]` de Pd rend toujours un résultat positif (mesuré), donc un résultat négatif
+retombe juste ; un `max 1` avant le modulo protège du clip non chargé.
+
+Avant ce correctif, la lecture repartait toujours de 0 : les boucles ne dérivaient pas, mais un
+`stopall` suivi d'un `playall` **écrasait** les décalages entre clips en les alignant tous sur une
+origine commune, qui n'était pas celle sur laquelle on avait joué.
+
+**La règle de longueur en puissance de 2 du §3 n'est PAS implémentée.** `commit.boucle` calcule
+simplement `barcount + drapeau`, le drapeau valant 1 sur un `stop` — non quantifié, donc il faut
+compter la mesure entamée — et 0 sur le passage en lecture, qui tombe sur une mesure. Rien ne
+contraint le résultat à diviser ou multiplier la mainloop : une prise de 3 mesures sous une
+mainloop de 4 est acceptée telle quelle, et jouera en `mod 3` contre une grille de 4.
+
+**Décision du 2026-08-29 : on accepte le polyrythme pour l'instant.** Ce n'est pas un défaut à
+corriger en l'état, c'est un comportement assumé. À terme, une option laissera le choix entre
+**phase stricte** — la longueur est arrondie à la prochaine valeur compatible avec la mainloop — et
+**polyrythme**, le comportement actuel. Ça se règle dans `commit.boucle`, au même endroit que la
+promotion d'un clip plus long en nouvelle référence.
+
+## 3ter. Deux états séparés, et c'est voulu (2026-08-29)
+
+Le loader tient **deux représentations distinctes**, et une seule bouge quand on joue.
+
+L'**état vivant** — `$0-state` — est écrit par `recplay`, `stop` et `delete`, et publié vers le
+parent sur `$3.loader.state`, que reçoivent `pedalier.pd`, `banc-looper` et `led-clip-state`.
+L'affichage suit donc le jeu.
+
+L'**état de scène** — `$0.scene.mode` et `$0.scene.clipRef` — n'est écrit que par trois chemins :
+la diffusion d'une scène chargée, le marqueur `begin` qui les remet à `empty`/`null`, et
+l'effacement. **Aucun chemin de pédale ne les touche.** Ce n'est donc pas une désynchronisation :
+il n'y a aucun retour du jeu vers la scène, par construction — `pd report`, qui alimente la
+sauvegarde, reporte les valeurs côté scène et pas l'état vivant.
+
+**Patrice, le 2026-08-29 : c'est le comportement voulu.** « La dichotomie entre l'état actuel et
+l'état enregistré de la scène est plutôt pratique, une performance ne va pas écraser l'état
+enregistré. » L'affectation d'un clip à une cellule reste un geste explicite, depuis l'écran, par
+les verbes `sceneSet` / `sceneEdit`.
+
+**Le corollaire à garder en tête** vaut dans l'autre sens : `playall` applique les modes *de la
+scène*, pas l'état du moment. Une cellule enregistrée à la pédale sur une case que la scène dit à
+l'arrêt ne repartira donc pas après un `stopall`/`playall`. Direction encore ouverte au 2026-08-29.
+
 ## 4. Ce qui existe déjà dans l'ancien système (`harmonizer.pd`, sous-patch `recorder`, lignes
    1167–2764) — analysé en lecture seule, à *adapter*, pas à copier tel quel
 
