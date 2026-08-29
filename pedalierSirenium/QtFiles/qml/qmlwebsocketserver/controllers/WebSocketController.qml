@@ -530,6 +530,17 @@ Item {
         });
     }
 
+    // ST : commande UDP diffusee aux sept sirenes (4 4 0 <etat>). PD n'en
+    // renvoie rien, l'ecran tient l'etat de son cote.
+    function sendSirensST(on) {
+        if (logger) logger.info("SYSTEM", "\u2699 ST " + (on ? "active" : "coupe"));
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "sirensST",
+            state: on ? 1 : 0
+        });
+    }
+
     // L'etat du clic n'est diffuse qu'au changement : une page qui se connecte
     // apres le boot ne le connaitrait pas. Elle le demande donc a l'ouverture.
     function requestClic() {

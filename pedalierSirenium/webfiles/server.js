@@ -284,6 +284,44 @@ app.post('/api/bluetooth/connect', async (req, res) => {
     }
 });
 
+// Accessibilite UDP de chaque sirene. Il n'y a pas de voie de retour dans le
+// patch -- netsend ne dit rien d'utile sous Linux, ou un envoi vers un hote
+// absent reussit pendant que le noyau attend la resolution ARP (mesure du
+// 2026-08-29). On interroge donc le reseau directement.
+//
+// La table ARP repond instantanement quand l'hote a ete joint recemment ; sinon
+// on tombe sur un ping court. Les sept partent en parallele, et le resultat est
+// garde quelques secondes pour qu'un rafraichissement de page ne relance pas
+// sept pings.
+const SIRENES = [1, 2, 3, 4, 5, 6, 7].map(n => ({ id: n, ip: `192.168.1.1${n}` }));
+let sirenesCache = { at: 0, data: null };
+
+async function pingSirene(ip) {
+    try {
+        const { stdout } = await execFile('ip', ['neigh', 'show', ip]);
+        if (/lladdr/.test(stdout) && !/INCOMPLETE|FAILED/.test(stdout)) return true;
+    } catch (e) { /* on retombe sur le ping */ }
+    try {
+        await execFile('ping', ['-c', '1', '-W', '1', ip]);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function readSirenes() {
+    if (sirenesCache.data && Date.now() - sirenesCache.at < 4000) return sirenesCache.data;
+    const data = await Promise.all(SIRENES.map(async s => ({
+        id: s.id, ip: s.ip, udp: await pingSirene(s.ip)
+    })));
+    sirenesCache = { at: Date.now(), data };
+    return data;
+}
+
+app.get('/api/sirens', async (req, res) => {
+    res.json({ sirens: await readSirenes() });
+});
+
 app.get('/api/rtp', async (req, res) => {
     res.json(await readRtpStatus());
 });

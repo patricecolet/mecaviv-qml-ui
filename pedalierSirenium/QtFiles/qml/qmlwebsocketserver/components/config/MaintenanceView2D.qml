@@ -13,6 +13,10 @@ Item {
     signal outputRequested(string dev)
     signal reconnectRequested()
     signal sirensConnectRequested()
+    // Le patch ne renvoie pas l'etat du ST : la page le tient, et le repose a
+    // chaque bascule. Un redemarrage de PD peut donc la desynchroniser.
+    property bool stEnabled: false
+    signal stRequested(bool on)
 
     // Clic audible : l'interrupteur est dans le bandeau, le niveau se règle ici
     // — on l'ajuste une fois, ce n'est pas un geste de jeu.
@@ -72,6 +76,11 @@ Item {
         x.setRequestHeader("Content-Type", "application/json");
         x.send("{}");
     }
+    // Accessibilite reseau de chaque sirene, par ping cote node. Le patch n'a
+    // aucune voie de retour : sans ca, une sirene eteinte est indiscernable
+    // d'une sirene muette.
+    property var sirens: []
+
     property bool rtpAvailable: false
 
     // Le QML est charge depuis qrc:/, donc une URL relative est prise par Qt pour
@@ -112,6 +121,9 @@ Item {
             root.rtpAvailable = d.available === true;
             root.rtpPeers = d.peers || [];
         });
+        _get("/api/sirens", function(d) {
+            root.sirens = d.sirens || [];
+        });
         _get("/api/bluetooth", function(d) {
             root.btConnected = d.connected === true;
             root.btName = d.name || "";
@@ -149,78 +161,163 @@ Item {
             color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10; font.letterSpacing: 2
         }
 
-        // --- Sortie des sirènes ---
+        // --- Sirènes : où va le son, qui répond, et les deux commandes ---
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: 12
 
             Text {
-                text: "Sortie des sirènes"
+                text: "Sirènes"
                 color: "#C7D2DC"; font.family: "monospace"; font.pixelSize: 14
             }
 
-            RowLayout {
-                spacing: 10
-                Repeater {
-                    model: root._outputs
-                    delegate: Rectangle {
-                        id: cell
-                        required property var modelData
-                        readonly property bool active: modelData.id === root.outputDevice
-                        width: 132; height: 62; radius: 5
-                        color: active ? "#1D2732" : "#111820"
-                        border.color: active ? "#66E4F2" : "#212B36"
-                        border.width: 1
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 2
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: cell.modelData.label
-                                color: cell.active ? "#66E4F2" : "#64737F"
-                                font.family: "monospace"; font.pixelSize: 18; font.bold: true
-                            }
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: cell.modelData.sub
-                                color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
-                            }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.outputRequested(cell.modelData.id)
-                        }
-                    }
-                }
-            }
-
-            RowLayout {
-                spacing: 10
-
-                Rectangle {
-                    width: 120; height: 22; radius: 3
-                    color: "#111820"; border.color: "#212B36"; border.width: 1
-                    Text {
-                        anchors.centerIn: parent
-                        text: "connecter UDP"
-                        color: "#64737F"; font.family: "monospace"; font.pixelSize: 10
-                    }
-                    MouseArea { anchors.fill: parent; onClicked: root.sirensConnectRequested() }
-                }
-
+            // Sortie
+            ColumnLayout {
+                spacing: 4
                 Text {
-                    // Les sockets UDP s'ouvrent au chargement du patch : sirènes
-                    // éteintes à ce moment-là, elles ne repartent jamais seules.
-                    text: "à faire si les sirènes ont été allumées après le pédalier."
+                    text: "sortie"
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+                }
+                RowLayout {
+                    spacing: 10
+                    Repeater {
+                        model: root._outputs
+                        delegate: Rectangle {
+                            id: cell
+                            required property var modelData
+                            readonly property bool active: modelData.id === root.outputDevice
+                            width: 132; height: 62; radius: 5
+                            color: active ? "#1D2732" : "#111820"
+                            border.color: active ? "#66E4F2" : "#212B36"
+                            border.width: 1
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 2
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: cell.modelData.label
+                                    color: cell.active ? "#66E4F2" : "#64737F"
+                                    font.family: "monospace"; font.pixelSize: 18; font.bold: true
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: cell.modelData.sub
+                                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: root.outputRequested(cell.modelData.id)
+                            }
+                        }
+                    }
+                }
+                Text {
+                    // Le changement de sortie remet les sirènes à zéro côté PD :
+                    // le dire, sinon le silence qui suit passe pour une panne.
+                    text: "changer de sortie remet les sirènes à zéro"
                     color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
                 }
             }
 
-            Text {
-                // Le changement de sortie remet les sirènes à zéro côté PD : le
-                // dire, sinon le silence qui suit passe pour une panne.
-                text: "Changer de sortie remet les sirènes à zéro."
-                color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+            // Qui répond, par ping depuis le backend. Le patch n'a aucune voie
+            // de retour : sans ça une sirène éteinte est indiscernable d'une
+            // sirène muette.
+            ColumnLayout {
+                spacing: 4
+                Text {
+                    text: "joignables"
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+                }
+                RowLayout {
+                    spacing: 6
+                    Repeater {
+                        model: root.sirens
+                        delegate: Rectangle {
+                            id: sirenCell
+                            required property var modelData
+                            readonly property bool joignable: modelData.udp === true
+                            width: 44; height: 30; radius: 3
+                            color: "#111820"
+                            border.color: joignable ? "#2F5F3A" : "#212B36"
+                            border.width: 1
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 1
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: "S" + sirenCell.modelData.id
+                                    color: sirenCell.joignable ? "#7FD98B" : "#3B4855"
+                                    font.family: "monospace"; font.pixelSize: 12; font.bold: true
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: sirenCell.joignable ? "udp" : "\u2014"
+                                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 8
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        visible: root.sirens.length === 0
+                        text: "état indisponible"
+                        color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+                    }
+                }
+            }
+
+            // Deux commandes UDP. Sans retour visuel un bouton qui marche passe
+            // pour mort : au doigt on n'a ni curseur ni survol pour s'en assurer.
+            ColumnLayout {
+                spacing: 4
+                Text {
+                    text: "commandes"
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+                }
+                RowLayout {
+                    spacing: 10
+
+                    Rectangle {
+                        width: 132; height: 30; radius: 3
+                        color: udpArea.pressed ? "#1D2732" : "#111820"
+                        border.color: udpArea.pressed ? "#66E4F2" : "#212B36"
+                        border.width: 1
+                        Text {
+                            anchors.centerIn: parent
+                            text: "connecter UDP"
+                            color: udpArea.pressed ? "#66E4F2" : "#64737F"
+                            font.family: "monospace"; font.pixelSize: 11
+                        }
+                        MouseArea {
+                            id: udpArea
+                            anchors.fill: parent
+                            onClicked: root.sirensConnectRequested()
+                        }
+                    }
+
+                    Rectangle {
+                        width: 132; height: 30; radius: 3
+                        color: root.stEnabled ? "#1D2732" : "#111820"
+                        border.color: stArea.pressed ? "#66E4F2"
+                                    : (root.stEnabled ? "#2F5F3A" : "#212B36")
+                        border.width: 1
+                        Text {
+                            anchors.centerIn: parent
+                            text: root.stEnabled ? "ST activé" : "ST coupé"
+                            color: root.stEnabled ? "#7FD98B" : "#64737F"
+                            font.family: "monospace"; font.pixelSize: 11
+                        }
+                        MouseArea {
+                            id: stArea
+                            anchors.fill: parent
+                            onClicked: root.stRequested(!root.stEnabled)
+                        }
+                    }
+                }
+                Text {
+                    text: "connecter UDP : si les sirènes ont été allumées après le pédalier"
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
+                }
             }
         }
 

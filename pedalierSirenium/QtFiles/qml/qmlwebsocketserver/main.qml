@@ -283,6 +283,7 @@ Window {
 
             // Page de maintenance
             MaintenanceView2D {
+                id: maintenance
                 anchors.fill: parent
                 visible: window.maintenanceMode
                 outputDevice: window.state.outputDevice
@@ -291,6 +292,10 @@ Window {
                 onReconnectRequested: wsController.reconnect()
                 onSirensConnectRequested: {
                     if (wsController.isConnected) wsController.sendSirensConnect();
+                }
+                onStRequested: function(on) {
+                    if (!wsController.isConnected) return;
+                    if (wsController.sendSirensST(on)) maintenance.stEnabled = on;
                 }
                 clicEnabled: window.state.clicEnabled
                 clicVolume: window.state.clicVolume
