@@ -11,6 +11,7 @@ Item {
     property color ringColor: "#66E4F2"
     property color trackColor: "#212B36"
     property real progress: 0.0        // 0..1
+    property real arcOpacity: 1.0      // arc éteint = boucle posée mais à l'arrêt
     property real lineWidth: 5
     property bool showHalo: false       // pulsation blanche (enregistrement)
     property real haloOpacity: 0.0
@@ -57,6 +58,7 @@ Item {
     Shape {
         anchors.fill: parent
         visible: root.progress > 0.0001
+        opacity: root.arcOpacity
         preferredRendererType: Shape.CurveRenderer
         ShapePath {
             strokeColor: root.ringColor

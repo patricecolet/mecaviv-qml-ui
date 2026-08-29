@@ -389,7 +389,7 @@ QtObject {
         var focusSiren = monoArmed ? monoSiren : (recSiren > 0 ? recSiren : mainLoopSiren);
 
         if (focusSiren < 0) {
-            focusState = { label: "—", ringColor: "#3B4855", progress: 0, showHalo: false, haloOpacity: 0,
+            focusState = { label: "—", ringColor: "#3B4855", progress: 0, arcOpacity: 1, showHalo: false, haloOpacity: 0,
                            sub: "aucune boucle", statusWord: "AU REPOS", statusColor: "#3B4855", statusNote: "Rien n'est armé.",
                            mBar: "—", mLen: "—", mRatio: "—", mRev: "—", ladderActive: false, ladderStops: [], ladderVerdict: "—" };
             return;
@@ -404,8 +404,15 @@ QtObject {
         var pRec = st.source === "rec" || st.transport === "recording";
         var pLen = st.ratio ? mainBars / st.ratio : mainBars;
         var ringProgress = 0;
+        var ringArc = 1;
         if (pRec) ringProgress = isMain ? (_bars % 1) : (mainBars > 0 ? (_bars % mainBars) / mainBars : 0);
         else if (st.transport === "playing" && pLen > 0) ringProgress = (_bars % pLen) / pLen;
+        else if (st.transport === "stopped") {
+            // Même règle que les petits anneaux : arc plein et éteint. À zéro, la
+            // sirène sélectionnée avait l'air vierge alors qu'elle porte un clip —
+            // c'est justement sur elle qu'on a besoin de le voir.
+            ringProgress = 1; ringArc = 0.4;
+        }
 
         var ringLabel = spec.label || ("S" + focusSiren);
         var ringColor = spec.color || "#66E4F2";
@@ -425,7 +432,7 @@ QtObject {
             var barsInto = Math.floor(_bars) + 1;
             focusState = {
                 label: ringLabel, ringColor: ringColor,
-                progress: ringProgress, showHalo: pRec, haloOpacity: pRec ? pulse * 0.5 : 0,
+                progress: ringProgress, arcOpacity: ringArc, showHalo: pRec, haloOpacity: pRec ? pulse * 0.5 : 0,
                 sub: ringSub, statusWord: "ENREGISTRE" + elsewhere, statusColor: "#FFFFFF",
                 statusNote: "Première boucle — la longueur sera fixée à l'arrêt.",
                 mBar: barsInto.toString(), mLen: "en cours", mRatio: "référence", mRev: "—",
@@ -446,7 +453,7 @@ QtObject {
             var refLabel = mainLoopSiren > 0 ? (SirenSpec.SPEC["siren" + mainLoopSiren] || {}).label || ("S" + mainLoopSiren) : "?";
             focusState = {
                 label: ringLabel, ringColor: ringColor,
-                progress: ringProgress, showHalo: pRec, haloOpacity: pRec ? pulse * 0.5 : 0,
+                progress: ringProgress, arcOpacity: ringArc, showHalo: pRec, haloOpacity: pRec ? pulse * 0.5 : 0,
                 sub: ringSub,
                 statusWord: "ENREGISTRE" + elsewhere, statusColor: "#FFFFFF",
                 statusNote: "Bornée par " + refLabel + " — " + mainBars + " mesures.",
@@ -466,7 +473,7 @@ QtObject {
         var hasLoop = rSt.transport !== undefined || rSt.source !== undefined;
         focusState = {
             label: ringLabel, ringColor: ringColor,
-            progress: ringProgress, showHalo: false, haloOpacity: 0,
+            progress: ringProgress, arcOpacity: ringArc, showHalo: false, haloOpacity: 0,
             sub: ringSub,
             statusWord: hasLoop ? (playing ? "LECTURE" : "ARRÊTÉE") : "EN JEU",
             statusColor: "#C7D2DC",

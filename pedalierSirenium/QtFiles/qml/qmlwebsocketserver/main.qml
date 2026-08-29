@@ -197,6 +197,7 @@ Window {
                     label: window.state.focusState.label || "—"
                     ringColor: window.state.focusState.ringColor || "#66E4F2"
                     progress: window.state.focusState.progress || 0
+                    arcOpacity: window.state.focusState.arcOpacity !== undefined ? window.state.focusState.arcOpacity : 1
                     showHalo: window.state.focusState.showHalo || false
                     haloOpacity: window.state.focusState.haloOpacity || 0
                     sub: window.state.focusState.sub || ""

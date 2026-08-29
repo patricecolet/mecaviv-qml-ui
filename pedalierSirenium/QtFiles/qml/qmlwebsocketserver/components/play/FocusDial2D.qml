@@ -11,6 +11,7 @@ Item {
     property string label: "—"
     property color ringColor: "#66E4F2"
     property real progress: 0
+    property real arcOpacity: 1.0
     property real haloOpacity: 0
     property bool showHalo: false
     property string sub: ""
@@ -69,6 +70,7 @@ Item {
                 lineWidth: 8
                 ringColor: root.ringColor
                 progress: root.progress
+                arcOpacity: root.arcOpacity
                 showHalo: root.showHalo
                 haloOpacity: root.haloOpacity
 

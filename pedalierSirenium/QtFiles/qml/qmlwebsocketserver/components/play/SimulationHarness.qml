@@ -301,7 +301,7 @@ QtObject {
                 e.progress = (_bars % len) / len;
                 e.meta = (i === mainLoop) ? "REF" : _ratioLabel(s.ratio);
             } else { // stopped
-                e.progress = 0; e.meta = _ratioLabel(s.ratio); e.present = 0.7;
+                e.progress = 1; e.meta = _ratioLabel(s.ratio); e.present = 0.7;
             }
             rs.push(e);
         }
@@ -324,6 +324,7 @@ QtObject {
             label: f.label || "S5",
             ringColor: f.color || "#F7F177",
             progress: cyc,
+            arcOpacity: 1,
             showHalo: true,
             haloOpacity: pulse * 0.5,
             sub: "cycle principal",
