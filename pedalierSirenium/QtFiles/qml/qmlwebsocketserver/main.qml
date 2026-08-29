@@ -289,6 +289,9 @@ Window {
                 connected: wsController.isConnected
                 onOutputRequested: function(dev) { window._setOutput(dev); }
                 onReconnectRequested: wsController.reconnect()
+                onSirensConnectRequested: {
+                    if (wsController.isConnected) wsController.sendSirensConnect();
+                }
                 clicEnabled: window.state.clicEnabled
                 clicVolume: window.state.clicVolume
                 onClicVolumeRequested: function(v) {

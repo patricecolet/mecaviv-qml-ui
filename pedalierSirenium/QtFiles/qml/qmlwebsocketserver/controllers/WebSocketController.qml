@@ -519,6 +519,17 @@ Item {
         });
     }
 
+    // Les sockets UDP vers les sirenes sont ouvertes au chargement du patch et
+    // ne se rouvrent jamais seules : sirenes eteintes a ce moment-la, le mode
+    // UDP reste muet jusqu'au redemarrage. Ce verbe rejoue la connexion.
+    function sendSirensConnect() {
+        if (logger) logger.info("SYSTEM", "\u21BB reconnexion UDP des sirenes");
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "sirensConnect"
+        });
+    }
+
     // L'etat du clic n'est diffuse qu'au changement : une page qui se connecte
     // apres le boot ne le connaitrait pas. Elle le demande donc a l'ouverture.
     function requestClic() {

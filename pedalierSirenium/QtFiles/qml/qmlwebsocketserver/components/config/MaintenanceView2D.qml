@@ -12,6 +12,7 @@ Item {
     property bool connected: false
     signal outputRequested(string dev)
     signal reconnectRequested()
+    signal sirensConnectRequested()
 
     // Clic audible : l'interrupteur est dans le bandeau, le niveau se règle ici
     // — on l'ajuste une fois, ce n'est pas un geste de jeu.
@@ -190,6 +191,28 @@ Item {
                             onClicked: root.outputRequested(cell.modelData.id)
                         }
                     }
+                }
+            }
+
+            RowLayout {
+                spacing: 10
+
+                Rectangle {
+                    width: 120; height: 22; radius: 3
+                    color: "#111820"; border.color: "#212B36"; border.width: 1
+                    Text {
+                        anchors.centerIn: parent
+                        text: "connecter UDP"
+                        color: "#64737F"; font.family: "monospace"; font.pixelSize: 10
+                    }
+                    MouseArea { anchors.fill: parent; onClicked: root.sirensConnectRequested() }
+                }
+
+                Text {
+                    // Les sockets UDP s'ouvrent au chargement du patch : sirènes
+                    // éteintes à ce moment-là, elles ne repartent jamais seules.
+                    text: "à faire si les sirènes ont été allumées après le pédalier."
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
                 }
             }
 
