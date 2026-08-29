@@ -20,7 +20,10 @@ ExecStartPre=@PEDALIER_REPO@/pedalierSirenium/deploy/device/wait-audio.sh
 # c'est VirMIDI, qui n'est pas une sortie audio, donc rien ne s'entend.
 # Le DSP est allume par le patch lui-meme (loadbang -> `; pd dsp 1`), pas ici :
 # ainsi il l'est aussi quand on ouvre pedalier.pd a la main.
-ExecStart=@PD_BIN@ -nogui -stderr $PD_AUDIO_OPTS @PD_PATCH@
+Environment=PD_BIN=@PD_BIN@
+# run-pd.sh traduit `-audiooutdev default` en index : cet index depend du
+# nombre de cartes ALSA enumerees, qui n'est pas le meme a froid et a chaud.
+ExecStart=@PEDALIER_REPO@/pedalierSirenium/deploy/device/run-pd.sh @PD_PATCH@
 Restart=on-failure
 RestartSec=2
 

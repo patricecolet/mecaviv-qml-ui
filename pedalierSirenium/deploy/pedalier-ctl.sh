@@ -794,6 +794,14 @@ phase_autostart() {
         install_file "$ENV_FILE" "$(sed "s|@HOME@|$HOME|g" "$DEVICE_DIR/env.example")" \
             && ok "configuration créée : $ENV_FILE"
     else
+        # Exception à la règle du « jamais écrasé » : un index de sortie audio figé
+        # est désormais connu pour bloquer Pd au démarrage à froid (l'index de
+        # `default` bouge avec le nombre de cartes ALSA présentes). On le remplace
+        # par le nom, que run-pd.sh résout à chaque lancement.
+        if grep -qE '^PD_AUDIO_OPTS=.*-audiooutdev[[:space:]]+[0-9]+' "$ENV_FILE"; then
+            run sed -i -E 's/(-audiooutdev[[:space:]]+)[0-9]+/\1default/' "$ENV_FILE"
+            ok "sortie audio désignée par son nom : -audiooutdev default"
+        fi
         local candidate; candidate=$(sed "s|@HOME@|$HOME|g" "$DEVICE_DIR/env.example")
         if [ "$candidate" != "$(cat "$ENV_FILE")" ]; then
             install_file "$ENV_FILE.new" "$candidate" >/dev/null
