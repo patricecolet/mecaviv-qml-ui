@@ -362,7 +362,10 @@ QtObject {
                 e.progress = len > 0 ? (_bars % len) / len : 0;
                 e.meta = (mainLoopSiren === i) ? "REF" : _lenLabel(s.ratio, s.loopSize);
             } else if (s.transport === "stopped") {
-                e.progress = 0; e.meta = s.ratio ? _lenLabel(s.ratio, s.loopSize) : ""; e.present = 0.7;
+                // Arc plein et éteint : la boucle est là, chargée, mais ne
+                // défile pas. À zéro elle avait l'air effacée alors que PD la
+                // garde — le clip est toujours sur le disque et dans midifile.
+                e.progress = 1; e.meta = s.ratio ? _lenLabel(s.ratio, s.loopSize) : ""; e.present = 0.7;
             } else {
                 e.present = 0.45;
             }
