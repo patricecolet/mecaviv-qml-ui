@@ -14,37 +14,57 @@ dure. Un **redémarrage rétablit** le fonctionnement normal, sans couper le
 courant.
 
 **Ce que le symptôme dit déjà** : les notes qui ne sonnent pas **apparaissent à
-l'écran**. Pd les reçoit donc, et les relaie au QML par le canal binaire. La
-perte est **en aval de Pd**, sur le chemin vers les sirènes — pas dans la
-captation.
+l'écran**. Pd les reçoit donc. La perte est en aval de la captation.
 
-**Mesures prises le 2026-08-30 vers 19:55, machine en état dégradé :**
+### Mesure du 2026-08-30 à 20:47, machine franchement dégradée
 
-| Mesure | Valeur | Ce qu'elle écarte |
+| | dégradé | après un simple redémarrage de Pd |
 |---|---|---|
-| Pd, RSS | **872 Mo, stables sur 2 min** | pas de fuite mémoire |
-| Pd, CPU | 20,9 %, stable | pas d'emballement |
-| 9 sockets UDP de Pd | files `0 / 0` | rien ne s'accumule à l'émission |
-| files UDP de la machine | aucune non vide | rien ne s'accumule à la réception |
-| rtpmidid | 71 min, 5,8 Mo, 0,1 % CPU | le démon ne gonfle pas |
-| charge | 1,53 / 1,75 / 1,82 | machine pas saturée |
+| CPU de Pd | **95 %** | 20,2 % stable |
+| RSS | **1,15 Go, +2,4 Mo/s** | 872 Mo stable |
+| `watchdog: signaling pd` | toutes les 2 s | zéro |
+| déconnexions websocket | toutes les 2 s | zéro |
 
-**Le seul signal anormal trouvé** : `rtpmidid` répète toutes les 25 secondes
-`[ERROR] rtppeer.cpp:315 | Bad CK count. Ignoring.`, alors qu'il annonce une
-latence de 0,20 ms. `CK` est la synchronisation d'horloge RTP-MIDI. À creuser en
-premier — c'est le seul compteur qui parle d'un désaccord qui pourrait s'aggraver.
+Le chien de garde de Pd se déclenche quand son fil temps réel n'est plus servi à
+l'heure. À 95 % de CPU, le MIDI part en retard ou se perd : **c'est très
+probablement la cause directe des notes tronquées.**
 
-**Non exploré** : le débit MIDI réellement émis vers les sirènes ; l'état des
-neuf sockets UDP, ouvertes **une seule fois au chargement du patch** et jamais
-rouvertes (voir la note sur le démarrage sans réseau) ; le comportement des
-machines de destination, dont `192.168.1.103` et `.113` ne répondaient pas au
-ping pendant la mesure.
+### Ce qui accumule
 
-**Comment mesurer la prochaine fois, sans attendre une heure** : relever RSS,
-CPU et les files UDP à intervalles réguliers depuis le début de la session, pour
-obtenir une pente au lieu d'un point.
+La page QML était dans une **boucle de reconnexion** — `Reconnexion` →
+`The remote host closed the connection` → retry, toutes les 2 secondes. Pd
+accepte puis referme aussitôt, et les numéros d'emplacement montent dans son
+journal (`WEBSOCKETS LIST: 49` puis `51`). Le `websocket-server` vendorisé ne
+paraît pas libérer les emplacements des clients partis : chaque rechargement de
+page, chaque redémarrage de Pd et chaque reconnexion en consomme un. Une fois la
+table pleine, le serveur referme tout, la page reboucle, et la tempête sature le
+processeur.
 
----
+Un redémarrage de Pd remet le compteur à zéro — ce qui explique que « le reboot
+règle tout », et **écarte une boucle de messages qui se réalimenterait** dans les
+patchs : celle-là repartirait aussitôt après le redémarrage, ce qui n'arrive pas.
+
+### Écarté par la mesure, ne pas refaire
+
+Une fuite mémoire de Pd **au repos** (872 Mo parfaitement stables sur plusieurs
+minutes, deux fois vérifié) ; l'accumulation dans les 9 sockets UDP de Pd (files
+0/0) ; toute file UDP de la machine ; un gonflement de `rtpmidid` (5,8 Mo,
+0,1 % de CPU après 71 minutes).
+
+> Une conclusion antérieure de cette fiche disait « ce n'est pas une fuite ».
+> Elle était fausse parce que mesurée au repos : la consommation ne monte que
+> quand la tempête de reconnexions tourne. Mesurer un régime, pas un instant.
+
+### Prochaine étape
+
+Ouvrir `application.layer/websocket-server.pd` (2563 lignes, vendorisé, clients
+gérés en `list`) et vérifier ce qu'il fait de l'emplacement d'un client
+déconnecté. Et côté QML, espacer les tentatives de reconnexion au lieu d'une
+toutes les 2 secondes, pour que l'échec ne se transforme pas en tempête.
+
+Reste hors de ce cadre, et à ne pas oublier : `rtpmidid` répète
+`[ERROR] Bad CK count. Ignoring.` toutes les 25 secondes en annonçant une latence
+de 0,20 ms.
 
 ## 2. Affichage pendant l'enregistrement
 

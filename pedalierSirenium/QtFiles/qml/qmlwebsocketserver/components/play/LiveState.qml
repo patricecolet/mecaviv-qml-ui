@@ -355,11 +355,23 @@ QtObject {
                 e.progress = (_bars % 1);
                 e.haloOpacity = pulse * 0.3;
             } else if (s.source === "lead" || s.source === "rec" || s.transport === "recording") {
+                // Pendant l'enregistrement la longueur du parcours n'existe pas
+                // encore : un arc qui defile pretendrait situer une position
+                // qu'on ne connait pas. Arc PLEIN qui respire — plein dit que la
+                // piste est occupee, la respiration dit que ca se fait. Le halo
+                // et l'opacite suffisent a le distinguer d'une boucle a l'arret,
+                // qui est pleine mais fixe.
                 e.halo = true; e.haloOpacity = pulse * 0.6;
-                e.progress = mainLoopSiren === i ? (_bars % 1) : (mainBars > 0 ? (_bars % mainBars) / mainBars : 0);
+                e.progress = 1;
+                e.present = 0.55 + pulse * 0.45;
             } else if (s.transport === "playing" && s.ratio) {
+                // La phase est ancree sur le DEBUT de la boucle, pas sur le
+                // compteur global de mesures. Sans `startBar`, une boucle lancee
+                // a la mesure 5 sur une longueur de 4 affichait 25 % a l'instant
+                // meme ou elle recommencait, et le repere de debut n'existait pas.
                 var len = mainBars / s.ratio;
-                e.progress = len > 0 ? (_bars % len) / len : 0;
+                var phase = len > 0 ? (_bars - (s.startBar || 0)) / len : 0;
+                e.progress = phase - Math.floor(phase);
                 e.meta = (mainLoopSiren === i) ? "REF" : _lenLabel(s.ratio, s.loopSize);
             } else if (s.transport === "stopped") {
                 // Arc plein et éteint : la boucle est là, chargée, mais ne

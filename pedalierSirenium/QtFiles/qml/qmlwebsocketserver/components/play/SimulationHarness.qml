@@ -294,8 +294,10 @@ QtObject {
             if (s.mode === "empty") {
                 e.present = 0.45; e.meta = "—";
             } else if (s.mode === "recording") {
-                var p = (i === mainLoop) ? (_bars % 1) : (_bars % mainBars) / mainBars;
-                e.progress = p; e.halo = true; e.haloOpacity = pulse * 0.6; e.meta = "";
+                // Meme vocabulaire que LiveState : arc plein qui respire. La
+                // longueur du parcours n'est pas connue pendant qu'on enregistre.
+                e.progress = 1; e.halo = true; e.haloOpacity = pulse * 0.6; e.meta = "";
+                e.present = 0.55 + pulse * 0.45;
             } else if (s.mode === "playing") {
                 var len = mainBars / s.ratio;
                 e.progress = (_bars % len) / len;
