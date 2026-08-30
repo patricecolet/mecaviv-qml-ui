@@ -192,7 +192,9 @@ QtObject {
     // un multiple de sa propre longueur, ce qui n'arrive que par hasard.
     function _loopPhase(st, len) {
         if (!(len > 0)) return 0;
-        var ph = (_bars - ((st && st.startBar) || 0)) / len;
+        var d = _bars - ((st && st.startBar) || 0);
+        if (d <= 0) return 0;   // avant son origine, une boucle n'a pas commencé
+        var ph = d / len;
         return ph - Math.floor(ph);
     }
 
@@ -216,7 +218,10 @@ QtObject {
         if (data.transport !== undefined) transport = String(data.transport);
         if (data.beat !== undefined) clockBeat = data.beat;
         if (data.bar !== undefined) clockBar = data.bar;
-        _bars = (clockBar - 1) + (clockBeat / Math.max(beatsPerBar, 1));
+        // PD envoie `bar: 0` tant que la premiere mesure n'est pas passee ; sans
+        // ce plancher `_bars` part a -1, et une phase negative se replie sur la
+        // FIN de la boucle -- l'ecran annoncait « 4 / 4 » au moment du depart.
+        _bars = Math.max(0, (clockBar - 1) + (clockBeat / Math.max(beatsPerBar, 1)));
     }
 
     function applyLoops(data) {
