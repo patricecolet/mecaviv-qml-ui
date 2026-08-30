@@ -181,6 +181,20 @@ QtObject {
     // ---------- état brut reçu de PD, par sirène (1..7) ----------
     // { source, transport, current_bar, loopSize, ratio, revolutions, degree }
     property var _loopStates: ({})
+    property var _recStart: ({})     // par sirène : la mesure où sa prise a commencé
+
+    function _barsRec(id) {
+        return _recStart[id] !== undefined ? Math.max(0, _bars - _recStart[id]) : 0;
+    }
+
+    // Où en est une boucle DANS SON PROPRE cycle, 0..1. Ancrée sur sa mesure de
+    // départ : `_bars % longueur` ne tombe juste que si la boucle a commencé sur
+    // un multiple de sa propre longueur, ce qui n'arrive que par hasard.
+    function _loopPhase(st, len) {
+        if (!(len > 0)) return 0;
+        var ph = (_bars - ((st && st.startBar) || 0)) / len;
+        return ph - Math.floor(ph);
+    }
 
     // ================= entrées : PD → LiveState =================
 
@@ -214,6 +228,19 @@ QtObject {
                 var s = data.states[i];
                 if (s.siren_id !== undefined) map[s.siren_id] = s;
             }
+            // Combien de mesures sont EN TRAIN d'être enregistrées : c'est
+            // l'écart depuis le début de la prise, pas le compteur global de
+            // mesures. Sans ça l'écran affichait la position dans le morceau,
+            // qui ne veut rien dire pendant qu'on enregistre.
+            var rs = _recStart;
+            for (var id in map) {
+                var av = _loopStates[id];
+                var etaitRec = av && (av.source === "rec" || av.transport === "recording");
+                var estRec = map[id].source === "rec" || map[id].transport === "recording";
+                if (estRec && !etaitRec) rs[id] = _bars;
+                else if (!estRec) delete rs[id];
+            }
+            _recStart = rs;
             _loopStates = map;
             // La longueur de la boucle de référence fixe l'échelle des paliers.
             if (mainLoopSiren > 0 && map[mainLoopSiren] && map[mainLoopSiren].loopSize) {
@@ -370,8 +397,7 @@ QtObject {
                 // a la mesure 5 sur une longueur de 4 affichait 25 % a l'instant
                 // meme ou elle recommencait, et le repere de debut n'existait pas.
                 var len = mainBars / s.ratio;
-                var phase = len > 0 ? (_bars - (s.startBar || 0)) / len : 0;
-                e.progress = phase - Math.floor(phase);
+                e.progress = _loopPhase(s, len);
                 e.meta = (mainLoopSiren === i) ? "REF" : _lenLabel(s.ratio, s.loopSize);
             } else if (s.transport === "stopped") {
                 // Arc plein et éteint : la boucle est là, chargée, mais ne
@@ -417,8 +443,12 @@ QtObject {
         var pLen = st.ratio ? mainBars / st.ratio : mainBars;
         var ringProgress = 0;
         var ringArc = 1;
-        if (pRec) ringProgress = isMain ? (_bars % 1) : (mainBars > 0 ? (_bars % mainBars) / mainBars : 0);
-        else if (st.transport === "playing" && pLen > 0) ringProgress = (_bars % pLen) / pLen;
+        if (pRec) {
+            // Même règle que les petits anneaux : pendant la prise la longueur du
+            // parcours n'existe pas encore, donc rien ne défile. Arc plein qui respire.
+            ringProgress = 1; ringArc = 0.55 + pulse * 0.45;
+        }
+        else if (st.transport === "playing" && pLen > 0) ringProgress = _loopPhase(st, pLen);
         else if (st.transport === "stopped") {
             // Même règle que les petits anneaux : arc plein et éteint. À zéro, la
             // sirène sélectionnée avait l'air vierge alors qu'elle porte un clip —
@@ -441,7 +471,7 @@ QtObject {
         var elsewhere = (rep !== focusSiren) ? " — " + rLabel : "";
 
         if (isRec && repIsMain) {
-            var barsInto = Math.floor(_bars) + 1;
+            var barsInto = Math.floor(_barsRec(rep)) + 1;
             focusState = {
                 label: ringLabel, ringColor: ringColor,
                 progress: ringProgress, arcOpacity: ringArc, showHalo: pRec, haloOpacity: pRec ? pulse * 0.5 : 0,
@@ -457,7 +487,7 @@ QtObject {
             var landing = -1, stops = [];
             for (var j = 0; j < _ratios.length; j++) {
                 var bars = mainBars * _ratios[j].mul;
-                var passed = (_bars >= bars && bars >= 1);
+                var passed = (_barsRec(rep) >= bars && bars >= 1);
                 if (passed) landing = j;
                 stops.push({ label: _ratios[j].label, bars: bars < 1 ? 0 : bars, passed: passed, landing: false });
             }
@@ -469,7 +499,7 @@ QtObject {
                 sub: ringSub,
                 statusWord: "ENREGISTRE" + elsewhere, statusColor: "#FFFFFF",
                 statusNote: "Bornée par " + refLabel + " — " + mainBars + " mesures.",
-                mBar: (Math.floor(_bars) + 1).toString(),
+                mBar: (Math.floor(_barsRec(rep)) + 1).toString(),
                 mLen: landing >= 0 ? (mainBars * _ratios[landing].mul).toString() : "—",
                 mRatio: landing >= 0 ? _ratios[landing].label : "—", mRev: "—",
                 ladderActive: true, ladderStops: stops,
@@ -492,7 +522,7 @@ QtObject {
             statusNote: hasLoop
                 ? (repIsMain ? "C'est elle qui donne le tempo aux autres." : "")
                 : "La note du sirenium part sur " + ringLabel + ".",
-            mBar: playing && len2 > 0 ? (Math.floor(_bars % len2) + 1) + " / " + Math.round(len2) : "—",
+            mBar: playing && len2 > 0 ? (Math.floor(_loopPhase(rSt, len2) * len2) + 1) + " / " + Math.round(len2) : "—",
             mLen: rSt.loopSize ? rSt.loopSize.toString() : "—",
             mRatio: rSt.ratio ? _ratioLabel(rSt.ratio) : "—",
             mRev: rSt.revolutions !== undefined ? rSt.revolutions.toString() : "—",
