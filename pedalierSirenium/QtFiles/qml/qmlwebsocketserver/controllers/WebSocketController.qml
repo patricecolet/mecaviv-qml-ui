@@ -338,6 +338,9 @@ Item {
             // harnais de simulation : l'écran passe en démo et n'en revient jamais
             // sans recharger la page. On retente tant qu'on n'est pas ouvert.
             reconnectTimer.running = (socket.status !== WebSocket.Open);
+            // Hors du bloc `logger` : la remise à zéro ne doit pas dépendre de
+            // la présence d'un logger.
+            if (socket.status === WebSocket.Open) root.reconnectDelayMs = root.reconnectBaseMs;
 
             if (root.logger) {
                 if (socket.status === WebSocket.Open) {
@@ -434,11 +437,21 @@ Item {
         return sendOrchestraCommand(voiceId + " pan " + pan);
     }
 
-    // Retentative tant que la socket n'est pas ouverte. Se rallume tout seul par
-    // onStatusChanged, s'éteint dès que PD répond — et `isConnected` repasse à
-    // vrai, ce qui remet main.qml sur LiveState. À la réouverture, onStatusChanged
-    // redemande déjà le preset et la liste des scènes : la vue se repeuple seule.
-    property int reconnectDelayMs: 2000
+    // Retentative tant que la socket n'est pas ouverte, avec un espacement qui
+    // CROÎT à chaque échec. À 2 s fixes, un refus passager se transformait en
+    // tempête : chaque tentative ouvre une connexion de plus, le serveur de PD
+    // plafonne à 24 clients simultanés (mesuré au banc le 2026-08-30), il finit
+    // par tout refuser, et la page rebouclait de plus belle. Mesuré sur le Pi :
+    // 30 reconnexions par minute, Pd à 95 % de CPU, son fil temps réel décroché,
+    // et le MIDI qui sort en retard — le pédalier devient inutilisable.
+    //
+    // Le délai repart à sa valeur de base dès que la socket s'ouvre, dans
+    // onStatusChanged : un redémarrage de PD est donc rattrapé aussi vite
+    // qu'avant, c'est l'échec qui dure qui se calme.
+    readonly property int reconnectBaseMs: 1000
+    readonly property int reconnectMaxMs: 15000
+    property int reconnectDelayMs: reconnectBaseMs
+
     Timer {
         id: reconnectTimer
         interval: root.reconnectDelayMs
@@ -446,21 +459,28 @@ Item {
         running: false
         onTriggered: {
             if (socket.status === WebSocket.Open) { running = false; return; }
+            root.reconnectDelayMs = Math.min(root.reconnectMaxMs, root.reconnectDelayMs * 2);
             root.reconnect();
         }
     }
 
+    // Ré-armement de la socket, 100 ms après l'avoir fermée. Objet déclaré une
+    // fois : la version précédente en fabriquait un neuf à CHAQUE tentative,
+    // soit un objet toutes les deux secondes tant que PD ne répondait pas.
+    Timer {
+        id: rearmTimer
+        interval: 100
+        repeat: false
+        onTriggered: socket.active = true
+    }
+
     function reconnect() {
         if (root.logger) {
-            root.logger.info("WEBSOCKET", "Reconnexion vers:", serverUrl);
+            root.logger.info("WEBSOCKET", "Reconnexion vers:", serverUrl,
+                             "— prochaine tentative dans", root.reconnectDelayMs, "ms");
         }
-        var reconnectTimer = Qt.createQmlObject('import QtQuick; Timer {interval: 100; repeat: false; running: true}',
-                                               root, 'dynamicTimer');
         socket.active = false;
-        reconnectTimer.triggered.connect(function() {
-            socket.active = true;
-            reconnectTimer.destroy();
-        });
+        rearmTimer.restart();
     }
     
     function sendTempoChange(newTempo) {
