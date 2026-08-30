@@ -55,14 +55,30 @@ minutes, deux fois vérifié) ; l'accumulation dans les 9 sockets UDP de Pd (fil
 > Elle était fausse parce que mesurée au repos : la consommation ne monte que
 > quand la tempête de reconnexions tourne. Mesurer un régime, pas un instant.
 
-### Prochaine étape
+### Corrigé le 2026-08-30
 
-Ouvrir `application.layer/websocket-server.pd` (2563 lignes, vendorisé, clients
-gérés en `list`) et vérifier ce qu'il fait de l'emplacement d'un client
-déconnecté. Et côté QML, espacer les tentatives de reconnexion au lieu d'une
-toutes les 2 secondes, pour que l'échec ne se transforme pas en tempête.
+**La cause est la cadence de reconnexion, pas une fuite.** Le serveur plafonne à
+**24 clients simultanés** — écrit en dur dans le patch vendorisé
+(`websockets-list` → `list length` → `< 24`, sinon « connections limit
+reached »), et confirmé au banc sur le Mac : la 25ᵉ connexion simultanée est
+refusée. Les places sont bien rendues quand un client meurt (`pd remove_socket`),
+donc rien ne fuit. Mais à 2 s fixes et sans relâche, une page qui n'arrive pas à
+se connecter ouvre **30 connexions par minute** : un refus passager suffit à
+remplir la table, le serveur refuse alors tout, et la page reboucle de plus
+belle.
 
-Reste hors de ce cadre, et à ne pas oublier : `rtpmidid` répète
+Le délai part maintenant de 1 s, double à chaque échec, plafonne à 15 s, et
+repart à sa base dès que la socket s'ouvre — un redémarrage de PD est donc
+rattrapé aussi vite qu'avant. Mesuré sur le Mac, page servie en local sans PD :
+2, 4, 8, 15, 15 s, soit sept tentatives en 75 s là où l'ancienne cadence en
+faisait trente-sept.
+
+**Reste à vérifier en session longue** : que la dégradation d'une heure ne
+revienne pas. Si elle revient malgré cet espacement, c'est qu'une autre source
+remplit la table — chercher alors les connexions à demi mortes que PD ne réape
+pas, et non une fuite.
+
+Et hors de ce cadre, toujours ouvert : `rtpmidid` répète
 `[ERROR] Bad CK count. Ignoring.` toutes les 25 secondes en annonçant une latence
 de 0,20 ms.
 
