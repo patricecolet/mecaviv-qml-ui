@@ -12,6 +12,18 @@
 # `aconnect 17:0 16:0` puis une injection dans hw:0,1 ne produit rien du tout sur
 # `aseqdump -p 16:0`. Seul l'autre sens fonctionne, ce qui donne l'illusion que
 # le port relaie quand on le teste avec `amidi`.
+# Attendre que Pure Data ait enregistre son client ALSA.
+#
+# Mesure du 2026-08-30 : lance en ExecStartPost, ce script partait des que le
+# PROCESSUS Pd existait -- plusieurs secondes avant que son client sequenceur
+# n'apparaisse. Il ne trouvait alors aucun « Pure Data » a relier, se terminait
+# en succes, et le pedalier restait muet sans que rien ne le signale. On attend
+# donc le client, pas le processus. Au pire on renonce et le timer reprendra.
+for _ in $(seq 1 40); do
+    aconnect -l 2>/dev/null | grep -q "'Pure Data'" && break
+    sleep 1
+done
+
 RTPMIDI_IN=("PEDALIER_SIRENIUM" "SIRENIUM" "La_Petite_Boite" "La_Grosse_Boite" "PEDALE_BOSS")
 # Le port virtuel reste relié à Pure Data IN 1 : c'est par lui qu'on injecte du
 # MIDI à la main pour tester sans le pédalier (`amidi -p hw:0,0 -S "B8 1A 7F"`).

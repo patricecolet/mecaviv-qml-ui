@@ -49,7 +49,8 @@ WEB_DIR="$PEDALIER_REPO/pedalierSirenium/webfiles"
 SCRIPTS_DIR="$PEDALIER_REPO/pedalierSirenium/scripts"
 # Tout ce qui est installé et activé…
 UNITS=(pedalier-rtpmidid.service pedalier-pd.service pedalier-node.service
-       pedalier-midi-connect.service pedalier-midi-connect.timer)
+       pedalier-midi-connect.service pedalier-midi-connect.timer
+       pedalier-audio-connect.service pedalier-audio-connect.timer)
 # …et parmi ça, ce qui doit tourner en permanence. Le câblage MIDI est un
 # oneshot rejoué par son timer : il est normalement inactif entre deux passages.
 SERVICES=(pedalier-rtpmidid.service pedalier-pd.service pedalier-node.service)

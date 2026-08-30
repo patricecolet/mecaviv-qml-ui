@@ -1,0 +1,16 @@
+[Unit]
+Description=Pédalier — liaison audio (Pure Data → sortie par défaut)
+PartOf=pedalier.target
+After=pedalier-pd.service
+
+[Service]
+Type=oneshot
+# Pas de RemainAfterExit, pour la même raison que le câblage MIDI : le timer
+# doit pouvoir rejouer la liaison. Une sortie peut apparaître longtemps après
+# le démarrage — casque Bluetooth appairé plus tard, ou reconnecté.
+EnvironmentFile=%h/.config/pedalier/env
+ExecStart=@PEDALIER_REPO@/pedalierSirenium/deploy/device/audio-connect.sh
+TimeoutStartSec=60
+
+[Install]
+WantedBy=pedalier.target

@@ -24,6 +24,15 @@ Environment=PD_BIN=@PD_BIN@
 # run-pd.sh traduit `-audiooutdev default` en index : cet index depend du
 # nombre de cartes ALSA enumerees, qui n'est pas le meme a froid et a chaud.
 ExecStart=@PEDALIER_REPO@/pedalierSirenium/deploy/device/run-pd.sh @PD_PATCH@
+# Un redémarrage de Pd en fait un NOUVEAU client ALSA et un nouveau client JACK :
+# tout son câblage disparaît avec l'ancien. Mesuré le 2026-08-30 — après un
+# restart, plus une seule liaison vers « Pure Data » dans aconnect, le pédalier
+# entier muet pendant dix-neuf minutes sans que rien ne le signale, le timer de
+# reprise n'ayant pas rejoué. On ne fait donc plus reposer le recâblage sur lui
+# seul : Pd le redemande lui-même. --no-block, sinon systemctl attend un job que
+# ce service tient déjà.
+ExecStartPost=/usr/bin/systemctl --user start --no-block pedalier-midi-connect.service
+ExecStartPost=/usr/bin/systemctl --user start --no-block pedalier-audio-connect.service
 Restart=on-failure
 RestartSec=2
 

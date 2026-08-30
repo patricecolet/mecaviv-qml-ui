@@ -23,15 +23,15 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
-     inkscape:zoom="2.6192451"
-     inkscape:cx="465.40128"
-     inkscape:cy="384.84371"
+     inkscape:zoom="1.5084136"
+     inkscape:cx="279.76412"
+     inkscape:cy="715.32105"
      inkscape:window-width="1472"
      inkscape:window-height="661"
      inkscape:window-x="0"
      inkscape:window-y="33"
      inkscape:window-maximized="0"
-     inkscape:current-layer="layer1" />
+     inkscape:current-layer="layer2" />
   <defs
      id="defs1" />
   <g
@@ -623,8 +623,16 @@
          id="text7">S7.play.stop</text>
       <text
          x="178.084"
-         y="48.2"
-         id="text8">toutes</text>
+         y="48.200001"
+         id="text8"><tspan
+           sodipodi:role="line"
+           id="tspan1"
+           x="178.084"
+           y="48.200001">Scene</tspan><tspan
+           sodipodi:role="line"
+           id="tspan2"
+           x="178.084"
+           y="51.700001">playstop/del</tspan></text>
     </g>
     <g
        style="font-size:2.1px;text-anchor:middle"
@@ -636,7 +644,7 @@
       <text
          x="51.313"
          y="85.300003"
-         id="text10">scene play/stop/del</text>
+         id="text10">tempo</text>
       <text
          x="72.480003"
          y="85.300003"
@@ -655,12 +663,12 @@
          id="text14">libre</text>
       <text
          x="157.147"
-         y="85.3"
-         id="text15">tempo</text>
+         y="85.300003"
+         id="text15">libre</text>
       <text
          x="178.313"
-         y="85.3"
-         id="text16">reset</text>
+         y="85.300003"
+         id="text16">libre</text>
     </g>
     <g
        style="font-size:2.8px;text-anchor:middle"
@@ -731,48 +739,48 @@
          sodipodi:role="line"
          x="15.1"
          style="font-weight:bold"
-         id="tspan59">Boutons ronds 10–17 — stop / play par sirène, 17 = toutes</tspan><tspan
+         id="tspan59">Boutons ronds 10–17 — stop / play par sirène ; 17 porte le transport de la scène</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan60">10→S1 … 16→S7, 17 = toutes. LED jaune de présélection sur les mêmes numéros.</tspan><tspan
+         id="tspan60">10→S1 … 16→S7. Appui long 3 s : ce qui va être effacé clignote en jaune ; un second</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan61"> </tspan><tspan
+         id="tspan61">appui avant 10 s confirme, sinon l'armement expire. Le rond 17 n'a pas de LED.</tspan><tspan
          sodipodi:role="line"
          x="15.1"
          style="font-weight:bold"
-         id="tspan62">Pédales de commande 18–25 — de gauche à droite</tspan><tspan
+         id="tspan62"> </tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan63">18   rec / play — sur la sirène présélectionnée au clavier</tspan><tspan
+         id="tspan63">Pédales de commande 18–25 — de gauche à droite</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan64">19   scene play / stop  ·  appui long 3 s : scene clear (la LED clignote)</tspan><tspan
+         id="tspan64">18   rec / play sur la sirène présélectionnée — sa LED dit l'état du clip : clignote à</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan65">20   scene next</tspan><tspan
+         id="tspan65">       l'enregistrement, allumée en lecture, éteinte sinon</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan66">21   scene write  ·  appui long 2 s : scene duplicate (la LED clignote)</tspan><tspan
+         id="tspan66">19   tap tempo — sa LED bat la mesure, plus longue sur le premier temps</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan67">22   new scene</tspan><tspan
+         id="tspan67">20   scene next — flash de la LED à chaque changement</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan68">23   libre</tspan><tspan
+         id="tspan68">21   scene write  ·  appui long 3 s puis second appui : scene duplicate (la LED clignote)</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan69">24   tap tempo</tspan><tspan
+         id="tspan69">22   new scene — flash de la LED</tspan><tspan
          sodipodi:role="line"
          x="15.1"
-         id="tspan70">25   reset de toutes les sirènes — part au relâché</tspan><tspan
+         id="tspan70">23, 24, 25   libres</tspan><tspan
          sodipodi:role="line"
          x="15.1"
          id="tspan71"> </tspan><tspan
          sodipodi:role="line"
          x="15.1"
          style="font-weight:bold"
-         id="tspan72">Clavier PK-6 26–37 — les sept touches blanches sélectionnent une sirène</tspan><tspan
+         id="tspan72">Clavier PK-6 26–38 — les sept touches blanches sélectionnent une sirène</tspan><tspan
          sodipodi:role="line"
          x="15.1"
          id="tspan73">Do 26→S1, Ré 28→S2, Mi 30→S3, Fa 31→S4, Sol 33→S5, La 35→S6, Si 37→S7</tspan><tspan
@@ -791,6 +799,6 @@
          sodipodi:role="line"
          x="15.1"
          style="font-style:italic;fill:#606060"
-         id="tspan78">Fonctions : docs/PEDALIER_MAPPING.md et docs/LOOPER_STATE_MACHINE.md — 25 juillet 2026.</tspan></text>
+         id="tspan78">Fonctions : docs/PEDALIER_MAPPING.md et docs/LOOPER_STATE_MACHINE.md — 30 août 2026.</tspan></text>
   </g>
 </svg>

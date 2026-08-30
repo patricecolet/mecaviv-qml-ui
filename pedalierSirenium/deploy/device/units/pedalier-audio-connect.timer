@@ -1,0 +1,12 @@
+[Unit]
+Description=Pédalier — reprise périodique de la liaison audio
+# wait-audio.sh ne fait qu'attendre avant de lancer Pd ; il n'a rien à dire
+# quand la sortie arrive après. C'est ce trou-là que ce timer bouche.
+
+[Timer]
+OnBootSec=25s
+OnUnitActiveSec=60s
+Unit=pedalier-audio-connect.service
+
+[Install]
+WantedBy=timers.target

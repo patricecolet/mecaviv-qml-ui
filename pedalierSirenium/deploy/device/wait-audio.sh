@@ -17,8 +17,20 @@
 # Meme contrat que wait-network.sh : on n'echoue jamais. Sans sortie audio, Pd
 # doit demarrer quand meme -- le MIDI et le WebSocket n'en dependent pas.
 
+# En JACK, Pd n'ouvre aucun PCM : c'est PipeWire qui tient la sortie, et
+# pedalier-audio-connect le raccorde des qu'une sortie apparait. Il n'y a donc
+# plus rien a attendre -- et l'attente coutait cher : mesure du 2026-08-30,
+# casque eteint, 110 s de demarrage pendant lesquelles l'ecran reste vide, ce
+# qui se lit comme un plantage. Le repli ALSA, lui, garde son garde-fou.
+case " ${PD_AUDIO_OPTS:-} " in
+    *" -jack "*) exit 0 ;;
+esac
+
+# La limite est une DUREE, pas un nombre de tours : chaque tour coute le temps
+# des pactl et du pw-play, si bien que 45 tours ont pris 110 s ce jour-la, et le
+# message annoncait 45 s.
 limit=45
-n=0
+debut=$(date +%s)
 
 sortie_prete() {
     # Un sink reel, c'est-a-dire autre que le « auto_null » que PipeWire
@@ -39,13 +51,13 @@ sortie_prete() {
         | timeout 5 pw-play --format=s16 --rate=48000 --channels=2 - 2>/dev/null
 }
 
-while [ "$n" -lt "$limit" ]; do
+while [ $(( $(date +%s) - debut )) -lt "$limit" ]; do
     if sortie_prete; then
-        [ "$n" -gt 0 ] && echo "sortie audio prete apres ${n}s"
+        ecoule=$(( $(date +%s) - debut ))
+        [ "$ecoule" -gt 0 ] && echo "sortie audio prete apres ${ecoule}s"
         exit 0
     fi
     sleep 1
-    n=$((n + 1))
 done
 
 echo "aucune sortie audio utilisable apres ${limit}s — demarrage sans son" >&2
