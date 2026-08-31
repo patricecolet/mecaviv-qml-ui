@@ -36,9 +36,15 @@ Item {
     MouseArea { anchors.fill: parent; onClicked: {} }
     Rectangle { anchors.fill: parent; color: "#0A0D11"; opacity: 0.94 }
 
+    // Le clavier est plus haut que l'ecran du pedalier (694 px pour 600) : centre,
+    // il perdait par le bas la rangee ANNULER / VALIDER, qui est la derniere.
+    // On le retrecit juste ce qu'il faut plutot que de le redessiner, pour qu'il
+    // tienne aussi sur un ecran plus petit que celui d'aujourd'hui.
     Column {
+        id: clavier
         anchors.centerIn: parent
-        spacing: 22
+        spacing: 16
+        scale: Math.min(1, (root.height - 16) / Math.max(1, clavier.height))
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -46,28 +52,40 @@ Item {
             color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10; font.letterSpacing: 1.6
         }
 
-        // le nom en cours, avec un curseur qui clignote
-        Rectangle {
+        // le nom en cours, avec un curseur qui clignote -- et la validation au bout
+        // du champ, la ou l'oeil lit deja le nom qu'il valide.
+        Row {
             anchors.horizontalCenter: parent.horizontalCenter
-            width: 700; height: 62; radius: 3
-            color: "#151D26"; border.width: 1; border.color: "#212B36"
-            Row {
-                anchors.centerIn: parent
-                spacing: 2
-                Text {
-                    text: root.value.length ? root.value : "sans nom"
-                    color: root.value.length ? "#FFFFFF" : "#3B4855"
-                    font.family: "monospace"; font.pixelSize: 26; font.bold: true
-                }
-                Rectangle {
-                    width: 2; height: 28; color: "#66E4F2"
-                    anchors.verticalCenter: parent.verticalCenter
-                    SequentialAnimation on opacity {
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0; duration: 480 }
-                        NumberAnimation { to: 1; duration: 480 }
+            spacing: 7
+
+            Rectangle {
+                width: 560; height: 62; radius: 3
+                color: "#151D26"; border.width: 1; border.color: "#212B36"
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 2
+                    Text {
+                        text: root.value.length ? root.value : "sans nom"
+                        color: root.value.length ? "#FFFFFF" : "#3B4855"
+                        font.family: "monospace"; font.pixelSize: 26; font.bold: true
+                    }
+                    Rectangle {
+                        width: 2; height: 28; color: "#66E4F2"
+                        anchors.verticalCenter: parent.verticalCenter
+                        SequentialAnimation on opacity {
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0; duration: 480 }
+                            NumberAnimation { to: 1; duration: 480 }
+                        }
                     }
                 }
+            }
+
+            KeyCap {
+                label: "VALIDER"; wide: 2; accent: true
+                height: 62
+                enabled: root.value.length > 0
+                onPressed: { root.visible = false; root.accepted(root.value); }
             }
         }
 
@@ -124,11 +142,6 @@ Item {
             KeyCap {
                 label: "ANNULER"; wide: 2
                 onPressed: { root.visible = false; root.cancelled(); }
-            }
-            KeyCap {
-                label: "VALIDER"; wide: 2; accent: true
-                enabled: root.value.length > 0
-                onPressed: { root.visible = false; root.accepted(root.value); }
             }
         }
     }
