@@ -205,7 +205,7 @@ lever.
 | **27, 29, 32, 34, 36** | Clavier PK-6 — **les cinq touches noires** | mode poly sur l'une, sélection de la voix sur une autre — **règle à discuter**. Trois restent libres, plus la huitième blanche (38). | à construire |
 | **43 – 46** | 4 interrupteurs montés sur les pédales d'expression | combinés au numéro de pédale (voir plus bas) | `pedals.modulators` |
 | **47 – 49** | 3 pédales d'expression (continues) | `$0.modulation.pedal` | `pedals.modulators` |
-| **53 – 60** | 8 boutons du petit boîtier | `- 50` → charge une scène → `$0.looper.scene.select.json` | `pedals.littlebox.buttons` |
+| **51 – 58** | 8 boutons du petit boîtier | `- 50` → scène 1-8 → `$0.scene.select`. **La scène demandée attend la mesure suivante** ; à l'arrêt du transport, la bascule est immédiate. Un bouton au-delà du nombre de scènes **crée** la scène manquante. | `pedals.littlebox.buttons` → `pd attente.mesure` |
 | **61 – 89** | 29 boutons du gros boîtier | `- 61` → `compoSelect <n>`, **0-based** → ouvre la n-ième composition | `pedals.bigbox.buttons` |
 | **90** | 30e bouton du gros boîtier | **inventaire** : tant qu'on appuie, les LEDs 61+ des boutons qui portent une composition s'allument | `pedals.bigbox.buttons` → `led.compo.available` |
 | **91** | 31e bouton du gros boîtier | rien | — |
@@ -275,8 +275,11 @@ Pour une sirène `N` de 1 à 7 :
 | État | CC | Plage | Sous-patch |
 |---|---|---|---|
 | Sirène **sélectionnée** | `9 + N` | 10 – 16 | `led.siren.selected` |
-| Sirène **en lecture** | `17 + N` | 18 – 24 | `led.siren.playing` |
-| Sirène **en enregistrement** | `25 + N` | 26 – 32 | `led.siren.recording` |
+| État du clip | `25 + N` | 26 – 32 | `led.clip.state` |
+
+`led.siren.playing` et `led.siren.recording` **n'existent plus** : `led.clip.state` les remplace et
+applique le partage tranché plus bas — `+ 26` sur la LED rouge, `select 1 2`, clignotement à
+l'enregistrement, continu en lecture, éteint sinon.
 
 Les LEDs réutilisent les numéros des boutons correspondants — entrée et sortie ne se marchent pas
 dessus puisqu'elles vont dans des directions opposées.
@@ -475,7 +478,7 @@ parler ni correspondre à ce document :
 
 - `selectedPedalId` (1-8) — la pédale virtuelle dont on édite la matrice ;
 - `pedalPosition` (1-8) dans `SceneGrid` — l'étiquette d'un emplacement de scène, qui correspond en
-  réalité aux boutons **53-60** du petit boîtier ;
+  réalité aux boutons **51-58** du petit boîtier ;
 - `siren.pedalActive` — un booléen par sirène venu de `voice.pedal`.
 
 Unifier ce vocabulaire sur celui de la feuille et du patch est un préalable à tout écran de

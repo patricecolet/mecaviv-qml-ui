@@ -151,6 +151,40 @@ corriger en l'état, c'est un comportement assumé. À terme, une option laisser
 **polyrythme**, le comportement actuel. Ça se règle dans `commit.boucle`, au même endroit que la
 promotion d'un clip plus long en nouvelle référence.
 
+## 3quater. La référence et son origine (2026-08-31)
+
+Deux pannes de la même famille, corrigées la même nuit. Toutes deux tenaient à une lecture trop
+étroite du §3, et toutes deux se voyaient à l'écran de la même façon : **plus aucun curseur ne
+circulait**.
+
+**Une boucle arrêtée reste la référence.** `pd reference` de `pedalier.pd` balaie les sept pistes
+pour désigner la mainloop et sa longueur, et ne retenait une candidate que pour l'état 2, « en
+lecture ». Une boucle ARRÊTÉE est à l'état 3. Après un `stop all`, plus aucune candidate : le patch
+émettait `main_loop 0` **et `mainbars 0`**, donc toutes les longueurs, tous les rapports et tous les
+curseurs disparaissaient d'un coup jusqu'au prochain enregistrement. Le §3 dit que la mainloop est
+la première boucle enregistrée, remplacée par une plus longue ; il ne dit rien de « celle qui joue
+en ce moment ». Le test est passé à `>= 2`.
+
+**L'origine de grille repart avec l'horloge.** La position d'une boucle se calcule des deux côtés
+comme `(mesure courante − mainloop-startbar) % longueur` — `pd phase` côté Pd, `_loopPhase` côté
+QML. Or `mainloop-startbar` est une mesure **absolue**, posée par `commit.boucle`, tandis que le
+départ du transport remet le compteur général à zéro. L'ancre restait à 16 ou 24, la différence
+passait négative, la phase tombait à 0 et y restait. Symptôme trompeur : le panneau annonce
+« LECTURE » et « 1 / 4 », l'horloge avance, **et aucun anneau ne bouge** — les boucles jouent pour
+de vrai, c'est leur position qui ment. Une boucle rappelée au démarrage n'avait même jamais eu
+d'ancre valable, aucune prise n'ayant tourné dans cette session.
+
+`pd scene.transport` pose donc l'origine à 0 au départ, sur la sortie du trigger qui tire **en
+premier**, avant `playall` et avant `play`. C'est la règle de Patrice appliquée à la lettre : « la
+source de vérité c'est la première boucle enregistrée, pas le compteur de mesure général, et si ce
+compteur pose un problème on le supprime. »
+
+> Ne pas confondre avec la tentative annulée `c6f4a43`, qui posait l'ancre sur la mesure **lue avant
+> la remise à zéro** — donc sur la valeur périmée elle-même. Elle ne corrigeait rien.
+
+**Leçon générale : toute ancre absolue doit repartir quand le compteur repart.** Et quand un anneau
+ne tourne pas, vérifier la phase avant de soupçonner l'état — ici l'état était juste.
+
 ## 3ter. Deux états séparés, et c'est voulu (2026-08-29)
 
 Le loader tient **deux représentations distinctes**, et une seule bouge quand on joue.

@@ -721,3 +721,56 @@ pd -nogui -noaudio -nomidiin  -midioutdev 3 -open leurre.pd       # 250 puis 248
 et un `source 1` envoyé à l'inlet de `midiclock` pour ouvrir la vanne du MIDI externe. La sortie
 WebSocket publie alors `clock` puis `loops`, ce qui permet de vérifier de bout en bout l'état des
 sept sirènes.
+
+## 24. Le tempo est écrit partout, relu nulle part (état au 2026-08-31)
+
+Le §16 a été implémenté à moitié, et la moitié manquante est celle qui se voit.
+
+**Ce qui est fait.** Chaque scène porte son champ `tempo` : le gabarit d'une scène neuve **hérite du
+tempo courant** au lieu du 120 codé en dur qu'il écrivait, et `scene write` y consigne le tempo du
+moment. Le chemin est direct — `pd scene.new` lit `$0-tempo`, envoie `sceneEdit new <bpm>`, et
+`route new` de `pd scene.edit` passe déjà ce qui suit le verbe jusqu'au gabarit, qui l'écrit en `$5`.
+Pour l'écriture d'une scène existante, `pd scene.save` envoie `sceneSet tempo <bpm>` entre le
+`report` et le `saveScene` : le verbe existait déjà, rien de neuf côté `composition-io`.
+
+`$0-tempo` est tenu par `pd tempo.courant`, alimenté par l'écho de l'horloge et initialisé à 120 au
+chargement. Les loaders le lisent par `$3-tempo`, comme ils lisent déjà `$3-mainloop-startbar`.
+
+**Ce qui manque.** Personne ne relit ce champ au chargement. Mesuré deux fois — six changements de
+scène en passant par des scènes à 117 et à 120, l'horloge reste à 120 ; et après un redémarrage
+complet, la scène courante portant 117, l'écran affiche 120. Voir `PROBLEMES_OUVERTS.md` §12 pour
+les deux causes possibles et le geste qui les départage.
+
+**Le clip porte aussi son tempo, et c'est autre chose.** Le §16 dit que le tempo vit dans la scène,
+« jamais dans le clip » — au sens où ce n'est pas le clip qui décide. Depuis le 2026-08-31, le clip
+en garde néanmoins la **trace** de son enregistrement, à deux endroits : un événement Set Tempo
+(`FF 51 03`, microsecondes par noire) en tête de piste du `.mid`, écrit par `pd record` de `clip-io`
+juste après le `write` ; et une clé `tempo` dans son `.json`, à côté de `length_bars` et
+`is_reference`. C'est de la documentation, pas une commande : elle sert à savoir à quelle vitesse
+une boucle a été jouée quand on la retrouve dans une autre composition. **Elle sera affichée dans
+l'outil de maintenance** (décidé le 2026-08-31), pas dans l'écran de jeu.
+
+Le tempo entre dans `clip-io` par un verbe `tempo`, pas par un argument de création : `clip-io` et
+`composition-io` sont instanciées **sans arguments** et n'ont donc aucun accès au `$0` du pédalier.
+
+## 25. Changer de scène à la volée — le petit boîtier (2026-08-31)
+
+Les huit boutons du petit boîtier (CC **51–58**, pas 53–60 comme l'annonçait `PEDALIER_MAPPING.md`)
+sélectionnent les scènes 1 à 8 par un simple `- 50`.
+
+**La scène demandée attend la mesure suivante.** Le changement était immédiat et coupait net en
+pleine boucle. `pd attente.mesure`, posé à l'entrée de `pd scene.select`, retient le numéro et le
+relâche sur le prochain `$0.midiclock.bar`. Tout ce qui suit est inchangé : une seule vanne à
+l'entrée plutôt que la quantification répandue dans la chaîne.
+
+**Transport à l'arrêt, aucun top ne viendrait jamais relâcher la demande** — le geste resterait sans
+effet. Le passage direct est donc ouvert au chargement (`spigot 1`) et se ferme dès que l'horloge
+démarre, les deux vannes étant pilotées en opposition par `$0.midiclock.transport`.
+
+Mesure à 120 BPM : appui au temps 3 de la mesure 1, la carte du morceau montre encore « 1 intro » à
+l'instant de l'appui et « 2 scene-2 » au premier top de la mesure 2. À l'arrêt, la bascule est
+immédiate.
+
+**Un bouton au-delà du nombre de scènes crée la scène manquante** — `pd scene.select` compare au
+compteur et bascule sur `$0.scene.new`. C'est la règle de Patrice : un geste qui désigne une chose
+absente la crée.
