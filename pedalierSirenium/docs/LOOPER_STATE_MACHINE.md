@@ -185,6 +185,31 @@ compteur pose un problème on le supprime. »
 **Leçon générale : toute ancre absolue doit repartir quand le compteur repart.** Et quand un anneau
 ne tourne pas, vérifier la phase avant de soupçonner l'état — ici l'état était juste.
 
+### Et l'origine s'ancre sur le décalage de la référence
+
+Poser l'origine à **zéro** ne suffisait pas, et le défaut restant se voyait tout de suite : une
+boucle rappelée jouait une mesure en retard sur le métronome. Mesuré sur une boucle de 4 mesures —
+mesure globale 1, 2, 3, 4 → mesure de la boucle 1/4, 1/4, 2/4, 3/4. Son cycle ne coïncidait plus
+avec la grille, donc au moment où elle rebouclait, l'écran était encore sur la mesure d'avant.
+
+`startBar = mainloop-startbar + offset_ticks/1920`, et `offset_ticks` vient du **fichier du clip** :
+c'est le décalage capté quand ce clip a été enregistré (§3bis), dans une session dont la grille
+n'existe plus. On l'appliquait par-dessus une origine remise à zéro.
+
+**Décision du 2026-08-31 : on garde les décalages relatifs entre boucles, ancrés sur celui de la
+référence.** Une boucle volontairement décalée de deux mesures le reste au rappel de la scène ;
+seule la référence retombe sur le premier temps. Ça ne demande aucune soustraction répandue dans la
+chaîne : il suffit de poser l'origine à **l'opposé** du décalage de la référence, puisque chaque
+loader calcule déjà `origine + son propre décalage`. Une seule écriture, au même endroit.
+
+Le nombre remonte par un **cinquième champ de `$0.loopstates`** : `pd loader.geom` publie le
+décalage brut à côté de la géométrie composée, et `pd reference` lit ce champ sur la ligne qu'il
+vient d'élire, dans `$0-mainoffset`. Aucun bus existant n'est élargi — `$0.loader.state` garde ses
+deux atomes et ses trois consommateurs, dont l'élargissement avait déjà cassé `pd filter` en
+silence une fois (§3bis).
+
+Mesure après correction, même boucle : mesure globale 1, 2, 3 → 1/4, 2/4, 3/4.
+
 ## 3ter. Deux états séparés, et c'est voulu (2026-08-29)
 
 Le loader tient **deux représentations distinctes**, et une seule bouge quand on joue.
