@@ -200,6 +200,15 @@ QtObject {
 
     // ================= entrées : PD → LiveState =================
 
+    // A la (re)connexion, l'ecran garde les chiffres de la session precedente
+    // tant que PD n'a pas envoye d'horloge -- et il n'en envoie qu'au depart du
+    // transport. On voyait donc « mesure 34 » pendant plusieurs secondes apres
+    // un redemarrage, ce qui se lit comme des mesures parasites avant le depart.
+    function resetClock() {
+        clockBar = 1; clockBeat = 1; _bars = 0;
+        transport = "stop";
+    }
+
     function applyClock(data) {
         if (!data) return;
         if (data.bpm !== undefined) bpm = data.bpm;
@@ -217,7 +226,12 @@ QtObject {
         // entre deux messages, _tick() continue d'interpoler depuis là.
         if (data.transport !== undefined) transport = String(data.transport);
         if (data.beat !== undefined) clockBeat = data.beat;
-        if (data.bar !== undefined) clockBar = data.bar;
+        // PD compte les mesures a partir de ZERO -- mesure du 2026-08-31, il
+        // emet 0, 1, 2, 3... au depart du transport. L'ecran les affichait
+        // telles quelles : « mesure 0 » puis « 1 », soit deux mesures avant
+        // celle qu'on lit comme la premiere. C'est ce qui se lisait comme un
+        // decompte au lancement.
+        if (data.bar !== undefined) clockBar = data.bar + 1;
         // PD envoie `bar: 0` tant que la premiere mesure n'est pas passee ; sans
         // ce plancher `_bars` part a -1, et une phase negative se replie sur la
         // FIN de la boucle -- l'ecran annoncait « 4 / 4 » au moment du depart.

@@ -64,6 +64,16 @@ Window {
     // composants d'affichage consomment ; il bascule seul selon la connexion.
     SimulationHarness { id: sim }
     LiveState { id: liveState }
+
+    // Une connexion neuve ne doit pas afficher les chiffres de la precedente :
+    // PD n'envoie son horloge qu'au depart du transport, donc l'ancienne mesure
+    // restait a l'ecran en attendant.
+    Connections {
+        target: wsController
+        function onIsConnectedChanged() {
+            if (wsController.isConnected) liveState.resetClock();
+        }
+    }
     readonly property var state: wsController.isConnected ? liveState : sim
 
     // Bascule vue de jeu / configuration (F2 ou bouton dans le bandeau)
