@@ -240,7 +240,10 @@ QtObject {
 
     function applyLoops(data) {
         if (!data) return;
-        if (data.main_loop !== undefined) mainLoopSiren = data.main_loop;
+        // PD dit « aucune reference » avec un 0 ; le reste du code attend -1
+        // (les sirenes sont numerotees 1 a 7). On normalise a l'entree plutot
+        // que de le rattraper a chaque endroit.
+        if (data.main_loop !== undefined) mainLoopSiren = data.main_loop > 0 ? data.main_loop : -1;
         if (Array.isArray(data.states)) {
             var map = {};
             for (var i = 0; i < data.states.length; i++) {
@@ -445,7 +448,10 @@ QtObject {
 
         var focusSiren = monoArmed ? monoSiren : (recSiren > 0 ? recSiren : mainLoopSiren);
 
-        if (focusSiren < 0) {
+        // PD envoie `main_loop: 0` pour dire « aucune reference » -- les sirenes
+        // sont numerotees 1 a 7. Tester `< 0` laissait passer le zero, et
+        // l'anneau decrivait une sirene « S0 » qui n'existe pas, sans curseur.
+        if (focusSiren <= 0) {
             focusState = { label: "—", ringColor: "#3B4855", progress: 0, arcOpacity: 1, showHalo: false, haloOpacity: 0,
                            sub: "aucune boucle", statusWord: "AU REPOS", statusColor: "#3B4855", statusNote: "Rien n'est armé.",
                            mBar: "—", mLen: "—", mRatio: "—", mRev: "—", ladderActive: false, ladderStops: [], ladderVerdict: "—" };
