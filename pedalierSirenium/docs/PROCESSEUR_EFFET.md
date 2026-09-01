@@ -97,16 +97,23 @@ Une séquence n'est **pas une suite de hauteurs** : c'est un **motif rythmique d
 hauteur reste celle tenue au sirenium ; rejouer la note referme puis rouvre le volet. Un trémolo
 programmable, en somme — ce qui explique que l'état sans séquence soit le trémolo continu.
 
+**Trois séquences par sirène** (Patrice, 2026-09-02), soit 21 en tout — pas trois communes à la
+scène comme une version antérieure de ce paragraphe l'affirmait. Les deux interrupteurs de la
+pédale A choisissent l'**indice** 1, 2 ou 3 ; chaque sirène visée joue alors *sa* séquence de cet
+indice.
+
 **Format mesuré le 2026-09-02**, en écrivant un bloc d'essai dans une scène et en sondant le dump.
-Deux clés, toutes deux sur le modèle de `voices` — donc la même machinerie de chargement :
+Deux clés, toutes deux des tableaux d'objets comme `voices` — donc la même machinerie de chargement :
 
 ```json
 "sequences": [
-  { "seq": 1, "tick": 0,   "velocite": 127 },
-  { "seq": 1, "tick": 480, "velocite": 60 },
-  { "seq": 2, "tick": 960, "velocite": 100 }
+  { "siren": 1, "seq": 1, "tick": 0,   "velocite": 127 },
+  { "siren": 1, "seq": 1, "tick": 480, "velocite": 60 },
+  { "siren": 3, "seq": 2, "tick": 960, "velocite": 100 }
 ],
-"sequenceLengths": [1920, 960, 3840]
+"sequenceLengths": [
+  { "siren": 1, "seq": 1, "ticks": 1920 }
+]
 ```
 
 Ce que le broadcast en émet, vérifié :
@@ -121,13 +128,20 @@ Un tableau d'objets donne `<clé> <index> <champ> <valeur>`, un tableau de nombr
 `<clé> <index> <valeur>`. **L'ordre est celui du hachage Lua** — dans la mesure, `sequenceLengths`
 sortait avant `tempo` et `tick` avant `seq` : la règle du latch jusqu'à `end` n'est pas théorique.
 
-**La longueur est propre à chaque séquence**, en ticks, 1920 (une mesure) par défaut. Patrice n'a pas
-tranché entre « boucler sur la mesure » et « longueur propre » ; c'est le choix qui ne ferme aucune
-porte, cohérent avec `length_ticks` des clips, et qui laisse les polyrythmes possibles
-(`project_looper_polyrythme_assume`).
+**La longueur par défaut est d'une mesure** (1920 ticks) et **s'allonge à l'édition** — décidé le
+2026-09-02. Une séquence plus longue que la mesure est donc prévue dès le départ, ce qui rejoint les
+polyrythmes déjà assumés pour le looper (`project_looper_polyrythme_assume`).
 
-**Les trois séquences sont communes à la scène**, pas une par sirène : les boutons de la pédale A en
-choisissent une, et le champ `pedal` dit déjà quelles sirènes la reçoivent.
+### D'où vient la hauteur
+
+**Le séquenceur ne porte aucune hauteur.** Les notes de la séquence sont *pitchées* par ce qui passe :
+la note du **clip en aval**, ou celle du **sirenium en amont**. C'est la réponse à la question posée
+le 2026-09-02 — il ne s'agit ni d'un CC de volume, ni d'un générateur de notes autonome, mais d'une
+réattaque de la note courante.
+
+Conséquence pour la construction : le séquenceur doit suivre **la dernière note de chaque sirène**,
+donc tenir sept états, alimentés en observant le flux. C'est ce qui le distingue des trois pédales,
+qui sont sans mémoire.
 
 Une ligne par événement :
 
