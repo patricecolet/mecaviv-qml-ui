@@ -175,6 +175,29 @@ mouvement de la sélection renvoyait sept valeurs identiques aux sirènes. Mesur
 `-1` pour que la première passe toujours. À rapprocher de `project_pedalier_flux_degrade` : ce
 chemin-là, au moins, ne contribuera pas au bruit.
 
+### Construit le 2026-09-02 — `pedale-tremolo.pd`, moitié trémolo de la pédale A
+
+CC 47 vers le **CC 92** des sirènes (*Tremolo Depth*). Les interrupteurs 43 et 44 composent le
+motif : 0 = trémolo, 1 à 3 = les séquences, qui restent à construire.
+
+**Le point qui compte est l'état, pas le mapping.** Dès qu'un interrupteur est enclenché, la
+profondeur retombe à **zéro** — sans ça le trémolo resterait figé à sa dernière valeur pendant
+qu'une séquence joue, et rien dans l'interface ne le dirait. La position reste mémorisée, donc
+revenir au trémolo la réapplique sans avoir à rebouger le pied. Mesuré : 80 sur les sept, 0 dès
+l'enclenchement, pédale ignorée pendant ce temps, 60 réappliqué au retour.
+
+`vers-ctl.pd` est sorti de `pedale-vibrato` au passage : le même montage `<sirene> <valeur>` →
+`ctl <valeur> <cc> <sirene>` servait déjà deux fois et servira aux séquences. Le numéro de CC est
+son argument de création.
+
+**Sa portée est provisoirement « toutes les sirènes »**, posée par un `loadbang`. La pédale A n'a
+pas d'interrupteur libre : sa portée doit venir du champ `pedal` de la table `voices`, que le
+fichier de scène ne porte pas encore (§4). C'est le premier point à reprendre quand le format de
+scène sera étendu.
+
+Ce qui manque encore à la pédale A : `tremoloSpeed` (CC 15) est censé venir de la scène, qui ne
+sait pas non plus le stocker. Aujourd'hui la vitesse du trémolo reste celle réglée sur la sirène.
+
 ---
 
 ## 6. Placement dans la chaîne
