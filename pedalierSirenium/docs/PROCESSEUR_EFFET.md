@@ -135,6 +135,29 @@ Deux conséquences :
   valeur quantifiée à dix crans, elle ferait clignoter l'harmonie à chaque frontière. Marge de
   recouvrement à la montée et à la descente, sinon l'effet est inutilisable au pied.
 
+### Construit le 2026-09-02 — `pedale-degre.pd`
+
+Le CC 49 devient un décalage de degrés ; le CC 46 dit s'il vaut pour toutes les sirènes ou pour la
+seule sélectionnée (traduite depuis `$0.loop.voice.select` par la table `voices`). L'objet émet une
+paire `<sirene> <decalage>` par sirène, à chaque changement de position, de portée ou de sélection.
+
+Trois valeurs sont posées et se changent en une constante — **elles sont mon choix, pas le tien** :
+
+| Réglage | Valeur | Effet |
+|---|---|---|
+| Course | `pos × (taille+1) / 128` | 0 au repos, **une octave pleine à fond**, quel que soit le nombre de degrés du mode |
+| Hystérésis | +1,2 / −0,2 cran | il faut dépasser franchement la frontière pour monter, et redescendre nettement pour revenir |
+| Sens | vers le haut seulement | la pédale part de sa butée basse, qui est le neutre |
+
+Mesuré : CC 64 met les sept sirènes à 4, l'interrupteur relâché ne laisse que la sélectionnée,
+CC 70 ne bouge rien (hystérésis) et CC 90 passe à 5. Bout en bout sur le vrai patch, une note 59
+ressort 65 — six demi-tons, ce qui est juste sur la chromatique chargée par défaut.
+
+**Il lit `$0.midi.pedalier.sirenium` en parallèle de la chaîne de rejet**, sans toucher à
+`pedals.modulators` : celui-ci continue d'alimenter la matrice 448 pour rien, ce qui est inoffensif.
+La suppression du §10 attendra un essai au pied — casser l'étage existant pendant que le Raspberry
+est inaccessible n'aurait aucun intérêt.
+
 ---
 
 ## 6. Placement dans la chaîne
@@ -183,8 +206,9 @@ Mesuré en headless (Ionian : +1 do→ré, +2 do→mi, +7 une octave, −1 le si
 patch. **La gamme chargée au démarrage est `Chromatic`** (12 degrés, `pd defaultScale` de
 `scaleManager`) — un décalage y vaut donc un demi-ton tant qu'aucune gamme n'est choisie.
 
-**L'entrée droite — le décalage — n'est câblée à rien.** C'est là que la pédale C viendra se
-brancher ; d'ici là l'objet est posé et sans effet.
+**Le décalage est par sirène, pas global.** L'entrée droite prend `<sirene> <decalage>` et l'objet
+tient sept lignes remises à zéro au chargement. C'est ce qu'exige l'interrupteur 46 : sans décalage
+par sirène, « toutes les sirènes ou la seule sélectionnée » n'a nulle part où agir.
 
 ---
 
