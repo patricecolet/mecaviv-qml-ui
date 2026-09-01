@@ -151,6 +151,35 @@ sont omises entièrement**. Un récepteur doit donc latcher entre `begin` et `en
 à ligne, et toute clé ajoutée doit avoir une valeur par défaut posée avant le dump — sinon elle
 garde silencieusement celle de la scène précédente.
 
+**Ce piège est observé, pas théorique** : au test, charger une scène antérieure au 2026-09-02 (donc
+sans bloc `voices`) laisse les vitesses de la scène précédente en place. Ça se résout en sauvant la
+scène une fois. **Aucune remise à zéro n'a été ajoutée**, et c'est délibéré : elle effacerait du même
+coup l'appariement voix→sirène des scènes anciennes, ce qui serait pire que l'héritage.
+
+### Construit le 2026-09-02 — `voices-vitesses.pd`
+
+À chaque scène chargée (`$1.scene.loaded`), la table est parcourue et les deux vitesses partent vers
+les sirènes : **CC 9** pour le vibrato, **CC 15** pour le trémolo — les fréquences de la table
+composeSiren. Il réutilise `vers-ctl`. Sans lui, les deux champs restaient inertes : stockés, relus,
+et personne pour les jouer.
+
+Mesuré : 14 CC par chargement, dans l'ordre des voix (3 4 1 2 5 6 7), et après sauvegarde la
+sirène 3 reçoit `ctl 50 15 3` et `ctl 30 9 3`.
+
+### Un vestige laissé en place — `voices.siren.preselection`
+
+Dans `harmoniseur.pd`, ce sous-patch **reçoit** les lignes de voix depuis `updateVoice`, mais les
+cherche dans une table globale `voices` (sans `$1`) qui n'existe pas, et écrit sur `sirenVoice` et
+`siren.voices.update`, deux canaux globaux sans destinataire. Son entrée `$1.siren.preselection` n'a
+elle-même aucun émetteur. Il fait la **présélection de sirène**, la fonction que la refonte du
+2026-07-31 a déplacée sur le clavier.
+
+Lui ajouter les `$1` serait le pire des gestes : ça le rebrancherait sur la vraie table pour exécuter
+un design abandonné. Il faut le **supprimer** — mais depuis l'éditeur graphique, où Pd renumérote
+lui-même. Trois tentatives de suppression scriptée ont échoué ici (indice mal calculé, puis deux fois
+une mauvaise attribution des connexions par profondeur, la seconde ayant touché d'autres
+sous-patchs) ; le fichier a été restauré à chaque fois. **Ne pas réessayer par script.**
+
 ---
 
 ## 5. Pédale C — transposition diatonique
