@@ -132,6 +132,21 @@ sortait avant `tempo` et `tick` avant `seq` : la règle du latch jusqu'à `end` 
 2026-09-02. Une séquence plus longue que la mesure est donc prévue dès le départ, ce qui rejoint les
 polyrythmes déjà assumés pour le looper (`project_looper_polyrythme_assume`).
 
+### Construit le 2026-09-02 — `sequences-io.pd`
+
+Le bloc `sequences` de la scène est rangé dans `$1.sequences`, **une ligne `<sirene> <seq> <tick>
+<velocite>`**. La sirène est un champ, pas un niveau de tableau imbriqué : la forme plate est celle
+que le dump sait rendre, et elle réutilise la machinerie de `voices`.
+
+Le piège n'était pas le format mais **la longueur variable de la table**. `text set` refuse d'écrire
+un champ sur une ligne qui n'existe pas, et le nombre d'événements n'est pas connu d'avance :
+`pd garantir` comble donc jusqu'à l'index demandé avec des lignes neutres, avant chaque écriture de
+champ. Mesuré : trois événements relus tels quels, et **deux chargements de suite laissent trois
+lignes, pas six** — le vidage sur `begin` fait son travail.
+
+Reste à écrire : la sauvegarde (`scene.sequences.save`, sur le modèle de `scene.voices.save`), les
+longueurs (`sequenceLengths`), et le séquenceur lui-même.
+
 ### D'où vient la hauteur
 
 **Le séquenceur ne porte aucune hauteur.** Les notes de la séquence sont *pitchées* par ce qui passe :
