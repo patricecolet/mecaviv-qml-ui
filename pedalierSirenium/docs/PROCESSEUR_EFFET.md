@@ -144,8 +144,24 @@ un champ sur une ligne qui n'existe pas, et le nombre d'événements n'est pas c
 champ. Mesuré : trois événements relus tels quels, et **deux chargements de suite laissent trois
 lignes, pas six** — le vidage sur `begin` fait son travail.
 
-Reste à écrire : la sauvegarde (`scene.sequences.save`, sur le modèle de `scene.voices.save`), les
-longueurs (`sequenceLengths`), et le séquenceur lui-même.
+Reste à écrire : la sauvegarde, les longueurs (`sequenceLengths`), et le séquenceur lui-même.
+
+**Un piège mesuré en tentant la sauvegarde, à ne pas réessayer tel quel.** Le motif « `until` +
+compteur + `text sequence` » ne s'entrelace pas comme on l'attend : avec un `[t b b]` qui bange le
+compteur d'un côté et `text sequence` de l'autre, l'ordre réellement observé est
+
+```
+CPT 0 · LIGNE · LIGNE · LIGNE · CPT 1 · CPT 2
+```
+
+— les lignes sortent groupées, et l'index reste bloqué à sa première valeur. Conséquence dans la
+sauvegarde : les 21 `sceneSet` partaient tous avec l'index 0 et s'écrasaient les uns les autres, ne
+laissant qu'une entrée dans le JSON. Le compteur seul, hors de ce contexte, compte pourtant
+correctement (0 1 2 3), y compris derrière un trigger.
+
+**Le remède est de parcourir par index** : `until` → compteur → `text get <ligne>`, exactement le
+motif de `sirenes-visees/emission`, qui est mesuré et fonctionne. Ne pas utiliser `text sequence`
+quand l'index de la ligne est nécessaire en même temps que son contenu.
 
 ### D'où vient la hauteur
 
