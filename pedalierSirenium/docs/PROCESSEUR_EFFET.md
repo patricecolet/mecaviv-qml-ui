@@ -106,8 +106,9 @@ Format proposé, une ligne par événement, dans le fichier de scène :
 - **Position en ticks**, pas en millisecondes : la séquence est calée sur l'horloge comme tout le
   reste, et c'est ce qui permet de l'enregistrer telle quelle (§7). Référence : 1920 ticks par
   mesure, comme les clips (`length_ticks` de `clip_*.json`).
-- **La vélocité est le profil du motif**, et la pédale la met à l'échelle : à fond, le volet se
-  referme complètement entre les notes ; au repos, rien ne se passe.
+- **La pédale module la vélocité** (confirmé par Patrice le 2026-09-02) : la séquence porte le
+  rythme et le profil, la position du pied les met à l'échelle. À fond, le volet se referme
+  complètement entre les notes ; au repos, rien ne se passe.
 - La **vitesse est dans la séquence**, jamais au pied — §1.
 
 **La table `voices` était déjà dans le format** — je l'avais cru absente en lisant une scène de
@@ -255,10 +256,17 @@ l'enclenchement, pédale ignorée pendant ce temps, 60 réappliqué au retour.
 `ctl <valeur> <cc> <sirene>` servait déjà deux fois et servira aux séquences. Le numéro de CC est
 son argument de création.
 
-**Sa portée est provisoirement « toutes les sirènes »**, posée par un `loadbang`. La pédale A n'a
-pas d'interrupteur libre : sa portée doit venir du champ `pedal` de la table `voices`, que le
-fichier de scène ne porte pas encore (§4). C'est le premier point à reprendre quand le format de
-scène sera étendu.
+**Sa portée vient du champ `pedal` de la scène** (depuis le 2026-09-02). `sirenes-visees` prend
+désormais un **mode** et non plus un booléen :
+
+| Mode | Sirènes visées | Qui l'utilise |
+|---|---|---|
+| 0 | la seule sélectionnée | pédales B et C, interrupteur relâché |
+| 1 | toutes | pédales B et C, interrupteur enclenché |
+| 2 | celles dont `pedal` vaut 1 dans la table `voices` | **pédale A**, qui n'a pas d'interrupteur libre |
+
+Mesuré : sur une table où seules les voix 0 et 2 portent `pedal = 1` (sirènes 3 et 1), une valeur de
+90 en mode 2 ne part que vers ces deux-là.
 
 Ce qui manque encore à la pédale A : `tremoloSpeed` (CC 15) est censé venir de la scène, qui ne
 sait pas non plus le stocker. Aujourd'hui la vitesse du trémolo reste celle réglée sur la sirène.
