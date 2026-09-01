@@ -158,6 +158,23 @@ ressort 65 — six demi-tons, ce qui est juste sur la chromatique chargée par d
 La suppression du §10 attendra un essai au pied — casser l'étage existant pendant que le Raspberry
 est inaccessible n'aurait aucun intérêt.
 
+### Construit le 2026-09-02 — `pedale-vibrato.pd` et `sirenes-visees.pd`
+
+La pédale B lit le CC 48 et émet **`ctl <valeur> 1 <sirene>`** : le CC 1 des sirènes est
+*Vibrato Amount*, et ce format est celui que `pd sendNote` utilise déjà (`$1 72 3`, CC 72 =
+Release). L'interrupteur 45 choisit la portée.
+
+**`sirenes-visees.pd` est sorti de `pedale-degre`** avant d'être recopié pour la pédale B : portée,
+sélection et boucle sur les sept sirènes étaient identiques. Ce que l'extraction supprime est réel —
+l'ordre des lectures avant la boucle est subtil, et il n'a plus à être juste qu'à un seul endroit.
+Chaque instance a son `$0`, donc les deux pédales ne se télescopent pas.
+
+**Elle n'émet que ce qui change**, et ce n'est pas une optimisation gratuite : sans ça, chaque
+mouvement de la sélection renvoyait sept valeurs identiques aux sirènes. Mesuré sur le vrai patch,
+**35 messages pour un seul mouvement utile, ramenés à 14**. La table des dernières valeurs part à
+`-1` pour que la première passe toujours. À rapprocher de `project_pedalier_flux_degrade` : ce
+chemin-là, au moins, ne contribuera pas au bruit.
+
 ---
 
 ## 6. Placement dans la chaîne
