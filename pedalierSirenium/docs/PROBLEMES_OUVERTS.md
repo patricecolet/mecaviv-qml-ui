@@ -15,7 +15,9 @@ contredit une mesure, c'est elle qui a tort, plusieurs sections ci-dessous en t�
 | Corrigé et **validé par Patrice** | Corrigé, **attend son pied** |
 |---|---|
 | une boucle arrêtée reste la référence | le tempo dans le `.mid` et le `.json` du clip |
-| l'origine de grille repart avec l'horloge | |
+| l'origine de grille repart avec l'horloge | **l'ancrage de la grille sur le décalage de la référence** (§17) |
+| le changement de scène du petit boîtier, à la mesure | |
+| l'héritage du tempo par une scène neuve | |
 | une scène neuve ne ressuscite plus les boucles | |
 | la note affichée aux anneaux (sous réserve accordeur) | |
 | le clavier de renommage de scène | |
@@ -263,3 +265,39 @@ redécouvrir à chaque lecture de journal.
 `docs/MIDI_CONFIGURATION.md` décrit un onglet « MIDI » du Debug Panel pour choisir les ports ; le
 panneau **et** l'onglet ont été supprimés. Le fichier porte une bannière de péremption — la garder,
 ne pas agir sur ses instructions.
+
+## 17. L'ancrage de la grille sur la référence — corrigé, **pas validé**
+
+**En suspens au 2026-09-01.** Corrigé, déployé, mesuré par moi ; Patrice n'a pas pu l'éprouver.
+
+**Symptôme.** Une boucle rappelée jouait une mesure en retard sur le métronome. Mesuré sur une
+boucle de 4 mesures : mesure globale 1, 2, 3, 4 → mesure de la boucle 1/4, 1/4, 2/4, 3/4. Son cycle
+ne coïncidait plus avec la grille, donc au moment où elle rebouclait, l'écran était encore sur la
+mesure d'avant.
+
+**Cause.** `startBar = mainloop-startbar + offset_ticks/1920`, et `offset_ticks` vient du fichier du
+clip : c'est le décalage capté quand ce clip a été enregistré, dans une session dont la grille
+n'existe plus. On l'appliquait par-dessus l'origine remise à zéro au départ du transport.
+
+**Correctif retenu, choisi par Patrice** : garder les décalages relatifs entre boucles, ancrés sur
+celui de la référence — l'origine se pose à **l'opposé** du décalage de la référence, puisque chaque
+loader calcule déjà `origine + son propre décalage`. Le nombre remonte par un cinquième champ de
+`$0.loopstates`. Détail dans `LOOPER_STATE_MACHINE.md` §3quater.
+
+**Mesure après correction** : mesure globale 1, 2, 3 → 1/4, 2/4, 3/4. Pd à 22 %, zéro erreur au
+chargement.
+
+**Ce qui reste à éprouver au pied** : qu'une boucle enregistrée en cours de session, elle, garde
+bien son décalage voulu — je n'ai mesuré que le cas du rappel, et je ne peux pas enregistrer de
+notes moi-même (§14).
+
+## 18. Deux hauteurs hors de toute plage MIDI
+
+**Vu une fois le 2026-08-31, non reproduit, non expliqué.** Sur une capture d'écran, S3 affichait
+« Mi 18 » et le sirénium « Do -2 » — soit des notes autour de 244 et de 0, impossibles pour du MIDI.
+Les autres sirènes affichaient des valeurs saines (Ré 3, Do 2, Do 5) au même instant.
+
+Ça peut n'être qu'un résidu de mes injections MIDI de la nuit. Mais si ça réapparaît en jouant,
+c'est une piste sérieuse : la formule d'affichage est la même des deux côtés
+(`_names[note % 12]` + `floor(note/12) − 2`), donc une valeur aberrante à l'écran vient d'une valeur
+aberrante sur le fil, pas du calcul.
