@@ -155,10 +155,36 @@ sirenium ─┬────────────────────→ h
       pédales A/B/C → table voices de la scène (volume / gate / degree)
 ```
 
-Rappel de §9, à ne pas perdre de vue en patchant : aujourd'hui la relecture d'un clip **contourne**
-l'harmoniseur — `clip-io` sort directement sur `$0.to.sirens`, si bien que deux producteurs se
-partagent ce bus. Avec l'harmoniseur aval, la relecture doit entrer **dans** cet harmoniseur au lieu
-d'arriver à côté.
+### Construit le 2026-09-01 — `harmoniseur-aval.pd`
+
+§9 annonçait un recâblage : « la relecture doit entrer **dans** l'harmoniseur aval au lieu d'arriver
+à côté ». **Il n'y en a pas eu besoin**, et c'est la bonne surprise de ce chantier. Le bus
+`$0.to.sirens` a trois producteurs (l'harmoniseur amont via `pd filter`, et les deux `s $3.to.sirens`
+de `siren-clip-loader` — relecture et ghost note) mais **un seul lecteur qui va au son** :
+`r $0.to.sirens` → `pd route.device`. L'objet s'insère donc sur le **lecteur**, en un seul câble
+coupé, et les clips le traversent d'eux-mêmes.
+
+Mieux : `pd captation` lit ce même bus, donc **en amont** de l'aval. Ce qui part dans le clip n'est
+pas transposé — exactement le partage que §9 demande, obtenu sans déplacer le point de captation.
+
+L'abstraction décale chaque `note` de N degrés dans `$1.scaleBuffer` ; `bend` et tout message
+inconnu passent intacts. Deux points à connaître :
+
+- **La convention du quart de ton est prise en compte** : la note du bus est un demi-ton sous la
+  hauteur réelle, d'où un `+ 1` avant la recherche du degré et un `- 1` après. Exact tant que le
+  bend est neutre ; sous bend réel la note dérive d'au plus un demi-ton, comme partout ailleurs sur
+  ce bus (`reference_to_sirens_note_decalee`).
+- **Neutre au repos, et neutre au démarrage.** Décalage 0 → la note ressort identique. Gamme pas
+  encore chargée → `text search` rend `-1`, une garde fait passer la note telle quelle : l'objet ne
+  peut pas rendre le patch muet au boot.
+
+Mesuré en headless (Ionian : +1 do→ré, +2 do→mi, +7 une octave, −1 le si dessous ; Diminished à
+4 degrés : le repli d'octave tient ; gamme vide : note intacte), puis bout-en-bout sur le vrai
+patch. **La gamme chargée au démarrage est `Chromatic`** (12 degrés, `pd defaultScale` de
+`scaleManager`) — un décalage y vaut donc un demi-ton tant qu'aucune gamme n'est choisie.
+
+**L'entrée droite — le décalage — n'est câblée à rien.** C'est là que la pédale C viendra se
+brancher ; d'ici là l'objet est posé et sans effet.
 
 ---
 
@@ -251,8 +277,9 @@ listes ne se correspondent pas ; la refonte est l'occasion de n'en garder qu'une
 
 Ordre validé par Patrice :
 
-1. **L'harmoniseur aval** (`SCENES_SPEC.md` §9) — préalable : le processeur en dépend, et la
-   relecture des clips doit y entrer au lieu d'arriver à côté sur `$0.to.sirens`.
+1. ~~**L'harmoniseur aval**~~ — **fait le 2026-09-01** (§6). Le socle est posé et neutre ; ce qui
+   reste de `SCENES_SPEC.md` §9, c'est rejouer un clip dans une **autre** gamme que celle où il a
+   été joué, et ça demande d'écrire la gamme d'origine dans le `.json` du clip (§13).
 2. **Le processeur d'effet** — ce document.
 3. **Le mode polyphonie** — nécessaire pour la suite, et jamais tranché
    (`PEDALIER_MAPPING.md` : piste en réflexion depuis le 2026-07-25).
@@ -304,3 +331,20 @@ Restent à leurrer, eux : les CC des pédales (par la sonde FUDI, ou un port MID
   sémantique qui est vide, et c'est une chance : on peut la définir sans rien casser. Reste à mesurer
   ce que `enable` déclenche réellement avant d'y toucher.
 - **La quatrième pédale BOSS (CC 50)** reste libre.
+- **Rejouer un clip dans une autre gamme** — le vrai objectif de `SCENES_SPEC.md` §9, et la seule
+  part non livrée. Elle demande la gamme d'origine dans le `.json` du clip (qui ne porte aujourd'hui
+  que `siren`, `is_reference`, `length_bars`, `length_ticks`, `id`, `offset_ticks`) et une
+  conversion position→position. `harmoniseur-aval` est l'endroit où ça viendra se greffer.
+
+### Un canal mort trouvé en chemin : `$1.tune`
+
+Dans `harmoniseur.pd`, **quatre `r $1.tune` et pas un seul émetteur**. La tonique circule en réalité
+sur le canal **global `tune`** (le `nbx` de `pd tune`, `send tune` / `receive tune-s`, sans `$0` ni
+`$1`) — même famille de vestige que les huit `send midi.pedalier.sirenium-r` corrigés le
+2026-08-01. Conséquence : dans tout calcul de degré, **la tonique vaut toujours 0**, quelle que
+soit la valeur affichée.
+
+Ça se répare en une boîte (`s $1.tune` à côté du `r tune`), mais **ce n'est pas anodin** : les
+degrés bougeront dès que la tonique ne sera pas do, donc le son change. `harmoniseur-aval` lit
+`$1.tune` — le nom juste, pas le vestige — et se comportera donc correctement le jour où le canal
+sera raccordé. Décision à prendre par Patrice, hors de ce chantier.
