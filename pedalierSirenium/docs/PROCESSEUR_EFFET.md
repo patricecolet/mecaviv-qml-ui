@@ -127,9 +127,16 @@ Quatre points à toucher, trouvés en suivant les écritures plutôt qu'en lisan
 | Où | Quoi |
 |---|---|
 | `voice.select.root` | préservait trois champs (`text get $1.voices 4 3`), en préserve cinq — sinon il réécrivait une ligne de sept atomes et **effaçait les deux nouveaux à chaque sélection de voix** |
+| `siren.reset` | **l'init du tampon** : son message `0 $1 0 127 0 0 $2` créait les sept lignes à sept atomes ; il en énonce neuf |
 | `updateVoice` | complète toute ligne reçue à neuf champs (`list append 0 0` puis `list split 9`) |
 | `scene.voices.save` | deux `sceneSet` de plus |
 | `scene.voices.load` | deux clés de plus dans son `select` |
+
+Les lignes de voix naissent dans `pd siren.reset`, sur `siren.reset all`, avec l'appariement
+voix→sirène `0 3, 1 4, 2 1, 3 2, 4 5, 5 6, 6 7` — l'ordre par hauteur (`reference_siren_pitch_order`).
+La complétion dans `updateVoice` reste en plus : c'est le point où **convergent toutes les écritures
+de ligne**, donc la garantie de longueur y est mieux placée que répétée chez chaque émetteur.
+Mesuré : 42 posé en `vibratoSpeed`, `siren.reset all`, la ligne revient à `0 0 0 127 0 0 3 0 0`.
 
 **`text set` refuse d'écrire au-delà de la fin d'une ligne** (`field number past end of line`, mesuré) :
 c'est pourquoi la complétion dans `updateVoice` est nécessaire, et pas seulement propre. Elle est
