@@ -1,0 +1,278 @@
+# Processeur d'effet — conception
+
+Décidé en discussion le **2026-09-01**. Ce document est la conception, pas un compte rendu : ce
+qu'il décrit n'est **pas encore patché**. Ce qui est validé est marqué comme tel ; ce qui reste
+ouvert est au §12, et rien de ce qui y figure ne doit être construit sans revalider.
+
+Le processeur d'effet est la moitié manquante d'une chaîne déjà à moitié écrite :
+`pedals.modulators` → `$0.modulation.pedal` existe, la matrice de modulation est stockée et éditable
+depuis le QML, mais **rien ne l'applique** — elle ne voyage que vers l'écran. Concevoir le
+processeur, c'est aussi décider ce que devient cette matrice. La réponse est : elle disparaît (§10).
+
+---
+
+## 1. Principe
+
+**Le pied donne l'amplitude, la scène donne le temps.**
+
+Une seule règle pour les trois pédales : la position de la pédale ouvre l'effet, tout ce qui est
+rythme ou vitesse est un réglage de scène. Rien à décider au cas par cas, et le geste au pied
+signifie la même chose partout.
+
+Corollaire : la refonte **supprime les 8 `pedalId` virtuels**. Les boutons ne multiplexent plus les
+pédales physiques, ils portent une fonction propre ; chaque pédale a une affectation fixe. C'est ce
+qui rend l'usage « plus précis et plus simple » — au prix de la matrice 448, voir §3 et §10.
+
+---
+
+## 2. Les contrôles
+
+Trois pédales d'expression continues et quatre interrupteurs, sur la **pédale BOSS** (IP .25,
+canal 9). Les numéros sont du matériel, ils sont figés : boutons **43-46**, pédales **47-50**
+(`PEDALIER_MAPPING.md`). Les interrupteurs ont chacun **leur LED** (43-46 en retour) : leur état est
+visible au sol, donc latché — pas de momentané à simuler.
+
+| Pédale | CC | Interrupteurs | Au pied | Dans la scène |
+|---|---|---|---|---|
+| **A** | 47 | **43 + 44** — choix du motif | amplitude : profondeur du trémolo, ou creusement du volet entre les notes | `tremoloSpeed`, et les 3 séquences |
+| **B** | 48 | **45** — portée | `vibratoDepth` | `vibratoSpeed` |
+| **C** | 49 | **46** — portée | transposition diatonique dans la gamme | `scaleMode`, `root` |
+
+**Les deux interrupteurs de la pédale A** donnent quatre états stables, tous utiles :
+
+| 43 | 44 | Pédale A agit sur |
+|---|---|---|
+| 0 | 0 | **trémolo** (modulation continue du volume) |
+| 1 | 0 | séquence **1** |
+| 0 | 1 | séquence **2** |
+| 1 | 1 | séquence **3** |
+
+Il n'y a donc pas d'état « la pédale ne fait rien » : sans séquence, elle fait le trémolo. C'est le
+même geste — ouvrir les volets — avec ou sans motif rythmique.
+
+**Les interrupteurs 45 et 46** portent la **portée** de leur pédale : appliquée à la seule sirène
+sélectionnée, ou à toutes. La pédale A n'a pas d'interrupteur libre : sa portée vient de la scène
+(§3), sans dérogation au pied.
+
+La **quatrième pédale BOSS (CC 50) reste libre**, comme aujourd'hui — `pedals.modulators` ne route
+que `47 48 49`.
+
+---
+
+## 3. L'état vit dans la table `voices` de la scène
+
+C'est le point de conception le plus important, et il ne demande aucun format nouveau.
+
+`pd scene.voices.load` remplit `$0.voices`, une ligne par voix, avec les champs :
+
+```
+enable   voice   degree   volume   gate   pedal   siren
+```
+
+Le champ **`pedal` n'est câblé à rien** — vérifié dans `pedalier.pd` le 2026-09-01 : les seuls
+`text get $0.voices` du patch lisent les champs 1 et 6. C'est une case réservée, jamais branchée.
+Elle attend exactement ce qu'on construit.
+
+Répartition :
+
+| Champ | Écrit par | Rôle |
+|---|---|---|
+| `volume` | pédale A | amplitude du trémolo / creusement du volet |
+| `gate` | pédale A (séquences) | ouverture-fermeture rythmique |
+| `degree` | pédale C | degré de la voix dans la gamme |
+| `pedal` | **la scène** | quelles voix suivent les pédales |
+
+Sept lignes, sauvegardées et rechargées avec la scène par une machinerie qui existe déjà, **au lieu
+de 448 valeurs** dans un fichier de préréglage séparé. Une profondeur par sirène et par pédale reste
+possible si le besoin apparaît, mais elle n'est pas dans cette conception : commencer par la table.
+
+Le champ `pedal` et les interrupteurs 45/46 ne se contredisent pas : la scène dit qui suit la
+pédale, l'interrupteur **force toutes les voix** tant qu'il est enclenché, sa LED le dit.
+
+---
+
+## 4. Les trois séquences
+
+Une séquence n'est **pas une suite de hauteurs** : c'est un **motif rythmique de réattaques**. La
+hauteur reste celle tenue au sirenium ; rejouer la note referme puis rouvre le volet. Un trémolo
+programmable, en somme — ce qui explique que l'état sans séquence soit le trémolo continu.
+
+Format proposé, une ligne par événement, dans le fichier de scène :
+
+```
+<position en ticks>  <vélocité>
+```
+
+- **Position en ticks**, pas en millisecondes : la séquence est calée sur l'horloge comme tout le
+  reste, et c'est ce qui permet de l'enregistrer telle quelle (§7). Référence : 1920 ticks par
+  mesure, comme les clips (`length_ticks` de `clip_*.json`).
+- **La vélocité est le profil du motif**, et la pédale la met à l'échelle : à fond, le volet se
+  referme complètement entre les notes ; au repos, rien ne se passe.
+- La **vitesse est dans la séquence**, jamais au pied — §1.
+
+Le fichier de scène ne porte aujourd'hui que `tempo`, `harmony{polyphony, root, scaleMode}`,
+`sirens[]`, `sceneName`, `order`, `sceneId`, `page`, `globalSceneId` (vérifié sur
+`sans-titre/scenes/scene_1.json`). Les séquences et la table `voices` sont **à y ajouter** : c'est
+le seul changement de format de fichier de cette conception.
+
+---
+
+## 5. Pédale C — transposition diatonique
+
+La pédale C transpose **chaque sirène dans la gamme sélectionnée** : toutes montent du même nombre
+de degrés, l'harmonie garde sa forme. Ce n'est pas un changement d'accord — poser l'accord est un
+autre chantier, et il vient après le mode polyphonie (§11).
+
+La machinerie existe déjà dans `harmoniseur.pd` : `$1.scaleBuffer` tient la gamme,
+`text search $1.scaleBuffer <= 0` donne la position d'une note dedans, `text size` donne son
+étendue. Transposer de N degrés est une addition sur cette position plus un repli d'octave.
+
+Deux conséquences :
+
+- **La course de la pédale s'adapte à la gamme.** Le nombre de crans est `text size $1.scaleBuffer`,
+  pas une constante — une dizaine de valeurs en pratique. Rien à reconfigurer en changeant de mode.
+- **Il faut une hystérésis, et ce n'est pas un détail.** Une pédale d'expression tremble ; sur une
+  valeur quantifiée à dix crans, elle ferait clignoter l'harmonie à chaque frontière. Marge de
+  recouvrement à la montée et à la descente, sinon l'effet est inutilisable au pied.
+
+---
+
+## 6. Placement dans la chaîne
+
+`SCENES_SPEC.md` §9 (décidé le 2026-07-31) pose **deux harmoniseurs, le point de captation entre les
+deux** ; l'harmoniseur aval était **reporté, pas abandonné**. Le processeur d'effet le rend
+nécessaire : c'est lui qui reçoit les notes engendrées.
+
+Et il fixe le placement du processeur. §9 dit que ce qui entre dans le clip est *déjà* harmonisé et
+réparti ; un processeur branché entre les deux harmoniseurs enverrait donc ses notes sur
+`$0.to.sirens` sans harmonie ni répartition. Il est **en amont de l'harmoniseur 1**, avec le
+sirenium :
+
+```
+sirenium ─┬────────────────────→ harmoniseur 1 ──→ [rec couche 1]   (gate ici)
+          └→ processeur ────────↗                  [rec couche 2] ──→ harmoniseur 2 → sirènes
+                  ↑
+      pédales A/B/C → table voices de la scène (volume / gate / degree)
+```
+
+Rappel de §9, à ne pas perdre de vue en patchant : aujourd'hui la relecture d'un clip **contourne**
+l'harmoniseur — `clip-io` sort directement sur `$0.to.sirens`, si bien que deux producteurs se
+partagent ce bus. Avec l'harmoniseur aval, la relecture doit entrer **dans** cet harmoniseur au lieu
+d'arriver à côté.
+
+---
+
+## 7. Enregistrement — deux couches
+
+Le rec libre **n'écrit pas dans le clip** : il insère ses événements dans un **second midifile qui
+tourne en parallèle**, pour que la seconde couche soit supprimable d'un geste sans toucher à la
+première. Conséquence heureuse : ce qui est gravé par le processeur est figé, mais jetable — ce qui
+lève l'objection habituelle contre l'enregistrement d'un résultat plutôt que d'un geste.
+
+**Quand une boucle existe déjà, le rec/play ne dépend plus du début de la mesure.** Le risque n'est
+pas le déclenchement, c'est **l'origine des ticks** : libéré de la mesure, il faut écrire à la phase
+courante
+
+```
+(mesure − mainloop-startbar) mod longueur
+```
+
+et non à 0. C'est exactement le défaut qui a produit le bug de grille du 2026-08-22
+(`pd phase` côté PD, `_loopPhase` côté QML). La couche 2 **garde la longueur de la boucle
+existante** : elle ne devient jamais boucle de référence, `mainloopCommit` ne la voit pas.
+
+---
+
+## 8. Le gate sirenium
+
+Le message `SIRENIUM` porte `note` et `velocity`. `note 0` = plus rien sous les doigts ;
+`note > 47` = dans l'ambitus (il commence à 48, `ambitusLow` dans `SireniumMonitor2D.qml`). Le vrai
+signal est donc : **le sirenium joue, ou ne joue pas**.
+
+À la fermeture du gate :
+
+- **seules les notes et le bend du sirenium** cessent d'être captées. Les CC continuent d'être
+  écrits, et la couche 2 n'est pas touchée ;
+- **le temps continue d'avancer** — sinon désynchronisation immédiate ;
+- **la note en cours reçoit son note off**, sinon sirène bloquée volet ouvert.
+
+Il faut une **hystérésis** : un seul `note 0` entre deux notes hacherait l'enregistrement. Soit une
+temporisation, soit attendre la fin de la note en cours. La forme exacte est au §12.
+
+---
+
+## 9. Découpage dans `pedalier.pd`
+
+Convention du patch : un sous-patch porte le **nom de la sortie dont il pend**, avec un préfixe de
+famille quand le mot est courant — la forêt de fenêtres Pd doit rester lisible.
+
+| Sous-patch | Rôle |
+|---|---|
+| `pd pedals.modulators` | **réécrit** : plus de `pedalId` virtuel ; route `47 48 49` vers trois sorties nommées, `43 44 45 46` vers les états d'interrupteur |
+| `pd effect.tremolo` | pédale A, état `00` : amplitude → `volume` des voix concernées |
+| `pd effect.sequence` | pédale A, états `01/10/11` : lit la séquence de la scène, engendre les réattaques, amplitude → vélocité |
+| `pd effect.vibrato` | pédale B → `vibratoDepth` |
+| `pd effect.degree` | pédale C : quantification sur `text size $1.scaleBuffer`, hystérésis, transposition diatonique |
+| `pd effect.scope` | interrupteurs 45/46 : sélection courante ou toutes, en surcharge du champ `pedal` |
+| `pd led.effect.state` | LEDs 43-46, valeur 127 comme le reste du patch |
+| `pd sirenium.gate` | §8 : ferme la captation notes+bend, hystérésis, note off |
+| `pd rec.couche2` | §7 : midifile parallèle, origine des ticks à la phase courante |
+
+Les paramètres passent par des **buffers `text`**, pas par des inlets froids, et l'état par instance
+par `value $0-nom` — jamais un `value` en nom nu, qui serait global.
+
+---
+
+## 10. Ce qui disparaît
+
+La refonte rend caduc tout l'étage `pedalId` :
+
+| Élément | Où | Sort |
+|---|---|---|
+| Matrice 8 × 7 × 8 = 448 | `$0.modulation.pedal.config` | supprimée, remplacée par la table `voices` (§3) |
+| `pedalId` virtuels 1-8 | `pedals.modulators` (décalages 0/4/6) | supprimés |
+| Préréglages de pédales | `pedal.presets/`, `pd pedals.preset.load`, `pd pedals.get.preset.list`, `pd pedals.default.preset` | supprimés |
+| `SIREN_PEDALS.pedalConfigChange` | `WebSocketController.qml` | supprimé |
+| Page CFG | `ConfigView2D.qml`, `ModulationMatrix2D.qml`, `PedalboardPortrait2D.qml` | à réexaminer : la matrice n'a plus d'objet, le reste peut survivre |
+| Liste des 8 contrôleurs | `config.js` | réduite à ce que les pédales touchent réellement |
+
+À vérifier avant de supprimer quoi que ce soit côté QML : `data.qrc` est manuel, et `ConfigView2D`
+est la seule cible du bouton `CFG`. Retirer la matrice sans lui donner un successeur laisse un
+bouton qui ouvre une page vide.
+
+Divergence relevée au passage, à trancher en même temps : PD liste neuf contrôleurs
+(`vibratoSpeed vibratoDepth vibratoProgression tremoloSpeed tremoloDepth attack release tune voice`)
+et `config.js` en liste huit, avec `volume` en plus et sans `vibratoProgression` ni `tune`. Les deux
+listes ne se correspondent pas ; la refonte est l'occasion de n'en garder qu'une.
+
+---
+
+## 11. Ordre des chantiers
+
+Ordre validé par Patrice :
+
+1. **L'harmoniseur aval** (`SCENES_SPEC.md` §9) — préalable : le processeur en dépend, et la
+   relecture des clips doit y entrer au lieu d'arriver à côté sur `$0.to.sirens`.
+2. **Le processeur d'effet** — ce document.
+3. **Le mode polyphonie** — nécessaire pour la suite, et jamais tranché
+   (`PEDALIER_MAPPING.md` : piste en réflexion depuis le 2026-07-25).
+4. **Poser l'accord** — en dernier, une fois la polyphonie décidée.
+
+Le nettoyage du §10 n'est pas un chantier séparé : il se fait avec le 2.
+
+---
+
+## 12. Non tranché
+
+- **Amplitude au pied pour la pédale A** : déduit de la règle du §1, jamais confirmé explicitement.
+  L'autre lecture serait la vitesse au pied et l'amplitude dans la séquence.
+- **Format exact des séquences** : `<ticks> <vélocité>` est une proposition. Reste à dire si une
+  séquence a une longueur propre (et laquelle) ou si elle boucle sur la mesure.
+- **Portée de la pédale A** : elle suit le champ `pedal` de la scène faute d'interrupteur libre.
+  À confirmer que c'est acceptable en jeu.
+- **Par quel geste on supprime la couche 2**, et par quel geste on la crée. Rien n'a été dit ; c'est
+  pourtant tout l'intérêt de la séparer.
+- **Forme de l'hystérésis du gate sirenium** (§8) : temporisation, ou attente de fin de note.
+- **`enable` et `gate`** dans la table `voices` : leur sémantique actuelle n'a pas été vérifiée
+  — aucun `text get` du patch ne les lit. À mesurer avant d'y écrire.
+- **La quatrième pédale BOSS (CC 50)** reste libre.
