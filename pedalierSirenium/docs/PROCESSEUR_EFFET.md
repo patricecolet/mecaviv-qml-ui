@@ -2,7 +2,7 @@
 
 Décidé en discussion le **2026-09-01**. Ce document est la conception, pas un compte rendu : ce
 qu'il décrit n'est **pas encore patché**. Ce qui est validé est marqué comme tel ; ce qui reste
-ouvert est au §12, et rien de ce qui y figure ne doit être construit sans revalider.
+ouvert est au §13, et rien de ce qui y figure ne doit être construit sans revalider.
 
 Le processeur d'effet est la moitié manquante d'une chaîne déjà à moitié écrite :
 `pedals.modulators` → `$0.modulation.pedal` existe, la matrice de modulation est stockée et éditable
@@ -197,7 +197,7 @@ signal est donc : **le sirenium joue, ou ne joue pas**.
 - **la note en cours reçoit son note off**, sinon sirène bloquée volet ouvert.
 
 Il faut une **hystérésis** : un seul `note 0` entre deux notes hacherait l'enregistrement. Soit une
-temporisation, soit attendre la fin de la note en cours. La forme exacte est au §12.
+temporisation, soit attendre la fin de la note en cours. La forme exacte est au §13.
 
 ---
 
@@ -262,7 +262,32 @@ Le nettoyage du §10 n'est pas un chantier séparé : il se fait avec le 2.
 
 ---
 
-## 12. Non tranché
+## 12. Banc de test sans matériel
+
+`harmoniseur.pd` embarque un **sirenium virtuel** : `pd sirenium` → `pd virtualSirenium`, armé par
+le toggle **`$1.sirenium.auto`**. Le toggle porte un nom de receive, donc il s'arme par `send` —
+sans souris, sans GUI, en headless.
+
+Ce qu'il produit : un `metro` (2000 ms, commutable à 1000) tire une valeur au hasard, la ramène
+**dans la gamme courante** par `text search $1.scaleBuffer <= 0` puis `text get $1.scaleBuffer`
+(un `route -1` écarte ce qui n'y est pas), transpose autour de 60 et sort la paire note/bend au
+quart de ton par `+ 0.5` / `* 8192` / `mod 8192`, dans un `makenote`.
+
+Deux conséquences pour ce chantier :
+
+- **C'est le banc de test de la pédale C.** Le sirenium virtuel puise dans le **même**
+  `$1.scaleBuffer` que la transposition diatonique du §5 : la gamme, la quantification et
+  l'hystérésis se vérifient sans toucher au matériel.
+- **Il respecte la convention du quart de ton** (`reference_to_sirens_note_decalee`) : ce qui en sort
+  a la même forme que le vrai sirenium, bend compris. Un test qui passe ici n'aura pas de surprise de
+  format au branchement.
+
+Restent à leurrer, eux : les CC des pédales (par la sonde FUDI, ou un port MIDI virtuel avec
+`amidi`) et les LEDs, qui ne se vérifient qu'au sol.
+
+---
+
+## 13. Non tranché
 
 - **Amplitude au pied pour la pédale A** : déduit de la règle du §1, jamais confirmé explicitement.
   L'autre lecture serait la vitesse au pied et l'amplitude dans la séquence.
@@ -273,6 +298,9 @@ Le nettoyage du §10 n'est pas un chantier séparé : il se fait avec le 2.
 - **Par quel geste on supprime la couche 2**, et par quel geste on la crée. Rien n'a été dit ; c'est
   pourtant tout l'intérêt de la séparer.
 - **Forme de l'hystérésis du gate sirenium** (§8) : temporisation, ou attente de fin de note.
-- **`enable` et `gate`** dans la table `voices` : leur sémantique actuelle n'a pas été vérifiée
-  — aucun `text get` du patch ne les lit. À mesurer avant d'y écrire.
+- **`gate`, `pedal` et `siren`** dans la table `voices` : personne ne les **lit**, mais ils sont déjà
+  **préservés** — `pd voice.select.root` (`harmoniseur.pd`) fait `text get $1.voices 4 3` et remet
+  ces trois champs en place quand il réécrit une ligne de voix. Le transport existe donc ; c'est leur
+  sémantique qui est vide, et c'est une chance : on peut la définir sans rien casser. Reste à mesurer
+  ce que `enable` déclenche réellement avant d'y toucher.
 - **La quatrième pédale BOSS (CC 50)** reste libre.
