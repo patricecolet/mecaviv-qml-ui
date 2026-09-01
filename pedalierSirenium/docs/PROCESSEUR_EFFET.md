@@ -110,10 +110,39 @@ Format proposé, une ligne par événement, dans le fichier de scène :
   referme complètement entre les notes ; au repos, rien ne se passe.
 - La **vitesse est dans la séquence**, jamais au pied — §1.
 
-Le fichier de scène ne porte aujourd'hui que `tempo`, `harmony{polyphony, root, scaleMode}`,
-`sirens[]`, `sceneName`, `order`, `sceneId`, `page`, `globalSceneId` (vérifié sur
-`sans-titre/scenes/scene_1.json`). Les séquences et la table `voices` sont **à y ajouter** : c'est
-le seul changement de format de fichier de cette conception.
+**La table `voices` était déjà dans le format** — je l'avais cru absente en lisant une scène de
+démonstration jamais réécrite, dans `examples/pedalier.compositions/`, qui n'est même pas la racine
+utilisée. **La vraie racine est `~/Documents/pedalier.compositions/`.** `pd scene.voices.save` écrit
+les champs des sept voix, `pd scene.voices.load` les relit, et le champ `pedal` en fait partie
+depuis le début. Seules les séquences restent à ajouter au format.
+
+### Étendu le 2026-09-02 — les deux vitesses, par sirène
+
+`vibratoSpeed` et `tremoloSpeed` sont les **champs 7 et 8** de `$0.voices`, ajoutés **à la fin** :
+aucun indice existant ne bouge, donc `text get … 6` (la sirène) et `text search … 1` (la voix)
+restent valides chez tous leurs lecteurs.
+
+Quatre points à toucher, trouvés en suivant les écritures plutôt qu'en lisant la disposition :
+
+| Où | Quoi |
+|---|---|
+| `voice.select.root` | préservait trois champs (`text get $1.voices 4 3`), en préserve cinq — sinon il réécrivait une ligne de sept atomes et **effaçait les deux nouveaux à chaque sélection de voix** |
+| `updateVoice` | complète toute ligne reçue à neuf champs (`list append 0 0` puis `list split 9`) |
+| `scene.voices.save` | deux `sceneSet` de plus |
+| `scene.voices.load` | deux clés de plus dans son `select` |
+
+**`text set` refuse d'écrire au-delà de la fin d'une ligne** (`field number past end of line`, mesuré) :
+c'est pourquoi la complétion dans `updateVoice` est nécessaire, et pas seulement propre. Elle est
+idempotente et vaut quel que soit l'émetteur, donc elle migre les lignes existantes sans rien casser.
+
+Cycle vérifié bout en bout sur le vrai patch : 42 écrit en mémoire, sauvegardé, **effacé en mémoire**
+(relu 0), scène rechargée, **relu 42 depuis le fichier**.
+
+Deux pièges du format, à connaître avant d'y ajouter quoi que ce soit — ils viennent du commentaire
+de `composition-io v4` : le dump d'une scène sort **en ordre de hachage Lua**, et **les clés nulles
+sont omises entièrement**. Un récepteur doit donc latcher entre `begin` et `end`, jamais agir ligne
+à ligne, et toute clé ajoutée doit avoir une valeur par défaut posée avant le dump — sinon elle
+garde silencieusement celle de la scène précédente.
 
 ---
 
