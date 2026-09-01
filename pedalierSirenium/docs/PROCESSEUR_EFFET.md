@@ -97,7 +97,39 @@ Une séquence n'est **pas une suite de hauteurs** : c'est un **motif rythmique d
 hauteur reste celle tenue au sirenium ; rejouer la note referme puis rouvre le volet. Un trémolo
 programmable, en somme — ce qui explique que l'état sans séquence soit le trémolo continu.
 
-Format proposé, une ligne par événement, dans le fichier de scène :
+**Format mesuré le 2026-09-02**, en écrivant un bloc d'essai dans une scène et en sondant le dump.
+Deux clés, toutes deux sur le modèle de `voices` — donc la même machinerie de chargement :
+
+```json
+"sequences": [
+  { "seq": 1, "tick": 0,   "velocite": 127 },
+  { "seq": 1, "tick": 480, "velocite": 60 },
+  { "seq": 2, "tick": 960, "velocite": 100 }
+],
+"sequenceLengths": [1920, 960, 3840]
+```
+
+Ce que le broadcast en émet, vérifié :
+
+```
+list sequences 0 tick 0          list sequenceLengths 0 1920
+list sequences 0 seq 1           list sequenceLengths 1 960
+list sequences 0 velocite 127    list sequenceLengths 2 3840
+```
+
+Un tableau d'objets donne `<clé> <index> <champ> <valeur>`, un tableau de nombres
+`<clé> <index> <valeur>`. **L'ordre est celui du hachage Lua** — dans la mesure, `sequenceLengths`
+sortait avant `tempo` et `tick` avant `seq` : la règle du latch jusqu'à `end` n'est pas théorique.
+
+**La longueur est propre à chaque séquence**, en ticks, 1920 (une mesure) par défaut. Patrice n'a pas
+tranché entre « boucler sur la mesure » et « longueur propre » ; c'est le choix qui ne ferme aucune
+porte, cohérent avec `length_ticks` des clips, et qui laisse les polyrythmes possibles
+(`project_looper_polyrythme_assume`).
+
+**Les trois séquences sont communes à la scène**, pas une par sirène : les boutons de la pédale A en
+choisissent une, et le champ `pedal` dit déjà quelles sirènes la reçoivent.
+
+Une ligne par événement :
 
 ```
 <position en ticks>  <vélocité>
@@ -455,8 +487,11 @@ Restent à leurrer, eux : les CC des pédales (par la sonde FUDI, ou un port MID
 
 - **Amplitude au pied pour la pédale A** : déduit de la règle du §1, jamais confirmé explicitement.
   L'autre lecture serait la vitesse au pied et l'amplitude dans la séquence.
-- **Format exact des séquences** : `<ticks> <vélocité>` est une proposition. Reste à dire si une
-  séquence a une longueur propre (et laquelle) ou si elle boucle sur la mesure.
+- **Longueur des séquences** : posée à 1920 ticks par défaut, propre à chaque séquence — c'est mon
+  choix, pas une décision de Patrice, qui n'a pas tranché entre ça et « boucler sur la mesure ».
+- **Une scène chargée se demande par un numéro nu** sur `$0.scene.select`, pas par `scene <n>` :
+  ce dernier ne charge rien et fait rediffuser la scène courante. Mesuré le 2026-09-02, après s'y
+  être laissé prendre.
 - **Portée de la pédale A** : elle suit le champ `pedal` de la scène faute d'interrupteur libre.
   À confirmer que c'est acceptable en jeu.
 - **Par quel geste on supprime la couche 2**, et par quel geste on la crée. Rien n'a été dit ; c'est
