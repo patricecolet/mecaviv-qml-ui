@@ -314,10 +314,22 @@ Une ligne par événement :
   zéro sur la note on, sans ancre absolue ni resynchronisation, contrairement au curseur du looper
   qui doit se caler sur `mainloop-startbar`.
 
-  Deux points à trancher : ce qui arrive **au bout de la longueur** (le motif boucle tant que la
-  note est tenue, ou joue une fois comme un ornement d'attaque), et ce qui **compte comme note on** —
-  une **ghost note** (vélocité 1, moteur muet) ne devrait pas relancer le motif, sinon le
-  rebouclage d'un clip le recalerait en silence.
+  Reste à trancher : ce qui arrive **au bout de la longueur** — le motif boucle tant que la note est
+  tenue, ou joue une fois comme un ornement d'attaque.
+
+- **Deux ghost notes, à ne pas confondre.** Celles que le séquenceur **émet** : placées dans le
+  silence entre deux pas — après le note off d'un pas, avant le note on du suivant — pour que le
+  moteur garde son régime et que l'attaque suivante soit nette (Patrice, 2026-09-02). « Si on
+  peut » : quand le gate remplit déjà l'intervalle jusqu'au pas suivant, il n'y a pas de trou à
+  combler. Activable par une **option dans l'UI du séquenceur**.
+
+  Et celles qu'il **reçoit** : la ghost d'anticipation que `clip-io/relance` envoie ~500 ms avant le
+  rebouclage. Celle-là ne doit pas relancer le motif, sinon le rebouclage d'un clip recale la
+  séquence en silence. **Encore à trancher.**
+
+- **Une UI de séquenceur apparaît ici pour la première fois.** Où vit-elle — dans le QML, à côté de
+  la page des scènes, ou dans le patch ? L'écran suppose un aller-retour WebSocket pour éditer les
+  fichiers de la bibliothèque ; le patch se contente de quelques sliders. Non tranché.
 
 **La table `voices` était déjà dans le format** — je l'avais cru absente en lisant une scène de
 démonstration jamais réécrite, dans `examples/pedalier.compositions/`, qui n'est même pas la racine
