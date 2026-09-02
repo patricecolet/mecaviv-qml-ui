@@ -17,7 +17,28 @@ Item {
     // quand la liaison WebSocket sera faite (voir PROCESSEUR_EFFET.md)
     property int sirene: 3
     property int motif: 1
-    property var sequences: [
+    property int bpm: 108
+    property int aEditer: 1
+    property var assignation: [1, 2, 0]     // seq assignee a bouton1, bouton2, 1+2
+    function nouvelleSequence() {
+        var b = bibliotheque.slice();
+        var n = 1;
+        for (var i = 0; i < b.length; i++) n = Math.max(n, b[i].index + 1);
+        b.push({ index: n, longueur: 1920, pas: [] });
+        bibliotheque = b;
+        aEditer = n;
+    }
+    function _sequence(i) {
+        for (var k = 0; k < bibliotheque.length; k++) if (bibliotheque[k].index === i) return bibliotheque[k];
+        return { index: 0, longueur: 1920, pas: [] };
+    }
+    function _enregistre(i, pas) {
+        var b = bibliotheque.slice();
+        for (var k = 0; k < b.length; k++) if (b[k].index === i) { b[k] = { index: i, longueur: b[k].longueur, pas: pas }; }
+        bibliotheque = b;
+    }
+
+    property var bibliotheque: [
         { index: 1, longueur: 1920, pas: [
             { tick: 0,    velocite: 127, hauteur: 0,  gate: 240, attack: 20, release: 30 },
             { tick: 480,  velocite: 100, hauteur: 2,  gate: 120, attack: 10, release: 40 },
@@ -30,7 +51,6 @@ Item {
             { tick: 480, velocite: 110, hauteur: 0,  gate: 200, attack: 15, release: 25 },
             { tick: 720, velocite: 70,  hauteur: 5,  gate: 100, attack: 25, release: 35 }
         ] },
-        { index: 0, longueur: 1920, pas: [] }
     ]
 
     readonly property var _nomPedale: ["A", "B", "C"]
@@ -56,7 +76,7 @@ Item {
         PedalboardPortrait2D {
             id: portrait
             Layout.fillWidth: true
-            Layout.preferredHeight: 395
+            Layout.preferredHeight: 150
             selKind: root.selKind
             selIndex: root.selIndex
             onSelected: function(kind, index) {
@@ -80,32 +100,121 @@ Item {
             }
         }
 
-        // ---- pédale A : les trois motifs de la sirène, plus le trémolo
+        // ---- pédale A : la bibliothèque, les trois emplacements, l'éditeur
         ColumnLayout {
             visible: root.selKind === "expr" && root.selIndex === 0
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 10
+            spacing: 8
 
-            Text {
-                text: "sirène " + root.sirene + " — les interrupteurs choisissent : "
-                      + (root.motif === 0 ? "trémolo" : "motif " + root.motif)
-                color: "#64737F"; font.family: "monospace"; font.pixelSize: 11
+            // les trois emplacements, dans l'ordre des combinaisons de boutons
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Text {
+                    text: "SIRÈNE " + root.sirene
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5
+                }
+                Repeater {
+                    model: [{ n: 1, lib: "bouton 1" }, { n: 2, lib: "bouton 2" }, { n: 3, lib: "1 + 2" }]
+                    delegate: Rectangle {
+                        id: emplacement
+                        required property var modelData
+                        Layout.preferredWidth: 118
+                        Layout.preferredHeight: 30
+                        radius: 3
+                        color: root.motif === modelData.n ? "#243040" : "#131A24"
+                        border.color: root.motif === modelData.n ? "#6699FF" : "#1E2833"
+                        border.width: 1
+                        RowLayout {
+                            anchors.centerIn: parent
+                            spacing: 8
+                            Text {
+                                text: emplacement.modelData.lib
+                                color: "#64737F"; font.family: "monospace"; font.pixelSize: 9
+                            }
+                            Text {
+                                text: root.assignation[emplacement.modelData.n - 1] > 0
+                                      ? "séq " + root.assignation[emplacement.modelData.n - 1] : "—"
+                                color: root.motif === emplacement.modelData.n ? "#FFFFFF" : "#4A5A6B"
+                                font.family: "monospace"; font.pixelSize: 11; font.bold: true
+                            }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                if (root.aEditer > 0) {
+                                    var a = root.assignation.slice();
+                                    a[emplacement.modelData.n - 1] = root.aEditer;
+                                    root.assignation = a;
+                                }
+                                root.motif = emplacement.modelData.n;
+                            }
+                        }
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                Text {
+                    text: "toucher un emplacement lui assigne la séquence choisie"
+                    color: "#2A3543"; font.family: "monospace"; font.pixelSize: 9
+                }
             }
 
-            Repeater {
-                model: root.sequences
-                delegate: SequenceEditor2D {
-                    required property var modelData
-                    required property int index
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.minimumHeight: 92
-                    steps: modelData.pas
-                    lengthTicks: modelData.longueur
-                    seqIndex: modelData.index
-                    actif: root.motif === index + 1
+            // la bibliothèque
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Text {
+                    text: "BIBLIOTHÈQUE"
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5
                 }
+                Repeater {
+                    model: root.bibliotheque
+                    delegate: Rectangle {
+                        id: vignette
+                        required property var modelData
+                        Layout.preferredWidth: 44
+                        Layout.preferredHeight: 30
+                        radius: 3
+                        color: root.aEditer === modelData.index ? "#6699FF" : "#131A24"
+                        border.color: root.aEditer === modelData.index ? "#8FB4FF" : "#1E2833"
+                        border.width: 1
+                        Text {
+                            anchors.centerIn: parent
+                            text: vignette.modelData.index
+                            color: root.aEditer === vignette.modelData.index ? "#0E141B" : "#64737F"
+                            font.family: "monospace"; font.pixelSize: 12; font.bold: true
+                        }
+                        MouseArea { anchors.fill: parent; onClicked: root.aEditer = vignette.modelData.index }
+                    }
+                }
+                Rectangle {
+                    Layout.preferredWidth: 44
+                    Layout.preferredHeight: 30
+                    radius: 3
+                    color: "#131A24"
+                    border.color: "#243040"; border.width: 1
+                    Text {
+                        anchors.centerIn: parent
+                        text: "+"; color: "#64737F"; font.family: "monospace"; font.pixelSize: 15
+                    }
+                    MouseArea { anchors.fill: parent; onClicked: root.nouvelleSequence() }
+                }
+                Item { Layout.fillWidth: true }
+            }
+
+            // l'éditeur de la séquence choisie
+            SequenceEditor2D {
+                id: editeur
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                steps: root._sequence(root.aEditer).pas
+                lengthTicks: root._sequence(root.aEditer).longueur
+                seqIndex: root.aEditer
+                actif: true
+                bpm: root.bpm
+                enJeu: root.assignation[root.motif - 1] === root.aEditer
+                onMotifModifie: function (pas) { root._enregistre(root.aEditer, pas); }
             }
         }
 
