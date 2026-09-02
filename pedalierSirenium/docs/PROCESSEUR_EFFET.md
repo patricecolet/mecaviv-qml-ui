@@ -1042,6 +1042,28 @@ d'où vient le clip — rien ne le relit au chargement, et il n'y a donc ni conv
 gérer. C'est ce qui fait le gain visé : copier un clip dans une autre scène, dans une autre
 tonalité, et que ça sonne directement.
 
+### Décidé le 2026-09-03 — deux fichiers au travail, un multipiste à l'export
+
+**`midifile` sait écrire du multipiste nativement** : `track <n>` suffit, il accumule chaque piste
+dans un `.trk` temporaire et les assemble au `flush`. Mesuré — `write <f> 480`, `track 1`, une note,
+`track 2`, un CC, `flush` : un fichier **format 1, trois pistes**, piste 1 `90 3c 64`, piste 2
+`b0 01 5a`. La piste 0 reste vide, ce qui est la convention du format 1 : elle porte le tempo.
+
+Ce qui coûte n'est pas d'écrire deux pistes, c'est **quand** on les écrit. `midifile` écrit en une
+passe et ne sait pas rouvrir un fichier pour y ajouter une piste. Or l'automation s'enregistre plus
+tard, sur une boucle déjà fermée : il faudrait à chaque prise relire le clip, rouvrir en écriture,
+réinjecter la matière événement par événement, puis écrire l'automation à côté. Et **on perdrait ce
+pour quoi la séparation existe** — jeter l'automation, aujourd'hui, c'est supprimer un fichier ;
+avec deux pistes, il faudrait la même réécriture complète.
+
+**Décision de Patrice** : deux fichiers pendant le travail, écrits en une passe et jetables d'un
+geste ; **l'assemblage en multipiste se fait à l'export**, un geste explicite où le coût de
+réécriture est payé une fois. Le fichier qui en sort est autonome et s'ouvre dans n'importe quelle
+DAW avec ses couches distinctes.
+
+À construire quand l'export viendra : une branche `track` dans `clip-io` (le `route` a de la place,
+comme pour `meta`), et le cycle read/dump/réinjection.
+
 **Fait le 2026-09-02** : `pd meta.du.clip` dans le loader écrit `meta 89 <armure> 0` et
 `meta 1 <mode>` juste après le `record`, un `t b a` garantissant que le fichier est ouvert avant. Un
 clip enregistré en ré dorien porte `ARMURE [2 0]` et `MODE Dorian`. L'automation ne les grave pas :
