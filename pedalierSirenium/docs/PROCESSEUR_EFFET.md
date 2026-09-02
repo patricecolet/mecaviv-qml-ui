@@ -220,22 +220,36 @@ canaux d'état du calcul, **7 vont dans une entrée froide** — `currentCents`,
 `currentScaleNote` — et toutes dans `harmonize` ou ses sous-patchs. La répartition, l'ambitus, le
 volume et le bend sont donc sans rétention.
 
-### La limite, mesurée
+### L'harmoniseur EST réentrant — et le vrai obstacle est ailleurs
 
-| Deux notes différentes envoyées… | Résultat |
-|---|---|
-| à 2 s d'intervalle | les deux sortent |
-| à 5 ms d'intervalle | les deux sortent |
-| **dans le même temps logique** (un seul `[t b b]`) | **une seule sort — la première est perdue** |
+Une première mesure semblait montrer qu'une note sur deux se perdait dans un même temps logique.
+**Elle était mal construite** : la note « perdue » répétait une note déjà jouée. Refaite avec trois
+notes neuves — 55 seule, puis 62 et 67 par un même `[t b b]` — **les trois sortent** :
 
-Donc **ce n'est pas l'état persistant qui bloque** : s'il fuyait d'un traitement à l'autre, le test à
-5 ms échouerait aussi, et les sept entrées froides sont bien réécrites à chaque passage. Ce qui casse
-est la réentrance **dans un même temps logique** — précisément le cas que produira le séquenceur
-quand deux motifs auront un pas sur le même tick.
+```
+NOTEOUT: 42 8192 3      <- 55
+NOTEOUT: 49 8192 3      <- 62
+NOTEOUT: 54 8192 3      <- 67
+```
 
-Point d'attaque de la refonte : chercher sur le chemin `harmonize` → `processVoice` ce qui ne
-survit pas à une seconde entrée dans le même temps logique, en commençant par les objets écrits puis
-relus dans le même passage.
+`harmonize` et `processVoice` sont donc **réentrants dans un même temps logique**. Sonder pas à pas
+l'a confirmé : les deux notes entrent dans `harmonize`, les deux en sortent, et les deux traversent
+`processVoice`.
+
+**Le vrai obstacle est `[change -1]`, dans `processVoice/voiceToMIDI`** : une note identique à la
+précédente ne passe pas. Ce filtre a sa raison d'être — le sirenium envoie un flux continu de
+position, et sans lui chaque message produirait une note. Mais il est **incompatible avec le
+séquenceur** : un motif qui réattaque la même note — le cas de base, « rejouer la note referme puis
+rouvre le volet » — serait entièrement filtré.
+
+C'est donc un préalable plus immédiat que le poly → poly : il faut distinguer **« la hauteur a
+changé »** (flux continu du sirenium, à filtrer) de **« une attaque a lieu »** (note on délibérée,
+à laisser passer même à hauteur égale). Le `change` répond à la première question et bloque la
+seconde.
+
+Ce qui reste pour le poly → poly proprement dit, l'état n'étant pas en cause : donner une **identité**
+à l'entrée (quelle voix cette note concerne) et remplacer le **broadcast** 1→[1-7] par un ciblage,
+en gardant le comportement actuel quand la note n'a pas d'identité.
 
 **Une fois poly → poly en place, les sept séquenceurs se placent avant `harmonize`** (Patrice,
 2026-09-02), chacun produisant sa ligne. C'est ce qui lève la tension signalée au §4 : les trois
