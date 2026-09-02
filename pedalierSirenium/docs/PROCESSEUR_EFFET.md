@@ -745,12 +745,18 @@ entrées : les notes viennent du jeu harmonisé, les contrôleurs de ce qui part
 sur `ctl` puisque la relecture des clips n'en produit pas. Mesuré : un `ctl 100 1 3` envoyé pendant
 l'automation ressort du fichier en `CC 1 100`.
 
-**La pédale C n'a rien à faire là, et c'est voulu** : `pedale-degre` agit dans `harmoniseur-aval`,
-c'est-à-dire dans l'harmoniseur 2 du schéma du §6, en aval du point de captation. La transposition
-s'applique en temps réel à tout ce qui sonne, relecture comprise, et n'est donc gravée nulle part —
-ni dans le clip, ni dans l'automation. Le §6 pose « deux harmoniseurs, le point de captation entre
-les deux » depuis le 2026-07-31 ; ce n'est pas un manque à combler. Une version antérieure de ce
-paragraphe le présentait comme un défaut : c'était une erreur de lecture de l'architecture. Conséquence heureuse : ce qui est gravé par le processeur est figé, mais jetable — ce qui
+**La transposition de la pédale C se grave, elle aussi** — décidé par Patrice pendant ce chantier
+et jamais consigné ici, d'où deux allers-retours : « on peut repasser par là en aval », « et bien
+c'est pas grave si le contenu a été harmonisé ». Repasser un contenu déjà transposé dans
+l'harmoniseur aval ne pose pas de problème, donc rien n'oblige à laisser le degré vivant.
+
+Ce qui suit de l'architecture, en revanche, reste vrai et utile : `pedale-degre` agit **dans**
+`harmoniseur-aval`, en aval du point de captation, donc **la matière du clip n'est pas transposée**.
+Graver le degré veut donc dire graver la commande, pas son effet : le degré part en **CC 20** (numéro
+libre, `composeSiren` n'utilise que 1, 9, 15, 72, 73 et 92), décalé de +64 pour porter les valeurs
+négatives, et l'automation le capte comme n'importe quel autre contrôleur. À la relecture ce CC
+est relu et réinjecté dans `harmoniseur-aval` : la transposition s'applique une fois, la note gravée
+ne l'ayant pas subie. Conséquence heureuse : ce qui est gravé par le processeur est figé, mais jetable — ce qui
 lève l'objection habituelle contre l'enregistrement d'un résultat plutôt que d'un geste.
 
 **Quand une boucle existe déjà, le rec/play ne dépend plus du début de la mesure.** Le risque n'est
@@ -995,15 +1001,40 @@ Restent à leurrer, eux : les CC des pédales (par la sonde FUDI, ou un port MID
   que `siren`, `is_reference`, `length_bars`, `length_ticks`, `id`, `offset_ticks`) et une
   conversion position→position. `harmoniseur-aval` est l'endroit où ça viendra se greffer.
 
-### Un canal mort trouvé en chemin : `$1.tune`
+### Branché le 2026-09-02 : la tonique atteint enfin le calcul
 
-Dans `harmoniseur.pd`, **quatre `r $1.tune` et pas un seul émetteur**. La tonique circule en réalité
-sur le canal **global `tune`** (le `nbx` de `pd tune`, `send tune` / `receive tune-s`, sans `$0` ni
-`$1`) — même famille de vestige que les huit `send midi.pedalier.sirenium-r` corrigés le
-2026-08-01. Conséquence : dans tout calcul de degré, **la tonique vaut toujours 0**, quelle que
-soit la valeur affichée.
+`tune` est **global et vivant** — c'est là que le `nbx` envoie la tonique, et `pd tune` ne fait que
+l'afficher (`r tune` → `s tune-s` pour le nombre, `route 0..10` → `C, C#, D…` pour le nom). Mais les
+**quatre lecteurs du calcul de degré attendent `$1.tune`** depuis la refonte v2 (commit `7d18bec`,
+2026-07-17), qui a préfixé les receives sans brancher l'émetteur. Résultat : la tonique valait 0, et
+tout s'harmonisait comme en do — le `root` de la scène était enregistré, affiché, et sans effet.
 
-Ça se répare en une boîte (`s $1.tune` à côté du `r tune`), mais **ce n'est pas anodin** : les
-degrés bougeront dès que la tonique ne sera pas do, donc le son change. `harmoniseur-aval` lit
-`$1.tune` — le nom juste, pas le vestige — et se comportera donc correctement le jour où le canal
-sera raccordé. Décision à prendre par Patrice, hors de ce chantier.
+**L'algorithme, lui, la prévoit.** Dans `pd getCurrentScaleNote` : `note → mod 12 → [ − tune ] →
+mod 12 → text search scaleBuffer` — la tonique est soustraite **avant** la recherche du degré, elle
+définit l'origine de la gamme. Ce n'est pas un décalage chromatique plaqué après coup, et les trois
+autres points d'usage sont du même ordre. Il ne manquait que la valeur.
+
+Un `s $1.tune` posé dans `pd tune`, alimenté par le `r tune` qui y était déjà. Mesuré : `tune 2`
+arrive bien sur `<id>.tune`. Le canal devient protégé du même coup, les receives étant préfixés.
+
+**À écouter avant de s'y fier** : les scènes existantes dont le `root` n'est pas do sonnaient
+jusqu'ici comme si elles étaient en do. Elles vont changer.
+
+### Décidé le 2026-09-02 — les réglages se gravent dans le clip
+
+Un clip rejoué se réharmonise dans la gamme courante ; pour retrouver le son d'origine il suffit de
+**rendre à l'harmoniseur les réglages qu'il avait à la captation** — il est déterministe, il refait
+le même calcul. Pas de conversion position→position à écrire, contrairement à ce que le §13
+annonçait.
+
+La scène les porte déjà, vérifié sur une scène réelle : `harmony { root, scaleMode, polyphony }`,
+`voices` (12 champs) et `tempo`. Reste le miroir dans le clip, et **le format MIDI a ce qu'il faut**
+(Patrice) : `midifile` sait écrire le **Key Signature**, `meta 89 <sf> <mi>` — vérifié dans le
+binaire, avec `sf` dans [−7,+7] et `mi` dans [0,1]. Limite à connaître : il ne code que l'armure et
+un mode binaire majeur/mineur, donc pas « dorien » ni « diminished » ; le mode demande un second
+meta, `Text Event` (1) ou `Sequencer-Specific` (127), tous deux supportés.
+
+À construire : une branche `meta` dans `clip-io`, dont le `route` ne la connaît pas encore.
+
+**Le gain visé** : copier un clip dans une autre scène, dans une autre tonalité, et que ça sonne
+directement.
