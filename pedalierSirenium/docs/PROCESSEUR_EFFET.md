@@ -286,11 +286,33 @@ l'entrée porte `<note> <bend>` en un seul message, et c'est lui qui produit les
 glissando du sirenium. Le filtre ne peut agir qu'**après** la séparation des deux chemins, c'est-à-dire
 là où il est.
 
-### Ce qui reste pour le poly → poly
+### Fait le 2026-09-02 — poly → poly, par un filtre dans `getVoices`
 
-L'état n'étant pas en cause : donner une **identité** à l'entrée (quelle voix cette note concerne) et
-remplacer le **broadcast** 1→[1-7] par un ciblage, en gardant le comportement actuel quand la note
-n'a pas d'identité.
+**Il n'y avait pas de boucle à refondre.** `[text sequence]`, sans message `wait`, déroule tout le
+buffer sur un seul bang : c'est lui qui parcourt les sept voix, et le `sel 1` sur `enable` retient
+celles qui sonnent. Mesuré — une seule note entrante fait sortir les sept lignes :
+
+```
+GV-LIGNE: 1 0 0 127 0 0 3 0 0 0 0 0     <- enable=1, sirene 3
+GV-LIGNE: 1 1 0 127 0 0 4 0 0 0 0 0     <- enable=1, sirene 4
+GV-LIGNE: 0 2 0 127 0 0 1 0 0 0 0 0     <- enable=0, ignoree
+...
+```
+
+Le ciblage tient donc en **un filtre posé à côté du `sel 1`** : une ligne passe si `enable` vaut 1
+**et** (aucune cible **ou** sa sirène est la cible), la cible venant de `$1.voix.cible`. L'identité
+est le **canal**, décidé par Patrice.
+
+Un `receive` non alimenté laisse l'entrée froide à zéro, donc **le broadcast reste le comportement
+par défaut sans rien initialiser** — le jeu au sirenium ne change pas.
+
+Vérifié : sans cible, une note donne `note 42 8192 3` **et** `note 42 8192 4` comme avant ; avec la
+cible à 4, elle ne donne que `note 49 8192 4`.
+
+**À savoir : la cible est persistante.** Chaque producteur doit la poser avant sa note et la remettre
+à zéro après, sinon le sirenium se retrouve adressé à la dernière sirène ciblée. C'est la contrepartie
+d'un canal plutôt que d'un atome dans le message — et ça évitait de toucher au format que plusieurs
+producteurs émettent.
 
 **Une fois poly → poly en place, les sept séquenceurs se placent avant `harmonize`** (Patrice,
 2026-09-02), chacun produisant sa ligne. C'est ce qui lève la tension signalée au §4 : les trois
