@@ -237,6 +237,42 @@ Point d'attaque de la refonte : chercher sur le chemin `harmonize` → `processV
 survit pas à une seconde entrée dans le même temps logique, en commençant par les objets écrits puis
 relus dans le même passage.
 
+**Une fois poly → poly en place, les sept séquenceurs se placent avant `harmonize`** (Patrice,
+2026-09-02), chacun produisant sa ligne. C'est ce qui lève la tension signalée au §4 : les trois
+séquences par sirène et les champs `seq1/2/3` de `voices` retrouvent leur destinataire.
+
+### `keep.last.note` reste valable
+
+Il est au milieu de la chaîne linéaire de `processVoice` — `voiceVolume → octavePerSiren →
+keep.last.note → voiceToChannel → voiceToBend → voiceToMIDI` — et laisse passer la note tout en la
+notant. Table indexée par le champ 2 (la sirène), une ligne par sirène ; `r $1.set.last.note.off`
+injecte directement dans sa sortie, c'est le mécanisme du note off.
+
+**Le grain est le bon pour ce qui vient** : une sirène est monophonique — un moteur, une hauteur.
+Avec sept motifs qui ajoutent des demi-tons et des gates courts, savoir quelle note couper sur quelle
+sirène est indispensable. Chaque séquenceur ciblant sa sirène, chaque ligne du tracker garde un seul
+producteur.
+
+**À vérifier pendant la refonte** : quand `text search` ne trouve pas la sirène, un `msg 8` envoie
+l'écriture à la **ligne 8** — une ligne fourre-tout. Si la table n'a pas neuf lignes, cette écriture
+est perdue ou atterrit ailleurs.
+
+### Audit des patchs annexes (2026-09-02)
+
+Fermeture transitive des instanciations depuis `pedalier.pd` : **40 patchs atteignables, 33 non**
+(dont 6 patchs d'aide, légitimes). La vieille chaîne est morte en bloc — `MidiToSiren`, `harmonizer`,
+`harmonizer.old`, `sirenVoice`, `voiceRecorder`, `voiceToMIDI`, `sirenChannelToVoiceNumber`,
+`sireniumPlayer` — avec `microtune`/`microtuneDisplay`, les trois `sysex*`, `curve-map`, `axis-map`,
+`looper`, `pd2json`, `json-array-to-list`, `getMidiDevice`, `enableV2radio`, `quit_pd`, `pchit-udp`,
+`sirenScoreRT`, `M645`.
+
+**Piège de cet inventaire** : `voiceToMIDI` et `voiceGate` existent en double — un sous-patch vivant
+dans `processVoice`, et un fichier `.pd` mort du même nom. Ne pas supprimer l'un en croyant l'autre.
+
+**Et un cas que la fermeture ne voit pas** : `sequences-io.pd` est atteignable mais **périmé** — il
+charge un bloc `sequences` depuis la scène, format abandonné au profit de la bibliothèque. À retirer,
+avec son instanciation dans le racine.
+
 ---
 
 ## Ce qui suit décrit le format abandonné, gardé pour la trace
