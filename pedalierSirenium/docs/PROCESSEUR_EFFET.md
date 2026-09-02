@@ -465,8 +465,8 @@ Une ligne par événement :
   zéro sur la note on, sans ancre absolue ni resynchronisation, contrairement au curseur du looper
   qui doit se caler sur `mainloop-startbar`.
 
-  Reste à trancher : ce qui arrive **au bout de la longueur** — le motif boucle tant que la note est
-  tenue, ou joue une fois comme un ornement d'attaque.
+  **La séquence boucle tant que la note est tenue** (Patrice, 2026-09-02). Au bout de la longueur
+  elle repart à zéro ; une nouvelle attaque la recale ; le note off de la source l'arrête.
 
 - **Deux ghost notes, à ne pas confondre.** Celles que le séquenceur **émet** : placées dans le
   silence entre deux pas — après le note off d'un pas, avant le note on du suivant — pour que le
