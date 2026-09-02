@@ -806,6 +806,23 @@ Cycle mesuré, du vide à l'effacement :
 
 L'abstraction s'adresse par le **rang** 0-based, seule clé dont dispose la machine à états.
 
+**Le transport traverse l'état 4 depuis le 2026-09-02.** Il ne le traversait pas : le `route 0 1 2 3`
+du chemin `stop` laissait tomber l'état 4, qui restait bloqué — la couche jamais fermée, et midifile
+laissant un fichier de **zéro octet avec son `.trk` orphelin** à côté. Le désarmement ne pend plus
+du geste mais de la **sortie** de l'état 4 : `pd sortie.de.couche2` écoute `outlet.state` et ferme
+dès que la valeur précédente valait 4. Une seule cause, donc tous les chemins sont couverts —
+`recplay`, `stop`, `mode`, `delete` — sans double `stop` envoyé à `clip-io`.
+
+**Défaut ouvert : la phase ne prend pas dans la chaîne complète.** Mesuré le 2026-09-02 avec une
+couche 1 réellement enregistrée sur deux mesures (notes relues à 959 et 2879, donc la couche 1 est
+juste) : la note de la couche 2 est gravée à **0**, ni à la phase attendue (1920), ni même aux 239
+ticks écoulés depuis l'armement. L'abstraction isolée donne pourtant les bons deltas — c'est le
+tableau ci-dessus. Le contexte réel change donc quelque chose : soit `pd phase` ne rend pas ce qu'on
+croit (`$1-lengthbars`, `$1-offsetticks` posés par le `read` du loader), soit l'ordre entre la pose
+de l'origine et l'ouverture de la porte n'est pas celui prévu. **Non localisé** : la copie
+instrumentée du banc n'a pas été chargée à la place de celle du repo, donc les sondes n'ont rien
+imprimé. À reprendre en instrumentant directement l'abstraction du repo.
+
 ---
 
 ## 8. Le gate sirenium
