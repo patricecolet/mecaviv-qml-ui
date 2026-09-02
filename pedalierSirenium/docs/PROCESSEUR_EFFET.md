@@ -131,6 +131,29 @@ C'est l'inverse de `[file]` (qui résout depuis le cwd, piège du 2026-07-31). C
 par un **chemin absolu** construit depuis la racine des compositions, comme le fait déjà
 `composition-io`.
 
+### La racine se distribue depuis une seule source — elle existe déjà
+
+**Contrainte posée par Patrice le 2026-09-02** : le chemin absolu doit venir d'une source unique pour
+toutes les parties de `pedalier.pd`. Cette source existe : **`$0.racine`**.
+
+`pd racine` (dans `looper`) lit `config.json`, vérifie par `file stat` que le chemin est accessible
+en écriture, retombe sur `~/Documents/pedalier.compositions` sinon, crée le dossier au besoin, et
+diffuse. `composition-io` renormalise et rediffuse sur le même canal — c'est donc sa valeur qui fait
+foi en dernier. Aujourd'hui le canal n'a **qu'un seul lecteur**, `pd sortie.memo` : il est bon, mais
+sous-utilisé.
+
+Les résolutions concurrentes, toutes relatives au dossier du patch :
+
+| Où | Comment | Sort |
+|---|---|---|
+| `pedals.get.preset.list`, `pedals.preset.load`, `pedals.preset.name.init` | `dir` → `pdcontrol` | **supprimées par le §10** — ce sont les préréglages de pédales |
+| `clic.config`, `clic.save` | `file patchpath` | subsistent ; à rebrancher sur `$0.racine` si on veut la source unique partout |
+
+Autrement dit, **le nettoyage déjà prévu satisfait la contrainte presque entièrement** : il ne
+restera que le clic. La bibliothèque de séquences, elle, se branche sur `r $1.racine` et compose son
+chemin par un message-box à substitution (`$1/sequences/$2.txt`), sans `pdcontrol` ni
+`file patchpath` local.
+
 Restent à trancher : où vit la bibliothèque (`<racine>/sequences/`, partagée entre compositions, me
 paraît le sens de « biblio »), comment l'index se traduit en nom de fichier, et **où la scène range
 ses trois références par sirène**. Sur ce dernier point, la voie courte est d'ajouter trois champs à
