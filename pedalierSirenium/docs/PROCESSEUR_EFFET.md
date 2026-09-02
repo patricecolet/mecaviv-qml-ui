@@ -163,6 +163,18 @@ correctement (0 1 2 3), y compris derrière un trigger.
 motif de `sirenes-visees/emission`, qui est mesuré et fonctionne. Ne pas utiliser `text sequence`
 quand l'index de la ligne est nécessaire en même temps que son contenu.
 
+**Ce remède corrige la moitié du problème, et une seconde anomalie reste ouverte.** Avec le parcours
+par index, les 21 longueurs partent bien avec 21 index distincts (au lieu d'une seule entrée). Mais
+sur une table de **deux** lignes, la boucle produit **cinq itérations ou plus**, en relisant
+alternativement la ligne 1 puis la ligne 0, pendant que l'index avance normalement 0, 1, 2, 3, 4.
+Autrement dit les deux sorties d'un même `[t f f]` paraissent ne pas porter la même valeur — ce qui
+ne devrait pas être possible, donc le modèle du montage est faux quelque part et la cause n'est pas
+identifiée.
+
+La sauvegarde a été **retirée** plutôt que laissée en place : elle écrivait des entrées mélangées
+dans les scènes. `sequences-io` est revenu à son état du commit `8b95c98` (chargement seul, testé).
+À reprendre en regardant le montage dans l'éditeur graphique, où le flux se lit d'un coup d'œil.
+
 ### D'où vient la hauteur
 
 **Le séquenceur ne porte aucune hauteur.** Les notes de la séquence sont *pitchées* par ce qui passe :
