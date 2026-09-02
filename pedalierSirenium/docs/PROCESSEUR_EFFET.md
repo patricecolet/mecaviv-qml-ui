@@ -263,10 +263,22 @@ La clé devient `(note*128 + bend)*16 + canal`. Le filtrage du flux continu est 
 même bend, même sirène donne toujours la même clé — mais il devient ce qu'il aurait toujours dû être :
 par sirène. Vérifié : `note 42 8192 3` **et** `note 42 8192 4` sortent, les bends inchangés.
 
-**Ce qui n'est pas réglé pour autant** : réattaquer la même note sur la même sirène reste filtré,
-puisque la clé est identique. C'est voulu pour le sirenium, et c'est encore l'obstacle du séquenceur.
-Il faudra une porte d'attaque — un drapeau qui force l'émission à clé égale — et le message
-`<note> <bend>` ne porte pas cette information aujourd'hui.
+### Corrigé le 2026-09-02 — la porte d'attaque
+
+Réattaquer la même note restait filtré, la clé étant identique. C'est voulu pour le sirenium, mais
+c'est le geste de base du séquenceur.
+
+**`[change]` accepte un message `set`, qui déplace sa référence sans émettre.** Un bang sur
+`$1.reattaque` envoie `set -1`, et la note suivante passe même à clé égale. Deux objets, et
+**aucun format de message touché** — l'alternative était de transporter un drapeau à travers les six
+sous-patchs de `processVoice`, chacun avec ses `list split` à réajuster.
+
+Mesuré : note 55 seule sort ; répétée, elle ne sort pas ; répétée après `reattaque`, elle sort. Le
+filtrage du flux continu est donc intact.
+
+**Usage pour le séquenceur** : envoyer un bang sur `$1.reattaque` juste avant chaque note émise.
+Comme il émet note par note, un bang par note suffit — inutile d'ouvrir la porte pour toutes les
+sirènes d'un coup.
 
 **Pourquoi le filtre ne peut pas simplement descendre à l'entrée** (idée examinée puis écartée) :
 l'entrée porte `<note> <bend>` en un seul message, et c'est lui qui produit les deux sorties. Un
