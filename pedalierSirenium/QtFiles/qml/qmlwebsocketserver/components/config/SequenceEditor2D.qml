@@ -229,6 +229,7 @@ Item {
                         id: casePas
                         required property int index
                         readonly property var pas: root._pasDe(index)
+                        readonly property bool surLeTemps: index % root.division === 0
                         // gate 0 coupe aussitôt : on garde un éclat minimal, sinon
                         // la tête de lecture sauterait le pas sans qu'on la voie.
                         readonly property real duree: pas ? Math.max(root._ticksParPas / 4,
@@ -239,9 +240,11 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         radius: 3
-                        color: sonne ? "#FFD166" : (pas !== null ? "#6699FF" : "#161E29")
-                        border.color: (index % root.division === 0) ? "#33465C" : "#212C3A"
-                        border.width: 1
+                        color: sonne ? "#FFD166"
+                                     : (pas !== null ? (surLeTemps ? "#7FA8FF" : "#5A80D8")
+                                                     : (surLeTemps ? "#1E2937" : "#141B24"))
+                        border.color: surLeTemps ? "#46617F" : "#1D2732"
+                        border.width: surLeTemps ? 2 : 1
                         Behavior on color { ColorAnimation { duration: 60 } }
 
                         Text {
@@ -267,10 +270,11 @@ Item {
                         id: caseVal
                         required property int index
                         readonly property var pas: root._pasDe(index)
+                        readonly property bool surLeTemps: index % root.division === 0
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        color: "#0E141B"
-                        border.color: (index % root.division === 0) ? "#243040" : "#171F28"
+                        color: surLeTemps ? "#131B25" : "#0C1118"
+                        border.color: surLeTemps ? "#2C3A4B" : "#151D26"
                         border.width: 1
 
                         Rectangle {
@@ -280,7 +284,7 @@ Item {
                             anchors.horizontalCenter: parent.horizontalCenter
                             width: parent.width - 6
                             height: caseVal.pas ? Math.max(2, (caseVal.height - 2) * root._fraction(caseVal.pas)) : 0
-                            color: "#39506E"
+                            color: caseVal.surLeTemps ? "#456A8E" : "#39506E"
                         }
                         Text {
                             visible: caseVal.pas !== null && caseVal.width > 24

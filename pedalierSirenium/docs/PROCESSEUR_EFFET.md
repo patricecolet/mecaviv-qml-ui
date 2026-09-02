@@ -406,6 +406,15 @@ sortait avant `tempo` et `tick` avant `seq` : la règle du latch jusqu'à `end` 
 2026-09-02. Une séquence plus longue que la mesure est donc prévue dès le départ, ce qui rejoint les
 polyrythmes déjà assumés pour le looper (`project_looper_polyrythme_assume`).
 
+> **Caduc depuis le passage à la bibliothèque de fichiers** (vérifié le 2026-09-02). La scène ne
+> porte plus les pas : elle ne garde que trois index par voix — `seq1`, `seq2`, `seq3`, champs 9 à
+> 11 de `voices` — et les pas vivent dans `<racine>/sequences/<index>.txt`. Les clés `sequences` et
+> `sequenceLengths` décrites ci-dessus, la table `$1.sequences` et l'abstraction `sequences-io.pd`
+> n'ont plus de lecteur : **rien dans `pedalier.pd` ne lit `$0.sequences`**, alors que
+> `sequences-io $0` y est encore instancié (ligne 3391). À retirer, avec `sequence-biblio.pd` que
+> `pd biblio` a remplacé. Ce qui suit est conservé pour la mesure de `pd garantir`, qui reste
+> valable si une table à longueur variable revient.
+
 ### Construit le 2026-09-02 — `sequences-io.pd`
 
 Le bloc `sequences` de la scène est rangé dans `$1.sequences`, **une ligne `<sirene> <seq> <tick>
@@ -463,7 +472,7 @@ qui sont sans mémoire.
 Une ligne par événement :
 
 ```
-<position en ticks>  <vélocité>
+<position en ticks>  <vélocité>   (format abandonné : un pas en porte six, voir plus haut)
 ```
 
 - **Position en ticks**, pas en millisecondes : la séquence est calée sur l'horloge comme tout le
