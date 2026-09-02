@@ -749,6 +749,39 @@ existante** : elle ne devient jamais boucle de référence, `mainloopCommit` ne 
 
 ---
 
+### Construit le 2026-09-02 — `clip-couche2.pd`
+
+Une abstraction par sirène, `clip-couche2 <$0 du loader> <$0 du parent> <sirène> <rang>`, à poser
+dans `siren-clip-loader` : elle y trouve, sans rien republier, les `value` dont elle a besoin.
+
+Six sous-patchs. `pd captation` est **la captation de la couche 1, reprise telle quelle** — même bus
+`to.sirens`, même format `event <status> <d1> <d2> <delta>`, même porte ouverte par `record` et
+fermée par `stop`. Ce qui change tient en un fil : un inlet pose l'origine du compteur de ticks.
+`pd phase` calcule cette origine avec la formule de `loop.playgate`, qui existait déjà :
+`(globalbarcount − mainloop-startbar − offset) mod lengthbars × 1920`. `pd clip-io` recopie tout
+`dir` passant sur le bus du loader, donc la couche 2 suit le dossier de la couche 1 sans
+configuration. `pd horodatage` suffixe le nom par `c2` : la couche se reconnaît au fichier.
+
+Mesuré de bout en bout, boucle de 2 mesures, note jouée 239 ticks après l'armement :
+
+| mesure courante | phase | delta gravé |
+|---|---|---|
+| 6 | 1920 | 2159 |
+| 7 | 0 | 239 |
+| 8 | 1920 | 2159 |
+| 9 | 0 | 239 |
+
+C'est précisément le défaut que ce paragraphe annonçait : sans `pd phase`, tout partait au tick zéro
+— la première version le faisait, faute d'avoir bangé les trois `value` froides avant la chaude.
+
+**Reste à brancher, et c'est un arbitrage, pas un câble.** L'abstraction obéit à un bus dédié,
+`couche2.rec <sirène> <0|1>` et `couche2.efface <sirène>`. Le geste réel — le poussoir play/rec sur
+une sirène qui a déjà une boucle — demande d'inhiber le `record` du loader dans ce cas, donc de
+toucher à la machine à états de `pd loop.state` (`== 2`, `== 3`, `$0-playing`), dont la sémantique
+n'est écrite nulle part. À faire avec Patrice plutôt que deviné.
+
+---
+
 ## 8. Le gate sirenium
 
 Le message `SIRENIUM` porte `note` et `velocity`. `note 0` = plus rien sous les doigts ;
