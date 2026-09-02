@@ -93,9 +93,33 @@ pédale, l'interrupteur **force toutes les voix** tant qu'il est enclenché, sa 
 
 ## 4. Les trois séquences
 
-Une séquence n'est **pas une suite de hauteurs** : c'est un **motif rythmique de réattaques**. La
-hauteur reste celle tenue au sirenium ; rejouer la note referme puis rouvre le volet. Un trémolo
-programmable, en somme — ce qui explique que l'état sans séquence soit le trémolo continu.
+**Un pas porte six valeurs** (Patrice, 2026-09-02) — ce qui corrige une version antérieure de ce
+paragraphe, qui affirmait qu'une séquence « n'est pas une suite de hauteurs » :
+
+```
+1920;                     <- ligne 0 : longueur de la sequence en ticks
+0 127 0 240 20 30;        <- tick, velocite, hauteur, gate, attack, release
+480 60 2 120 10 40;
+```
+
+- **hauteur** : ajoutée ou retirée à la note source, **en demi-tons** — parce que le résultat
+  repasse par l'harmoniseur, qui recalculera son degré. Ce sont les « notes passantes » de la
+  formule initiale.
+- **gate** : durée en ticks avant le note off, indépendante de l'espacement des pas.
+- **attack / release** : CC 73 et CC 72. Deux CC par pas et par sirène, donc le filtre « n'émettre
+  que ce qui change » de `sirenes-visees` s'applique ici aussi — la plupart des pas d'un motif
+  partagent la même enveloppe.
+
+**Le séquenceur se place avant `harmonize`, pas dans `processVoice`.** Les hauteurs étant en
+demi-tons et devant être harmonisées, le décalage s'applique en amont du calcul de gamme. Bénéfice
+secondaire : en amont, le séquenceur ne voit jamais sa propre sortie, donc pas de boucle à craindre.
+
+**Tension non résolue, signalée le 2026-09-02** : « trois séquences par sirène » suppose un motif par
+sirène, or **avant `harmonize` il n'y a qu'une seule ligne** — c'est lui qui la répartit ensuite. Un
+séquenceur placé là ne peut jouer qu'un motif à la fois, et les champs `seq1/seq2/seq3` ajoutés à
+`voices` n'auraient plus de destinataire à cet endroit. Trois issues : un seul motif commun (les
+références redeviennent des champs de scène), sept séquenceurs après la répartition (donc dans
+`processVoice`, écarté), ou deux étages. À trancher avant de construire.
 
 **Trois séquences par sirène** (Patrice, 2026-09-02), soit 21 en tout — pas trois communes à la
 scène comme une version antérieure de ce paragraphe l'affirmait. Les deux interrupteurs de la
