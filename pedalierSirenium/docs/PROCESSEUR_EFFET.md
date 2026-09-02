@@ -272,9 +272,18 @@ Une ligne par événement :
 - **Position en ticks**, pas en millisecondes : la séquence est calée sur l'horloge comme tout le
   reste, et c'est ce qui permet de l'enregistrer telle quelle (§7). Référence : 1920 ticks par
   mesure, comme les clips (`length_ticks` de `clip_*.json`).
-- **La pédale module la vélocité** (confirmé par Patrice le 2026-09-02) : la séquence porte le
-  rythme et le profil, la position du pied les met à l'échelle. À fond, le volet se referme
-  complètement entre les notes ; au repos, rien ne se passe.
+- **La vélocité combine la source et la pédale A** (Patrice, 2026-09-02) — la source étant le
+  sirenium ou le clip. Formule retenue, à confirmer :
+
+  ```
+  velocite = source * (1 - a + a * seq/127)      avec a = pedale A / 127
+  ```
+
+  Au repos (`a = 0`) la vélocité **est** celle de la source : le motif est là mais inaudible, le jeu
+  reste normal. À fond (`a = 1`) le motif s'applique pleinement et referme le volet là où il met 0.
+  Ce n'est donc **pas** un produit sec `source × pedale`, qui rendrait l'instrument muet pédale
+  relâchée. Même logique que le trémolo, et la nuance de la source reste audible à travers le motif
+  au lieu d'être écrasée.
 - La **vitesse est dans la séquence**, jamais au pied — §1.
 
 **La table `voices` était déjà dans le format** — je l'avais cru absente en lisant une scène de
