@@ -1036,5 +1036,13 @@ meta, `Text Event` (1) ou `Sequencer-Specific` (127), tous deux supportés.
 
 À construire : une branche `meta` dans `clip-io`, dont le `route` ne la connaît pas encore.
 
-**Le gain visé** : copier un clip dans une autre scène, dans une autre tonalité, et que ça sonne
-directement.
+**La tonalité gravée dans le clip est informative** (Patrice, 2026-09-02) : **c'est la scène qui
+définit la tonalité**. Le key signature sert à rendre le fichier juste dans une DAW et à documenter
+d'où vient le clip — rien ne le relit au chargement, et il n'y a donc ni conversion ni conflit à
+gérer. C'est ce qui fait le gain visé : copier un clip dans une autre scène, dans une autre
+tonalité, et que ça sonne directement.
+
+**Fait le 2026-09-02** : `pd meta.du.clip` dans le loader écrit `meta 89 <armure> 0` et
+`meta 1 <mode>` juste après le `record`, un `t b a` garantissant que le fichier est ouvert avant. Un
+clip enregistré en ré dorien porte `ARMURE [2 0]` et `MODE Dorian`. L'automation ne les grave pas :
+elle ne porte pas de hauteurs à réharmoniser.
