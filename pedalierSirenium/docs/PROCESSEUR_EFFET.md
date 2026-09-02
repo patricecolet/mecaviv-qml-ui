@@ -774,11 +774,37 @@ Mesuré de bout en bout, boucle de 2 mesures, note jouée 239 ticks après l'arm
 C'est précisément le défaut que ce paragraphe annonçait : sans `pd phase`, tout partait au tick zéro
 — la première version le faisait, faute d'avoir bangé les trois `value` froides avant la chaude.
 
-**Reste à brancher, et c'est un arbitrage, pas un câble.** L'abstraction obéit à un bus dédié,
-`couche2.rec <sirène> <0|1>` et `couche2.efface <sirène>`. Le geste réel — le poussoir play/rec sur
-une sirène qui a déjà une boucle — demande d'inhiber le `record` du loader dans ce cas, donc de
-toucher à la machine à états de `pd loop.state` (`== 2`, `== 3`, `$0-playing`), dont la sémantique
-n'est écrite nulle part. À faire avec Patrice plutôt que deviné.
+### Branché le 2026-09-02 — l'état 4
+
+La machine à états n'était pas à élargir, seulement à lire : elle tient en huit objets dans
+`siren-loop-state/pd recplay`, qui pose un `pending` selon l'état courant — 0 → 1 (vide,
+enregistre), 1 → 2 (enregistre, joue), **2 → 1** (joue, réenregistre), 3 → 3.
+
+C'est cette troisième ligne qui portait le cas de la couche 2, et elle était déjà une sortie
+distincte du `route`. L'état 2 part maintenant vers `pd demarre.couche2`, qui applique **l'état 4
+tout de suite, sans pending** — c'est tout l'intérêt : dès qu'une boucle existe, le geste ne dépend
+plus du début de mesure. L'appui suivant repasse en 2 par `pd stop.couche2`.
+
+Deux conséquences à connaître :
+
+- **`loop.state` compte 4 comme un état jouant** (`expr $f1 == 2 || $f1 == 4`). Sans ça, publier 4
+  fermerait le `playgate` et couperait la lecture de la première couche pendant qu'on grave la
+  seconde — exactement ce qu'on ne veut pas.
+- **`delete` efface les deux** (décidé par Patrice) : une sortie ajoutée au trigger de `pd delete`
+  part la première vers `couche2.efface`, avant l'effacement de la première couche.
+
+Cycle mesuré, du vide à l'effacement :
+
+| geste | état | ce qui sort |
+|---|---|---|
+| `recplay` puis `bar` | 1 | `record` — la couche 1 enregistre |
+| `recplay` puis `bar` | 2 | `stopclip 1920 1 1 0` — la boucle joue |
+| `recplay` | **4** | `couche2.rec 2 1`, **sans `bar`** |
+| `recplay` | 2 | `couche2.rec 2 0` |
+| `recplay` | 4 | `couche2.rec 2 1` |
+| `delete` | 0 | `couche2.efface 2` puis `erase` |
+
+L'abstraction s'adresse par le **rang** 0-based, seule clé dont dispose la machine à états.
 
 ---
 
