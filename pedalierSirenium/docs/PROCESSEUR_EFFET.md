@@ -247,9 +247,38 @@ changé »** (flux continu du sirenium, à filtrer) de **« une attaque a lieu �
 à laisser passer même à hauteur égale). Le `change` répond à la première question et bloque la
 seconde.
 
-Ce qui reste pour le poly → poly proprement dit, l'état n'étant pas en cause : donner une **identité**
-à l'entrée (quelle voix cette note concerne) et remplacer le **broadcast** 1→[1-7] par un ciblage,
-en gardant le comportement actuel quand la note n'a pas d'identité.
+### Corrigé le 2026-09-02 — l'unisson était impossible
+
+Le `change -1` comparait une clé `note*128 + bend`, **sans le canal**. Mesuré en sondant la clé :
+
+```
+VOICE2MIDI-IN: 3 42 8192 0   CLE-IN: 42 8192  -> CLE-OUT: 13568   (la sirene 3 passe)
+VOICE2MIDI-IN: 4 42 8192 0   CLE-IN: 42 8192  -> rien             (la sirene 4 est bloquee)
+```
+
+Deux voix à l'unisson produisaient la même clé, et la seconde note était filtrée : la sirène recevait
+son bend mais jamais sa note. **L'unisson était impossible, en silence.**
+
+La clé devient `(note*128 + bend)*16 + canal`. Le filtrage du flux continu est conservé — même note,
+même bend, même sirène donne toujours la même clé — mais il devient ce qu'il aurait toujours dû être :
+par sirène. Vérifié : `note 42 8192 3` **et** `note 42 8192 4` sortent, les bends inchangés.
+
+**Ce qui n'est pas réglé pour autant** : réattaquer la même note sur la même sirène reste filtré,
+puisque la clé est identique. C'est voulu pour le sirenium, et c'est encore l'obstacle du séquenceur.
+Il faudra une porte d'attaque — un drapeau qui force l'émission à clé égale — et le message
+`<note> <bend>` ne porte pas cette information aujourd'hui.
+
+**Pourquoi le filtre ne peut pas simplement descendre à l'entrée** (idée examinée puis écartée) :
+l'entrée porte `<note> <bend>` en un seul message, et c'est lui qui produit les deux sorties. Un
+`change` posé là bloquerait le message entier à hauteur constante, donc gèlerait le bend — le
+glissando du sirenium. Le filtre ne peut agir qu'**après** la séparation des deux chemins, c'est-à-dire
+là où il est.
+
+### Ce qui reste pour le poly → poly
+
+L'état n'étant pas en cause : donner une **identité** à l'entrée (quelle voix cette note concerne) et
+remplacer le **broadcast** 1→[1-7] par un ciblage, en gardant le comportement actuel quand la note
+n'a pas d'identité.
 
 **Une fois poly → poly en place, les sept séquenceurs se placent avant `harmonize`** (Patrice,
 2026-09-02), chacun produisant sa ligne. C'est ce qui lève la tension signalée au §4 : les trois
