@@ -201,6 +201,44 @@ seul endroit, en clair, et qui se lit en ouvrant l'objet plutôt qu'en relisant 
 
 ---
 
+## Refonte mono → poly vers poly → poly
+
+**Diagnostic de Patrice (2026-09-02)** : `harmonize` est structurellement mono → poly. Une ligne
+entre, l'état de calcul est unique, et la polyphonie n'apparaît qu'à la sortie par répartition
+(broadcast 1→[1-7]). Sept motifs simultanés — un par sirène — demandent sept traitements
+indépendants.
+
+### Ce que l'analyse a écarté
+
+**La mémoire de note est déjà par sirène.** `keep.last.note` n'est pas un scalaire global : c'est une
+table `$1.harmonizer.last.note` avec `text search` sur le champ 2 et écriture ligne par ligne. Rien à
+construire de ce côté.
+
+**Les rétentions sont toutes dans `harmonize`, aucune dans `processVoice`.** Sur 24 lectures des
+canaux d'état du calcul, **7 vont dans une entrée froide** — `currentCents`, `voiceOctave`,
+`currentVoiceChannel`, `nextCurrentScaleNote`, `voiceInterval`, `currentScaleIndex`,
+`currentScaleNote` — et toutes dans `harmonize` ou ses sous-patchs. La répartition, l'ambitus, le
+volume et le bend sont donc sans rétention.
+
+### La limite, mesurée
+
+| Deux notes différentes envoyées… | Résultat |
+|---|---|
+| à 2 s d'intervalle | les deux sortent |
+| à 5 ms d'intervalle | les deux sortent |
+| **dans le même temps logique** (un seul `[t b b]`) | **une seule sort — la première est perdue** |
+
+Donc **ce n'est pas l'état persistant qui bloque** : s'il fuyait d'un traitement à l'autre, le test à
+5 ms échouerait aussi, et les sept entrées froides sont bien réécrites à chaque passage. Ce qui casse
+est la réentrance **dans un même temps logique** — précisément le cas que produira le séquenceur
+quand deux motifs auront un pas sur le même tick.
+
+Point d'attaque de la refonte : chercher sur le chemin `harmonize` → `processVoice` ce qui ne
+survit pas à une seconde entrée dans le même temps logique, en commençant par les objets écrits puis
+relus dans le même passage.
+
+---
+
 ## Ce qui suit décrit le format abandonné, gardé pour la trace
 
 **Format mesuré le 2026-09-02**, en écrivant un bloc d'essai dans une scène et en sondant le dump.
