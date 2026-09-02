@@ -154,15 +154,26 @@ restera que le clic. La bibliothèque de séquences, elle, se branche sur `r $1.
 chemin par un message-box à substitution (`$1/sequences/$2.txt`), sans `pdcontrol` ni
 `file patchpath` local.
 
-Restent à trancher : où vit la bibliothèque (`<racine>/sequences/`, partagée entre compositions, me
-paraît le sens de « biblio »), comment l'index se traduit en nom de fichier, et **où la scène range
-ses trois références par sirène**. Sur ce dernier point, la voie courte est d'ajouter trois champs à
-la table `voices` — la machinerie d'extension a servi aujourd'hui pour `vibratoSpeed` et
-`tremoloSpeed`, elle est testée, et ça éviterait d'ajouter une clé de scène.
+**Tranché le 2026-09-02** : la bibliothèque vit dans **`<racine>/sequences/`**, à côté des dossiers
+de composition — partagée, donc. La scène range ses références dans **trois champs de plus de la
+table `voices`** (`seq1`, `seq2`, `seq3`, champs 9 à 11). Et les séquences sont **chargées à la
+volée** : sept tables actives, une par sirène, rechargées quand les boutons changent d'indice —
+pas les 21 en mémoire.
 
-Reste aussi à décider combien de séquences sont chargées en mémoire : les 21, ou seulement les sept
-actives (une par sirène), rechargées au changement d'indice. La seconde suffit si un `read` de
-fichier minuscule entre deux motifs est acceptable.
+### Fait le 2026-09-02 — les références dans `voices`, et un sous-patch qui documente la table
+
+`seq1 seq2 seq3` sont les champs 9, 10, 11. Mêmes quatre points à toucher que pour les vitesses :
+init dans `siren.reset` (douze atomes), complétion dans `updateVoice` (`list append 0 0 0 0 0` puis
+`list split 12`), préservation dans `voice.select.root` (`text get $1.voices 4 8`), sauvegarde et
+chargement de scène.
+
+Mesuré : `seq1` mis à 5, sauvegardé, **effacé en mémoire**, scène rechargée, ligne relue
+`0 0 0 127 0 0 3 0 0 5 0 0` — douze champs, la référence revenue du fichier.
+
+**Un sous-patch `pd champs` est posé à côté de la définition de la table** (demande de Patrice) : il
+énumère les douze champs et rappelle les quatre points à toucher pour en ajouter un. C'est
+l'application directe de « le diagramme est le programme » — la disposition d'une donnée décrite à un
+seul endroit, en clair, et qui se lit en ouvrant l'objet plutôt qu'en relisant ce document.
 
 ---
 
