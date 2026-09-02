@@ -285,6 +285,15 @@ Une ligne par événement :
   relâchée. Même logique que le trémolo, et la nuance de la source reste audible à travers le motif
   au lieu d'être écrasée.
 - La **vitesse est dans la séquence**, jamais au pied — §1.
+- **Retrig sur note on** (Patrice, 2026-09-02) : la séquence redémarre à chaque attaque de la
+  source. Sa phase est donc relative au geste, **pas à la mesure** — un compteur de ticks remis à
+  zéro sur la note on, sans ancre absolue ni resynchronisation, contrairement au curseur du looper
+  qui doit se caler sur `mainloop-startbar`.
+
+  Deux points à trancher : ce qui arrive **au bout de la longueur** (le motif boucle tant que la
+  note est tenue, ou joue une fois comme un ornement d'attaque), et ce qui **compte comme note on** —
+  une **ghost note** (vélocité 1, moteur muet) ne devrait pas relancer le motif, sinon le
+  rebouclage d'un clip le recalerait en silence.
 
 **La table `voices` était déjà dans le format** — je l'avais cru absente en lisant une scène de
 démonstration jamais réécrite, dans `examples/pedalier.compositions/`, qui n'est même pas la racine
