@@ -50,13 +50,13 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 28
-        spacing: 20
+        anchors.margins: 20
+        spacing: 12
 
         PedalboardPortrait2D {
             id: portrait
             Layout.fillWidth: true
-            Layout.preferredHeight: 300
+            Layout.preferredHeight: 395
             selKind: root.selKind
             selIndex: root.selIndex
             onSelected: function(kind, index) {
@@ -100,6 +100,7 @@ Item {
                     required property int index
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.minimumHeight: 92
                     steps: modelData.pas
                     lengthTicks: modelData.longueur
                     seqIndex: modelData.index
