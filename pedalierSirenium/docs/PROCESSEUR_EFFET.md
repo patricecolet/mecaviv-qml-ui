@@ -97,18 +97,40 @@ pédale, l'interrupteur **force toutes les voix** tant qu'il est enclenché, sa 
 paragraphe, qui affirmait qu'une séquence « n'est pas une suite de hauteurs » :
 
 ```
-1920;                     <- ligne 0 : longueur de la sequence en ticks
-0 127 0 240 20 30;        <- tick, velocite, hauteur, gate, attack, release
-480 60 2 120 10 40;
+1920 4 1;                 <- ligne 0 : longueur en ticks, division, vitesse
+0 127 0 4 0 0;            <- tick, velocite, hauteur, gate, attack, release
+480 100 2 2 0 0;
 ```
 
 - **hauteur** : ajoutée ou retirée à la note source, **en demi-tons** — parce que le résultat
   repasse par l'harmoniseur, qui recalculera son degré. Ce sont les « notes passantes » de la
   formule initiale.
-- **gate** : durée en ticks avant le note off, indépendante de l'espacement des pas.
-- **attack / release** : CC 73 et CC 72. Deux CC par pas et par sirène, donc le filtre « n'émettre
-  que ce qui change » de `sirenes-visees` s'applique ici aussi — la plupart des pas d'un motif
-  partagent la même enveloppe.
+- **gate** : **en quarts de pas**, pas en ticks (Patrice, 2026-09-02). Quatre est un pas plein,
+  huit lie deux pas, et **zéro coupe aussitôt** — le note off part au tick suivant, jamais avant
+  la note, sans quoi il ne s'entendrait pas. Une durée relative survit au changement de division
+  et de vitesse, ce qu'une durée en ticks ne fait pas.
+- **attack / release** : CC 73 et CC 72, **à zéro par défaut**. Deux CC par pas et par sirène, donc
+  le filtre « n'émettre que ce qui change » de `sirenes-visees` s'applique ici aussi — la plupart
+  des pas d'un motif partagent la même enveloppe.
+
+**La ligne 0 porte la grille, pas seulement la longueur.** `division` vaut 4 ou 3 : le temps se
+divise en binaire ou en ternaire, et le pas dure `480 / (division × vitesse)` ticks. `vitesse` vaut
+1 ou 2, relativement au temps. De là vient le quart de pas — `120 / (division × vitesse)` ticks —
+que `pd biblio` calcule au chargement et que `pd gate` multiplie.
+
+Mesuré le 2026-09-02, banc headless sur le chemin réel (chargement → tick → gate → note off) :
+
+| grille | quart | gate 4 | gate 1 | gate 0 |
+|---|---|---|---|---|
+| ÷4 ×1 | 30 ticks | off à +120 | +30 | +1 |
+| ÷3 ×1 | 40 ticks | off à +160 | — | — |
+| ÷4 ×2 | 15 ticks | off à +60 | — | — |
+
+**`text get <nom> <onset>` ne rend qu'UN champ**, pas la ligne — il faut `text get <nom> 0 3`. La
+ligne 0 revenait donc réduite à sa longueur, et le `list append 4 1` de secours faisait passer
+toute séquence pour du binaire : le ternaire coupait à 120 ticks au lieu de 160. Même erreur dans
+`pd coupe`, qui envoyait la voix à 0 dans `set.last.note.off` — **et `harmoniseur.voice.pd` porte
+le même montage, ligne 189**, non corrigé ici parce que c'est un patch tiers à cette refonte.
 
 **Le séquenceur se place avant `harmonize`, pas dans `processVoice`.** Les hauteurs étant en
 demi-tons et devant être harmonisées, le décalage s'applique en amont du calcul de gamme. Bénéfice

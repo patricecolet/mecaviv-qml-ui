@@ -10,9 +10,13 @@ import QtQuick.Layouts
 Item {
     id: root
 
-    // steps[i] = { tick, velocite, hauteur, gate, attack, release }
-    property var steps: []
-    property int lengthTicks: 1920
+    // Un pas est repéré par son rang, pas par son tick : changer la division
+    // garde le motif et change sa saveur, au lieu de le désaligner.
+    // pas[i] = { n, velocite, hauteur, gate, attack, release }
+    property var pas: []
+    property int division: 4                  // pas par temps : 4 binaire, 3 ternaire
+    property int vitesse: 1                   // ×1 ou ×2 par rapport au temps
+    property int blocs: 1
     property int seqIndex: 0
     property bool actif: false
 
@@ -22,23 +26,23 @@ Item {
     property bool enJeu: false
 
     // édition
-    property int mesure: 0                    // la mesure affichée
+    property int bloc: 0                       // le bloc affiché
     property string parametre: "velocite"
 
-    // le motif appartient au parent : l'éditeur propose, il ne s'écrit pas
-    // lui-même — une assignation locale casserait la liaison sur steps.
-    signal motifModifie(var pas)
+    // L'éditeur propose, il ne s'écrit pas lui-même : une assignation locale
+    // casserait la liaison, et une séquence neuve garderait les pas de l'autre.
+    signal sequenceModifiee(var seq)
 
-    readonly property int _ticksParMesure: 1920
-    readonly property int _pasParMesure: 16
-    readonly property int _ticksParPas: _ticksParMesure / _pasParMesure   // 120
-    readonly property int _nbMesures: Math.max(1, Math.round(lengthTicks / _ticksParMesure))
+    readonly property int _ticksParTemps: 480
+    readonly property int _pasParBloc: 4 * division
+    readonly property int _ticksParPas: _ticksParTemps / (division * vitesse)
+    readonly property int lengthTicks: blocs * _pasParBloc * _ticksParPas
     readonly property bool _lit: enJeu && phase >= 0
 
     readonly property var _params: [
         { cle: "velocite", nom: "VÉL",  min: 1,   max: 127 },
         { cle: "hauteur",  nom: "NOTE", min: -12, max: 12 },
-        { cle: "gate",     nom: "GATE", min: 10,  max: 480 },
+        { cle: "gate",     nom: "GATE", min: 0,   max: 16 },
         { cle: "attack",   nom: "ATK",  min: 0,   max: 127 },
         { cle: "release",  nom: "REL",  min: 0,   max: 127 }
     ]
@@ -46,42 +50,55 @@ Item {
         for (var i = 0; i < _params.length; i++) if (_params[i].cle === cle) return _params[i];
         return _params[0];
     }
-    function _tick(n) { return (mesure * _ticksParMesure) + n * _ticksParPas; }
+    function _rang(n) { return (bloc * _pasParBloc) + n; }
 
-    function _pas(n) {
-        var t = _tick(n);
-        for (var i = 0; i < steps.length; i++) if (steps[i].tick === t) return steps[i];
+    function _pasDe(n) {
+        var r = _rang(n);
+        for (var i = 0; i < pas.length; i++) if (pas[i].n === r) return pas[i];
         return null;
     }
+    function _seq(nouveauxPas, div, vit, nbBlocs) {
+        return { division: div, vitesse: vit, blocs: nbBlocs, pas: nouveauxPas };
+    }
+    function _rend(nouveauxPas) { sequenceModifiee(_seq(nouveauxPas, division, vitesse, blocs)); }
+
     function _bascule(n) {
-        var t = _tick(n);
-        var copie = steps.slice();
+        var r = _rang(n);
+        var copie = pas.slice();
         for (var i = 0; i < copie.length; i++) {
-            if (copie[i].tick === t) { copie.splice(i, 1); motifModifie(copie); return; }
+            if (copie[i].n === r) { copie.splice(i, 1); _rend(copie); return; }
         }
-        copie.push({ tick: t, velocite: 100, hauteur: 0, gate: 120, attack: 20, release: 30 });
-        copie.sort(function (a, b) { return a.tick - b.tick; });
-        motifModifie(copie);
+        copie.push({ n: r, velocite: 100, hauteur: 0, gate: 4, attack: 0, release: 0 });
+        copie.sort(function (a, b) { return a.n - b.n; });
+        _rend(copie);
     }
     function _regle(n, fraction) {
         var p = _def(parametre);
         var v = Math.round(p.min + Math.max(0, Math.min(1, fraction)) * (p.max - p.min));
-        var t = _tick(n);
-        var copie = steps.slice();
+        var r = _rang(n);
+        var copie = pas.slice();
         for (var i = 0; i < copie.length; i++) {
-            if (copie[i].tick === t) {
+            if (copie[i].n === r) {
                 var s = {};
                 for (var k in copie[i]) s[k] = copie[i][k];
                 s[parametre] = v;
                 copie[i] = s;
-                motifModifie(copie);
+                _rend(copie);
                 return;
             }
         }
     }
-    function _fraction(pas) {
-        var p = _def(parametre);
-        return (pas[parametre] - p.min) / (p.max - p.min);
+    function _fraction(p) {
+        var d = _def(parametre);
+        return (p[parametre] - d.min) / (d.max - d.min);
+    }
+    // Changer la division garde les rangs ; ce qui dépasse le nouveau nombre de
+    // blocs est coupé, sans quoi des pas resteraient joués mais invisibles.
+    function _taille(div, vit, nbBlocs) {
+        var max = nbBlocs * 4 * div;
+        var copie = [];
+        for (var i = 0; i < pas.length; i++) if (pas[i].n < max) copie.push(pas[i]);
+        sequenceModifiee(_seq(copie, div, vit, nbBlocs));
     }
 
     NumberAnimation {
@@ -91,7 +108,27 @@ Item {
         loops: Animation.Infinite
         from: 0
         to: root.lengthTicks
-        duration: Math.max(200, (root.lengthTicks / 480) * (60000 / Math.max(1, root.bpm)))
+        duration: Math.max(200, (root.lengthTicks / root._ticksParTemps) * (60000 / Math.max(1, root.bpm)))
+    }
+
+    component Bascule: Rectangle {
+        id: bascule
+        property bool choisi: false
+        property string libelle: ""
+        signal touche()
+        Layout.preferredWidth: 30
+        Layout.preferredHeight: 20
+        radius: 2
+        color: choisi ? "#243040" : "#131A24"
+        border.color: choisi ? "#6699FF" : "#1E2833"
+        border.width: 1
+        Text {
+            anchors.centerIn: parent
+            text: bascule.libelle
+            color: bascule.choisi ? "#FFFFFF" : "#4A5A6B"
+            font.family: "monospace"; font.pixelSize: 9; font.bold: true
+        }
+        MouseArea { anchors.fill: parent; onClicked: bascule.touche() }
     }
 
     RowLayout {
@@ -103,39 +140,79 @@ Item {
             Layout.fillHeight: true
             spacing: 6
 
-            // ---- en-tête : la séquence, sa longueur, la mesure affichée
+            // ---- en-tête : la séquence, sa grille, le bloc affiché
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: 8
                 Text {
                     text: root.seqIndex > 0 ? "séquence " + root.seqIndex : "vide"
                     color: root.actif ? "#FFFFFF" : "#64737F"
                     font.family: "monospace"; font.pixelSize: 13; font.bold: true
                 }
-                Text {
-                    text: root._nbMesures + (root._nbMesures > 1 ? " mesures" : " mesure")
-                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
-                }
                 Repeater {
-                    model: root._nbMesures
+                    model: root.blocs
                     delegate: Rectangle {
-                        id: ongletMesure
+                        id: ongletBloc
                         required property int index
-                        width: 20; height: 18; radius: 2
-                        color: root.mesure === index ? "#6699FF" : "#1A2230"
+                        Layout.preferredWidth: 20
+                        Layout.preferredHeight: 18
+                        radius: 2
+                        color: root.bloc === index ? "#6699FF" : "#1A2230"
                         border.color: "#243040"; border.width: 1
                         Text {
                             anchors.centerIn: parent
-                            text: ongletMesure.index + 1
-                            color: root.mesure === ongletMesure.index ? "#0E141B" : "#64737F"
+                            text: ongletBloc.index + 1
+                            color: root.bloc === ongletBloc.index ? "#0E141B" : "#64737F"
                             font.family: "monospace"; font.pixelSize: 9
                         }
-                        MouseArea { anchors.fill: parent; onClicked: root.mesure = ongletMesure.index }
+                        MouseArea { anchors.fill: parent; onClicked: root.bloc = ongletBloc.index }
                     }
                 }
+                Bascule {
+                    Layout.preferredWidth: 18
+                    libelle: "+"
+                    onTouche: root._taille(root.division, root.vitesse, root.blocs + 1)
+                }
+                Bascule {
+                    Layout.preferredWidth: 18
+                    libelle: "−"
+                    onTouche: {
+                        if (root.blocs > 1) {
+                            if (root.bloc >= root.blocs - 1) root.bloc = root.blocs - 2;
+                            root._taille(root.division, root.vitesse, root.blocs - 1);
+                        }
+                    }
+                }
+
+                Item { Layout.preferredWidth: 10 }
+                Text {
+                    text: "PAR TEMPS"
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.2
+                }
+                Bascule {
+                    choisi: root.division === 4; libelle: "4"
+                    onTouche: root._taille(4, root.vitesse, root.blocs)
+                }
+                Bascule {
+                    choisi: root.division === 3; libelle: "3"
+                    onTouche: root._taille(3, root.vitesse, root.blocs)
+                }
+                Text {
+                    text: "VITESSE"
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.2
+                }
+                Bascule {
+                    choisi: root.vitesse === 1; libelle: "×1"
+                    onTouche: root._taille(root.division, 1, root.blocs)
+                }
+                Bascule {
+                    choisi: root.vitesse === 2; libelle: "×2"
+                    onTouche: root._taille(root.division, 2, root.blocs)
+                }
+
                 Item { Layout.fillWidth: true }
                 Text {
-                    text: root.steps.length + " pas"
+                    text: root.pas.length + " pas"
                     color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10
                 }
             }
@@ -147,19 +224,23 @@ Item {
                 Layout.maximumHeight: 72
                 spacing: 3
                 Repeater {
-                    model: root._pasParMesure
+                    model: root._pasParBloc
                     delegate: Rectangle {
                         id: casePas
                         required property int index
-                        readonly property var pas: root._pas(index)
+                        readonly property var pas: root._pasDe(index)
+                        // gate 0 coupe aussitôt : on garde un éclat minimal, sinon
+                        // la tête de lecture sauterait le pas sans qu'on la voie.
+                        readonly property real duree: pas ? Math.max(root._ticksParPas / 4,
+                                                                     pas.gate * root._ticksParPas / 4) : 0
                         readonly property bool sonne: root._lit && pas !== null
-                                                      && root.phase >= pas.tick
-                                                      && root.phase < pas.tick + pas.gate
+                                                      && root.phase >= pas.n * root._ticksParPas
+                                                      && root.phase < pas.n * root._ticksParPas + duree
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         radius: 3
                         color: sonne ? "#FFD166" : (pas !== null ? "#6699FF" : "#161E29")
-                        border.color: (index % 4 === 0) ? "#33465C" : "#212C3A"
+                        border.color: (index % root.division === 0) ? "#33465C" : "#212C3A"
                         border.width: 1
                         Behavior on color { ColorAnimation { duration: 60 } }
 
@@ -181,15 +262,15 @@ Item {
                 Layout.maximumHeight: 150
                 spacing: 3
                 Repeater {
-                    model: root._pasParMesure
+                    model: root._pasParBloc
                     delegate: Rectangle {
                         id: caseVal
                         required property int index
-                        readonly property var pas: root._pas(index)
+                        readonly property var pas: root._pasDe(index)
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         color: "#0E141B"
-                        border.color: (index % 4 === 0) ? "#243040" : "#171F28"
+                        border.color: (index % root.division === 0) ? "#243040" : "#171F28"
                         border.width: 1
 
                         Rectangle {

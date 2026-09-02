@@ -24,32 +24,36 @@ Item {
         var b = bibliotheque.slice();
         var n = 1;
         for (var i = 0; i < b.length; i++) n = Math.max(n, b[i].index + 1);
-        b.push({ index: n, longueur: 1920, pas: [] });
+        b.push({ index: n, division: 4, vitesse: 1, blocs: 1, pas: [] });
         bibliotheque = b;
         aEditer = n;
     }
     function _sequence(i) {
         for (var k = 0; k < bibliotheque.length; k++) if (bibliotheque[k].index === i) return bibliotheque[k];
-        return { index: 0, longueur: 1920, pas: [] };
+        return { index: 0, division: 4, vitesse: 1, blocs: 1, pas: [] };
     }
-    function _enregistre(i, pas) {
+    function _enregistre(i, seq) {
         var b = bibliotheque.slice();
-        for (var k = 0; k < b.length; k++) if (b[k].index === i) { b[k] = { index: i, longueur: b[k].longueur, pas: pas }; }
+        for (var k = 0; k < b.length; k++) {
+            if (b[k].index === i)
+                b[k] = { index: i, division: seq.division, vitesse: seq.vitesse,
+                         blocs: seq.blocs, pas: seq.pas };
+        }
         bibliotheque = b;
     }
 
     property var bibliotheque: [
-        { index: 1, longueur: 1920, pas: [
-            { tick: 0,    velocite: 127, hauteur: 0,  gate: 240, attack: 20, release: 30 },
-            { tick: 480,  velocite: 100, hauteur: 2,  gate: 120, attack: 10, release: 40 },
-            { tick: 960,  velocite: 90,  hauteur: 0,  gate: 240, attack: 20, release: 30 },
-            { tick: 1440, velocite: 70,  hauteur: -3, gate: 180, attack: 15, release: 25 }
+        { index: 1, division: 4, vitesse: 1, blocs: 1, pas: [
+            { n: 0,  velocite: 127, hauteur: 0,  gate: 4, attack: 0, release: 0 },
+            { n: 4,  velocite: 100, hauteur: 2,  gate: 2, attack: 0, release: 0 },
+            { n: 8,  velocite: 90,  hauteur: 0,  gate: 4, attack: 0, release: 0 },
+            { n: 12, velocite: 70,  hauteur: -3, gate: 3, attack: 0, release: 0 }
         ] },
-        { index: 2, longueur: 960, pas: [
-            { tick: 0,   velocite: 110, hauteur: 0,  gate: 200, attack: 15, release: 25 },
-            { tick: 240, velocite: 70,  hauteur: -3, gate: 100, attack: 25, release: 35 },
-            { tick: 480, velocite: 110, hauteur: 0,  gate: 200, attack: 15, release: 25 },
-            { tick: 720, velocite: 70,  hauteur: 5,  gate: 100, attack: 25, release: 35 }
+        { index: 2, division: 3, vitesse: 1, blocs: 1, pas: [
+            { n: 0, velocite: 110, hauteur: 0,  gate: 3, attack: 0, release: 0 },
+            { n: 2, velocite: 70,  hauteur: -3, gate: 1, attack: 0, release: 0 },
+            { n: 6, velocite: 110, hauteur: 0,  gate: 3, attack: 0, release: 0 },
+            { n: 9, velocite: 70,  hauteur: 5,  gate: 0, attack: 0, release: 0 }
         ] },
     ]
 
@@ -208,13 +212,15 @@ Item {
                 id: editeur
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                steps: root._sequence(root.aEditer).pas
-                lengthTicks: root._sequence(root.aEditer).longueur
+                pas: root._sequence(root.aEditer).pas
+                division: root._sequence(root.aEditer).division
+                vitesse: root._sequence(root.aEditer).vitesse
+                blocs: root._sequence(root.aEditer).blocs
                 seqIndex: root.aEditer
                 actif: true
                 bpm: root.bpm
                 enJeu: root.assignation[root.motif - 1] === root.aEditer
-                onMotifModifie: function (pas) { root._enregistre(root.aEditer, pas); }
+                onSequenceModifiee: function (seq) { root._enregistre(root.aEditer, seq); }
             }
         }
 
