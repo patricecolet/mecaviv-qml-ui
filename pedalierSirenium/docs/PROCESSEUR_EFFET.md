@@ -689,7 +689,7 @@ sirenium :
 
 ```
 sirenium ─┬────────────────────→ harmoniseur 1 ──→ [rec couche 1]   (gate ici)
-          └→ processeur ────────↗                  [rec couche 2] ──→ harmoniseur 2 → sirènes
+          └→ processeur ────────↗                  [rec automation] ──→ harmoniseur 2 → sirènes
                   ↑
       pédales A/B/C → table voices de la scène (volume / gate / degree)
 ```
@@ -728,11 +728,26 @@ par sirène, « toutes les sirènes ou la seule sélectionnée » n'a nulle part
 
 ---
 
-## 7. Enregistrement — deux couches
+## 7. Enregistrement — une piste d'automation à côté du clip
 
 Le rec libre **n'écrit pas dans le clip** : il insère ses événements dans un **second midifile qui
-tourne en parallèle**, pour que la seconde couche soit supprimable d'un geste sans toucher à la
-première. Conséquence heureuse : ce qui est gravé par le processeur est figé, mais jetable — ce qui
+tourne en parallèle**, pour que l'automation soit supprimable d'un geste sans toucher à la matière.
+
+**Ce n'est pas une couche de matière, c'est une piste d'automation** (Patrice, 2026-09-02). Ce
+qu'elle grave, c'est **l'action des pédales** : les contrôleurs qu'elles produisent — CC 1 du
+vibrato, CC 92 du trémolo — et **les notes du séquenceur**, qui sont de l'automation elles aussi
+même si elles ont la forme de notes. La désactiver rend la boucle nue ; c'est tout son but, et c'est
+ce qui décide de ce qu'on capte.
+
+Conséquence sur le point de captation, corrigée le 2026-09-02 : les contrôleurs **ne passent pas par
+`du.jeu`** — `vers-ctl` les met directement sur `to.sirens`. La captation de l'automation a donc deux
+entrées : les notes viennent du jeu harmonisé, les contrôleurs de ce qui part aux sirènes, filtrés
+sur `ctl` puisque la relecture des clips n'en produit pas. Mesuré : un `ctl 100 1 3` envoyé pendant
+l'automation ressort du fichier en `CC 1 100`.
+
+Une nuance qui reste : `pedale-degre` agit dans `harmoniseur-aval`, **en aval** du point de
+captation. La transposition de la pédale C n'est donc pas encore enregistrée — il faudrait graver le
+degré lui-même, pas son effet. Conséquence heureuse : ce qui est gravé par le processeur est figé, mais jetable — ce qui
 lève l'objection habituelle contre l'enregistrement d'un résultat plutôt que d'un geste.
 
 **Quand une boucle existe déjà, le rec/play ne dépend plus du début de la mesure.** Le risque n'est
@@ -744,14 +759,14 @@ courante
 ```
 
 et non à 0. C'est exactement le défaut qui a produit le bug de grille du 2026-08-22
-(`pd phase` côté PD, `_loopPhase` côté QML). La couche 2 **garde la longueur de la boucle
+(`pd phase` côté PD, `_loopPhase` côté QML). L'automation **garde la longueur de la boucle
 existante** : elle ne devient jamais boucle de référence, `mainloopCommit` ne la voit pas.
 
 ---
 
-### Construit le 2026-09-02 — `clip-couche2.pd`
+### Construit le 2026-09-02 — `clip-automation.pd`
 
-Une abstraction par sirène, `clip-couche2 <$0 du loader> <$0 du parent> <sirène> <rang>`, à poser
+Une abstraction par sirène, `clip-automation <$0 du loader> <$0 du parent> <sirène> <rang>`, à poser
 dans `siren-clip-loader` : elle y trouve, sans rien republier, les `value` dont elle a besoin.
 
 Six sous-patchs. `pd captation` est **la captation de la couche 1, reprise telle quelle** — même bus
@@ -759,8 +774,8 @@ Six sous-patchs. `pd captation` est **la captation de la couche 1, reprise telle
 fermée par `stop`. Ce qui change tient en un fil : un inlet pose l'origine du compteur de ticks.
 `pd phase` calcule cette origine avec la formule de `loop.playgate`, qui existait déjà :
 `(globalbarcount − mainloop-startbar − offset) mod lengthbars × 1920`. `pd clip-io` recopie tout
-`dir` passant sur le bus du loader, donc la couche 2 suit le dossier de la couche 1 sans
-configuration. `pd horodatage` suffixe le nom par `c2` : la couche se reconnaît au fichier.
+`dir` passant sur le bus du loader, donc l'automation suit le dossier de la couche 1 sans
+configuration. `pd horodatage` suffixe le nom par `auto` : la couche se reconnaît au fichier.
 
 Mesuré de bout en bout, boucle de 2 mesures, note jouée 239 ticks après l'armement :
 
@@ -780,10 +795,10 @@ La machine à états n'était pas à élargir, seulement à lire : elle tient en
 `siren-loop-state/pd recplay`, qui pose un `pending` selon l'état courant — 0 → 1 (vide,
 enregistre), 1 → 2 (enregistre, joue), **2 → 1** (joue, réenregistre), 3 → 3.
 
-C'est cette troisième ligne qui portait le cas de la couche 2, et elle était déjà une sortie
-distincte du `route`. L'état 2 part maintenant vers `pd demarre.couche2`, qui applique **l'état 4
+C'est cette troisième ligne qui portait le cas de l'automation, et elle était déjà une sortie
+distincte du `route`. L'état 2 part maintenant vers `pd demarre.automation`, qui applique **l'état 4
 tout de suite, sans pending** — c'est tout l'intérêt : dès qu'une boucle existe, le geste ne dépend
-plus du début de mesure. L'appui suivant repasse en 2 par `pd stop.couche2`.
+plus du début de mesure. L'appui suivant repasse en 2 par `pd stop.automation`.
 
 Deux conséquences à connaître :
 
@@ -791,7 +806,7 @@ Deux conséquences à connaître :
   fermerait le `playgate` et couperait la lecture de la première couche pendant qu'on grave la
   seconde — exactement ce qu'on ne veut pas.
 - **`delete` efface les deux** (décidé par Patrice) : une sortie ajoutée au trigger de `pd delete`
-  part la première vers `couche2.efface`, avant l'effacement de la première couche.
+  part la première vers `automation.efface`, avant l'effacement de la première couche.
 
 Cycle mesuré, du vide à l'effacement :
 
@@ -799,17 +814,17 @@ Cycle mesuré, du vide à l'effacement :
 |---|---|---|
 | `recplay` puis `bar` | 1 | `record` — la couche 1 enregistre |
 | `recplay` puis `bar` | 2 | `stopclip 1920 1 1 0` — la boucle joue |
-| `recplay` | **4** | `couche2.rec 2 1`, **sans `bar`** |
-| `recplay` | 2 | `couche2.rec 2 0` |
-| `recplay` | 4 | `couche2.rec 2 1` |
-| `delete` | 0 | `couche2.efface 2` puis `erase` |
+| `recplay` | **4** | `automation.rec 2 1`, **sans `bar`** |
+| `recplay` | 2 | `automation.rec 2 0` |
+| `recplay` | 4 | `automation.rec 2 1` |
+| `delete` | 0 | `automation.efface 2` puis `erase` |
 
 L'abstraction s'adresse par le **rang** 0-based, seule clé dont dispose la machine à états.
 
 **Le transport traverse l'état 4 depuis le 2026-09-02.** Il ne le traversait pas : le `route 0 1 2 3`
 du chemin `stop` laissait tomber l'état 4, qui restait bloqué — la couche jamais fermée, et midifile
 laissant un fichier de **zéro octet avec son `.trk` orphelin** à côté. Le désarmement ne pend plus
-du geste mais de la **sortie** de l'état 4 : `pd sortie.de.couche2` écoute `outlet.state` et ferme
+du geste mais de la **sortie** de l'état 4 : `pd sortie.de.automation` écoute `outlet.state` et ferme
 dès que la valeur précédente valait 4. Une seule cause, donc tous les chemins sont couverts —
 `recplay`, `stop`, `mode`, `delete` — sans double `stop` envoyé à `clip-io`.
 
@@ -817,14 +832,14 @@ dès que la valeur précédente valait 4. Une seule cause, donc tous les chemins
 
 `to.sirens` est un bus de **sortie** : l'harmoniseur y met ce qu'on joue, et `pd to.siren` du loader
 y remet ce que les clips rejouent. Les deux captations y écoutaient. Invisible pour la couche 1, qui
-ne joue pas pendant qu'elle enregistre ; fatal pour la couche 2, qui grave par-dessus une boucle qui
+ne joue pas pendant qu'elle enregistre ; fatal pour l'automation, qui grave par-dessus une boucle qui
 tourne.
 
-Mesuré : couche 1 portant les notes 62 et 64, couche 2 armée, **rien joué au sirenium** — la couche 2
+Mesuré : couche 1 portant les notes 62 et 64, automation armée, **rien joué au sirenium** — l'automation
 gravait la note 62. Elle se reprenait elle-même.
 
 L'harmoniseur publie donc en plus sur **`$1.du.jeu`**, par un trigger sur sa sortie, et les deux
-captations écoutent là. Même mesure après : la couche 2 ne contient aucune note, et la couche 1
+captations écoutent là. Même mesure après : l'automation ne contient aucune note, et la couche 1
 capte toujours son jeu sur une boucle vide — sirenium et transformations ensemble, ce qui est le but.
 
 **Piège rencontré en posant ce trigger** : le canvas racine de `harmoniseur.pd` entrelace objets et
@@ -835,7 +850,7 @@ connexions déjà passées ne voient pas les nouveaux index.
 
 **Défaut ouvert : la phase ne prend pas dans la chaîne complète.** Mesuré le 2026-09-02 avec une
 couche 1 réellement enregistrée sur deux mesures (notes relues à 959 et 2879, donc la couche 1 est
-juste) : la note de la couche 2 est gravée à **0**, ni à la phase attendue (1920), ni même aux 239
+juste) : la note de l'automation est gravée à **0**, ni à la phase attendue (1920), ni même aux 239
 ticks écoulés depuis l'armement. L'abstraction isolée donne pourtant les bons deltas — c'est le
 tableau ci-dessus. Le contexte réel change donc quelque chose : soit `pd phase` ne rend pas ce qu'on
 croit (`$1-lengthbars`, `$1-offsetticks` posés par le `read` du loader), soit l'ordre entre la pose
@@ -856,7 +871,7 @@ signal est donc : **le sirenium joue, ou ne joue pas**.
 À la fermeture du gate :
 
 - **seules les notes et le bend du sirenium** cessent d'être captées. Les CC continuent d'être
-  écrits, et la couche 2 n'est pas touchée ;
+  écrits, et l'automation n'est pas touchée ;
 - **le temps continue d'avancer** — sinon désynchronisation immédiate ;
 - **la note en cours reçoit son note off**, sinon sirène bloquée volet ouvert.
 
@@ -880,7 +895,7 @@ famille quand le mot est courant — la forêt de fenêtres Pd doit rester lisib
 | `pd effect.scope` | interrupteurs 45/46 : sélection courante ou toutes, en surcharge du champ `pedal` |
 | `pd led.effect.state` | LEDs 43-46, valeur 127 comme le reste du patch |
 | `pd sirenium.gate` | §8 : ferme la captation notes+bend, hystérésis, note off |
-| `pd rec.couche2` | §7 : midifile parallèle, origine des ticks à la phase courante |
+| `clip-automation` | §7 : midifile parallèle, origine des ticks à la phase courante ; posée dans `siren-clip-loader` |
 
 Les paramètres passent par des **buffers `text`**, pas par des inlets froids, et l'état par instance
 par `value $0-nom` — jamais un `value` en nom nu, qui serait global.
@@ -963,7 +978,7 @@ Restent à leurrer, eux : les CC des pédales (par la sonde FUDI, ou un port MID
   être laissé prendre.
 - **Portée de la pédale A** : elle suit le champ `pedal` de la scène faute d'interrupteur libre.
   À confirmer que c'est acceptable en jeu.
-- **Par quel geste on supprime la couche 2**, et par quel geste on la crée. Rien n'a été dit ; c'est
+- **Par quel geste on supprime l'automation**, et par quel geste on la crée. Rien n'a été dit ; c'est
   pourtant tout l'intérêt de la séparer.
 - **Forme de l'hystérésis du gate sirenium** (§8) : temporisation, ou attente de fin de note.
 - **`gate`, `pedal` et `siren`** dans la table `voices` : personne ne les **lit**, mais ils sont déjà
