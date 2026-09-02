@@ -102,6 +102,49 @@ scène comme une version antérieure de ce paragraphe l'affirmait. Les deux inte
 pédale A choisissent l'**indice** 1, 2 ou 3 ; chaque sirène visée joue alors *sa* séquence de cet
 indice.
 
+### Une bibliothèque de fichiers, pas un bloc dans la scène (2026-09-02)
+
+**Décision de Patrice, qui remplace tout ce qui précédait sur le format.** Les séquences ne sont plus
+stockées dans la scène : elles vivent dans une **bibliothèque de fichiers `.txt`**, gérés par
+`text define` et ses messages `read` / `write`. La scène ne garde qu'une **référence** — l'index de
+la séquence.
+
+Ce que ça supprime, et c'est l'essentiel : plus de tableau imbriqué à faire traverser le dump de
+scène, plus d'index de tableau à reconstruire, plus de `sceneSet` par champ. Les deux anomalies qui
+bloquaient la sauvegarde (voir plus bas) **n'ont plus d'objet** — le code fautif disparaît au lieu
+d'être réparé. Et une séquence devient réutilisable d'une scène à l'autre, ce que le bloc embarqué
+ne permettait pas.
+
+Un fichier de bibliothèque, format proposé :
+
+```
+1920;        <- ligne 0 : la longueur en ticks
+0 127;       <- puis un evenement par ligne : <tick> <velocite>
+480 60;
+960 100;
+```
+
+**Mesuré le 2026-09-02 : `text read` résout un chemin relatif depuis le dossier du PATCH**, pas
+depuis le répertoire de travail — vérifié en lançant Pd depuis `/tmp` sur un patch situé ailleurs.
+C'est l'inverse de `[file]` (qui résout depuis le cwd, piège du 2026-07-31). Conséquence : dans une
+**abstraction**, le relatif viserait `application.layer/`, donc la bibliothèque doit être atteinte
+par un **chemin absolu** construit depuis la racine des compositions, comme le fait déjà
+`composition-io`.
+
+Restent à trancher : où vit la bibliothèque (`<racine>/sequences/`, partagée entre compositions, me
+paraît le sens de « biblio »), comment l'index se traduit en nom de fichier, et **où la scène range
+ses trois références par sirène**. Sur ce dernier point, la voie courte est d'ajouter trois champs à
+la table `voices` — la machinerie d'extension a servi aujourd'hui pour `vibratoSpeed` et
+`tremoloSpeed`, elle est testée, et ça éviterait d'ajouter une clé de scène.
+
+Reste aussi à décider combien de séquences sont chargées en mémoire : les 21, ou seulement les sept
+actives (une par sirène), rechargées au changement d'indice. La seconde suffit si un `read` de
+fichier minuscule entre deux motifs est acceptable.
+
+---
+
+## Ce qui suit décrit le format abandonné, gardé pour la trace
+
 **Format mesuré le 2026-09-02**, en écrivant un bloc d'essai dans une scène et en sondant le dump.
 Deux clés, toutes deux des tableaux d'objets comme `voices` — donc la même machinerie de chargement :
 
