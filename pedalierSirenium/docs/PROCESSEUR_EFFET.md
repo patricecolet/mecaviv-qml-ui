@@ -813,15 +813,37 @@ du geste mais de la **sortie** de l'état 4 : `pd sortie.de.couche2` écoute `ou
 dès que la valeur précédente valait 4. Une seule cause, donc tous les chemins sont couverts —
 `recplay`, `stop`, `mode`, `delete` — sans double `stop` envoyé à `clip-io`.
 
+### Un bus dédié pour ce qui vient du jeu (2026-09-02)
+
+`to.sirens` est un bus de **sortie** : l'harmoniseur y met ce qu'on joue, et `pd to.siren` du loader
+y remet ce que les clips rejouent. Les deux captations y écoutaient. Invisible pour la couche 1, qui
+ne joue pas pendant qu'elle enregistre ; fatal pour la couche 2, qui grave par-dessus une boucle qui
+tourne.
+
+Mesuré : couche 1 portant les notes 62 et 64, couche 2 armée, **rien joué au sirenium** — la couche 2
+gravait la note 62. Elle se reprenait elle-même.
+
+L'harmoniseur publie donc en plus sur **`$1.du.jeu`**, par un trigger sur sa sortie, et les deux
+captations écoutent là. Même mesure après : la couche 2 ne contient aucune note, et la couche 1
+capte toujours son jeu sur une boucle vide — sirenium et transformations ensemble, ce qui est le but.
+
+**Piège rencontré en posant ce trigger** : le canvas racine de `harmoniseur.pd` entrelace objets et
+connexions. Insérer les nouveaux objets avant le premier `#X connect` a décalé trois connexions
+préexistantes — quatre `connection failed` au chargement. Les objets vont **après le dernier objet
+racine** : Pd lit séquentiellement, un objet doit exister avant la connexion qui le nomme, et les
+connexions déjà passées ne voient pas les nouveaux index.
+
 **Défaut ouvert : la phase ne prend pas dans la chaîne complète.** Mesuré le 2026-09-02 avec une
 couche 1 réellement enregistrée sur deux mesures (notes relues à 959 et 2879, donc la couche 1 est
 juste) : la note de la couche 2 est gravée à **0**, ni à la phase attendue (1920), ni même aux 239
 ticks écoulés depuis l'armement. L'abstraction isolée donne pourtant les bons deltas — c'est le
 tableau ci-dessus. Le contexte réel change donc quelque chose : soit `pd phase` ne rend pas ce qu'on
 croit (`$1-lengthbars`, `$1-offsetticks` posés par le `read` du loader), soit l'ordre entre la pose
-de l'origine et l'ouverture de la porte n'est pas celui prévu. **Non localisé** : la copie
-instrumentée du banc n'a pas été chargée à la place de celle du repo, donc les sondes n'ont rien
-imprimé. À reprendre en instrumentant directement l'abstraction du repo.
+de l'origine et l'ouverture de la porte n'est pas celui prévu. **À moitié localisé** (sondes posées dans l'abstraction du repo) : le compteur de ticks est juste
+— il finit bien à 239 après l'armement — et `pd phase` rend 0. Mais le delta transmis vaut
+**−3600**, soit `239 − 3839` : la mémoire du dernier événement garde la valeur héritée du passage de
+la couche 1, et midifile écrête le négatif à 0. Poser l'origine dans cette mémoire en plus du
+compteur n'a pas suffi ; la note reste gravée à 0. À reprendre là.
 
 ---
 
