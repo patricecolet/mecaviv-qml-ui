@@ -745,9 +745,12 @@ entrées : les notes viennent du jeu harmonisé, les contrôleurs de ce qui part
 sur `ctl` puisque la relecture des clips n'en produit pas. Mesuré : un `ctl 100 1 3` envoyé pendant
 l'automation ressort du fichier en `CC 1 100`.
 
-Une nuance qui reste : `pedale-degre` agit dans `harmoniseur-aval`, **en aval** du point de
-captation. La transposition de la pédale C n'est donc pas encore enregistrée — il faudrait graver le
-degré lui-même, pas son effet. Conséquence heureuse : ce qui est gravé par le processeur est figé, mais jetable — ce qui
+**La pédale C n'a rien à faire là, et c'est voulu** : `pedale-degre` agit dans `harmoniseur-aval`,
+c'est-à-dire dans l'harmoniseur 2 du schéma du §6, en aval du point de captation. La transposition
+s'applique en temps réel à tout ce qui sonne, relecture comprise, et n'est donc gravée nulle part —
+ni dans le clip, ni dans l'automation. Le §6 pose « deux harmoniseurs, le point de captation entre
+les deux » depuis le 2026-07-31 ; ce n'est pas un manque à combler. Une version antérieure de ce
+paragraphe le présentait comme un défaut : c'était une erreur de lecture de l'architecture. Conséquence heureuse : ce qui est gravé par le processeur est figé, mais jetable — ce qui
 lève l'objection habituelle contre l'enregistrement d'un résultat plutôt que d'un geste.
 
 **Quand une boucle existe déjà, le rec/play ne dépend plus du début de la mesure.** Le risque n'est
