@@ -10,6 +10,47 @@ import QtQuick.Layouts
 Item {
     id: root
 
+    // Une piste horizontale 0-127 : le pied donne l'amplitude (voir PROCESSEUR_EFFET.md
+    // §1), la vitesse se règle ici, dans la scène.
+    component ReglageCC: RowLayout {
+        id: reglage
+        property string label: ""
+        property int value: 0
+        property color accent: "#6699FF"
+        signal edited(int v)
+        spacing: 10
+        Text {
+            text: reglage.label
+            color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.2
+            Layout.preferredWidth: 190
+        }
+        Rectangle {
+            id: piste
+            Layout.fillWidth: true
+            Layout.preferredHeight: 18
+            radius: 3
+            color: "#131A24"
+            border.color: "#1E2833"; border.width: 1
+            Rectangle {
+                width: piste.width * (reglage.value / 127)
+                height: parent.height
+                radius: 3
+                color: reglage.accent
+            }
+            MouseArea {
+                anchors.fill: parent
+                function pose(mx) { reglage.edited(Math.max(0, Math.min(127, Math.round(mx / piste.width * 127)))); }
+                onPressed: function(mouse) { pose(mouse.x); }
+                onPositionChanged: function(mouse) { if (pressed) pose(mouse.x); }
+            }
+        }
+        Text {
+            text: reglage.value
+            color: "#64737F"; font.family: "monospace"; font.pixelSize: 10
+            Layout.preferredWidth: 26
+        }
+    }
+
     property string selKind: "expr"
     property int selIndex: 0
 
@@ -18,6 +59,11 @@ Item {
     property int sirene: 3
     property int motif: 1
     property int bpm: 108
+    // les trois vitesses de la table voices (champs 7, 8, 12) ; remplacees par
+    // celles de la scene quand la liaison WebSocket sera faite (voir PROCESSEUR_EFFET.md)
+    property int tremoloSpeed: 0
+    property int vibratoSpeed: 0
+    property int vibratoProgression: 0
     property int aEditer: 1
     property var assignation: [1, 2, 0]     // seq assignee a bouton1, bouton2, 1+2
     function nouvelleSequence() {
@@ -164,6 +210,15 @@ Item {
                 }
             }
 
+            // vitesse du tremolo — au pied c'est l'amplitude, la vitesse vit dans la scène
+            ReglageCC {
+                Layout.fillWidth: true
+                label: "VITESSE TRÉMOLO · CC 15"
+                value: root.tremoloSpeed
+                accent: "#ff9966"
+                onEdited: function(v) { root.tremoloSpeed = v; }
+            }
+
             // la bibliothèque
             RowLayout {
                 Layout.fillWidth: true
@@ -224,16 +279,43 @@ Item {
             }
         }
 
-        // ---- pédales B et C : une ligne de description, le réglage vit dans la scène
+        // ---- pédale B : description + les deux vitesses de la scène
+        ColumnLayout {
+            visible: root.selKind === "expr" && root.selIndex === 1
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 10
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: "Profondeur du vibrato au pied — CC 1 des sirènes. Les deux vitesses ci-dessous viennent de la scène, champs vibratoSpeed et vibratoProgression de chaque voix.\n\nL'interrupteur 45 décide si la pédale agit sur toutes les sirènes ou sur la seule sélectionnée."
+                color: "#64737F"; font.family: "monospace"; font.pixelSize: 13; lineHeight: 1.5
+            }
+            ReglageCC {
+                Layout.fillWidth: true
+                label: "VITESSE VIBRATO · CC 9"
+                value: root.vibratoSpeed
+                accent: "#6699FF"
+                onEdited: function(v) { root.vibratoSpeed = v; }
+            }
+            ReglageCC {
+                Layout.fillWidth: true
+                label: "ACCÉLÉRATION · CC 11"
+                value: root.vibratoProgression
+                accent: "#6699FF"
+                onEdited: function(v) { root.vibratoProgression = v; }
+            }
+            Item { Layout.fillHeight: true }
+        }
+
+        // ---- pédale C : une ligne de description, le réglage vit dans la scène
         Text {
-            visible: root.selKind === "expr" && root.selIndex > 0
+            visible: root.selKind === "expr" && root.selIndex === 2
             Layout.fillWidth: true
             Layout.fillHeight: true
             wrapMode: Text.WordWrap
             verticalAlignment: Text.AlignTop
-            text: root.selIndex === 1
-                  ? "Profondeur du vibrato au pied — CC 1 des sirènes. La vitesse vient de la scène, champ vibratoSpeed de chaque voix, et part en CC 9 au chargement.\n\nL'interrupteur 45 décide si la pédale agit sur toutes les sirènes ou sur la seule sélectionnée."
-                  : "Transposition dans la gamme — la position choisit un degré, et la course s'adapte au mode : elle vaut une octave, quel que soit le nombre de degrés.\n\nUne hystérésis empêche l'harmonie de clignoter à la frontière entre deux degrés. L'interrupteur 46 décide de la portée."
+            text: "Transposition dans la gamme — la position choisit un degré, et la course s'adapte au mode : elle vaut une octave, quel que soit le nombre de degrés.\n\nUne hystérésis empêche l'harmonie de clignoter à la frontière entre deux degrés. L'interrupteur 46 décide de la portée."
             color: "#64737F"; font.family: "monospace"; font.pixelSize: 13; lineHeight: 1.5
         }
 

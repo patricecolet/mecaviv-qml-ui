@@ -145,7 +145,14 @@ faut tenir longtemps.
 | 22 | **New scene** | — | — | `$0.scene.new` |
 | 23 | libre | — | — | — |
 | 24 | **Tap tempo** | — | — | `$0.tempo.tap` |
-| 25 | **Reset** de toutes les sirènes | — | — | `$0.siren.reset all` |
+| 25 | **Désactive/réactive l'automation** enregistrée, LED | — | — | `$0.automation.disabled` |
+
+**Corrigé le 2026-09-03** : cette ligne disait CC 25 → reset de toutes les sirènes. Mesuré dans
+`pedalier.pd` (`pd pedals.main`) : cette sortie de `route 0 1 2 3 4 5 6 7` n'avait **aucune
+connexion** — le `siren.reset all` qui existe dans le patch est déclenché par le changement de
+sortie audio (v1/v2/DSP), sans lien avec un CC. CC 25 était donc libre malgré ce que cette page
+affirmait ; voir `PROCESSEUR_EFFET.md` §14 pour ce qui l'occupe maintenant. La phrase « CC 25 part
+au relâché » plus bas décrivait ce même geste jamais câblé — à ne pas reproduire pour le nouveau.
 
 **L'ordre est celui de la portée croissante** : niveau clip (18-19), niveau scène (20-22), global
 (24-25). Le geste le plus fréquent est sur la pédale la plus atteignable.

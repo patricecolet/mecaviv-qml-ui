@@ -1025,17 +1025,21 @@ Mesuré le 2026-09-03, cycle complet sur le loader réel (clip de 3 mesures, not
 Convention du patch : un sous-patch porte le **nom de la sortie dont il pend**, avec un préfixe de
 famille quand le mot est courant — la forêt de fenêtres Pd doit rester lisible.
 
-| Sous-patch | Rôle |
-|---|---|
-| `pd pedals.modulators` | **réécrit** : plus de `pedalId` virtuel ; route `47 48 49` vers trois sorties nommées, `43 44 45 46` vers les états d'interrupteur |
-| `pd effect.tremolo` | pédale A, état `00` : amplitude → `volume` des voix concernées |
-| `pd effect.sequence` | pédale A, états `01/10/11` : lit la séquence de la scène, engendre les réattaques, amplitude → vélocité |
-| `pd effect.vibrato` | pédale B → `vibratoDepth` |
-| `pd effect.degree` | pédale C : quantification sur `text size $1.scaleBuffer`, hystérésis, transposition diatonique |
-| `pd effect.scope` | interrupteurs 45/46 : sélection courante ou toutes, en surcharge du champ `pedal` |
-| `pd led.effect.state` | LEDs 43-46, valeur 127 comme le reste du patch |
-| `pd sirenium.gate` | §8 : **construit** — ferme la captation notes+bend, temporisation de 500 ms |
-| `clip-automation` | §7 : midifile parallèle, origine des ticks à la phase courante ; posée dans `siren-clip-loader` |
+Les noms ci-dessous sont ceux du plan initial ; la construction réelle a choisi d'autres noms
+(`pedale-tremolo`, `pedale-vibrato`, `pedale-degre`, `sirenes-visees`, `sequenceur`), tous décrits
+en détail au §4-§6. **Table conservée pour la correspondance, pas comme TODO** :
+
+| Sous-patch prévu | Devenu | État |
+|---|---|---|
+| `pd pedals.modulators` | (lui-même) | **réécrit le 2026-09-03** (§14) : plus de matrice, réduit à l'écho LED 43-46 + CC25 |
+| `pd effect.tremolo` | `pedale-tremolo.pd` | **construit** |
+| `pd effect.sequence` | `sequenceur.pd` (×7, sous-patch `pd sequenceurs`) | **construit** |
+| `pd effect.vibrato` | `pedale-vibrato.pd` | **construit** |
+| `pd effect.degree` | `pedale-degre.pd` | **construit** |
+| `pd effect.scope` | `sirenes-visees.pd` | **construit**, réutilisé par plusieurs pédales |
+| `pd led.effect.state` | `led.effect.state` (dans `pedals.modulators`) | **construit le 2026-09-03** |
+| `pd sirenium.gate` | (lui-même) | §8 : **construit** |
+| `clip-automation` | `automation.pd` + `auto-piste.pd` | §7 refondu le 2026-09-03 : **construit**, deux fichiers, pas de multipiste encore |
 
 Les paramètres passent par des **buffers `text`**, pas par des inlets froids, et l'état par instance
 par `value $0-nom` — jamais un `value` en nom nu, qui serait global.
@@ -1048,12 +1052,12 @@ La refonte rend caduc tout l'étage `pedalId` :
 
 | Élément | Où | Sort |
 |---|---|---|
-| Matrice 8 × 7 × 8 = 448 | `$0.modulation.pedal.config` | supprimée, remplacée par la table `voices` (§3) |
-| `pedalId` virtuels 1-8 | `pedals.modulators` (décalages 0/4/6) | supprimés |
-| Préréglages de pédales | `pedal.presets/`, `pd pedals.preset.load`, `pd pedals.get.preset.list`, `pd pedals.default.preset` | supprimés |
-| `SIREN_PEDALS.pedalConfigChange` | `WebSocketController.qml` | supprimé |
-| Page CFG | `ConfigView2D.qml`, `ModulationMatrix2D.qml`, `PedalboardPortrait2D.qml` | à réexaminer : la matrice n'a plus d'objet, le reste peut survivre |
-| Liste des 8 contrôleurs | `config.js` | réduite à ce que les pédales touchent réellement |
+| Matrice 8 × 7 × 8 = 448 | `$0.modulation.pedal.config` | **supprimée le 2026-09-03**, remplacée par la table `voices` (§3) |
+| `pedalId` virtuels 1-8 | `pedals.modulators` (décalages 0/4/6) | **supprimés le 2026-09-03** |
+| Préréglages de pédales, côté QML | routes `SIREN_PEDALS` presets, `savePreset`/`loadPreset`/… | **supprimés le 2026-09-03** (`WebSocketController.qml`) |
+| Préréglages de pédales, côté PD | `pedal.presets/` (4 fichiers), `pd pedals.preset.load`, `pd pedals.get.preset.list`, `pd pedals.default.preset` | **supprimés le 2026-09-03** : `pedal.presets/` effacé (`git rm`), et `pd modulation.pedals` — qui les contenait tous, avec la matrice elle-même et 3 autres sous-patchs annexes — vidé de son contenu. Vérifié sans câble vers le reste du patch avant de vider ; la coquille `[pd modulation.pedals]` reste visible, vide, à retirer depuis l'éditeur graphique |
+| Page CFG | `ConfigView2D.qml`, `ModulationMatrix2D.qml`, `PedalboardPortrait2D.qml` | **fait** (session antérieure + 2026-09-03) : `ModulationMatrix2D` supprimé, `ConfigView2D` reconstruit avec la bibliothèque de séquences et les trois curseurs |
+| Liste des 8 contrôleurs | `config.js` | **supprimée le 2026-09-03** (aucun lecteur trouvé, pas seulement réduite) |
 
 À vérifier avant de supprimer quoi que ce soit côté QML : `data.qrc` est manuel, et `ConfigView2D`
 est la seule cible du bouton `CFG`. Retirer la matrice sans lui donner un successeur laisse un
@@ -1109,23 +1113,25 @@ Restent à leurrer, eux : les CC des pédales (par la sonde FUDI, ou un port MID
 
 ## 13. Non tranché
 
-- **Amplitude au pied pour la pédale A** : déduit de la règle du §1, jamais confirmé explicitement.
-  L'autre lecture serait la vitesse au pied et l'amplitude dans la séquence.
-- **Longueur des séquences** : posée à 1920 ticks par défaut, propre à chaque séquence — c'est mon
-  choix, pas une décision de Patrice, qui n'a pas tranché entre ça et « boucler sur la mesure ».
+- ~~**Amplitude au pied pour la pédale A**~~ — **confirmé le 2026-09-03** : c'est bien l'amplitude
+  au pied, la vitesse se règle dans cfg (voir §14).
+- ~~**Longueur des séquences**~~ — **confirmée le 2026-09-03** : 1920 ticks (une mesure) par défaut
+  est bien la décision de Patrice, pas seulement mon choix.
 - **Une scène chargée se demande par un numéro nu** sur `$0.scene.select`, pas par `scene <n>` :
   ce dernier ne charge rien et fait rediffuser la scène courante. Mesuré le 2026-09-02, après s'y
   être laissé prendre.
 - **Portée de la pédale A** : elle suit le champ `pedal` de la scène faute d'interrupteur libre.
   À confirmer que c'est acceptable en jeu.
-- **Par quel geste on supprime l'automation.** La créer ne demande rien de plus (§8) ; l'effacer
-  seule, sans effacer le clip, n'a pas été discuté.
+- ~~**Par quel geste on supprime l'automation.**~~ — **construit le 2026-09-03** : CC 25, avec LED.
+  Voir §14.
 - **`gate`, `pedal` et `siren`** dans la table `voices` : personne ne les **lit**, mais ils sont déjà
   **préservés** — `pd voice.select.root` (`harmoniseur.pd`) fait `text get $1.voices 4 3` et remet
   ces trois champs en place quand il réécrit une ligne de voix. Le transport existe donc ; c'est leur
   sémantique qui est vide, et c'est une chance : on peut la définir sans rien casser. Reste à mesurer
   ce que `enable` déclenche réellement avant d'y toucher.
-- **La quatrième pédale BOSS (CC 50)** reste libre.
+- ~~**La quatrième pédale BOSS (CC 50)**~~ — **corrigé le 2026-09-03** : elle n'existe pas. Ce
+  point du §1 était faux ; la pédale BOSS n'a que les trois pédales d'expression et les quatre
+  interrupteurs (§2).
 - **Rejouer un clip dans une autre gamme** — le vrai objectif de `SCENES_SPEC.md` §9, et la seule
   part non livrée. Elle demande la gamme d'origine dans le `.json` du clip (qui ne porte aujourd'hui
   que `siren`, `is_reference`, `length_bars`, `length_ticks`, `id`, `offset_ticks`) et une
@@ -1198,3 +1204,101 @@ comme pour `meta`), et le cycle read/dump/réinjection.
 `meta 1 <mode>` juste après le `record`, un `t b a` garantissant que le fichier est ouvert avant. Un
 clip enregistré en ré dorien porte `ARMURE [2 0]` et `MODE Dorian`. L'automation ne les grave pas :
 elle ne porte pas de hauteurs à réharmoniser.
+
+---
+
+## 14. Champ 12, `pedals.modulators` et le nettoyage — 2026-09-03
+
+### Construit — `vibratoProgression`, champ 12 de `voices` (CC 11)
+
+Troisième vitesse de la pédale A/B : l'accélération du vibrato, `CC 11` dans `COMPOSESIREN_ARCHITECTURE.md`
+(« Vibrato Attack »). Même montage que `vibratoSpeed`/`tremoloSpeed` (§4, étendu le 2026-09-02),
+un champ de plus **à la fin** — les quatre points de touche (`siren.reset`, `updateVoice`,
+`voice.select.root`, `scene.voices.save`/`load`), plus l'entrée dans `pd champs`. `voices-vitesses.pd`
+envoie maintenant trois CC au chargement de scène (9, 15, 11) au lieu de deux, même idiome
+`text get … 12 1` → `list prepend` (cold = siren) → `vers-ctl 11`.
+
+**Vérifié le 2026-09-03**, en direct sur le vrai `pedalier.pd` (banc `pedales.virtuelles`/
+`banc-looper`, sonde FUDI temporaire, retirée après coup) : `TEST-REPLAY-SCENE` rejoue
+`$0.scene.loaded`, et les trois CC sortent dans l'ordre pour chaque sirène —
+`ctl 0 15 3 / ctl 0 9 3 / ctl 0 11 3`, etc. sur les sept. Le montage marche.
+
+### `pedals.modulators` : la matrice 448 ne reçoit plus rien
+
+Les trois pédales A/B/C (`pedale-tremolo`, `pedale-vibrato`, `pedale-degre`) lisent déjà
+`$0.midi.pedalier.sirenium` **directement** — elles ne dépendaient pas de `pedals.modulators`, dont
+la seule sortie vivante était `s $0.modulation.pedal` (la matrice condamnée par §10) plus un
+passage pour les boutons de scène (CC ≥ 51, sans rapport avec les pédales, conservé tel quel). Toute
+la machinerie de `pedalId` virtuel (décalages 0/4/6, `list prepend`, `list trim`) est retirée avec
+son unique destinataire.
+
+### Construit — `led.effect.state`, dans `pedals.modulators`
+
+Le nouveau contenu du sous-patch : un écho des interrupteurs 43-46. Comme `pedale-degre.pd`, il
+préserve la portée du >= 51 (obj4 pack(48,248) après moses51 est ceci qu'exactement).
+`r $0.midi.pedalier.sirenium` → `route ctl` → `swap` → `pack` → `route 43 44 45 46`, et chaque
+sortie repart telle quelle sur `$0.midi.pedalier.sirenium-r` via `list append <même CC>` — le même
+contrat `<valeur> <cc>` que `led.pedal.tempo`/`led.pedal.scene`/`led.pedal.preselection` (vérifié en
+lisant leur câblage). **Les interrupteurs sont déjà latchés côté matériel** (§2) : l'état reçu EST
+l'état à afficher, l'écho est inconditionnel, sans logique de latch côté patch.
+
+### Nettoyage — presets de pédales et matrice, côté QML
+
+`WebSocketController.qml` : retiré tout ce qui ne servait que les presets de pédales — les quatre
+`registerRoute("device.SIREN_PEDALS...")` (vestiges du système de routes, déjà noté inerte par
+CLAUDE.md), la branche `json.device === "SIREN_PEDALS"` dans le handler texte (ne produisait que
+`presetList`/`currentPreset`/`presets`, sans aucun lecteur ailleurs dans l'arbre QML — vérifié par
+grep), et les cinq fonctions `savePreset`/`loadPreset`/`requestPresetList`/`deletePreset`/
+`requestCurrentPreset`, elles aussi sans appelant. `enableMonitoring`/`disableMonitoring` restent :
+même device `SIREN_PEDALS`, mais sans rapport avec les presets.
+
+`config.js` : les objets `controllers` (définitions, ordre, sections) et `pedals` (compte,
+`defaultPreset`), plus les trois fonctions helper associées, n'avaient **aucun lecteur** dans tout
+`QtFiles/` — seul `websocketUrl` est réellement importé (`WebSocketController.qml`). Supprimés
+plutôt que réconciliés avec la liste PD (divergence notée au §10) : la liste elle-même n'avait plus
+d'objet.
+
+`ModulationMatrix2D.qml` était déjà supprimé (commit `379310d`, 2026-09-02) — vérifié avant de
+commencer, pas refait ici.
+
+### Construit — les trois vitesses dans l'écran cfg
+
+`ConfigView2D.qml` : un composant QML inline `ReglageCC` (piste 0-127, glisser pour régler),
+déclaré **à l'intérieur** de l'`Item` racine — `qmllint` (Qt 6.10.0) refuse la syntaxe
+`component Nom: Type { }` posée avant l'objet racine du fichier (erreur de syntaxe reproduite sur un
+fichier minimal, corrigée en la redéclarant comme enfant de `root`). Utilisé trois fois : vitesse du
+trémolo (pédale A, CC 15) sous les emplacements de motif, vitesse et accélération du vibrato
+(pédale B, CC 9 et CC 11) sous le texte descriptif. État local pour l'instant (`root.tremoloSpeed`
+etc.), même statut que `bibliotheque`/`assignation` : remplacé par la scène quand la liaison
+WebSocket existera. Pédale C inchangée, aucune vitesse ne la concerne.
+
+**Vérifié** : `qmllint` propre sur `ConfigView2D.qml` et `WebSocketController.qml` (plus d'avertissement
+que sur les fichiers non touchés du même arbre), `node --check` propre sur `config.js`, build WASM
+incrémental sans erreur, testé au navigateur (harnais de simulation) : les trois curseurs
+s'affichent et répondent au glisser, pédale C reste en texte pur.
+
+### Construit — CC 25 désactive/réactive l'automation, avec LED
+
+**C'est une mute, pas une suppression** — le mot du §13 était trompeur. Rien n'est effacé : la
+table `$1.auto<sirène><cc>` reste intacte, seule sa **lecture** est coupée. `pd lecture`
+(`auto-piste.pd`) gagnait déjà une vanne sur `$0-repris` (reprise en main par pédale) ; une
+seconde vanne, en série, teste un canal global `$1.automation.disabled` (où `$1` = le `$0` de
+`pedalier.pd`, transporté par `automation <...> <$0 parent> <sirène>` → `auto-piste \$2 ...`,
+déjà vérifié par le reste de l'abstraction). Les deux vannes se combinent en cascade
+(`spigot` → `spigot`), pas par un `&&` : plus court, et chacune se lit séparément dans le patch.
+
+`pedals.main` (`pedalier.pd`) : la route CC 18-25 avait deux sorties mortes (23-24, `- 18` inclus,
+sans rapport avec ce chantier) — l'outlet 7 (CC 25) était **libre**, malgré `PEDALIER_MAPPING.md`
+qui le dit assigné au reset des sirènes : mesuré dans le patch réel, aucune connexion sur cette
+sortie de `route 0 1 2 3 4 5 6 7`, le `siren.reset all` trouvé ailleurs est déclenché par le
+changement de sortie audio (v1/v2/DSP), sans rapport avec un CC. **La doc de mapping est stale sur
+ce point**, à corriger séparément. CC25 bascule un `value $0-auto.disabled` (lu/écrit par le même
+inlet, bang lit / float écrit), diffuse le nouvel état sur `$0.automation.disabled`, et l'échoue en
+LED sur `$0.midi.pedalier.sirenium-r` — même format `<valeur> <cc>` que `led.effect.state` (§ ci-
+dessus). Un `loadbang` pose la LED à l'état neutre au chargement.
+
+**Vérifié le 2026-09-03**, en direct : `ctl 1 25` injecté deux fois sur `$0.midi.pedalier.sirenium`
+— premier appui `AUTOMATION-DISABLED: 1` + écho LED `1 25` ; second appui, retour à `0` sur les
+deux. L'aller-retour est propre. **Reste à vérifier** : la cascade des deux vannes dans
+`auto-piste.pd` avec une automation réellement enregistrée en train de jouer (pas testé — demande
+une prise réelle, pas seulement l'injection du CC).

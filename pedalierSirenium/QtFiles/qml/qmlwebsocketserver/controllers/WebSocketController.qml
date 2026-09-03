@@ -111,31 +111,6 @@ Item {
             }
         );
         
-        // SIREN_PEDALS - Presets
-        parser.registerRoute("device.SIREN_PEDALS.presetList", 
-            function(value) {
-                root.pathMessageReceived(["presets", "list"], value);
-            }
-        );
-        
-        parser.registerRoute("device.SIREN_PEDALS.action", 
-            function(value, path) {
-                root.pathMessageReceived(["action"], value);
-            }
-        );
-        
-        parser.registerRoute("device.SIREN_PEDALS.name", 
-            function(value) {
-                root.pathMessageReceived(["preset", "name"], value);
-            }
-        );
-        
-        // SIREN_PEDALS - Configuration des pédales
-        parser.registerRoute("device.SIREN_PEDALS.pedals", 
-            function(value) {
-                root.pathMessageReceived(["preset", "data"], value);
-            }
-        );
     }
     
     function getStatusText() {
@@ -258,17 +233,6 @@ Item {
                     }
                     if (json.output) {
                         root.batchReceived("outputDevice", json.output);
-                    }
-                } else if (json.device === "SIREN_PEDALS") {
-                    if (json.presetList) {
-                        root.batchReceived("presetList", json.presetList);
-                    }
-                    if (json.name && json.pedals) {
-                        // Preset complet (getCurrentPreset ou loadPreset)
-                        root.batchReceived("currentPreset", json);
-                    } else if (json.pedals) {
-                        // Données de preset sans nom (ancien format)
-                        root.batchReceived("presets", { pedals: json.pedals });
                     }
                 } else if (json.device === "LOOPER_SCENES") {
                     if (json.composition) {
@@ -595,48 +559,6 @@ Item {
         loadConfiguration();
     }
     
-    function savePreset(name, data) {
-        return sendMessage({
-            device: "SIREN_PEDALS",
-            action: "savePreset",
-            presetName: name
-        });
-    }
-
-    function loadPreset(name) {
-        return sendMessage({
-            device: "SIREN_PEDALS",
-            action: "loadPreset",
-            presetName: name
-        });
-    }
-
-    function requestPresetList() {
-        return sendMessage({
-            device: "SIREN_PEDALS",
-            action: "getPresetList"
-        });
-    }
-
-    function deletePreset(presetName) {
-        if (root.logger) {
-            root.logger.info("PRESET", "Suppression du preset:", presetName);
-        }
-        return sendMessage({
-            device: "SIREN_PEDALS",
-            action: "deletePreset",
-            presetName: presetName
-        });
-    }
-
-    function requestCurrentPreset() {
-        if (logger) logger.info("PRESET", "🌐 Envoi de getCurrentPreset");
-        return sendMessage({
-            device: "SIREN_PEDALS",
-            action: "getCurrentPreset"
-        });
-    }
-
     // Nouvelle fonction pour demander la liste des scènes
     function requestScenesList() {
         if (logger) logger.info("SCENES", "🌐 Envoi de getScenesList");
