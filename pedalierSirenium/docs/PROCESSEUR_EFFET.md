@@ -982,26 +982,41 @@ la table contient une seule ligne, `499 96` (le tick brut, la valeur quantifiée
 fermée, `relance`, puis exactement 3840 pulses → `ctl 96 48 3` ressort. Un tour pile, quel que soit
 le moment de la relance.
 
-**Ce qui reste ouvert, et ce qui ne l'est pas.** Une première version de cette note disait que le
-compteur « part du chargement du patch » : c'est faux, et Patrice l'a relevé. Les `pulse480`
-n'existent que quand le transport tourne, donc c'est bien lui qui mène le compteur.
+### L'automation est calée sur le clip — 2026-09-03
 
-Ce que la mesure montre en revanche (2026-09-03, `midiclock` seul, tempo 240) : un **Start MIDI
-remet le compteur de mesures à zéro** — `route 248 250 251 252` envoie un `raz` à `pd counter` — mais
-**ne touche pas au flux de `pulse480`**. Deux passes de lecture, `play … stop` puis `play … stop` :
-`BAR` refait 1, 2, 3 puis **0**, 1, 2, pendant que l'accumulateur de pulses passe de 10720 à 14680,
-sans discontinuité. Les deux références divergent donc à chaque Start.
+Une première version de cette note disait que le compteur « part du chargement du patch » : c'est
+faux, et Patrice l'a relevé. Les `pulse480` n'existent que quand le transport tourne. Ce que la
+mesure montre (`midiclock` seul, tempo 240) : un **Start MIDI remet le compteur de mesures à zéro** —
+`route 248 250 251 252` envoie un `raz` à `pd counter` — mais **ne touche pas au flux de
+`pulse480`** : deux passes `play … stop`, `BAR` refait 1, 2, 3 puis **0**, 1, 2 pendant que
+l'accumulateur passe de 10720 à 14680 sans discontinuité.
 
-Sur la lecture du clip, l'écart ne se voit pas tant que rien ne le réancre : `clip-io` avance lui
-aussi au pulse, et `pd loop.playgate` ne recalcule sa position sur la grille **qu'à l'ouverture du
-playgate**. Tant que le clip tourne sans interruption, clip et automation restent verrouillés. Le
-jour où le playgate se rouvre — stop puis play sur la pédale, changement de scène — le clip saute à
-sa place sur la grille et l'automation, elle, ne suit pas. Même chose pour une table relue depuis le
-disque dans une autre session.
+D'où la décision : **l'automation n'a pas d'horloge à elle, elle lit celle du clip.** `clip-io` sort
+déjà sa position (deuxième sortie de `midifile`), et le loader s'en sert pour reboucler
+(`pd grille`) et pour la ghost note (`pd relance`). Le loader la publie maintenant sur
+`$0.clip.position`, et `pd tick` la prend telle quelle : elle gèle quand le clip gèle, elle saute
+quand le playgate le réancre sur la grille, et l'automation suit.
 
-Le remède tient dans la même idée que la correction ci-dessus : que `pd tick` **calcule** la position
-au lieu de la compter, avec la formule de `pd loop.playgate`. À trancher avant de sauver les tables
-dans le dossier du clip.
+**Pendant une prise qui grave le clip, il n'y a plus de position** — le playgate est fermé, `midifile`
+écrit. `pd tick` compte alors les pulses depuis l'appui, **sans repli**, puisque la longueur n'est pas
+encore connue ; c'est exactement l'origine que `pd captation` utilise pour ses deltas, donc le tick 0
+du clip par construction. La bascule entre les deux régimes se fait sur `prise × prise.notes`.
+
+**Et une prise d'automation seule laisse le playgate ouvert.** `pd loop.state` calculait
+`état == 2 || état == 4` ; il calcule maintenant
+`état == 2 || état == 4 || (état == 1 && prise.notes == 0)`. Sans ça le clip se serait tu pendant
+qu'on l'automate — et l'automation, calée sur lui, aurait gelé avec lui. La porte est relevée sur le
+chemin de **l'état** (`pd prise.notes`) et non sur celui du `record`, parce que la sortie `state` tire
+en premier : le playgate se calcule juste après et lui faut la valeur fraîche.
+
+Mesuré le 2026-09-03, cycle complet sur le loader réel (clip de 3 mesures, note à 479, sonde FUDI) :
+
+| Ce qu'on fait | Ce qu'on mesure |
+|---|---|
+| prise porte ouverte, geste 960 pulses après l'appui | table = `959 60` — compté depuis l'appui |
+| prise porte fermée sur boucle pleine | `REC 1`, aucun nouveau `.mid`, **et le clip continue de sonner** |
+| relecture, tour découpé en douze tranches de 480 | note et geste toujours **à deux tranches d'écart**, cinq tours de suite |
+| arrêt du clip puis relance (playgate réancré sur la grille) | l'écart reste de deux tranches — le geste a suivi le saut |
 
 ---
 
