@@ -160,7 +160,7 @@ maintenant : la scène chargée au boot (plus de `cur.scene` à 0) et un `[moses
 - **Une scène existe toujours** (décidé le 2026-07-31), pour qu'on puisse enregistrer sans rien
   préparer. La règle est le pendant de « une composition est toujours ouverte » (§22) : à la fin de
   chaque passe de `scenesList`, si le buffer est vide, `composition-io` crée la scène 1. Une
-  composition neuve naît donc avec `scenes/scene_1.json`, et supprimer la dernière scène revient à
+  composition neuve naît donc avec `scenes/scene_1/scene.json`, et supprimer la dernière scène revient à
   la remettre à blanc plutôt qu'à laisser le morceau sans scène.
 - **Une seule pédale rec/play** (CC 18 depuis le 2026-07-31), et elle enregistre **toutes les sirènes
   en jeu dans l'harmoniseur** — pas une sirène désignée. C'est l'harmoniseur amont (§9) qui décide
@@ -521,8 +521,8 @@ seuil de variation, sinon un bend lent ne produit rien pendant longtemps puis sa
 création : `[file]` seul instancie `file handle`, qui n'a pas la méthode). Vérifié sur le dépôt réel :
 
 ```
-[symbol <compdir>/scenes/*.json( -> [file glob] -> .../scenes/1.json 0
-                                                   .../scenes/2.json 0
+[symbol <compdir>/scenes/scene_*/scene.json( -> [file glob] -> .../scene_1/scene.json 0
+                                                                .../scene_2/scene.json 0
 [symbol <root>/pedalier.compositions/*(            .../pedalier.compositions/12 1
 ```
 
@@ -543,9 +543,9 @@ Intention annoncée par Patrice le 2026-07-21, à construire en fin de niveau co
 
 Ce n'est pas seulement une fonctionnalité future — ça contraint une décision présente :
 
-- Un `clipRef` est résolu **relativement au `clips/` de la composition ouverte** (`composition-io`
-  sort ce dossier sur son outlet 2). Une scène importée référence donc des clips qui n'existent pas
-  dans la composition d'accueil.
+- Un `clipRef` est résolu **relativement au dossier de la scène ouverte** (`composition-io` sort ce
+  dossier sur son outlet 2, à chaque changement de scène). Une scène importée référence donc des
+  clips qui n'existent pas dans la composition d'accueil.
 - **Rien ne garantit l'unicité des noms de clips entre compositions** — `clip_A` peut exister dans
   les deux, avec des contenus différents. Une copie naïve écraserait ou détournerait silencieusement.
 
@@ -563,9 +563,10 @@ reste valable telle quelle.
 - **Il se pose sur la sirène correspondante**, jamais sur une autre : un clip enregistré sur S3 l'a
   été dans l'ambitus de S3, le déplacer le ferait sonner faux. Un seul index de sirène suffit donc
   au message.
-- **Copie dans le pool d'accueil, renommage seulement en cas de collision**, avec un suffixe égal à
-  l'id de la composition source (`clip_A` venu de la compo 7 → `clip_A-7`). Déterministe et
-  traçable, et repêcher le même clip ne le duplique pas puisqu'il retombe sur le même nom.
+- **Copie dans le dossier de la scène d'accueil, renommage seulement en cas de collision**, avec un
+  suffixe égal au nom de la composition source (`clip_A` venu de `compoB` → `clip_A-compoB`).
+  Déterministe et traçable. Mesuré le 2026-09-03 : repêcher **deux fois** le même clip en fait bien
+  deux copies, la seconde suffixée — le test de collision ne porte que sur le nom nu.
 - Le clip arrive en `mode: play`.
 
 La composition d'accueil reste donc autonome et transportable, et les noms restent lisibles tant
@@ -662,12 +663,12 @@ Tout le patch accède aux deux dossiers par une abstraction :
 
 Elle préfixe son entrée avec le dossier demandé ; un bang rend le dossier seul. Tant qu'aucune
 composition n'est ouverte, la ligne `compo` n'existe pas et `dir-prefix` ne rend rien — ce qui vaut
-mieux que de construire `/scenes/scene_N.json` à la racine du disque. `compdir-guard` reste
+mieux que de construire `/scenes/scene_N/scene.json` à la racine du disque. `compdir-guard` reste
 par-dessus et garde les cinq commandes d'édition.
 
 ### Remplir les buffers : `[scenes-scan]`
 
-`[scenes-scan <dossier de composition>]` énumère `scenes/scene_*.json` et en sort le contenu champ
+`[scenes-scan <dossier de composition>]` énumère `scenes/scene_*/scene.json` et en sort le contenu champ
 par champ : à gauche `<i> <chemin...> <valeur>`, au milieu l'index de la scène (juste avant son
 premier champ), à droite « fini ». Elle porte son propre `pdjson`.
 
@@ -774,3 +775,38 @@ immédiate.
 **Un bouton au-delà du nombre de scènes crée la scène manquante** — `pd scene.select` compare au
 compteur et bascule sur `$0.scene.new`. C'est la règle de Patrice : un geste qui désigne une chose
 absente la crée.
+
+---
+
+## 26. L'arborescence d'une composition — un dossier par scène, un par clip (2026-09-03)
+
+Décidé et construit le 2026-09-03, après avoir vidé `~/Documents/pedalier.compositions` : plus de
+pool de clips à plat au niveau de la composition. Le disque a maintenant la forme du modèle.
+
+```
+<racine>/
+  <composition>/
+    composition.json          nom, id, banques
+    scenes/
+      scene_1/
+        scene.json            les sept cellules
+        <clipRef>/
+          clip.mid            les notes
+          clip.json           tonalité d'origine, réglages de l'harmoniseur
+      scene_2/
+        ...
+```
+
+- **Le dossier porte le numéro, `composition.json` porte le nom.** Renommer une scène ne touche pas
+  au disque ; c'est ce qui rend une scène copiable-collable d'une composition à l'autre. Migrer une
+  scène vers une composition qui a déjà ce numéro demande de renommer le dossier à l'arrivée.
+- **Le clip a son propre dossier**, ce qui laisse la place aux tables d'automation à côté du `.mid`
+  et du `.json` sans inventer de convention de nommage.
+- **Supprimer un clip supprime son dossier** (`file delete` en mode `recursive`), supprimer une
+  scène emporte les sept.
+- **Le dossier de clips suit la scène** : `pd scene` de `composition-io` émet
+  `<compo>/scenes/scene_<n>` sur son outlet 2 **avant** de déverser le contenu de la scène, si bien
+  que `clip-io` pointe au bon endroit quand les références arrivent. Il n'est plus émis à
+  l'ouverture d'une composition — à ce moment-là aucune scène n'est encore choisie.
+- **Duplication plutôt que partage** : deux scènes qui jouent « le même » clip en ont chacune une
+  copie. C'est léger et ça supprime toute question de propriété (§19).
