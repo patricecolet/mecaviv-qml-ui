@@ -916,21 +916,59 @@ compteur n'a pas suffi ; la note reste gravée à 0. À reprendre là.
 
 ---
 
-## 8. Le gate sirenium
+## 8. Le gate sirenium — construit le 2026-09-03
 
 Le message `SIRENIUM` porte `note` et `velocity`. `note 0` = plus rien sous les doigts ;
 `note > 47` = dans l'ambitus (il commence à 48, `ambitusLow` dans `SireniumMonitor2D.qml`). Le vrai
 signal est donc : **le sirenium joue, ou ne joue pas**.
 
-À la fermeture du gate :
+**C'est ce seul signal qui distingue une prise de clip d'une prise d'automation** (Patrice,
+2026-09-03) : il n'y a pas de geste supplémentaire à inventer. La règle tient en deux lignes.
+
+- **Le gate décide si le sirenium est gravé.** Fermé à l'instant où la prise démarre, `clip-io` ne
+  reçoit pas son `record` : le clip garde son contenu et continue de jouer, seule l'automation
+  enregistre. Ouvert, la prise grave le clip comme avant.
+- **L'automation n'enregistre pas sans sirenium si la boucle est vide** — sur une boucle vide c'est
+  le sirenium qui donne la longueur, sans lui il n'y a nulle part où poser les gestes.
+
+**Hystérésis : une temporisation de 500 ms** (§13 laissait le choix ouvert avec « attendre la fin de
+la note »). Un `note 0` isolé entre deux notes n'a pas le temps de fermer la porte ; le `delay` est
+annulé par la note suivante. Mesuré : note dans l'ambitus → 1, relâchée → 0 après la temporisation,
+et un trou court entre deux notes ne produit aucun 0 intermédiaire.
+
+À la fermeture du gate en cours de prise :
 
 - **seules les notes et le bend du sirenium** cessent d'être captées. Les CC continuent d'être
   écrits, et l'automation n'est pas touchée ;
 - **le temps continue d'avancer** — sinon désynchronisation immédiate ;
-- **la note en cours reçoit son note off**, sinon sirène bloquée volet ouvert.
+- **la note en cours reçoit son note off** : elle vient du sirenium lui-même, qui envoie `note 0`
+  avant que la temporisation ne referme la porte.
 
-Il faut une **hystérésis** : un seul `note 0` entre deux notes hacherait l'enregistrement. Soit une
-temporisation, soit attendre la fin de la note en cours. La forme exacte est au §13.
+### Où ça vit
+
+| Objet | Rôle |
+|---|---|
+| `pd sirenium.gate` (`pedalier.pd`) | lit `$0.midi.sirenium`, temporise, écrit `value $0-sirenium.gate` et diffuse `$0.sirenium.gate` |
+| `pd prise` (`siren-clip-loader`) | à la transition `record` : mémorise l'état de la porte dans `value $0-prise.notes`, arme l'automation par `$0.prise`, et ne laisse passer le `record` vers `clip-io` que si la porte est ouverte |
+| `pd fin.de.prise` (idem) | désarme l'automation, puis ne laisse passer le `stop` que si la prise avait ouvert un fichier — sinon `midifile` viderait un clip jamais rouvert |
+| `pd captation` (idem) | une vanne de plus sur le chemin note/bend, suivie de `$3.sirenium.gate` |
+| `pd arme` (`automation.pd`) | `armement && (porte || longueur > 0)`, recalculé à chaque changement de l'un des trois |
+
+Mesuré le 2026-09-03 sur le loader réel, piloté par la sonde FUDI :
+
+| Porte | Boucle | Prise | Clip écrit | Automation |
+|---|---|---|---|---|
+| fermée | vide | oui | **non** | **non** |
+| fermée → ouverte en cours | vide | oui | non | passe à 1 dès l'ouverture |
+| ouverte | vide | oui | `clip_<id>/clip.mid` | oui |
+| fermée | 2 mesures | oui | **non** | **oui** |
+
+**Défaut connu, inchangé par ce chantier** : le tick de l'automation (`pd tick`) compte les pulses
+depuis son dernier `relance` et se replie sur la longueur du clip, alors que la lecture du clip est
+calée sur la grille globale (`pd loop.playgate` : `((globalbarcount − mainloop-startbar −
+offsetticks/1920) mod lengthbars) × 1920`). Les deux ne coïncident pas. C'est le « défaut ouvert »
+du §7, et il vaut toujours : tant qu'il n'est pas réglé, une automation enregistrée retombe à la
+mauvaise place. C'est le prochain point à traiter.
 
 ---
 
@@ -948,7 +986,7 @@ famille quand le mot est courant — la forêt de fenêtres Pd doit rester lisib
 | `pd effect.degree` | pédale C : quantification sur `text size $1.scaleBuffer`, hystérésis, transposition diatonique |
 | `pd effect.scope` | interrupteurs 45/46 : sélection courante ou toutes, en surcharge du champ `pedal` |
 | `pd led.effect.state` | LEDs 43-46, valeur 127 comme le reste du patch |
-| `pd sirenium.gate` | §8 : ferme la captation notes+bend, hystérésis, note off |
+| `pd sirenium.gate` | §8 : **construit** — ferme la captation notes+bend, temporisation de 500 ms |
 | `clip-automation` | §7 : midifile parallèle, origine des ticks à la phase courante ; posée dans `siren-clip-loader` |
 
 Les paramètres passent par des **buffers `text`**, pas par des inlets froids, et l'état par instance
@@ -1032,9 +1070,8 @@ Restent à leurrer, eux : les CC des pédales (par la sonde FUDI, ou un port MID
   être laissé prendre.
 - **Portée de la pédale A** : elle suit le champ `pedal` de la scène faute d'interrupteur libre.
   À confirmer que c'est acceptable en jeu.
-- **Par quel geste on supprime l'automation**, et par quel geste on la crée. Rien n'a été dit ; c'est
-  pourtant tout l'intérêt de la séparer.
-- **Forme de l'hystérésis du gate sirenium** (§8) : temporisation, ou attente de fin de note.
+- **Par quel geste on supprime l'automation.** La créer ne demande rien de plus (§8) ; l'effacer
+  seule, sans effacer le clip, n'a pas été discuté.
 - **`gate`, `pedal` et `siren`** dans la table `voices` : personne ne les **lit**, mais ils sont déjà
   **préservés** — `pd voice.select.root` (`harmoniseur.pd`) fait `text get $1.voices 4 3` et remet
   ces trois champs en place quand il réécrit une ligne de voix. Le transport existe donc ; c'est leur
