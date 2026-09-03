@@ -730,6 +730,51 @@ par sirène, « toutes les sirènes ou la seule sélectionnée » n'a nulle part
 
 ## 7. Enregistrement — une piste d'automation à côté du clip
 
+> **Refondu dans la nuit du 2026-09-03. Tout ce qui suit dans cette section décrit l'ancienne
+> version — `clip-automation`, le midifile parallèle, l'état 4, `autoRef` — qui est **supprimée**.
+> Ce qui la remplace est décrit juste en dessous ; le reste est gardé pour la trace des mesures.
+
+### Ce qui existe depuis le 2026-09-03 : `automation` + `auto-piste`
+
+**On grave les gestes, pas leurs conséquences.** Mesuré : un balayage des trois pédales produit
+**1030 messages CC** vers les sirènes — dont 896 pour le seul vibrato, soit 128 positions × 7
+sirènes — quand le geste lui-même en fait 128. Rejouer la position et laisser les pédales
+redistribuer divise par sept, et garde l'automation vivante : la séquence de la pédale A peut
+changer après coup sans toucher l'enregistrement.
+
+**`midifile` ne convient pas** (Patrice) : il écrit en une passe et ne relit pas ce qu'il écrit, donc
+filtrer un contrôleur imposerait `read` → `dump` → tampon → réécriture, à chaque reprise en main.
+Une table `[text]` le fait en trois objets — mesuré.
+
+**Une table par contrôleur**, `<tick> <valeur>` : une pédale n'a qu'une position à un instant donné,
+donc une seule ligne par tick — pas de tri, pas de boucle à la lecture, et reprendre la main c'est
+ne plus lire cette table. `auto-piste <parent> <sirène> <numéro> <pas>` tient l'une d'elles ;
+`automation <$0 du loader> <$0 du parent> <sirène>` en instancie sept (47 48 49 pour les pédales,
+43 à 46 pour les interrupteurs) et vit **dans `siren-clip-loader`**.
+
+**Quantifié par piste** (Patrice) : huit crans pour le vibrato et le trémolo, quatre pour la pédale C
+dont les valeurs sont déjà des degrés, un pour les interrupteurs. Un `change` ne laisse passer que
+les vrais sauts.
+
+**L'automation appartient au clip** : elle boucle sur `$0-lengthbars`, qui diffère d'une sirène à
+l'autre. La relecture vise donc **cette** sirène, par `vers-ctl` et `to.sirens` — rejouer sur le
+canal du pédalier ferait agir la pédale sur toutes les sirènes visées.
+
+**Le rec/play arme l'automation** : le loader envoie déjà `record` sur son bus, `pd arme` l'écoute.
+Un `read` rend la main sur toutes les pistes.
+
+**Reprise en main, mode latch** (Patrice) : toucher une pédale la sort de l'automation — sa table
+cesse d'être lue et se réécrit au fil du passage — jusqu'à la relance de la scène ou un nouvel
+enregistrement. Par pédale et non en bloc.
+
+Cycle mesuré de bout en bout : valeur 70 → quantifiée en 64 → écrite au tick 10 ; le tick suivant ne
+relit rien (la pédale est en main) ; relance ; le tick d'après rend 64. Puis, dans le loader :
+`ctl 64 48 3` rejoué **une seule fois**, sur le bon contrôleur et la bonne sirène.
+
+---
+
+### Ancienne version, gardée pour la trace
+
 Le rec libre **n'écrit pas dans le clip** : il insère ses événements dans un **second midifile qui
 tourne en parallèle**, pour que l'automation soit supprimable d'un geste sans toucher à la matière.
 
