@@ -963,12 +963,31 @@ Mesuré le 2026-09-03 sur le loader réel, piloté par la sonde FUDI :
 | ouverte | vide | oui | `clip_<id>/clip.mid` | oui |
 | fermée | 2 mesures | oui | **non** | **oui** |
 
-**Défaut connu, inchangé par ce chantier** : le tick de l'automation (`pd tick`) compte les pulses
-depuis son dernier `relance` et se replie sur la longueur du clip, alors que la lecture du clip est
-calée sur la grille globale (`pd loop.playgate` : `((globalbarcount − mainloop-startbar −
-offsetticks/1920) mod lengthbars) × 1920`). Les deux ne coïncident pas. C'est le « défaut ouvert »
-du §7, et il vaut toujours : tant qu'il n'est pas réglé, une automation enregistrée retombe à la
-mauvaise place. C'est le prochain point à traiter.
+### Le tick n'a pas d'origine à trouver — corrigé le 2026-09-03
+
+J'avais annoncé ici un défaut de phase hérité du §7 : il n'existe pas sous cette forme. **Le §7 était
+un problème de `midifile`, qui stocke des deltas** — il fallait donc que l'origine des ticks soit
+juste à l'instant de la prise. La table `text` stocke le **tick absolu en tête de ligne**, et la
+relecture le cherche (`text search <table> 0`). Seule la période compte, pas l'origine : le décalage
+constant entre le compteur de l'automation et la position du clip ne se voit jamais, puisque les deux
+tournent sur la même longueur (Patrice, 2026-09-03).
+
+**Conséquence, et c'est l'inverse de ce que je proposais : le compteur ne doit JAMAIS être remis à
+zéro.** `relance` le faisait, à chaque chargement de scène — ce qui déplaçait tout ce qui était déjà
+gravé. Retiré de `pd tick`. `relance` garde son autre rôle, le seul qui lui revienne : remettre
+`$0-repris` à zéro dans chaque `auto-piste`, c'est-à-dire rouvrir les pistes reprises à la main.
+
+Mesuré le 2026-09-03 (longueur 2 mesures = 3840 ticks) : geste `ctl 100 48` envoyé au pulse 500 →
+la table contient une seule ligne, `499 96` (le tick brut, la valeur quantifiée au pas de 8). Prise
+fermée, `relance`, puis exactement 3840 pulses → `ctl 96 48 3` ressort. Un tour pile, quel que soit
+le moment de la relance.
+
+**Ce qui reste ouvert** : le compteur part du chargement du patch, alors que la position du clip est
+ancrée sur la grille (`$0-globalbarcount` recopie le compteur de mesures de `midiclock`, et « une
+remise à zéro de l'horloge se propage toute seule »). Un arrêt-relance du transport, ou une table
+relue depuis le disque dans une autre session, changent donc le décalage. Le remède tient dans la
+même idée : que `pd tick` **calcule** la position au lieu de la compter, avec la formule de
+`pd loop.playgate`. À trancher avant de sauver les tables dans le dossier du clip.
 
 ---
 
