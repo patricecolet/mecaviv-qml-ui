@@ -982,12 +982,26 @@ la table contient une seule ligne, `499 96` (le tick brut, la valeur quantifiée
 fermée, `relance`, puis exactement 3840 pulses → `ctl 96 48 3` ressort. Un tour pile, quel que soit
 le moment de la relance.
 
-**Ce qui reste ouvert** : le compteur part du chargement du patch, alors que la position du clip est
-ancrée sur la grille (`$0-globalbarcount` recopie le compteur de mesures de `midiclock`, et « une
-remise à zéro de l'horloge se propage toute seule »). Un arrêt-relance du transport, ou une table
-relue depuis le disque dans une autre session, changent donc le décalage. Le remède tient dans la
-même idée : que `pd tick` **calcule** la position au lieu de la compter, avec la formule de
-`pd loop.playgate`. À trancher avant de sauver les tables dans le dossier du clip.
+**Ce qui reste ouvert, et ce qui ne l'est pas.** Une première version de cette note disait que le
+compteur « part du chargement du patch » : c'est faux, et Patrice l'a relevé. Les `pulse480`
+n'existent que quand le transport tourne, donc c'est bien lui qui mène le compteur.
+
+Ce que la mesure montre en revanche (2026-09-03, `midiclock` seul, tempo 240) : un **Start MIDI
+remet le compteur de mesures à zéro** — `route 248 250 251 252` envoie un `raz` à `pd counter` — mais
+**ne touche pas au flux de `pulse480`**. Deux passes de lecture, `play … stop` puis `play … stop` :
+`BAR` refait 1, 2, 3 puis **0**, 1, 2, pendant que l'accumulateur de pulses passe de 10720 à 14680,
+sans discontinuité. Les deux références divergent donc à chaque Start.
+
+Sur la lecture du clip, l'écart ne se voit pas tant que rien ne le réancre : `clip-io` avance lui
+aussi au pulse, et `pd loop.playgate` ne recalcule sa position sur la grille **qu'à l'ouverture du
+playgate**. Tant que le clip tourne sans interruption, clip et automation restent verrouillés. Le
+jour où le playgate se rouvre — stop puis play sur la pédale, changement de scène — le clip saute à
+sa place sur la grille et l'automation, elle, ne suit pas. Même chose pour une table relue depuis le
+disque dans une autre session.
+
+Le remède tient dans la même idée que la correction ci-dessus : que `pd tick` **calcule** la position
+au lieu de la compter, avec la formule de `pd loop.playgate`. À trancher avant de sauver les tables
+dans le dossier du clip.
 
 ---
 
