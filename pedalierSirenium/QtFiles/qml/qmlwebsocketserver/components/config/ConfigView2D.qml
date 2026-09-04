@@ -106,15 +106,15 @@ Item {
     readonly property var _nomPedale: ["A", "B", "C"]
 
     function _titre() {
-        if (selKind === "expr") return "Pédale d'expression " + _nomPedale[selIndex];
         if (selKind === "push") return "Poussoir " + (selIndex + 1);
         if (selKind === "sw")   return "Interrupteur — pédale " + _nomPedale[Math.floor(selIndex / 10)];
+        if (selKind === "expr") return "";
         return "Touche du clavier";
     }
     function _sousTitre() {
-        if (selKind === "expr") return ["motif et trémolo · CC 47", "vibrato · CC 48", "degré dans la gamme · CC 49"][selIndex];
         if (selKind === "push") return "interrupteur · assignable";
         if (selKind === "sw")   return selIndex < 10 ? "choix du motif" : "portée : toutes ou la sélectionnée";
+        if (selKind === "expr") return "";
         return "sensible à la vélocité";
     }
 
@@ -138,6 +138,7 @@ Item {
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#171F28" }
 
         RowLayout {
+            visible: root.selKind !== "expr"
             spacing: 14
             Text {
                 text: root._titre()
@@ -150,173 +151,213 @@ Item {
             }
         }
 
-        // ---- pédale A : la bibliothèque, les trois emplacements, l'éditeur
-        ColumnLayout {
-            visible: root.selKind === "expr" && root.selIndex === 0
+        // Une rangée = une pédale : nom, rôle et réglages toujours visibles, pour comparer
+        // les trois d'un coup d'œil plutôt que de naviguer entre elles.
+        component RangeePedale: ColumnLayout {
+            id: rangee
+            property string nom: ""
+            property string role: ""
+            property color accent: "#6699FF"
             Layout.fillWidth: true
-            Layout.fillHeight: true
             spacing: 8
-
-            // les trois emplacements, dans l'ordre des combinaisons de boutons
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 6
+                spacing: 10
+                Rectangle { Layout.preferredWidth: 4; Layout.preferredHeight: 20; radius: 2; color: rangee.accent }
                 Text {
-                    text: "SIRÈNE " + root.sirene
-                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5
+                    text: rangee.nom
+                    color: "#FFFFFF"; font.family: "monospace"; font.pixelSize: 15; font.bold: true
                 }
-                Repeater {
-                    model: [{ n: 1, lib: "bouton 1" }, { n: 2, lib: "bouton 2" }, { n: 3, lib: "1 + 2" }]
-                    delegate: Rectangle {
-                        id: emplacement
-                        required property var modelData
-                        Layout.preferredWidth: 118
-                        Layout.preferredHeight: 30
-                        radius: 3
-                        color: root.motif === modelData.n ? "#243040" : "#131A24"
-                        border.color: root.motif === modelData.n ? "#6699FF" : "#1E2833"
-                        border.width: 1
-                        RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 8
-                            Text {
-                                text: emplacement.modelData.lib
-                                color: "#64737F"; font.family: "monospace"; font.pixelSize: 9
-                            }
-                            Text {
-                                text: root.assignation[emplacement.modelData.n - 1] > 0
-                                      ? "séq " + root.assignation[emplacement.modelData.n - 1] : "—"
-                                color: root.motif === emplacement.modelData.n ? "#FFFFFF" : "#4A5A6B"
-                                font.family: "monospace"; font.pixelSize: 11; font.bold: true
-                            }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                if (root.aEditer > 0) {
-                                    var a = root.assignation.slice();
-                                    a[emplacement.modelData.n - 1] = root.aEditer;
-                                    root.assignation = a;
-                                }
-                                root.motif = emplacement.modelData.n;
-                            }
-                        }
-                    }
-                }
-                Item { Layout.fillWidth: true }
                 Text {
-                    text: "toucher un emplacement lui assigne la séquence choisie"
-                    color: "#2A3543"; font.family: "monospace"; font.pixelSize: 9
+                    text: rangee.role
+                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 10; font.letterSpacing: 1.2
                 }
             }
+        }
 
-            // vitesse du tremolo — au pied c'est l'amplitude, la vitesse vit dans la scène
-            ReglageCC {
-                Layout.fillWidth: true
-                label: "VITESSE TRÉMOLO · CC 15"
-                value: root.tremoloSpeed
-                accent: "#ff9966"
-                onEdited: function(v) { root.tremoloSpeed = v; }
-            }
+        Flickable {
+            visible: root.selKind === "expr"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            contentWidth: width
+            contentHeight: rangees.implicitHeight
+            ColumnLayout {
+                id: rangees
+                width: parent.width
+                spacing: 18
 
-            // la bibliothèque
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-                Text {
-                    text: "BIBLIOTHÈQUE"
-                    color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5
-                }
-                Repeater {
-                    model: root.bibliotheque
-                    delegate: Rectangle {
-                        id: vignette
-                        required property var modelData
-                        Layout.preferredWidth: 44
-                        Layout.preferredHeight: 30
-                        radius: 3
-                        color: root.aEditer === modelData.index ? "#6699FF" : "#131A24"
-                        border.color: root.aEditer === modelData.index ? "#8FB4FF" : "#1E2833"
-                        border.width: 1
+                // ---- pédale A : la bibliothèque, les trois emplacements, l'éditeur
+                RangeePedale {
+                    nom: "PÉDALE A"; role: "motif et trémolo · CC 47"; accent: "#ff9966"
+
+                    // les trois emplacements, dans l'ordre des combinaisons de boutons
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
                         Text {
-                            anchors.centerIn: parent
-                            text: vignette.modelData.index
-                            color: root.aEditer === vignette.modelData.index ? "#0E141B" : "#64737F"
-                            font.family: "monospace"; font.pixelSize: 12; font.bold: true
+                            text: "SIRÈNE " + root.sirene
+                            color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5
                         }
-                        MouseArea { anchors.fill: parent; onClicked: root.aEditer = vignette.modelData.index }
+                        Repeater {
+                            model: [{ n: 1, lib: "bouton 1" }, { n: 2, lib: "bouton 2" }, { n: 3, lib: "1 + 2" }]
+                            delegate: Rectangle {
+                                id: emplacement
+                                required property var modelData
+                                Layout.preferredWidth: 118
+                                Layout.preferredHeight: 30
+                                radius: 3
+                                color: root.motif === modelData.n ? "#243040" : "#131A24"
+                                border.color: root.motif === modelData.n ? "#6699FF" : "#1E2833"
+                                border.width: 1
+                                RowLayout {
+                                    anchors.centerIn: parent
+                                    spacing: 8
+                                    Text {
+                                        text: emplacement.modelData.lib
+                                        color: "#64737F"; font.family: "monospace"; font.pixelSize: 9
+                                    }
+                                    Text {
+                                        text: root.assignation[emplacement.modelData.n - 1] > 0
+                                              ? "séq " + root.assignation[emplacement.modelData.n - 1] : "—"
+                                        color: root.motif === emplacement.modelData.n ? "#FFFFFF" : "#4A5A6B"
+                                        font.family: "monospace"; font.pixelSize: 11; font.bold: true
+                                    }
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        // un emplacement deja assigne se charge dans l'editeur ;
+                                        // un emplacement vide recoit la sequence en cours d'edition
+                                        var assignee = root.assignation[emplacement.modelData.n - 1];
+                                        if (assignee > 0) {
+                                            root.aEditer = assignee;
+                                        } else if (root.aEditer > 0) {
+                                            var a = root.assignation.slice();
+                                            a[emplacement.modelData.n - 1] = root.aEditer;
+                                            root.assignation = a;
+                                        }
+                                        root.motif = emplacement.modelData.n;
+                                    }
+                                }
+                            }
+                        }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: "un emplacement assigné se charge dans l'éditeur ; un emplacement vide reçoit la séquence en cours"
+                            color: "#2A3543"; font.family: "monospace"; font.pixelSize: 9
+                        }
+                    }
+
+                    // vitesse du tremolo — au pied c'est l'amplitude, la vitesse vit dans la scène
+                    ReglageCC {
+                        Layout.fillWidth: true
+                        label: "VITESSE TRÉMOLO · CC 15"
+                        value: root.tremoloSpeed
+                        accent: "#ff9966"
+                        onEdited: function(v) { root.tremoloSpeed = v; }
+                    }
+
+                    // la bibliothèque
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        Text {
+                            text: "BIBLIOTHÈQUE"
+                            color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5
+                        }
+                        Repeater {
+                            model: root.bibliotheque
+                            delegate: Rectangle {
+                                id: vignette
+                                required property var modelData
+                                Layout.preferredWidth: 44
+                                Layout.preferredHeight: 30
+                                radius: 3
+                                color: root.aEditer === modelData.index ? "#6699FF" : "#131A24"
+                                border.color: root.aEditer === modelData.index ? "#8FB4FF" : "#1E2833"
+                                border.width: 1
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: vignette.modelData.index
+                                    color: root.aEditer === vignette.modelData.index ? "#0E141B" : "#64737F"
+                                    font.family: "monospace"; font.pixelSize: 12; font.bold: true
+                                }
+                                MouseArea { anchors.fill: parent; onClicked: root.aEditer = vignette.modelData.index }
+                            }
+                        }
+                        Rectangle {
+                            Layout.preferredWidth: 44
+                            Layout.preferredHeight: 30
+                            radius: 3
+                            color: "#131A24"
+                            border.color: "#243040"; border.width: 1
+                            Text {
+                                anchors.centerIn: parent
+                                text: "+"; color: "#64737F"; font.family: "monospace"; font.pixelSize: 15
+                            }
+                            MouseArea { anchors.fill: parent; onClicked: root.nouvelleSequence() }
+                        }
+                        Item { Layout.fillWidth: true }
+                    }
+
+                    // l'éditeur de la séquence choisie
+                    SequenceEditor2D {
+                        id: editeur
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 220
+                        pas: root._sequence(root.aEditer).pas
+                        division: root._sequence(root.aEditer).division
+                        vitesse: root._sequence(root.aEditer).vitesse
+                        blocs: root._sequence(root.aEditer).blocs
+                        seqIndex: root.aEditer
+                        actif: true
+                        bpm: root.bpm
+                        enJeu: root.assignation[root.motif - 1] === root.aEditer
+                        onSequenceModifiee: function (seq) { root._enregistre(root.aEditer, seq); }
                     }
                 }
-                Rectangle {
-                    Layout.preferredWidth: 44
-                    Layout.preferredHeight: 30
-                    radius: 3
-                    color: "#131A24"
-                    border.color: "#243040"; border.width: 1
+
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#171F28" }
+
+                // ---- pédale B : description + les deux vitesses de la scène
+                RangeePedale {
+                    nom: "PÉDALE B"; role: "vibrato · CC 48"; accent: "#6699FF"
                     Text {
-                        anchors.centerIn: parent
-                        text: "+"; color: "#64737F"; font.family: "monospace"; font.pixelSize: 15
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: "Profondeur du vibrato au pied — CC 1 des sirènes. Les deux vitesses ci-dessous viennent de la scène, champs vibratoSpeed et vibratoProgression de chaque voix. L'interrupteur 45 décide si la pédale agit sur toutes les sirènes ou sur la seule sélectionnée."
+                        color: "#64737F"; font.family: "monospace"; font.pixelSize: 12; lineHeight: 1.4
                     }
-                    MouseArea { anchors.fill: parent; onClicked: root.nouvelleSequence() }
+                    ReglageCC {
+                        Layout.fillWidth: true
+                        label: "VITESSE VIBRATO · CC 9"
+                        value: root.vibratoSpeed
+                        accent: "#6699FF"
+                        onEdited: function(v) { root.vibratoSpeed = v; }
+                    }
+                    ReglageCC {
+                        Layout.fillWidth: true
+                        label: "ACCÉLÉRATION · CC 11"
+                        value: root.vibratoProgression
+                        accent: "#6699FF"
+                        onEdited: function(v) { root.vibratoProgression = v; }
+                    }
                 }
-                Item { Layout.fillWidth: true }
-            }
 
-            // l'éditeur de la séquence choisie
-            SequenceEditor2D {
-                id: editeur
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                pas: root._sequence(root.aEditer).pas
-                division: root._sequence(root.aEditer).division
-                vitesse: root._sequence(root.aEditer).vitesse
-                blocs: root._sequence(root.aEditer).blocs
-                seqIndex: root.aEditer
-                actif: true
-                bpm: root.bpm
-                enJeu: root.assignation[root.motif - 1] === root.aEditer
-                onSequenceModifiee: function (seq) { root._enregistre(root.aEditer, seq); }
-            }
-        }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#171F28" }
 
-        // ---- pédale B : description + les deux vitesses de la scène
-        ColumnLayout {
-            visible: root.selKind === "expr" && root.selIndex === 1
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 10
-            Text {
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                text: "Profondeur du vibrato au pied — CC 1 des sirènes. Les deux vitesses ci-dessous viennent de la scène, champs vibratoSpeed et vibratoProgression de chaque voix.\n\nL'interrupteur 45 décide si la pédale agit sur toutes les sirènes ou sur la seule sélectionnée."
-                color: "#64737F"; font.family: "monospace"; font.pixelSize: 13; lineHeight: 1.5
+                // ---- pédale C : une ligne de description, le réglage vit dans la scène
+                RangeePedale {
+                    nom: "PÉDALE C"; role: "degré dans la gamme · CC 49"; accent: "#99cc66"
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: "Transposition dans la gamme — la position choisit un degré, et la course s'adapte au mode : elle vaut une octave, quel que soit le nombre de degrés. Une hystérésis empêche l'harmonie de clignoter à la frontière entre deux degrés. L'interrupteur 46 décide de la portée."
+                        color: "#64737F"; font.family: "monospace"; font.pixelSize: 12; lineHeight: 1.4
+                    }
+                }
             }
-            ReglageCC {
-                Layout.fillWidth: true
-                label: "VITESSE VIBRATO · CC 9"
-                value: root.vibratoSpeed
-                accent: "#6699FF"
-                onEdited: function(v) { root.vibratoSpeed = v; }
-            }
-            ReglageCC {
-                Layout.fillWidth: true
-                label: "ACCÉLÉRATION · CC 11"
-                value: root.vibratoProgression
-                accent: "#6699FF"
-                onEdited: function(v) { root.vibratoProgression = v; }
-            }
-            Item { Layout.fillHeight: true }
-        }
-
-        // ---- pédale C : une ligne de description, le réglage vit dans la scène
-        Text {
-            visible: root.selKind === "expr" && root.selIndex === 2
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            wrapMode: Text.WordWrap
-            verticalAlignment: Text.AlignTop
-            text: "Transposition dans la gamme — la position choisit un degré, et la course s'adapte au mode : elle vaut une octave, quel que soit le nombre de degrés.\n\nUne hystérésis empêche l'harmonie de clignoter à la frontière entre deux degrés. L'interrupteur 46 décide de la portée."
-            color: "#64737F"; font.family: "monospace"; font.pixelSize: 13; lineHeight: 1.5
         }
 
         // ---- le reste
