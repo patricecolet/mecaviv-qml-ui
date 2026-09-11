@@ -368,6 +368,22 @@ Item {
         }
     }
     
+    // Vitesse d'un CC de vitesse (tremolo/vibrato/vibratoAccel) editee dans l'ecran
+    // CFG : PD ecrit la valeur dans la table voices de la sirene visee et la pousse
+    // en direct (voir voices-vitesses.pd, qui fait le meme geste au chargement de
+    // scene). "champ" est "tremolo" | "vibrato" | "vibratoAccel", pas un numero de
+    // colonne -- c'est PD qui connait la correspondance champ/CC.
+    function sendVoiceSpeed(siren, champ, value) {
+        if (logger) logger.info("SYSTEM", "🎛️ vitesse", champ, "sirène", siren, "→", value);
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "voiceSpeed",
+            siren: siren,
+            champ: champ,
+            value: value
+        });
+    }
+
     function sendPedalConfig(pedalId, sirenId, controllerType) {
         let configMessage = {
             device: "SIREN_LOOPER",

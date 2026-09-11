@@ -1302,3 +1302,29 @@ dessus). Un `loadbang` pose la LED à l'état neutre au chargement.
 deux. L'aller-retour est propre. **Reste à vérifier** : la cascade des deux vannes dans
 `auto-piste.pd` avec une automation réellement enregistrée en train de jouer (pas testé — demande
 une prise réelle, pas seulement l'injection du CC).
+
+## 15. Le séquenceur — ce qu'il écoute, et le seuil de vélocité
+
+`sequenceur.pd` est instancié sept fois dans `pd sequenceurs` de `harmoniseur.pd`, en série et non
+en parallèle : chacun laisse passer ce qui n'est pas pour lui. Il écoute quatre bus, tous préfixés
+par le `$0` de `pedalier.pd` : `motif` (0 le trémolo, 1 à 3 la séquence), `pedale.a`,
+`racine` et `midiclock.pulse480`.
+
+**Le note-on se teste à `> 1`, pas à `!= 0`.** Le `max 1` sur le chemin qui va vers
+`$0.harmoniseur.in` force toute vélocité nulle à 1 — la ghost note, moteur qui tourne et vanne
+fermée. Le séquenceur ne voit donc jamais de zéro : un note off lui arrive en vélocité 1. C'est ce
+seuil qui décide du départ au premier pas et de l'arrêt du motif, dans `pd source`.
+
+**Le volume du pas, dans `pd volume`** : `vel = base × (1 − a·(1 − s))`, où `base` est le volume de
+la voix (champ 3 de `voices`), `s` la vélocité du pas divisée par 127, et `a` la pédale A divisée
+par 127. À `a = 0` le volume de la scène passe inchangé, à `a = 1` la séquence le dicte
+entièrement. Comme `s ≤ 1`, la séquence ne peut qu'atténuer : la pédale règle la profondeur d'un
+creusement rythmique, jamais un gain.
+
+**Point ouvert** : `$0.pedale.a` n'a pas encore d'émetteur dans `pedalier.pd`, donc `a` vaut 0 et
+la séquence ne creuse rien. Y envoyer la position brute de la pédale (`$0-pos` de `pd pedale-A`) et
+non la sortie de `pd profondeur`, qui retombe à zéro dès qu'un interrupteur est enclenché —
+c'est-à-dire précisément quand la séquence joue. Le réglage se fera à l'oreille sur le sirénium.
+
+Un index de séquence nul dans `voices` (champs 9, 10, 11) veut dire « aucune séquence à cet
+emplacement » : aucun fichier n'est lu et la tenue retombe, comme au motif 0.

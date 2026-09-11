@@ -59,11 +59,14 @@ Item {
     property int sirene: 3
     property int motif: 1
     property int bpm: 108
-    // les trois vitesses de la table voices (champs 7, 8, 12) ; remplacees par
-    // celles de la scene quand la liaison WebSocket sera faite (voir PROCESSEUR_EFFET.md)
+    // les trois vitesses de la table voices, poussees en direct a la sirene root.sirene
+    // (voir voices-vitesses.pd : tremolo = champ 8/CC 15, vibrato = champ 7/CC 9,
+    // vibratoProgression = champ 12/CC 11). La valeur initiale, elle, vient encore de la
+    // scene par defaut faute de liaison WebSocket entrante (voir PROCESSEUR_EFFET.md).
     property int tremoloSpeed: 0
     property int vibratoSpeed: 0
     property int vibratoProgression: 0
+    signal vitesseEditee(string champ, int siren, int value)
     property int aEditer: 1
     property var assignation: [1, 2, 0]     // seq assignee a bouton1, bouton2, 1+2
     function nouvelleSequence() {
@@ -255,7 +258,10 @@ Item {
                         label: "VITESSE TRÉMOLO · CC 15"
                         value: root.tremoloSpeed
                         accent: "#ff9966"
-                        onEdited: function(v) { root.tremoloSpeed = v; }
+                        onEdited: function(v) {
+                            root.tremoloSpeed = v;
+                            root.vitesseEditee("tremolo", root.sirene, v);
+                        }
                     }
 
                     // la bibliothèque
@@ -334,14 +340,20 @@ Item {
                         label: "VITESSE VIBRATO · CC 9"
                         value: root.vibratoSpeed
                         accent: "#6699FF"
-                        onEdited: function(v) { root.vibratoSpeed = v; }
+                        onEdited: function(v) {
+                            root.vibratoSpeed = v;
+                            root.vitesseEditee("vibrato", root.sirene, v);
+                        }
                     }
                     ReglageCC {
                         Layout.fillWidth: true
                         label: "ACCÉLÉRATION · CC 11"
                         value: root.vibratoProgression
                         accent: "#6699FF"
-                        onEdited: function(v) { root.vibratoProgression = v; }
+                        onEdited: function(v) {
+                            root.vibratoProgression = v;
+                            root.vitesseEditee("vibratoAccel", root.sirene, v);
+                        }
                     }
                 }
 

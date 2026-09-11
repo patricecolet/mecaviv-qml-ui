@@ -290,6 +290,9 @@ Window {
             ConfigView2D {
                 anchors.fill: parent
                 visible: window.configMode && !window.scenesMode && !window.maintenanceMode
+                onVitesseEditee: function(champ, siren, value) {
+                    if (wsController.isConnected) wsController.sendVoiceSpeed(siren, champ, value);
+                }
             }
 
             // Page de maintenance
