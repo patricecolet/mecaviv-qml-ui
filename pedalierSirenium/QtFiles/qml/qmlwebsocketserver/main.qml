@@ -53,6 +53,8 @@ Window {
                 case "voiceSelect": liveState.applyVoiceSelect(data); break;
                 case "outputDevice": liveState.applyOutputDevice(data); break;
                 case "clic": liveState.applyClic(data); break;
+                case "pedals": liveState.applyPedals(data); break;
+                case "sequences": liveState.applySequences(data); break;
                 default:
                     if (logger) logger.debug("WEBSOCKET", "batch non routé:", batchType);
             }
@@ -290,8 +292,26 @@ Window {
             ConfigView2D {
                 anchors.fill: parent
                 visible: window.configMode && !window.scenesMode && !window.maintenanceMode
+                sirene: window.state.monoSiren
+                voiceState: window.state.voiceState
+                motif: window.state.motif
+                bpm: window.state.bpm
+                sequences: window.state.sequences
+                // sans sirène en mono (0) il n'y a personne à régler : rien ne part
                 onVitesseEditee: function(champ, siren, value) {
-                    if (wsController.isConnected) wsController.sendVoiceSpeed(siren, champ, value);
+                    if (siren > 0 && wsController.isConnected) wsController.sendVoiceSpeed(siren, champ, value);
+                }
+                onSequenceEditee: function(emplacement, siren, index) {
+                    if (siren > 0 && wsController.isConnected) wsController.sendVoiceSeq(siren, emplacement, index);
+                }
+                onSequenceModifiee: function(index, seq) {
+                    if (wsController.isConnected) wsController.sendSequence(index, seq);
+                }
+                onNouvelleSequenceDemandee: {
+                    // un index de plus que le plus grand connu, vide : PD crée le fichier
+                    var n = 1;
+                    for (var i = 0; i < window.state.sequences.length; i++) n = Math.max(n, window.state.sequences[i].index + 1);
+                    if (wsController.isConnected) wsController.sendSequence(n, { division: 4, vitesse: 1, blocs: 1, pas: [] });
                 }
             }
 

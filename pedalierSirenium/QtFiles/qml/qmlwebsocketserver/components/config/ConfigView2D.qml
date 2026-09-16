@@ -54,57 +54,37 @@ Item {
     property string selKind: "expr"
     property int selIndex: 0
 
-    // les trois motifs de la sirène courante ; remplacés par ceux de la scène
-    // quand la liaison WebSocket sera faite (voir PROCESSEUR_EFFET.md)
-    property int sirene: 3
-    property int motif: 1
-    property int bpm: 108
-    // les trois vitesses de la table voices, poussees en direct a la sirene root.sirene
-    // (voir voices-vitesses.pd : tremolo = champ 8/CC 15, vibrato = champ 7/CC 9,
-    // vibratoProgression = champ 12/CC 11). La valeur initiale, elle, vient encore de la
-    // scene par defaut faute de liaison WebSocket entrante (voir PROCESSEUR_EFFET.md).
-    property int tremoloSpeed: 0
-    property int vibratoSpeed: 0
-    property int vibratoProgression: 0
+    // Tout ce que cet écran affiche vient de PD par main.qml (window.state) :
+    // la sirène en mono, la ligne de sa voix dans la table voices, l'interrupteur
+    // en jeu, le tempo, la bibliothèque de séquences. Rien n'est gardé ici --
+    // un réglage part vers PD et c'est son écho qui met l'écran à jour.
+    property int sirene: 0                 // VOICE_SELECT.siren, 0 = aucune
+    property var voiceState: ({ seq1: 0, seq2: 0, seq3: 0,
+                                tremoloSpeed: 0, vibratoSpeed: 0, vibratoProgression: 0 })
+    property int motif: 0                  // 0 trémolo, 1..3 l'emplacement joué (43/44)
+    property real bpm: 120
+    property var sequences: []             // la bibliothèque telle que PD la sert
+    readonly property var assignation: [voiceState.seq1, voiceState.seq2, voiceState.seq3]
+
     signal vitesseEditee(string champ, int siren, int value)
-    property int aEditer: 1
-    property var assignation: [1, 2, 0]     // seq assignee a bouton1, bouton2, 1+2
-    function nouvelleSequence() {
-        var b = bibliotheque.slice();
-        var n = 1;
-        for (var i = 0; i < b.length; i++) n = Math.max(n, b[i].index + 1);
-        b.push({ index: n, division: 4, vitesse: 1, blocs: 1, pas: [] });
-        bibliotheque = b;
-        aEditer = n;
+    signal sequenceEditee(int emplacement, int siren, int index)
+    signal sequenceModifiee(int index, var seq)
+    signal nouvelleSequenceDemandee()
+
+    // le seul état propre à l'écran : quelle séquence est ouverte dans l'éditeur.
+    // 0 = aucune (l'éditeur est muet) ; dès que la bibliothèque arrive, la
+    // première. Une séquence ne s'édite ni ne s'écrit sous l'index 0, qui veut
+    // dire « pas de séquence » dans la table voices.
+    property int aEditer: 0
+    onSequencesChanged: {
+        if (sequences.length === 0) { aEditer = 0; return; }
+        for (var k = 0; k < sequences.length; k++) if (sequences[k].index === aEditer) return;
+        aEditer = sequences[0].index;
     }
     function _sequence(i) {
-        for (var k = 0; k < bibliotheque.length; k++) if (bibliotheque[k].index === i) return bibliotheque[k];
+        for (var k = 0; k < sequences.length; k++) if (sequences[k].index === i) return sequences[k];
         return { index: 0, division: 4, vitesse: 1, blocs: 1, pas: [] };
     }
-    function _enregistre(i, seq) {
-        var b = bibliotheque.slice();
-        for (var k = 0; k < b.length; k++) {
-            if (b[k].index === i)
-                b[k] = { index: i, division: seq.division, vitesse: seq.vitesse,
-                         blocs: seq.blocs, pas: seq.pas };
-        }
-        bibliotheque = b;
-    }
-
-    property var bibliotheque: [
-        { index: 1, division: 4, vitesse: 1, blocs: 1, pas: [
-            { n: 0,  velocite: 127, hauteur: 0,  gate: 4, attack: 0, release: 0 },
-            { n: 4,  velocite: 100, hauteur: 2,  gate: 2, attack: 0, release: 0 },
-            { n: 8,  velocite: 90,  hauteur: 0,  gate: 4, attack: 0, release: 0 },
-            { n: 12, velocite: 70,  hauteur: -3, gate: 3, attack: 0, release: 0 }
-        ] },
-        { index: 2, division: 3, vitesse: 1, blocs: 1, pas: [
-            { n: 0, velocite: 110, hauteur: 0,  gate: 3, attack: 0, release: 0 },
-            { n: 2, velocite: 70,  hauteur: -3, gate: 1, attack: 0, release: 0 },
-            { n: 6, velocite: 110, hauteur: 0,  gate: 3, attack: 0, release: 0 },
-            { n: 9, velocite: 70,  hauteur: 5,  gate: 0, attack: 0, release: 0 }
-        ] },
-    ]
 
     readonly property var _nomPedale: ["A", "B", "C"]
 
@@ -199,7 +179,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: 6
                         Text {
-                            text: "SIRÈNE " + root.sirene
+                            text: root.sirene > 0 ? "SIRÈNE " + root.sirene : "AUCUNE SIRÈNE — pédale key"
                             color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5
                         }
                         Repeater {
@@ -221,33 +201,29 @@ Item {
                                         color: "#64737F"; font.family: "monospace"; font.pixelSize: 9
                                     }
                                     Text {
-                                        text: root.assignation[emplacement.modelData.n - 1] > 0
-                                              ? "séq " + root.assignation[emplacement.modelData.n - 1] : "—"
+                                        // 0 dans voices = la sequence par defaut de l'emplacement (1, 2, 3),
+                                        // affichee en retrait pour dire qu'elle n'a pas ete choisie
+                                        text: "séq " + (root.assignation[emplacement.modelData.n - 1] > 0
+                                              ? root.assignation[emplacement.modelData.n - 1] : emplacement.modelData.n)
+                                        opacity: root.assignation[emplacement.modelData.n - 1] > 0 ? 1 : 0.55
                                         color: root.motif === emplacement.modelData.n ? "#FFFFFF" : "#4A5A6B"
                                         font.family: "monospace"; font.pixelSize: 11; font.bold: true
                                     }
                                 }
                                 MouseArea {
                                     anchors.fill: parent
+                                    // cliquer un emplacement y pose la sequence ouverte dans
+                                    // l'editeur -- toujours, qu'il soit vide ou deja pris
                                     onClicked: {
-                                        // un emplacement deja assigne se charge dans l'editeur ;
-                                        // un emplacement vide recoit la sequence en cours d'edition
-                                        var assignee = root.assignation[emplacement.modelData.n - 1];
-                                        if (assignee > 0) {
-                                            root.aEditer = assignee;
-                                        } else if (root.aEditer > 0) {
-                                            var a = root.assignation.slice();
-                                            a[emplacement.modelData.n - 1] = root.aEditer;
-                                            root.assignation = a;
-                                        }
-                                        root.motif = emplacement.modelData.n;
+                                        if (root.aEditer > 0 && root.sirene > 0)
+                                            root.sequenceEditee(emplacement.modelData.n, root.sirene, root.aEditer);
                                     }
                                 }
                             }
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: "un emplacement assigné se charge dans l'éditeur ; un emplacement vide reçoit la séquence en cours"
+                            text: "cliquer un emplacement y pose la séquence ouverte dans l'éditeur"
                             color: "#2A3543"; font.family: "monospace"; font.pixelSize: 9
                         }
                     }
@@ -256,12 +232,9 @@ Item {
                     ReglageCC {
                         Layout.fillWidth: true
                         label: "VITESSE TRÉMOLO · CC 15"
-                        value: root.tremoloSpeed
+                        value: root.voiceState.tremoloSpeed
                         accent: "#ff9966"
-                        onEdited: function(v) {
-                            root.tremoloSpeed = v;
-                            root.vitesseEditee("tremolo", root.sirene, v);
-                        }
+                        onEdited: function(v) { root.vitesseEditee("tremolo", root.sirene, v); }
                     }
 
                     // la bibliothèque
@@ -273,7 +246,7 @@ Item {
                             color: "#3B4855"; font.family: "monospace"; font.pixelSize: 9; font.letterSpacing: 1.5
                         }
                         Repeater {
-                            model: root.bibliotheque
+                            model: root.sequences
                             delegate: Rectangle {
                                 id: vignette
                                 required property var modelData
@@ -302,9 +275,14 @@ Item {
                                 anchors.centerIn: parent
                                 text: "+"; color: "#64737F"; font.family: "monospace"; font.pixelSize: 15
                             }
-                            MouseArea { anchors.fill: parent; onClicked: root.nouvelleSequence() }
+                            MouseArea { anchors.fill: parent; onClicked: root.nouvelleSequenceDemandee() }
                         }
                         Item { Layout.fillWidth: true }
+                        Text {
+                            visible: root.sequences.length === 0
+                            text: "aucune séquence — PD n'en a pas servi"
+                            color: "#2A3543"; font.family: "monospace"; font.pixelSize: 9
+                        }
                     }
 
                     // l'éditeur de la séquence choisie
@@ -317,10 +295,10 @@ Item {
                         vitesse: root._sequence(root.aEditer).vitesse
                         blocs: root._sequence(root.aEditer).blocs
                         seqIndex: root.aEditer
-                        actif: true
+                        actif: root.aEditer > 0
                         bpm: root.bpm
-                        enJeu: root.assignation[root.motif - 1] === root.aEditer
-                        onSequenceModifiee: function (seq) { root._enregistre(root.aEditer, seq); }
+                        enJeu: root.motif > 0 && root.assignation[root.motif - 1] === root.aEditer
+                        onSequenceModifiee: function (seq) { if (root.aEditer > 0) root.sequenceModifiee(root.aEditer, seq); }
                     }
                 }
 
@@ -338,22 +316,16 @@ Item {
                     ReglageCC {
                         Layout.fillWidth: true
                         label: "VITESSE VIBRATO · CC 9"
-                        value: root.vibratoSpeed
+                        value: root.voiceState.vibratoSpeed
                         accent: "#6699FF"
-                        onEdited: function(v) {
-                            root.vibratoSpeed = v;
-                            root.vitesseEditee("vibrato", root.sirene, v);
-                        }
+                        onEdited: function(v) { root.vitesseEditee("vibrato", root.sirene, v); }
                     }
                     ReglageCC {
                         Layout.fillWidth: true
                         label: "ACCÉLÉRATION · CC 11"
-                        value: root.vibratoProgression
+                        value: root.voiceState.vibratoProgression
                         accent: "#6699FF"
-                        onEdited: function(v) {
-                            root.vibratoProgression = v;
-                            root.vitesseEditee("vibratoAccel", root.sirene, v);
-                        }
+                        onEdited: function(v) { root.vitesseEditee("vibratoAccel", root.sirene, v); }
                     }
                 }
 

@@ -1,5 +1,6 @@
 import QtQuick
 import "../../sirenSpec.js" as SirenSpec
+import "../../sequences.js" as Sequences
 
 // Harnais de données simulées (Phase 1) : reproduit clock + états de boucles
 // au format attendu, pour vérifier visuellement la vue de jeu sans PureData.
@@ -196,6 +197,29 @@ QtObject {
         if (data.siren !== undefined) monoSiren = data.siren;
         if (data.voice !== undefined) monoVoice = data.voice;
     }
+
+    // --- la démo de l'écran cfg : une voix, un emplacement joué, deux séquences ---
+    // Seul endroit où des valeurs en dur sont admises : sans PD, la page doit
+    // rester vivante. Même interface que LiveState.
+    property var voiceState: ({ seq1: 1, seq2: 2, seq3: 0,
+                                tremoloSpeed: 40, vibratoSpeed: 64, vibratoProgression: 0 })
+    property int motif: 1
+    function applyPedals(data) { if (data && data.motif !== undefined) motif = data.motif; }
+    property var sequences: [
+        { index: 1, division: 4, vitesse: 1, blocs: 1, pas: [
+            { n: 0,  velocite: 127, hauteur: 0,  gate: 100, attack: 0, release: 0 },
+            { n: 4,  velocite: 100, hauteur: 2,  gate: 50, attack: 0, release: 0 },
+            { n: 8,  velocite: 90,  hauteur: 0,  gate: 100, attack: 0, release: 0 },
+            { n: 12, velocite: 70,  hauteur: -3, gate: 75, attack: 0, release: 0 }
+        ] },
+        { index: 2, division: 3, vitesse: 1, blocs: 1, pas: [
+            { n: 0, velocite: 110, hauteur: 0,  gate: 75, attack: 0, release: 0 },
+            { n: 2, velocite: 70,  hauteur: -3, gate: 25, attack: 0, release: 0 },
+            { n: 6, velocite: 110, hauteur: 0,  gate: 75, attack: 0, release: 0 },
+            { n: 9, velocite: 70,  hauteur: 5,  gate: 0, attack: 0, release: 0 }
+        ] }
+    ]
+    function applySequences(data) { if (data) sequences = Sequences.depuisPd(data.sequences); }
 
     // --- sorties, réévaluées à chaque tick ---
     // Meme interface que LiveState. Sans PD il n'y a pas de transport a suivre :

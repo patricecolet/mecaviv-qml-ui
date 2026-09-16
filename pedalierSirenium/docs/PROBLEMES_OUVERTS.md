@@ -206,7 +206,12 @@ est dans les loaders et n'a pas été écrit** — ne pas le faire pendant que q
 
 ## 12. Le tempo d'une scène est écrit, jamais relu
 
-**Trouvé le 2026-08-31, non corrigé.**
+**Trouvé le 2026-08-31 — tranché le 2026-09-16 : il EST relu, et c'était le problème.** Mesuré
+en séance : `scene_1.json` portait `tempo: 0`, et à chaque rediffusion de la scène l'horloge
+passait à 20 (le `clip 20 300` de `midiclock.pd`), en écrasant le bpm réglé sur la page. Corrigé
+deux fois : un tempo nul est ignoré par `midiclock` (`moses 1` avant le clip), et le bpm de la
+page atteint enfin PD (`pd clock.get` → `tempo <n>` sur l'entrée de `pd midiclock`) — jusque-là
+`clock: {bpm}` n'avait aucun receveur. Le texte qui suit est gardé pour la trace.
 
 Chaque scène porte un champ `tempo` : le gabarit d'une scène neuve **hérite du tempo courant**
 (`993c8b6`) et `scene write` y consigne le tempo au moment de l'écriture (`4fff7d8`). Mesuré : tap

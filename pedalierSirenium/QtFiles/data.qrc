@@ -36,6 +36,7 @@
         <file>qml/qmlwebsocketserver/config.js</file>
         <file>qml/qmlwebsocketserver/sirenSpec.json</file>
         <file>qml/qmlwebsocketserver/sirenSpec.js</file>
+        <file>qml/qmlwebsocketserver/sequences.js</file>
 
     </qresource>
 

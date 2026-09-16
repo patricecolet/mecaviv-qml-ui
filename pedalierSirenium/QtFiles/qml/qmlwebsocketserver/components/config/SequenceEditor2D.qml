@@ -12,7 +12,7 @@ Item {
 
     // Un pas est repéré par son rang, pas par son tick : changer la division
     // garde le motif et change sa saveur, au lieu de le désaligner.
-    // pas[i] = { n, velocite, hauteur, gate, attack, release }
+    // pas[i] = { n, velocite, hauteur, gate, attack, release } -- gate en % du pas
     property var pas: []
     property int division: 4                  // pas par temps : 4 binaire, 3 ternaire
     property int vitesse: 1                   // ×1 ou ×2 par rapport au temps
@@ -42,7 +42,7 @@ Item {
     readonly property var _params: [
         { cle: "velocite", nom: "VÉL",  min: 1,   max: 127 },
         { cle: "hauteur",  nom: "NOTE", min: -12, max: 12 },
-        { cle: "gate",     nom: "GATE", min: 0,   max: 16 },
+        { cle: "gate",     nom: "GATE", min: 0,   max: 100 },   // en % du pas
         { cle: "attack",   nom: "ATK",  min: 0,   max: 127 },
         { cle: "release",  nom: "REL",  min: 0,   max: 127 }
     ]
@@ -68,7 +68,10 @@ Item {
         for (var i = 0; i < copie.length; i++) {
             if (copie[i].n === r) { copie.splice(i, 1); _rend(copie); return; }
         }
-        copie.push({ n: r, velocite: 100, hauteur: 0, gate: 4, attack: 0, release: 0 });
+        // un pas neuf : gate a la moitie du pas (Patrice, 2026-09-16, a l'oreille --
+        // en dessous la sirene n'a pas le temps d'ouvrir, au-dessus les pas se
+        // touchent), attack et release 0
+        copie.push({ n: r, velocite: 100, hauteur: 0, gate: 50, attack: 0, release: 0 });
         copie.sort(function (a, b) { return a.n - b.n; });
         _rend(copie);
     }
@@ -232,8 +235,8 @@ Item {
                         readonly property bool surLeTemps: index % root.division === 0
                         // gate 0 coupe aussitôt : on garde un éclat minimal, sinon
                         // la tête de lecture sauterait le pas sans qu'on la voie.
-                        readonly property real duree: pas ? Math.max(root._ticksParPas / 4,
-                                                                     pas.gate * root._ticksParPas / 4) : 0
+                        readonly property real duree: pas ? Math.max(root._ticksParPas / 8,
+                                                                     pas.gate / 100 * root._ticksParPas) : 0
                         readonly property bool sonne: root._lit && pas !== null
                                                       && root.phase >= pas.n * root._ticksParPas
                                                       && root.phase < pas.n * root._ticksParPas + duree

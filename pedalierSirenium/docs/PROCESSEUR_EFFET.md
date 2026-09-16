@@ -105,10 +105,11 @@ paragraphe, qui affirmait qu'une séquence « n'est pas une suite de hauteurs »
 - **hauteur** : ajoutée ou retirée à la note source, **en demi-tons** — parce que le résultat
   repasse par l'harmoniseur, qui recalculera son degré. Ce sont les « notes passantes » de la
   formule initiale.
-- **gate** : **en quarts de pas**, pas en ticks (Patrice, 2026-09-02). Quatre est un pas plein,
-  huit lie deux pas, et **zéro coupe aussitôt** — le note off part au tick suivant, jamais avant
-  la note, sans quoi il ne s'entendrait pas. Une durée relative survit au changement de division
-  et de vitesse, ce qu'une durée en ticks ne fait pas.
+- **gate** : **en pour cent du pas** (Patrice, 2026-09-16 — remplace les quarts de pas du
+  02/09, dont la graduation passait du simple au double d'un cran à l'autre). 100 est un pas
+  plein, **zéro coupe aussitôt** — le note off part au tick suivant, jamais avant la note, sans
+  quoi il ne s'entendrait pas. Pas de valeur au-delà de 100 : une note continue, c'est un pas de
+  plus. Une durée relative survit au changement de division et de vitesse.
 - **attack / release** : CC 73 et CC 72, **à zéro par défaut**. Deux CC par pas et par sirène, donc
   le filtre « n'émettre que ce qui change » de `sirenes-visees` s'applique ici aussi — la plupart
   des pas d'un motif partagent la même enveloppe.
@@ -1328,3 +1329,85 @@ c'est-à-dire précisément quand la séquence joue. Le réglage se fera à l'or
 
 Un index de séquence nul dans `voices` (champs 9, 10, 11) veut dire « aucune séquence à cet
 emplacement » : aucun fichier n'est lu et la tenue retombe, comme au motif 0.
+
+## 16. La vérité sur l'écran cfg — 2026-09-16
+
+Règle posée par Patrice ce jour : **le codage en dur est proscrit sauf demande explicite** ; seule
+la démo (`SimulationHarness.qml`) y a droit. Ce que ça a délogé : `ConfigView2D.qml` visait
+`sirene: 3` en dur depuis le 02/09, affichait des motifs (`assignation [1,2,0]`) et une bibliothèque
+de deux séquences que PD n'avait jamais vus. « On n'entend pas les séquences » : PD avait 0 partout.
+
+Désormais l'écran n'a plus d'état à lui. Il affiche `window.state` — LiveState avec PD, le harnais
+sans — et un réglage part vers PD, dont l'écho met l'écran à jour :
+
+| Donnée | Vers la page | Depuis la page |
+|---|---|---|
+| sirène visée | `VOICE_SELECT.siren` (la pédale key) | `voiceSelect` |
+| `seq1 seq2 seq3`, `tremoloSpeed vibratoSpeed vibratoProgression` | `VOICE_SELECT`, qui porte maintenant la ligne de la voix (`voice-state.pd`) ; rejoué après `voiceSeq`, `voiceSpeed`, chargement de scène, reset, et sur demande `voiceState` | `voiceSeq {siren, emplacement, index}` → `voice.seq.write` ; `voiceSpeed` inchangé |
+| emplacement joué (43/44) | `SIREN_LOOPER.pedals.motif` (`motif.monitoring`) | — |
+| bibliothèque | `SEQUENCES.sequences[]` (`sequences-io.pd`) : `index length division vitesse pas[{tick velocite hauteur gate attack release}]`, à la connexion (`sequencesList`) et après chaque écriture | `sequenceWrite {index, steps, length, division, vitesse, pas:[…]}` — **les pas à plat**, six nombres par pas, parce que le dump de pdjson ne garantit l'ordre que dans un tableau, jamais entre les clés d'un objet ; `sequences-io` replace chaque valeur par sa position |
+
+`sequences.js` (QML) est le seul endroit qui connaît les deux formats : ticks ↔ numéro de pas,
+longueur en ticks ↔ blocs d'une mesure.
+
+**Mesuré sur le vrai `pedalier.pd`, par le vrai socket** (client Python en frames binaires, comme
+QML) : `sequencesList` → les deux fichiers ; `voiceSeq 3 1 1` → écho `seq1: 1` ; `voiceSpeed tremolo
+40` → écho `tremoloSpeed: 40` ; `sequenceWrite` index 9 → `9.txt` écrit par position, bibliothèque
+rediffusée avec 9 ; `ctl 127 43` → `pedals.motif: 1` ; `scene.transport play` → `VOICE_SELECT`
+rejoué. Deux pièges rencontrés : un `print` sur `$0webserver` tue Pd net (le JSON des scènes est
+trop long pour lui) — sonder ce bus par le socket, pas par `print` ; et l'écho de `voiceSelect`
+est retenu par le `change` quand on redemande la voix déjà sélectionnée — c'est `voiceState` qui
+sert à relire l'état.
+
+Le banc (`banc-looper`) simule les pédales, l'UI compose et assigne : les boîtes d'assignation
+ajoutées au banc le matin même ont été retirées le jour même.
+
+### L'horloge tourne toujours — décision du 2026-09-16
+
+Mesuré avec la configuration exacte de Patrice (S5, séq 1 sur bouton 1, 43, Auto) : transport
+à l'arrêt, chaque note sort telle quelle ; transport en marche, le motif la reprend. Le séquenceur
+compte `$0.midiclock.pulse480`, qui ne tickait qu'en lecture — un effet de pédale muet hors lecture.
+
+**Décision (option 2)** : le métronome part au chargement et le `stop` ne l'éteint plus
+(`midiclock.pd`). Seuls `beat`, `bar` et `pulse` restent sous le transport, par deux spigots armés
+par `start`/`continue` et désarmés par `stop` — `pulse480` est libre. Les autres lecteurs de
+`pulse480` (`siren-clip-loader`, `automation`) se gardent déjà sur leur propre état (`loop.playgate`,
+`prise`). Mesuré : à l'arrêt le motif joue et aucune mesure ne défile ; `play` → les mesures
+avancent ; `stop` → elles s'arrêtent.
+
+### Le séquenceur enfin entendu — l'après-midi du 2026-09-16
+
+Une fois la page honnête, le banc a parlé. Dans l'ordre, chaque point mesuré sur le socket (client
+Python, canal binaire horodaté) ou en headless sur le vrai `pedalier.pd` :
+
+- **Le gate coupe par un note-off (vélocité 0)**, avec le release du pas envoyé au premier pas
+  (`change -1` dans `pd enveloppe` : avec `change` seul, un release 0 n'était jamais envoyé et la
+  sirène gardait le sien). Une ghost note (vélocité 1) a été essayée et **rejetée** : une fois la
+  vanne fermée, une réattaque à la même hauteur ne rouvre rien, la sirène reste en sourdine.
+- **Un compteur de gate non entier ne coupe jamais** : 21 % de 120 ticks = 25,2 → 24,2 → … → 0,2,
+  jamais zéro. Un pas sur deux restait ouvert. `int()` dans `pd gate`.
+- **Le gate est en pour cent du pas** (0–100, pas au-delà : une note continue = un pas de plus) ;
+  les quarts de pas passaient du simple au double d'un cran à l'autre. Un pas neuf part à **50 %**,
+  attack et release 0 — à l'oreille, en dessous la sirène n'ouvre pas, au-dessus les pas se
+  touchent.
+- **La pédale A est une profondeur** : `$0.pedale.a` reçoit enfin la position brute. À 0, le gate
+  vaut 100 (la note ne coupe jamais), la vélocité est celle de la voix, et **la hauteur du pas ne
+  s'applique pas** ; dès que la pédale bouge (> 0) la hauteur s'applique telle quelle, et gate et
+  vélocité glissent vers ceux du pas jusqu'à 127. Pas d'interpolation sur la hauteur — « sinon des
+  options compliquées ».
+- **Le motif redémarre à chaque note-on**, legato compris ; un note-off n'arrête que s'il libère la
+  note tenue ; chaque pas emporte vélocité et bend de la note source, sans quoi le note-off de la
+  touche précédente rendait les pas muets. **43 relâché** : le note-on suivant ne relance rien.
+  **Changer de voix au pied** arrête le motif de l'ancienne sirène (sa note n'aura jamais de note-off).
+- **Rien à refaire d'une scène à l'autre** : assigner ou régler une vitesse écrit la scène une
+  demi-seconde après (`del 500` → `$0.scene.write`) ; le reset ne réécrit que les 7 premiers champs
+  d'une voix et `updateVoice` garde vitesses et séquences ; un index nul dans `voices` **est la
+  séquence par défaut de l'emplacement** (1, 2, 3), et `sequences-io` copie les trois fichiers de
+  `application.layer/sequences.defaut/` dans une bibliothèque vide. Réécrire ou réassigner une
+  séquence recharge le motif en cours (`$0.motif.relire`).
+- **L'horloge tourne toujours** (voir plus haut) ; le bpm de la page atteint PD ; un tempo nul de
+  scène est ignoré.
+
+Reste noté, non traité : à 20 % je mesure 10–14 ms de son au lieu de 25 — les comptes courts
+semblent tomber dans une rafale de sous-ticks après un top d'horloge (`grain`). Et le mode song
+piloté par l'horloge externe, nommé par Patrice, à voir plus tard.

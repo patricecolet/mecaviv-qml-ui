@@ -2,6 +2,7 @@ import QtQuick
 import QtWebSockets
 import QtNetwork
 import "../config.js" as Config  // ← Import simple !
+import "../sequences.js" as Sequences
 
 Item {
     id: root
@@ -234,6 +235,10 @@ Item {
                     if (json.output) {
                         root.batchReceived("outputDevice", json.output);
                     }
+                    // Les pédales : l'emplacement joué par 43/44 ($0.motif)
+                    if (json.pedals) {
+                        root.batchReceived("pedals", json.pedals);
+                    }
                 } else if (json.device === "LOOPER_SCENES") {
                     if (json.composition) {
                         if (root.logger) root.logger.info("WEBSOCKET", "🎼 Composition reçue:", JSON.stringify(json.composition));
@@ -260,6 +265,13 @@ Item {
                             if (root.logger) root.logger.error("WEBSOCKET", "❌ MessageRouter non disponible");
                         }
                     }
+                }
+
+                // SEQUENCES : la bibliothèque <racine>/sequences/*.txt, entière,
+                // à la connexion et après chaque écriture.
+                if (json.device === "SEQUENCES") {
+                    if (root.logger) root.logger.info("WEBSOCKET", "🎼 Bibliothèque reçue :", (json.sequences || []).length, "séquences");
+                    root.batchReceived("sequences", json);
                 }
 
                 // SIRENIUM : la note jouée avant harmonisation ($0.harmoniseur.in
@@ -309,12 +321,13 @@ Item {
             if (root.logger) {
                 if (socket.status === WebSocket.Open) {
                     root.logger.info("WEBSOCKET", "Connecté à", root.serverUrl);
-                    // Demander le preset courant dès la connexion
-                    root.requestCurrentPreset();
                     // Demander la liste des scènes dès la connexion
                     root.requestScenesList();
                     // Et l'état du clic, que PD ne diffuse qu'au changement
                     root.requestClic();
+                    // Et la bibliothèque de séquences, et la ligne de la voix en mono
+                    root.requestSequences();
+                    root.requestVoiceState();
                 } else if (socket.status === WebSocket.Error) {
                     root.logger.error("WEBSOCKET", "Erreur:", socket.errorString);
                 } else if (socket.status === WebSocket.Closed) {
@@ -382,6 +395,51 @@ Item {
             champ: champ,
             value: value
         });
+    }
+
+    // Sequence assignee a un emplacement de la pedale A (1 = bouton 1, 2 = bouton 2,
+    // 3 = les deux) pour une sirene : PD ecrit l'index dans seq1..seq3 de la table
+    // voices (voir voice.seq.write), et la scene l'emporte a la sauvegarde.
+    function sendVoiceSeq(siren, emplacement, index) {
+        if (logger) logger.info("SYSTEM", "🎼 séquence", index, "→ emplacement", emplacement, "sirène", siren);
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "voiceSeq",
+            siren: siren,
+            emplacement: emplacement,
+            index: index
+        });
+    }
+
+    // Une séquence éditée dans cfg : PD réécrit <racine>/sequences/<index>.txt
+    // et renvoie la bibliothèque. Les pas partent à plat -- six nombres par pas,
+    // <tick> <vélocité> <hauteur> <gate> <attack> <release> -- parce que le dump
+    // de pdjson ne garantit l'ordre que dans un tableau, pas entre les clés
+    // d'un objet ; PD replace chaque valeur par sa position (sequences-io.pd).
+    function sendSequence(index, seq) {
+        if (!(index > 0)) return false;   // 0 = aucune séquence, jamais un fichier
+        var lignes = Sequences.versLignes(seq);
+        var plat = [];
+        for (var i = 0; i < lignes.length; i++) plat = plat.concat(lignes[i]);
+        if (logger) logger.info("SYSTEM", "🎼 séquence", index, "→ PD,", lignes.length, "pas");
+        return sendMessage({
+            device: "SIREN_LOOPER",
+            action: "sequenceWrite",
+            index: index,
+            steps: lignes.length,
+            length: seq.blocs * 1920,
+            division: seq.division,
+            vitesse: seq.vitesse,
+            pas: plat
+        });
+    }
+
+    function requestVoiceState() {
+        return sendMessage({ device: "SIREN_LOOPER", action: "voiceState" });
+    }
+
+    function requestSequences() {
+        return sendMessage({ device: "SIREN_LOOPER", action: "sequencesList" });
     }
 
     function sendPedalConfig(pedalId, sirenId, controllerType) {

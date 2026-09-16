@@ -1,5 +1,6 @@
 import QtQuick
 import "../../sirenSpec.js" as SirenSpec
+import "../../sequences.js" as Sequences
 
 // État réel, alimenté par le vrai flux WebSocket (voir docs/PD_WORK.md).
 // Même interface de sortie que SimulationHarness.qml — main.qml bascule de
@@ -113,10 +114,38 @@ QtObject {
     property int monoVoice: -1
     readonly property bool monoArmed: monoSiren > 0
 
+    // La ligne de la voix sélectionnée dans la table voices, telle que PD la
+    // renvoie avec VOICE_SELECT (et à chaque écriture : voiceSeq, voiceSpeed,
+    // chargement de scène). L'écran cfg n'affiche que ça.
+    property var voiceState: ({ seq1: 0, seq2: 0, seq3: 0,
+                                tremoloSpeed: 0, vibratoSpeed: 0, vibratoProgression: 0 })
+
     function applyVoiceSelect(data) {
         if (!data) return;
         if (data.siren !== undefined) monoSiren = data.siren;
         if (data.voice !== undefined) monoVoice = data.voice;
+        if (data.seq1 !== undefined) {
+            voiceState = { seq1: data.seq1, seq2: data.seq2, seq3: data.seq3,
+                           tremoloSpeed: data.tremoloSpeed, vibratoSpeed: data.vibratoSpeed,
+                           vibratoProgression: data.vibratoProgression };
+        }
+    }
+
+    // ---------- pédale A : l'emplacement en jeu ----------
+    // $0.motif côté PD : 0 le trémolo, 1..3 la séquence choisie par 43/44.
+    property int motif: 0
+    function applyPedals(data) {
+        if (!data) return;
+        if (data.motif !== undefined) motif = data.motif;
+    }
+
+    // ---------- la bibliothèque de séquences ----------
+    // Servie par PD depuis <racine>/sequences/*.txt (device SEQUENCES) ; vide
+    // tant qu'il n'a rien envoyé, et l'écran cfg le dit.
+    property var sequences: []
+    function applySequences(data) {
+        if (!data) return;
+        sequences = Sequences.depuisPd(data.sequences);
     }
 
     // ---------- maintenance : la sortie des sirènes ----------
