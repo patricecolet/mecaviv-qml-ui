@@ -1,0 +1,150 @@
+{
+  "machines": {
+    "linuxMaitre": {
+      "ip": "192.168.1.101",
+      "sshUser": "root",
+      "sshAlias": "linux-maître",
+      "midiPath": "/mnt/disk/home/guest/WorkSpaceSirenes/Midi/",
+      "playlistPath": "/mnt/disk/home/guest/WorkSpaceSirenes/liste_de_lecture/",
+      "derniereListePath": "/mnt/disk/home/guest/WorkSpaceSirenes/derniere_liste",
+      "cmdPort": 8001
+    },
+    "raspberryClic": {
+      "ip": "192.168.1.104",
+      "sshUser": "sirenateur",
+      "sshAlias": "raspberry-clic",
+      "midiPath": "/home/sirenateur/WorkSpaceSirenes/Midi/",
+      "playlistPath": "/home/sirenateur/WorkSpaceSirenes/liste_de_lecture/",
+      "derniereListePath": "/home/sirenateur/WorkSpaceSirenes/derniere_liste"
+    },
+    "s1": {
+      "ip": "192.168.1.11",
+      "sshUser": "root",
+      "sshAlias": "sirene-s1",
+      "midiPort": 8001,
+      "cmdPort": 1234,
+      "midiChannel": 1,
+      "keb": {
+        "ip": "192.168.1.70",
+        "port": 8000,
+        "type": "F5"
+      }
+    },
+    "s2": {
+      "ip": "192.168.1.12",
+      "sshUser": "root",
+      "sshAlias": "sirene-s2",
+      "midiPort": 8001,
+      "cmdPort": 1234,
+      "midiChannel": 2,
+      "keb": {
+        "ip": "192.168.1.71",
+        "port": 8000,
+        "type": "F5"
+      }
+    },
+    "s3": {
+      "ip": "192.168.1.13",
+      "sshUser": "root",
+      "sshAlias": "sirene-s3",
+      "midiPort": 8001,
+      "cmdPort": 1234,
+      "midiChannel": 3,
+      "keb": {
+        "ip": "192.168.1.72",
+        "port": 8000,
+        "type": "F5"
+      }
+    },
+    "s4": {
+      "ip": "192.168.1.14",
+      "sshUser": "root",
+      "sshAlias": "sirene-s4",
+      "midiPort": 8001,
+      "cmdPort": 1234,
+      "midiChannel": 4,
+      "keb": {
+        "ip": "192.168.1.73",
+        "port": 8000,
+        "type": "F6"
+      }
+    },
+    "s5": {
+      "ip": "192.168.1.15",
+      "sshUser": "root",
+      "sshAlias": "sirene-s5",
+      "midiPort": 8001,
+      "cmdPort": 1234,
+      "midiChannel": 5,
+      "keb": {
+        "ip": "192.168.1.74",
+        "port": 8000,
+        "type": "F5"
+      }
+    },
+    "s6": {
+      "ip": "192.168.1.16",
+      "sshUser": "root",
+      "sshAlias": "sirene-s6",
+      "midiPort": 8001,
+      "cmdPort": 1234,
+      "midiChannel": 6,
+      "keb": {
+        "ip": "192.168.1.75",
+        "port": 8000,
+        "type": "F5"
+      }
+    },
+    "s7": {
+      "ip": "192.168.1.17",
+      "sshUser": "root",
+      "sshAlias": "sirene-s7",
+      "midiPort": 8001,
+      "cmdPort": 1234,
+      "midiChannel": 7,
+      "keb": {
+        "ip": "192.168.1.76",
+        "port": 8000,
+        "type": "F5"
+      }
+    },
+    "voitureA": {
+      "ip": "192.168.1.50",
+      "sshUser": "root",
+      "sshAlias": "voiture-a",
+      "midiPort": 8001,
+      "midiChannel": 15
+    },
+    "voitureB": {
+      "ip": "192.168.1.51",
+      "sshUser": "root",
+      "sshAlias": "voiture-b",
+      "midiPort": 8001,
+      "midiChannel": 15
+    },
+    "pavillon1": {
+      "ip": "192.168.1.52",
+      "sshUser": "root",
+      "sshAlias": "pavillon-1",
+      "midiPort": 8001,
+      "midiChannel": 12
+    },
+    "pavillon2": {
+      "ip": "192.168.1.53",
+      "sshUser": "root",
+      "sshAlias": "pavillon-2",
+      "midiPort": 8001,
+      "midiChannel": 13
+    }
+  },
+  "ports": {
+    "http": 8005,
+    "websocket": 8006,
+    "udp": 8000,
+    "bail": 8004
+  },
+  "bail": {
+    "ttlSeconds": 5,
+    "heartbeatSeconds": 2
+  }
+}

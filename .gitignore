@@ -84,6 +84,8 @@ temp/
 
 SirenePupitre/midifiles/
 config.json
+# la table du parc du service SirenManager n'a rien de local (pas de clés : SSH passe par ~/.ssh/config)
+!SirenManager/backend/config.json
 
 # SSL certificates (ne pas versionner les clés privées)
 **/ssl/
