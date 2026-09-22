@@ -31,7 +31,10 @@
         "port": 8000,
         "type": "F5"
       },
-      "role": "sirene"
+      "role": "sirene",
+      "cb4tech": {
+        "ip": "192.168.1.201"
+      }
     },
     "s2": {
       "ip": "192.168.1.12",
@@ -45,7 +48,10 @@
         "port": 8000,
         "type": "F5"
       },
-      "role": "sirene"
+      "role": "sirene",
+      "cb4tech": {
+        "ip": "192.168.1.202"
+      }
     },
     "s3": {
       "ip": "192.168.1.13",
@@ -59,7 +65,10 @@
         "port": 8000,
         "type": "F5"
       },
-      "role": "sirene"
+      "role": "sirene",
+      "cb4tech": {
+        "ip": "192.168.1.203"
+      }
     },
     "s4": {
       "ip": "192.168.1.14",
@@ -73,7 +82,10 @@
         "port": 8000,
         "type": "F6"
       },
-      "role": "sirene"
+      "role": "sirene",
+      "cb4tech": {
+        "ip": "192.168.1.204"
+      }
     },
     "s5": {
       "ip": "192.168.1.15",
@@ -87,7 +99,10 @@
         "port": 8000,
         "type": "F5"
       },
-      "role": "sirene"
+      "role": "sirene",
+      "cb4tech": {
+        "ip": "192.168.1.205"
+      }
     },
     "s6": {
       "ip": "192.168.1.16",
@@ -101,7 +116,10 @@
         "port": 8000,
         "type": "F5"
       },
-      "role": "sirene"
+      "role": "sirene",
+      "cb4tech": {
+        "ip": "192.168.1.206"
+      }
     },
     "s7": {
       "ip": "192.168.1.17",
@@ -115,7 +133,10 @@
         "port": 8000,
         "type": "F5"
       },
-      "role": "sirene"
+      "role": "sirene",
+      "cb4tech": {
+        "ip": "192.168.1.207"
+      }
     },
     "voitureA": {
       "ip": "192.168.1.50",
@@ -163,6 +184,100 @@
       "ip": "192.168.1.113",
       "sshAlias": "minipc",
       "role": "regie"
+    },
+    "trompe": {
+      "ip": "192.168.1.18",
+      "sshUser": "root",
+      "sshAlias": "trompe",
+      "midiPort": 8001,
+      "midiChannel": 8,
+      "role": "trompe",
+      "keb": {
+        "ip": "192.168.1.77",
+        "port": 8000,
+        "type": "F5"
+      }
+    },
+    "pupitre1": {
+      "ip": "192.168.1.41",
+      "role": "pupitre",
+      "volant": {
+        "ip": "192.168.1.31"
+      }
+    },
+    "pupitre2": {
+      "ip": "192.168.1.42",
+      "role": "pupitre",
+      "volant": {
+        "ip": "192.168.1.32"
+      }
+    },
+    "pupitre3": {
+      "ip": "192.168.1.43",
+      "role": "pupitre",
+      "volant": {
+        "ip": "192.168.1.33"
+      }
+    },
+    "pupitre4": {
+      "ip": "192.168.1.44",
+      "role": "pupitre",
+      "volant": {
+        "ip": "192.168.1.34"
+      }
+    },
+    "pupitre5": {
+      "ip": "192.168.1.45",
+      "role": "pupitre",
+      "volant": {
+        "ip": "192.168.1.35"
+      }
+    },
+    "pupitre6": {
+      "ip": "192.168.1.46",
+      "role": "pupitre",
+      "volant": {
+        "ip": "192.168.1.36"
+      }
+    },
+    "pupitre7": {
+      "ip": "192.168.1.47",
+      "role": "pupitre",
+      "volant": {
+        "ip": "192.168.1.37"
+      }
+    },
+    "macCompo": {
+      "ip": "192.168.1.103",
+      "role": "composition"
+    },
+    "sirenium": {
+      "ip": "192.168.1.10",
+      "midiChannel": 11,
+      "role": "controleur"
+    },
+    "pedaleBoss": {
+      "ip": "192.168.1.25",
+      "midiChannel": 9,
+      "role": "controleur"
+    },
+    "petiteBoite": {
+      "ip": "192.168.1.26",
+      "midiChannel": 9,
+      "role": "controleur"
+    },
+    "grosseBoite": {
+      "ip": "192.168.1.27",
+      "midiChannel": 9,
+      "role": "controleur"
+    },
+    "pedalierSirenium": {
+      "ip": "192.168.1.21",
+      "midiChannel": 9,
+      "role": "controleur",
+      "volant": {
+        "ip": "192.168.1.20"
+      }
     }
   },
   "ports": {
