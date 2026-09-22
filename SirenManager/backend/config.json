@@ -7,7 +7,8 @@
       "midiPath": "/mnt/disk/home/guest/WorkSpaceSirenes/Midi/",
       "playlistPath": "/mnt/disk/home/guest/WorkSpaceSirenes/liste_de_lecture/",
       "derniereListePath": "/mnt/disk/home/guest/WorkSpaceSirenes/derniere_liste",
-      "cmdPort": 8001
+      "cmdPort": 8001,
+      "role": "maitre"
     },
     "raspberryClic": {
       "ip": "192.168.1.104",
@@ -15,7 +16,8 @@
       "sshAlias": "raspberry-clic",
       "midiPath": "/home/sirenateur/WorkSpaceSirenes/Midi/",
       "playlistPath": "/home/sirenateur/WorkSpaceSirenes/liste_de_lecture/",
-      "derniereListePath": "/home/sirenateur/WorkSpaceSirenes/derniere_liste"
+      "derniereListePath": "/home/sirenateur/WorkSpaceSirenes/derniere_liste",
+      "role": "clic"
     },
     "s1": {
       "ip": "192.168.1.11",
@@ -28,7 +30,8 @@
         "ip": "192.168.1.70",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "role": "sirene"
     },
     "s2": {
       "ip": "192.168.1.12",
@@ -41,7 +44,8 @@
         "ip": "192.168.1.71",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "role": "sirene"
     },
     "s3": {
       "ip": "192.168.1.13",
@@ -54,7 +58,8 @@
         "ip": "192.168.1.72",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "role": "sirene"
     },
     "s4": {
       "ip": "192.168.1.14",
@@ -67,7 +72,8 @@
         "ip": "192.168.1.73",
         "port": 8000,
         "type": "F6"
-      }
+      },
+      "role": "sirene"
     },
     "s5": {
       "ip": "192.168.1.15",
@@ -80,7 +86,8 @@
         "ip": "192.168.1.74",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "role": "sirene"
     },
     "s6": {
       "ip": "192.168.1.16",
@@ -93,7 +100,8 @@
         "ip": "192.168.1.75",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "role": "sirene"
     },
     "s7": {
       "ip": "192.168.1.17",
@@ -106,35 +114,55 @@
         "ip": "192.168.1.76",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "role": "sirene"
     },
     "voitureA": {
       "ip": "192.168.1.50",
       "sshUser": "root",
       "sshAlias": "voiture-a",
       "midiPort": 8001,
-      "midiChannel": 15
+      "midiChannel": 15,
+      "role": "voiture"
     },
     "voitureB": {
       "ip": "192.168.1.51",
       "sshUser": "root",
       "sshAlias": "voiture-b",
       "midiPort": 8001,
-      "midiChannel": 15
+      "midiChannel": 15,
+      "role": "voiture"
     },
     "pavillon1": {
       "ip": "192.168.1.52",
       "sshUser": "root",
       "sshAlias": "pavillon-1",
       "midiPort": 8001,
-      "midiChannel": 12
+      "midiChannel": 12,
+      "role": "pavillon",
+      "keb": {
+        "ip": "192.168.1.80",
+        "port": 8000,
+        "type": "F5"
+      }
     },
     "pavillon2": {
       "ip": "192.168.1.53",
       "sshUser": "root",
       "sshAlias": "pavillon-2",
       "midiPort": 8001,
-      "midiChannel": 13
+      "midiChannel": 13,
+      "role": "pavillon",
+      "keb": {
+        "ip": "192.168.1.81",
+        "port": 8000,
+        "type": "F5"
+      }
+    },
+    "miniPC": {
+      "ip": "192.168.1.113",
+      "sshAlias": "minipc",
+      "role": "regie"
     }
   },
   "ports": {
