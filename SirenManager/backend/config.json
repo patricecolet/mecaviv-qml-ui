@@ -34,7 +34,11 @@
       "role": "sirene",
       "cb4tech": {
         "ip": "192.168.1.201"
-      }
+      },
+      "chaines": [
+        "v1",
+        "cb4tech"
+      ]
     },
     "s2": {
       "ip": "192.168.1.12",
@@ -51,7 +55,11 @@
       "role": "sirene",
       "cb4tech": {
         "ip": "192.168.1.202"
-      }
+      },
+      "chaines": [
+        "v1",
+        "cb4tech"
+      ]
     },
     "s3": {
       "ip": "192.168.1.13",
@@ -68,7 +76,11 @@
       "role": "sirene",
       "cb4tech": {
         "ip": "192.168.1.203"
-      }
+      },
+      "chaines": [
+        "v1",
+        "cb4tech"
+      ]
     },
     "s4": {
       "ip": "192.168.1.14",
@@ -85,7 +97,11 @@
       "role": "sirene",
       "cb4tech": {
         "ip": "192.168.1.204"
-      }
+      },
+      "chaines": [
+        "v1",
+        "cb4tech"
+      ]
     },
     "s5": {
       "ip": "192.168.1.15",
@@ -102,7 +118,11 @@
       "role": "sirene",
       "cb4tech": {
         "ip": "192.168.1.205"
-      }
+      },
+      "chaines": [
+        "v1",
+        "cb4tech"
+      ]
     },
     "s6": {
       "ip": "192.168.1.16",
@@ -119,7 +139,11 @@
       "role": "sirene",
       "cb4tech": {
         "ip": "192.168.1.206"
-      }
+      },
+      "chaines": [
+        "v1",
+        "cb4tech"
+      ]
     },
     "s7": {
       "ip": "192.168.1.17",
@@ -136,7 +160,11 @@
       "role": "sirene",
       "cb4tech": {
         "ip": "192.168.1.207"
-      }
+      },
+      "chaines": [
+        "v1",
+        "cb4tech"
+      ]
     },
     "voitureA": {
       "ip": "192.168.1.50",
@@ -144,7 +172,13 @@
       "sshAlias": "voiture-a",
       "midiPort": 8001,
       "midiChannel": 15,
-      "role": "voiture"
+      "role": "voiture",
+      "v2": {
+        "ip": "192.168.1.56"
+      },
+      "chaines": [
+        "v1"
+      ]
     },
     "voitureB": {
       "ip": "192.168.1.51",
@@ -152,7 +186,13 @@
       "sshAlias": "voiture-b",
       "midiPort": 8001,
       "midiChannel": 15,
-      "role": "voiture"
+      "role": "voiture",
+      "v2": {
+        "ip": "192.168.1.57"
+      },
+      "chaines": [
+        "v1"
+      ]
     },
     "pavillon1": {
       "ip": "192.168.1.52",
@@ -165,7 +205,10 @@
         "ip": "192.168.1.80",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "chaines": [
+        "v1"
+      ]
     },
     "pavillon2": {
       "ip": "192.168.1.53",
@@ -178,7 +221,10 @@
         "ip": "192.168.1.81",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "chaines": [
+        "v1"
+      ]
     },
     "miniPC": {
       "ip": "192.168.1.113",
@@ -196,7 +242,10 @@
         "ip": "192.168.1.77",
         "port": 8000,
         "type": "F5"
-      }
+      },
+      "chaines": [
+        "v1"
+      ]
     },
     "pupitre1": {
       "ip": "192.168.1.41",
@@ -278,6 +327,21 @@
       "volant": {
         "ip": "192.168.1.20"
       }
+    },
+    "cb4Voiture1": {
+      "ip": "192.168.1.92",
+      "rtpName": "Voiture1",
+      "role": "cb4tech"
+    },
+    "cb4Studio2": {
+      "ip": "192.168.1.94",
+      "rtpName": "Studio2",
+      "role": "cb4tech"
+    },
+    "cb4Voiture2": {
+      "ip": "192.168.1.96",
+      "rtpName": "Voiture2",
+      "role": "cb4tech"
     }
   },
   "ports": {
