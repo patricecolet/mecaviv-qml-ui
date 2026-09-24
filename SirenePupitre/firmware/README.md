@@ -116,9 +116,9 @@ quelles : les fichiers de `nvs/pins/` en sont la copie exacte, vérifiée à l'o
 | `D5` | LED 1 | `led` | note 61 | `/pad1/led` | **entrée** |
 | `D7` | LED 2 | `led` | note 62 | `/pad2/led` | **entrée** |
 
-Les LED sont des **entrées** : elles réagissent à ce que Pd leur envoie. Pads et LED partagent
-volontairement leurs notes (61, 62), de sorte qu'une frappe allume la LED correspondante — d'où
-l'intérêt de piloter les LED en OSC (`/pad1/led`) plutôt qu'en MIDI, pour éviter la boucle.
+Les LED sont pilotées par le firmware lui-même : NiDMI fait un écho local des notes qu'il
+génère, et pads et LED partagent volontairement leurs notes (61, 62) — une frappe allume la LED
+correspondante sans passer par Pd. Rien à brancher côté Pd pour ça.
 
 Le firmware ajoute lui-même le suffixe d'axe aux composants multi-axes : l'adresse `/joystick`
 de `A8` produit `/joystick/x`, `/joystick/y` et `/joystick/z`.

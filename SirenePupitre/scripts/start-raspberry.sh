@@ -200,6 +200,16 @@ start_puredata() {
     fi
 }
 
+# Fonction pour relier le MIDI USB du pad (NiDMI) à l'entrée MIDI de PureData
+# Appelée en boucle : le pad peut être branché après Pd, redémarrer, ou Pd être
+# relancé par pd-watchdog. aconnect échoue si le lien existe déjà ou si l'un des
+# deux ports est absent — seul un nouveau lien est journalisé.
+connect_pad_midi() {
+    if aconnect "nidmi" "Pure Data" 2>/dev/null; then
+        echo "$(date): 🎹 Pad MIDI (nidmi) relié à PureData"
+    fi
+}
+
 # Fonction pour démarrer le navigateur
 start_browser() {
     echo "$(date): Démarrage du navigateur..."
@@ -329,9 +339,10 @@ main() {
     echo "$(date): 🎵 PureData: ALSA MIDI device 1"
     echo "$(date): 🔊 Volume: 100%"
     
-    # 10. Garder le script en vie
+    # 10. Garder le script en vie, en rebranchant le pad sur PureData
     while true; do
-        sleep 60
+        connect_pad_midi
+        sleep 2
     done
 }
 
