@@ -1,9 +1,9 @@
 # Provenance des binaires de ce dossier — a mettre a jour a chaque copie depuis NiDMI.
-firmware_version  = v0.2.0-rc1-13-g5184edc-dirty   (chaine embarquee : « dirty » vient de
+firmware_version  = v0.2.0-rc1-14-geef6d03-dirty   (chaine embarquee : « dirty » vient de
                     pd/basic-exemple.pd, modifie dans l'arbre de travail et hors
                     firmware ; les sources compilees sont celles du commit ci-dessous)
 firmware_variant  = usbmidi-on+usbnet
-source_repo       = https://github.com/patricecolet/NiDMI  (branche feat/usb-net, commit 5184edc,
+source_repo       = https://github.com/patricecolet/NiDMI  (branche feat/usb-net, commit eef6d03,
                     non pousse ; bibliotheque nidmi-core branche feat/usb-ncm-spike, commit 73cda96)
 build_command     = ./scripts/nidmi.sh build --board s3 --variant on --usb-net --ota
 partition_table   = tools/nidmi_s3_ota_dual_littlefs.csv
@@ -13,9 +13,10 @@ bootloader/partitions : inchanges depuis le build du 2026-08-25 (identiques octe
 nvs_image         = gyrophone-pad.nvs.bin (genere par scripts/build-nvs.sh depuis
                     nvs/gyrophone-pad.csv ; capture depuis la carte de reference,
                     modifiee depuis — voir l'en-tete du CSV). USB seul : wifi_enabled=0,
-                    rtp_enabled=0, osc_out_all=0 (cles lues a partir de 5184edc).
+                    rtp_enabled=0 (cles lues a partir de 5184edc) ; osc_out_all=1 (sortie
+                    RAW pour le calibrage).
 
 valide_sur        = Pi (cdc_ncm) : 20 redemarrages + 2 rebranchements, 22/22 (build de debug),
-                    puis CE binaire charge par OTA : 10/10, Wi-Fi et RTP-MIDI coupes,
-                    MIDI USB relie a Pd. macOS : lien encore intermittent, ~1 demarrage
+                    puis 5184edc par OTA : 10/10, Wi-Fi et RTP-MIDI coupes, MIDI USB relie
+                    a Pd. eef6d03 (route output-enable) : OTA + OSC RAW recu sur le Pi. macOS : lien encore intermittent, ~1 demarrage
                     sur 2 (sujet ouvert cote NiDMI).

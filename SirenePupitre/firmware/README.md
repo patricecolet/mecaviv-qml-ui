@@ -43,8 +43,9 @@ NiDMI se compile en plusieurs variantes ; celle embarquée ici est **USB-MIDI ac
 - il n'y a **plus de port série** tant que ce firmware tourne : l'USB est pris par le MIDI et le
   réseau. C'est le principal effet de bord à connaître (voir *Pièges*).
 
-Les girophones tournent en **USB seul** : la NVS coupe le Wi-Fi, RTP-MIDI et l'OSC
-(`wifi_enabled=0`, `rtp_enabled=0`, `osc_out_all=0`, lus par NiDMI à partir de `5184edc`).
+Les girophones tournent en **USB seul** : la NVS coupe le Wi-Fi et RTP-MIDI
+(`wifi_enabled=0`, `rtp_enabled=0`, lus par NiDMI à partir de `5184edc`). L'OSC reste actif : sa sortie
+RAW (ADC 0-4095) arrive sur le Pi en UDP 8000 et sert au calibrage.
 L'interface web, le calibrage et l'OTA passent par le câble. Le même binaire et la même NVS
 servent pour tous les girophones.
 

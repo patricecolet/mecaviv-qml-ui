@@ -6,9 +6,10 @@
 # TYPES : l API rend les valeurs, pas les types NVS. Ils doivent suivre les
 # get/put du firmware -- osc_port est i32 (getInt) ; en u32 la lecture echoue
 # et l OSC part sur le port par defaut 8001.
-# USB seul (2026-09-24) : ni Wi-Fi, ni RTP-MIDI, ni OSC -- wifi_enabled et
-# rtp_enabled demandent un firmware NiDMI qui les lit au demarrage (feat/usb-net
-# apres e4de224) ; un firmware plus ancien les ignore et garde le Wi-Fi.
+# USB seul (2026-09-24) : ni Wi-Fi ni RTP-MIDI -- wifi_enabled et rtp_enabled
+# demandent NiDMI >= 5184edc ; un firmware plus ancien les ignore et garde le Wi-Fi.
+# OSC garde (osc_out_all=1) : la sortie RAW (ADC 0-4095) sert au calibrage, elle
+# part en diffusion sur le reseau USB, port 8000.
 # Regenerer l image : ./scripts/build-nvs.sh
 #
 # ATTENTION mdns_name / rtp_name : toutes les cartes flashees avec cette image
@@ -27,7 +28,7 @@ rtp_enabled,data,u8,0
 osc_target,data,string,ap+usb
 osc_port,data,i32,8000
 osc_broadcast,data,u8,1
-osc_out_all,data,u8,0
+osc_out_all,data,u8,1
 osc_interface,data,string,ap+usb
 # --- Controles du pupitre (message 0x02 CONTROLLERS) ---
 pin_D2,file,string,pins/D2.json
