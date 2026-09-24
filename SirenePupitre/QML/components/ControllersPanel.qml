@@ -44,7 +44,6 @@ Rectangle {
     property var webSocketController: null
 
     // Tests
-    property bool faderTestActive: false
     property bool leftSpeakerTestOn: false
     property bool rightSpeakerTestOn: false
 
@@ -177,12 +176,6 @@ Rectangle {
             return true
         configController.updateCounter
         return configController.isSubComponentVisible("controllers", key)
-    }
-
-    function testFader(active) {
-        if (!webSocketController || !webSocketController.connected)
-            return
-        webSocketController.sendBinaryMessage({ type: "FADER_TEST", value: active ? 1 : 0 })
     }
 
     function testSpeaker(channel, active) {
@@ -427,12 +420,6 @@ Rectangle {
             selected: root.rightSpeakerTestOn
             onClicked: { root.rightSpeakerTestOn = !root.rightSpeakerTestOn; root.testSpeaker("right", root.rightSpeakerTestOn) }
         }
-        FlatButton {
-            visible: root.isShown("fader")
-            label: root.faderTestActive ? "TEST FADER ON" : "TEST FADER"
-            selected: root.faderTestActive
-            onClicked: { root.faderTestActive = !root.faderTestActive; root.testFader(root.faderTestActive) }
-        }
     }
 
     GridLayout {
@@ -601,7 +588,6 @@ Rectangle {
         Card {
             title: "SLIDER"
             visible: root.isShown("fader")
-            lit: root.faderTestActive
             Gauge { label: "valeur"; value: root.faderValue }
         }
 
@@ -622,7 +608,7 @@ Rectangle {
             title: "ENCODEUR"
             visible: root.isShown("encoder")
             lit: root.encoderPressed
-            Gauge { label: "valeur"; value: root.encoderValue }
+            Gauge { label: "valeur"; value: root.encoderValue; maximum: 255 }
             Lamp { label: "appuyé"; on: root.encoderPressed }
         }
 
