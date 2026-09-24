@@ -23,7 +23,7 @@ Tâches et améliorations futures pour l'ensemble du système mecaviv-qml-ui.
 - [ ] Mode plein écran optimisé pour Raspberry Pi
 
 #### SirenePupitre — girophones (pad NiDMI, MIDI USB)
-- [ ] Flasher tous les girophones : firmware NiDMI usbmidi-on+usbnet + NVS `gyrophone-pad` (USB seul)
+- [x] Flasher tous les girophones : firmware NiDMI usbmidi-on+usbnet + NVS `gyrophone-pad` (USB seul) — 9 cartes le 2026-09-24
 - [ ] Brancher le MIDI du pad dans `M645.pd` (échelles à mesurer sur le Pi d'abord)
 - [ ] Calibrage des pads et du slider depuis l'interface QML
 
