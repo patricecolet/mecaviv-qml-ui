@@ -462,7 +462,7 @@ Page {
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: Math.max(280, parent.height * 0.42)
+                height: Math.max(280, parent.height * 0.75)
                 z: 200  // Au-dessus de la portée (z:1) et du gameModeOverlay (z:100)
                 configController: root.configController
                 webSocketController: root.webSocketController

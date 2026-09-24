@@ -1,45 +1,54 @@
 import QtQuick
-import QtQuick3D
-import "./indicators"
+import QtQuick.Layouts
 
+// Panneau des contrôleurs, en 2D : une carte par contrôleur, dans une grille qui
+// s'adapte à la largeur. Remplace la vue 3D (indicateurs QtQuick3D), dont la
+// caméra à champ fixe faisait déborder les indicateurs dès que le panneau
+// changeait de proportions. L'interface publique (propriétés, fonctions appelées
+// par Test2D et le WebSocket) est inchangée.
 Rectangle {
     id: root
-    
-    // Propriétés pour les données des contrôleurs
-    property real wheelPosition: 0
+
+    // Données des contrôleurs (message 0x02, voir WebSocketController)
+    property real wheelPosition: 0          // 0-360 degrés
     property real wheelSpeed: 0
-    property real joystickX: 0
+    property real joystickX: 0              // -1..1
     property real joystickY: 0
     property real joystickZ: 0
     property bool joystickButton: false
-    property int gearShiftPosition: 0
-    property string gearShiftMode: "0"   // Valeur demi-tons : 0, 1, 12, 24, 48
+    property int gearShiftPosition: 0       // 0-4
+    property string gearShiftMode: "0"      // demi-tons : 0, 1, 12, 24, 48
     property int faderValue: 0
     property int modPedalValue: 0
     property real modPedalPercent: 0
-    // Pad 1
     property int pad1Velocity: 0
     property int pad1Aftertouch: 0
     property bool pad1Active: false
-    // Pad 2
     property int pad2Velocity: 0
     property int pad2Aftertouch: 0
     property bool pad2Active: false
-    // Boutons supplémentaires
     property bool button1: false
     property bool button2: false
-    // Encodeur
     property int encoderValue: 0
     property bool encoderPressed: false
-    
-    // Propriétés visuelles
+
+    // Apparence
     property color backgroundColor: "#0a0a0a"
     property color borderColor: "#2a2a2a"
+    property color accent: "#00ff00"
+    property color cardColor: "#141414"
+    property color dimText: "#7a7a7a"
+    property color valueText: "#ccffcc"
     property int headerHeight: 5
     property var configController: null
     property var webSocketController: null
-    property bool faderTestActive: false  // État du toggle de test
-    // Calibrage pads
+
+    // Tests
+    property bool faderTestActive: false
+    property bool leftSpeakerTestOn: false
+    property bool rightSpeakerTestOn: false
+
+    // Calibrage pads (protocole actuel, vers PureData)
     property string padCalibrationMode: "min"  // "min" | "max"
     property bool pad1CalibrationActive: false
     property bool pad2CalibrationActive: false
@@ -51,26 +60,32 @@ Rectangle {
     property int pad2CalibMaxV: 127
     property int pad2CalibMinA: 0
     property int pad2CalibMaxA: 127
-    /** Valeurs int16 affichées sous les boutons de calibration (reçues par WebSocket), une seule structure [pad0, pad1]. */
+    /** Valeurs brutes des deux pads [pad0, pad1] (PAD_CALIBRATION_VALUE). */
     property var padCalibDisplayValues: [0, 0]
 
-    /** Calibrage joystick : min, 0.min, 0.max, max (modes radio). */
+    // Calibrage joystick : min, 0.min, 0.max, max
     property string joystickCalibrationMode: "min"  // "min" | "zero_min" | "zero_max" | "max"
-    /** Lectures brutes X/Y (même source que le paquet binaire 0x02 contrôleurs). */
     property real joystickRawX: 0
     property real joystickRawY: 0
-    /** Seuils affichés [min, zeroMin, zeroMax, max] — `JOYSTICK_CALIBRATION_STATE` ou config `calibration.joystick`. */
     property var joyCalibStateX: []
     property var joyCalibStateY: []
-    /** Valeurs filtrées (firmware) — affichage à côté des seuils ; pas d’init depuis la config. */
     property real joystickFilteredX: 0
     property real joystickFilteredY: 0
     property bool joystickFilteredReceived: false
+
+    color: backgroundColor
+    border.color: borderColor
+    border.width: 1
+    radius: 5
 
     onConfigControllerChanged: {
         if (root.configController)
             Qt.callLater(function () { root.refreshJoystickCalibrationStateFromConfig() })
     }
+
+    // ------------------------------------------------------------------
+    // Fonctions publiques (inchangées)
+    // ------------------------------------------------------------------
 
     function setPadCalibrationValues(values) {
         if (values && Array.isArray(values) && values.length >= 2)
@@ -95,10 +110,7 @@ Rectangle {
         if (Array.isArray(raw)) {
             if (raw.length < 4)
                 return null
-            a = Number(raw[0])
-            b = Number(raw[1])
-            c = Number(raw[2])
-            d = Number(raw[3])
+            a = Number(raw[0]); b = Number(raw[1]); c = Number(raw[2]); d = Number(raw[3])
         } else if (typeof raw === "object") {
             a = Number(raw.min)
             b = Number(raw.zeroMin !== undefined ? raw.zeroMin : raw.zero_min)
@@ -142,21 +154,8 @@ Rectangle {
         var arr = axis === "x" ? root.joyCalibStateX : root.joyCalibStateY
         if (!arr || !Array.isArray(arr) || arr.length <= index)
             return "—"
-        var v = arr[index]
-        if (typeof v === "number" && isFinite(v))
-            return String(Math.round(v))
-        if (typeof v === "string" && v.length) {
-            var p = parseFloat(v)
-            if (isFinite(p))
-                return String(Math.round(p))
-        }
-        return "—"
-    }
-
-    function joyCalibRowText(axis, idx) {
-        var labels = ["min", "0.min", "0.max", "max"]
-        var lab = labels[idx] !== undefined ? labels[idx] : "?"
-        return lab + " " + root.joyCalibSlot(axis, idx)
+        var v = Number(arr[index])
+        return isFinite(v) ? String(Math.round(v)) : "—"
     }
 
     function setJoystickFilteredValues(fx, fy) {
@@ -169,982 +168,68 @@ Rectangle {
         root.joystickFilteredReceived = true
     }
 
-    function joyFilteredLine(axis) {
-        if (!root.joystickFilteredReceived)
-            return (axis === "x" ? "X" : "Y") + " —"
-        var v = axis === "x" ? root.joystickFilteredX : root.joystickFilteredY
-        var s = Math.abs(v - Math.round(v)) < 1e-5 ? String(Math.round(v)) : v.toFixed(2)
-        return (axis === "x" ? "X " : "Y ") + s
-    }
-
     function showControllerValues() {
         return configController ? configController.isComponentVisible("controllerValues") : true
     }
-    
-    // Fonction pour envoyer un message de test du fader (1 ou 0)
-    function testFader(active) {
-        if (!webSocketController || !webSocketController.connected) {
-            console.log("[ControllersPanel] WebSocket non connecté, test fader annulé")
-            return
-        }
-        
-        // Envoyer un message JSON simple pour tester le fader (1 = activé, 0 = désactivé)
-        var message = {
-            type: "FADER_TEST",
-            value: active ? 1 : 0
-        }
-        
-        // Envoyer via sendBinaryMessage (qui convertit JSON en binaire)
-        webSocketController.sendBinaryMessage(message)
-        console.log("[ControllersPanel] FADER_TEST envoyé:", JSON.stringify(message))
+
+    function isShown(key) {
+        if (!configController)
+            return true
+        configController.updateCounter
+        return configController.isSubComponentVisible("controllers", key)
     }
 
-    property bool leftSpeakerTestOn: false
-    property bool rightSpeakerTestOn: false
+    function testFader(active) {
+        if (!webSocketController || !webSocketController.connected)
+            return
+        webSocketController.sendBinaryMessage({ type: "FADER_TEST", value: active ? 1 : 0 })
+    }
 
     function testSpeaker(channel, active) {
-        if (!webSocketController || !webSocketController.connected) {
-            console.log("[ControllersPanel] WebSocket non connecté, test HP annulé")
+        if (!webSocketController || !webSocketController.connected)
             return
-        }
         webSocketController.sendBinaryMessage({ type: "SPEAKER_TEST", channel: channel, active: active })
-        console.log("[ControllersPanel] SPEAKER_TEST channel:", channel, "active:", active)
     }
 
-    /** Envoie un message PAD_CALIBRATION pour déclencher le calibrage : pad (0 ou 1), mode (min ou max). */
     function sendPadCalibration(pad) {
-        if (!webSocketController || !webSocketController.connected) return
-        webSocketController.sendBinaryMessage({
-            type: "PAD_CALIBRATION",
-            pad: pad,
-            mode: root.padCalibrationMode
-        })
+        if (!webSocketController || !webSocketController.connected)
+            return
+        webSocketController.sendBinaryMessage({ type: "PAD_CALIBRATION", pad: pad, mode: root.padCalibrationMode })
     }
 
-    color: backgroundColor
-    border.color: borderColor
-    border.width: 1
-    radius: 5
-    
-    // Indicateur de connexion (en haut à droite)
-    Rectangle {
-        width: 10
-        height: 10
-        radius: 5
-        color: root.wheelSpeed !== 0 || root.faderValue !== 0 || root.pad1Active || root.pad2Active ? "#00ff00" : "#ff0000"
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 15
-        
-        SequentialAnimation on opacity {
-            running: root.wheelSpeed !== 0 || root.faderValue !== 0 || root.pad1Active || root.pad2Active
-            loops: Animation.Infinite
-            NumberAnimation { to: 0.3; duration: 1000 }
-            NumberAnimation { to: 1.0; duration: 1000 }
-        }
-    }
-    
-    // Vue 3D pour les contrôleurs
-    View3D {
-        id: controllerView3D
-        anchors.fill: parent
-        anchors.topMargin: headerHeight
-        anchors.margins: 10
-        
-        environment: SceneEnvironment {
-            clearColor: "#1a1a40"
-            backgroundMode: SceneEnvironment.Color
-            antialiasingMode: SceneEnvironment.NoAA
-            probeExposure: 1.2
-        }
-        
-        PerspectiveCamera {
-            id: camera
-            position: Qt.vector3d(0, 0, 800)
-            fieldOfView: 23
-            clipFar: 1000
-            clipNear: 1
-        }
-        
-        // Éclairage général
-        DirectionalLight {
-            eulerRotation.x: -45
-            eulerRotation.y: -45
-            brightness: 1.0
-            color: Qt.rgba(1, 1, 1, 1)
-        }
-        
-        DirectionalLight {
-            eulerRotation.x: -20
-            eulerRotation.y: 45
-            brightness: 0.9
-            color: Qt.rgba(0.8, 0.8, 1, 1)
-        }
-        
-        // Organisation des contrôleurs
-        Node {
-            id: controllersContainer
-            property real totalWidth: 800
-            property real itemSpacing: totalWidth / 4
-
-            // 🔧 Échelle globale depuis la configuration
-            property real configScale: {
-                if (configController && configController.updateCounter >= 0) {
-                    return configController.getValueAtPath(["displayConfig", "components", "controllers", "scale"]) || 0.8
-                }
-                return 0.8
-            }
-            
-            scale: Qt.vector3d(
-                Math.min(1.5, Math.min(controllerView3D.width / 900, controllerView3D.height / 320)) * configScale,
-                Math.min(1.5, Math.min(controllerView3D.width / 900, controllerView3D.height / 320)) * configScale,
-                Math.min(1.5, Math.min(controllerView3D.width / 900, controllerView3D.height / 320)) * configScale
-            )
-            
-            // Position 1/6 - Wheel
-            Node {
-                x: -parent.itemSpacing * 3
-                y: 0
-                z: 0
-                visible: {
-                    if (!configController) return true
-                    configController.updateCounter
-                    return configController.isSubComponentVisible("controllers", "wheel")
-                }
-                
-                WheelIndicator {
-                    position: root.wheelPosition
-                    speed: root.wheelSpeed
-                    scale: Qt.vector3d(1.2, 1.2, 1.2)
-                    showValues: showControllerValues()
-                }
-            }
-            
-            // Position 3/6 - GearShift
-            Node {
-                x: -parent.itemSpacing * 2.2
-                y: 0
-                z: -150
-                visible: {
-                    if (!configController) return true
-                    configController.updateCounter
-                    return configController.isSubComponentVisible("controllers", "gearShift")
-                }
-                
-                GearShiftIndicator {
-                    position: root.gearShiftPosition
-                    mode: root.gearShiftMode
-                    scale: Qt.vector3d(1.5, 1.5, 1.5)
-                    showValues: showControllerValues()
-                }
-            }
-            
-            // Position 2/6 - Joystick
-            Node {
-                x: -parent.itemSpacing * 0.8
-                y: 0
-                z: 0
-                visible: {
-                    if (!configController) return true
-                    configController.updateCounter
-                    return configController.isSubComponentVisible("controllers", "joystick")
-                }
-                
-                JoystickIndicator {
-                    xValue: root.joystickX
-                    yValue: root.joystickY
-                    zValue: root.joystickZ
-                    button: root.joystickButton
-                    scale: Qt.vector3d(1.5, 1.5, 1.5)
-                    showValues: showControllerValues()
-                }
-            }
-            
-            // Position 4/6 - Fader
-            Node {
-                x: parent.itemSpacing * 0.0
-                y: 0
-                z: 0
-                visible: {
-                    if (!configController) return true
-                    configController.updateCounter
-                    return configController.isSubComponentVisible("controllers", "fader")
-                }
-                
-                FaderIndicator {
-                    value: root.faderValue
-                    scale: Qt.vector3d(1.5, 1.5, 1.5)
-                    showValues: showControllerValues()
-                }
-            }
-            
-            // Position 4.5/6 - Encoder
-            Node {
-                x: parent.itemSpacing * 0.6
-                y: 0
-                z: 0
-                visible: {
-                    if (!configController) return true
-                    configController.updateCounter
-                    return configController.isSubComponentVisible("controllers", "encoder")
-                }
-                
-                EncoderIndicator {
-                    value: root.encoderValue
-                    pressed: root.encoderPressed
-                    scale: Qt.vector3d(1.5, 1.5, 1.5)
-                    showValues: showControllerValues()
-                }
-            }
-            
-            // Position 5/6 - Pedal
-            Node {
-                x: parent.itemSpacing * 1.5
-                y: 10
-                z: 0
-                visible: {
-                    if (!configController) return true
-                    configController.updateCounter
-                    return configController.isSubComponentVisible("controllers", "modPedal")
-                }
-                
-                PedalIndicator {
-                    value: root.modPedalValue
-                    percent: root.modPedalPercent
-                    scale: Qt.vector3d(1.5, 1.5, 1.5)
-                    orientation: Qt.vector3d(20, 60, 10)
-                    showValues: showControllerValues()
-                }
-            }
-            
-            // Position 6a/6 - Pad 1
-            Node {
-                x: parent.itemSpacing * 2.3
-                y: 0
-                z: 0
-                visible: {
-                    if (!configController) return true
-                    configController.updateCounter
-                    return configController.isSubComponentVisible("controllers", "pad")
-                }
-                
-                PadIndicator {
-                    aftertouch: root.pad1Aftertouch
-                    velocity: root.pad1Velocity
-                    scale: Qt.vector3d(1.3, 1.3, 1.3)
-                    orientation: Qt.vector3d(-90, 90, 90)
-                    showValues: showControllerValues()
-                }
-            }
-            
-            // Position 6b/6 - Pad 2
-            Node {
-                x: parent.itemSpacing * 2.7
-                y: 0
-                z: 0
-                visible: {
-                    if (!configController) return true
-                    configController.updateCounter
-                    return configController.isSubComponentVisible("controllers", "pad")
-                }
-                
-                PadIndicator {
-                    aftertouch: root.pad2Aftertouch
-                    velocity: root.pad2Velocity
-                    scale: Qt.vector3d(1.3, 1.3, 1.3)
-                    orientation: Qt.vector3d(-90, 90, 90)
-                    showValues: showControllerValues()
-                }
-            }
-        }
-    }
-    
-    // Overlay 2D pour le mode GearShift
-    Text {
-        visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "gearShift")
-        text: root.gearShiftMode
-        font.pixelSize: 14
-        font.bold: true
-        color: "#CCCCCC"
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.horizontalCenterOffset: -parent.width * 0.19  // Position centrée au-dessus du GearShift
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 30
-    }
-    
-    // Labels pour les pads (+ plage calibrage en mode calibrage)
-    Row {
-        visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "pad")
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.horizontalCenterOffset: parent.width * 0.33
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 30
-        spacing: 50
-        
-        Column {
-            spacing: 2
-            Text {
-                text: "PAD 1"
-                font.pixelSize: 12
-                font.bold: root.pad1Active
-                color: root.pad1Active ? "#00ff00" : "#666666"
-            }
-        }
-        
-        Column {
-            spacing: 2
-            Text {
-                text: "PAD 2"
-                font.pixelSize: 12
-                font.bold: root.pad2Active
-                color: root.pad2Active ? "#00ff00" : "#666666"
-            }
-        }
-    }
-    
-    // Boutons test haut-parleurs (tout à gauche)
-    Row {
-        id: speakerTestBar
-        visible: showControllerValues()
-        anchors.top: parent.top
-        anchors.topMargin: 6
-        anchors.left: parent.left
-        anchors.leftMargin: 12
-        spacing: 8
-        z: 1000
-
-        // HP G (switch on/off)
-        Rectangle {
-            width: 56
-            height: 28
-            radius: 4
-            color: root.leftSpeakerTestOn ? "#00aa00" : (maHPG.containsMouse ? "#3a3a3a" : "#2a2a2a")
-            border.color: "#00ff00"
-            border.width: root.leftSpeakerTestOn ? 2 : 1
-            MouseArea {
-                id: maHPG
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    root.leftSpeakerTestOn = !root.leftSpeakerTestOn
-                    root.testSpeaker("left", root.leftSpeakerTestOn)
-                }
-            }
-            Text {
-                anchors.centerIn: parent
-                text: root.leftSpeakerTestOn ? "HP G ON" : "HP G"
-                color: root.leftSpeakerTestOn ? "#000000" : "#00ff00"
-                font.pixelSize: 10
-                font.bold: root.leftSpeakerTestOn
-            }
-        }
-
-        // HP D (switch on/off)
-        Rectangle {
-            width: 56
-            height: 28
-            radius: 4
-            color: root.rightSpeakerTestOn ? "#00aa00" : (maHPD.containsMouse ? "#3a3a3a" : "#2a2a2a")
-            border.color: "#00ff00"
-            border.width: root.rightSpeakerTestOn ? 2 : 1
-            MouseArea {
-                id: maHPD
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    root.rightSpeakerTestOn = !root.rightSpeakerTestOn
-                    root.testSpeaker("right", root.rightSpeakerTestOn)
-                }
-            }
-            Text {
-                anchors.centerIn: parent
-                text: root.rightSpeakerTestOn ? "HP D ON" : "HP D"
-                color: root.rightSpeakerTestOn ? "#000000" : "#00ff00"
-                font.pixelSize: 10
-                font.bold: root.rightSpeakerTestOn
-            }
-        }
-    }
-
-    // Calibrage joystick (gauche : évite le chevauchement avec les pads à droite)
-    Row {
-        id: joystickCalibBar
-        // Indépendant de controllerValues : le calibrage doit rester visible même si les chiffres 3D sont masqués
-        visible: configController && configController.isSubComponentVisible("controllers", "joystick")
-        anchors.top: parent.top
-        anchors.topMargin: 6
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.horizontalCenterOffset: -parent.width * 0.22
-        spacing: 10
-        z: 1000
-
-        Column {
-            id: joystickCalibControls
-            spacing: 6
-            width: implicitWidth
-
-        Text {
-            text: "Joystick"
-            color: "#88ff88"
-            font.pixelSize: 9
-            font.bold: true
-        }
-
-        Row {
-            id: joyModeRow
-            spacing: 3
-
-            Rectangle {
-                width: 34
-                height: 22
-                radius: 3
-                color: root.joystickCalibrationMode === "min" ? "#00aa00" : (jMaMin.containsMouse ? "#3a3a3a" : "#2a2a2a")
-                border.color: "#00ff00"
-                border.width: root.joystickCalibrationMode === "min" ? 2 : 1
-                MouseArea {
-                    id: jMaMin
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.joystickCalibrationMode = "min"
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "min"
-                    color: root.joystickCalibrationMode === "min" ? "#000000" : "#00ff00"
-                    font.pixelSize: 8
-                    font.bold: root.joystickCalibrationMode === "min"
-                }
-            }
-            Rectangle {
-                width: 38
-                height: 22
-                radius: 3
-                color: root.joystickCalibrationMode === "zero_min" ? "#00aa00" : (jMaZmin.containsMouse ? "#3a3a3a" : "#2a2a2a")
-                border.color: "#00ff00"
-                border.width: root.joystickCalibrationMode === "zero_min" ? 2 : 1
-                MouseArea {
-                    id: jMaZmin
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.joystickCalibrationMode = "zero_min"
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "0.min"
-                    color: root.joystickCalibrationMode === "zero_min" ? "#000000" : "#00ff00"
-                    font.pixelSize: 7
-                    font.bold: root.joystickCalibrationMode === "zero_min"
-                }
-            }
-            Rectangle {
-                width: 38
-                height: 22
-                radius: 3
-                color: root.joystickCalibrationMode === "zero_max" ? "#00aa00" : (jMaZmax.containsMouse ? "#3a3a3a" : "#2a2a2a")
-                border.color: "#00ff00"
-                border.width: root.joystickCalibrationMode === "zero_max" ? 2 : 1
-                MouseArea {
-                    id: jMaZmax
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.joystickCalibrationMode = "zero_max"
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "0.max"
-                    color: root.joystickCalibrationMode === "zero_max" ? "#000000" : "#00ff00"
-                    font.pixelSize: 7
-                    font.bold: root.joystickCalibrationMode === "zero_max"
-                }
-            }
-            Rectangle {
-                width: 34
-                height: 22
-                radius: 3
-                color: root.joystickCalibrationMode === "max" ? "#00aa00" : (jMaMax.containsMouse ? "#3a3a3a" : "#2a2a2a")
-                border.color: "#00ff00"
-                border.width: root.joystickCalibrationMode === "max" ? 2 : 1
-                MouseArea {
-                    id: jMaMax
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.joystickCalibrationMode = "max"
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "max"
-                    color: root.joystickCalibrationMode === "max" ? "#000000" : "#00ff00"
-                    font.pixelSize: 8
-                    font.bold: root.joystickCalibrationMode === "max"
-                }
-            }
-        }
-
-        Row {
-            spacing: 8
-
-            Column {
-                spacing: 3
-                width: 72
-                Rectangle {
-                    width: parent.width
-                    height: 26
-                    radius: 3
-                    color: jMaCalX.containsMouse ? "#3a3a3a" : "#2a2a2a"
-                    border.color: "#00ff00"
-                    border.width: 1
-                    MouseArea {
-                        id: jMaCalX
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.sendJoystickCalibration("x")
-                    }
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Calibrer X"
-                        color: "#00ff00"
-                        font.pixelSize: 9
-                        font.bold: true
-                    }
-                }
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WrapAnywhere
-                    maximumLineCount: 3
-                    text: "X " + Math.round(root.joystickRawX)
-                    font.pixelSize: 10
-                    font.bold: true
-                    color: "#ccffcc"
-                }
-            }
-
-            Column {
-                spacing: 3
-                width: 72
-                Rectangle {
-                    width: parent.width
-                    height: 26
-                    radius: 3
-                    color: jMaCalY.containsMouse ? "#3a3a3a" : "#2a2a2a"
-                    border.color: "#00ff00"
-                    border.width: 1
-                    MouseArea {
-                        id: jMaCalY
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.sendJoystickCalibration("y")
-                    }
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Calibrer Y"
-                        color: "#00ff00"
-                        font.pixelSize: 9
-                        font.bold: true
-                    }
-                }
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WrapAnywhere
-                    maximumLineCount: 3
-                    text: "Y " + Math.round(root.joystickRawY)
-                    font.pixelSize: 10
-                    font.bold: true
-                    color: "#ccffcc"
-                }
-            }
-        }
-        }
-
-        Column {
-            id: joystickCalibThresholds
-            spacing: 4
-            anchors.verticalCenter: joystickCalibControls.verticalCenter
-
-            Text {
-                text: "Seuils"
-                color: "#88ff88"
-                font.pixelSize: 9
-                font.bold: true
-            }
-            Row {
-                spacing: 10
-                Column {
-                    spacing: 1
-                    Text {
-                        text: "X"
-                        color: "#aaffaa"
-                        font.pixelSize: 8
-                        font.bold: true
-                    }
-                    Text {
-                        text: root.joyCalibRowText("x", 0)
-                        color: "#ccffcc"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                    Text {
-                        text: root.joyCalibRowText("x", 1)
-                        color: "#ccffcc"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                    Text {
-                        text: root.joyCalibRowText("x", 2)
-                        color: "#ccffcc"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                    Text {
-                        text: root.joyCalibRowText("x", 3)
-                        color: "#ccffcc"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                }
-                Column {
-                    spacing: 1
-                    Text {
-                        text: "Y"
-                        color: "#aaffaa"
-                        font.pixelSize: 8
-                        font.bold: true
-                    }
-                    Text {
-                        text: root.joyCalibRowText("y", 0)
-                        color: "#ccffcc"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                    Text {
-                        text: root.joyCalibRowText("y", 1)
-                        color: "#ccffcc"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                    Text {
-                        text: root.joyCalibRowText("y", 2)
-                        color: "#ccffcc"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                    Text {
-                        text: root.joyCalibRowText("y", 3)
-                        color: "#ccffcc"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                }
-                Column {
-                    spacing: 1
-                    Text {
-                        text: "Filtré"
-                        color: "#aaffaa"
-                        font.pixelSize: 8
-                        font.bold: true
-                    }
-                    Text {
-                        text: root.joyFilteredLine("x")
-                        color: "#ffeeaa"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                    Text {
-                        text: root.joyFilteredLine("y")
-                        color: "#ffeeaa"
-                        font.pixelSize: 8
-                        font.family: "monospace"
-                    }
-                }
-            }
-        }
-    }
-
-    // Boutons calibration pads (tout à droite)
-    Row {
-        id: padCalibBar
-        visible: showControllerValues() && configController && configController.isSubComponentVisible("controllers", "pad")
-        anchors.top: parent.top
-        anchors.topMargin: 6
-        anchors.right: parent.right
-        anchors.rightMargin: 12
-        spacing: 8
-        z: 1000
-
-        // Sélecteur Min / Max
-        Row {
-            spacing: 4
-            Rectangle {
-                width: 44
-                height: 28
-                radius: 4
-                color: root.padCalibrationMode === "min" ? "#00aa00" : (maMin.containsMouse ? "#3a3a3a" : "#2a2a2a")
-                border.color: "#00ff00"
-                border.width: root.padCalibrationMode === "min" ? 2 : 1
-                MouseArea {
-                    id: maMin
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.padCalibrationMode = "min"
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "Min"
-                    color: root.padCalibrationMode === "min" ? "#000000" : "#00ff00"
-                    font.pixelSize: 10
-                    font.bold: root.padCalibrationMode === "min"
-                }
-            }
-            Rectangle {
-                width: 44
-                height: 28
-                radius: 4
-                color: root.padCalibrationMode === "max" ? "#00aa00" : (maMax.containsMouse ? "#3a3a3a" : "#2a2a2a")
-                border.color: "#00ff00"
-                border.width: root.padCalibrationMode === "max" ? 2 : 1
-                MouseArea {
-                    id: maMax
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.padCalibrationMode = "max"
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "Max"
-                    color: root.padCalibrationMode === "max" ? "#000000" : "#00ff00"
-                    font.pixelSize: 10
-                    font.bold: root.padCalibrationMode === "max"
-                }
-            }
-        }
-
-        // Calibrer PAD 1 + valeur int16 en dessous
-        Column {
-            spacing: 4
-            Rectangle {
-                width: 110
-                height: 28
-                radius: 4
-                color: ma1.containsMouse ? "#3a3a3a" : "#2a2a2a"
-                border.color: "#00ff00"
-                border.width: 1
-                MouseArea {
-                    id: ma1
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        root.sendPadCalibration(0)
-                    }
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "Calibrer PAD 1"
-                    color: "#00ff00"
-                    font.pixelSize: 10
-                    font.bold: true
-                }
-            }
-            Text {
-                width: 110
-                horizontalAlignment: Text.AlignHCenter
-                text: root.padCalibDisplayValues[0]
-                font.pixelSize: 11
-                color: "#00ff00"
-            }
-        }
-
-        // Calibrer PAD 2 + valeur int16 en dessous
-        Column {
-            spacing: 4
-            Rectangle {
-                width: 110
-                height: 28
-                radius: 4
-                color: ma2.containsMouse ? "#3a3a3a" : "#2a2a2a"
-                border.color: "#00ff00"
-                border.width: 1
-                MouseArea {
-                    id: ma2
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        root.sendPadCalibration(1)
-                    }
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "Calibrer PAD 2"
-                    color: "#00ff00"
-                    font.pixelSize: 10
-                    font.bold: true
-                }
-            }
-            Text {
-                width: 110
-                horizontalAlignment: Text.AlignHCenter
-                text: root.padCalibDisplayValues[1]
-                font.pixelSize: 11
-                color: "#00ff00"
-            }
-        }
-    }
-
-    // Barre "Tests et calibrage" (2D, centrée) — TEST FADER uniquement
-    Row {
-        id: testsCalibBar
-        visible: showControllerValues()
-        anchors.top: parent.top
-        anchors.topMargin: 6
-        anchors.horizontalCenter: parent.horizontalCenter
-        spacing: 12
-        z: 1000
-
-        // TEST FADER
-        Rectangle {
-            width: 80
-            height: 28
-            radius: 4
-            visible: configController && configController.isSubComponentVisible("controllers", "fader")
-            color: root.faderTestActive ? "#00aa00" : (maFader.containsMouse ? "#3a3a3a" : "#2a2a2a")
-            border.color: "#00ff00"
-            border.width: root.faderTestActive ? 3 : 1
-            MouseArea {
-                id: maFader
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    root.faderTestActive = !root.faderTestActive
-                    root.testFader(root.faderTestActive)
-                }
-            }
-            Text {
-                anchors.centerIn: parent
-                text: root.faderTestActive ? "TEST ON" : "TEST FADER"
-                color: root.faderTestActive ? "#000000" : "#00ff00"
-                font.pixelSize: 10
-                font.bold: true
-            }
-        }
-    }
-
-    // Boutons supplémentaires en overlay 2D (en bas)
-    Row {
-        visible: showControllerValues()
-        anchors.bottom: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottomMargin: 5
-        spacing: 15
-        
-        // Bouton 1
-        Rectangle {
-            width: 50
-            height: 30
-            radius: 4
-            color: root.button1 ? "#00ff00" : "#2a2a2a"
-            border.color: root.button1 ? "#00aa00" : "#444444"
-            border.width: 2
-            
-            Text {
-                text: "BTN 1"
-                anchors.centerIn: parent
-                color: root.button1 ? "#000000" : "#666666"
-                font.pixelSize: 10
-                font.bold: root.button1
-            }
-        }
-        
-        // Bouton 2
-        Rectangle {
-            width: 50
-            height: 30
-            radius: 4
-            color: root.button2 ? "#00ff00" : "#2a2a2a"
-            border.color: root.button2 ? "#00aa00" : "#444444"
-            border.width: 2
-            
-            Text {
-                text: "BTN 2"
-                anchors.centerIn: parent
-                color: root.button2 ? "#000000" : "#666666"
-                font.pixelSize: 10
-                font.bold: root.button2
-            }
-        }
-    }
-
-    Connections {
-        target: root.configController
-        ignoreUnknownSignals: true
-        function onSettingsUpdated() {
-            root.refreshJoystickCalibrationStateFromConfig()
-        }
-    }
-
-    Component.onCompleted: root.refreshJoystickCalibrationStateFromConfig()
-
-    // Fonction pour mettre à jour toutes les données
     function updateControllers(controllersData) {
-        
         if (controllersData.wheel) {
             wheelPosition = controllersData.wheel.position || 0
             wheelSpeed = controllersData.wheel.velocity || 0
         }
-        
         if (controllersData.joystick) {
             var j = controllersData.joystick
             function joyNum(v) {
-                if (typeof v === "number" && isFinite(v))
-                    return v
-                if (typeof v === "string" && v.length > 0) {
-                    var n = parseFloat(v)
-                    if (isFinite(n))
-                        return n
-                }
-                return 0
+                var n = typeof v === "number" ? v : parseFloat(v)
+                return isFinite(n) ? n : 0
             }
-            var jx = joyNum(j.x)
-            var jy = joyNum(j.y)
-            joystickRawX = jx
-            joystickRawY = jy
-            joystickX = jx / 127.0
-            joystickY = jy / 127.0
+            joystickRawX = joyNum(j.x)
+            joystickRawY = joyNum(j.y)
+            joystickX = joystickRawX / 127.0
+            joystickY = joystickRawY / 127.0
             joystickZ = joyNum(j.z) / 127.0
-            joystickButton = controllersData.joystick.button || false
+            joystickButton = j.button || false
         }
-        
         if (controllersData.gearShift) {
             gearShiftPosition = controllersData.gearShift.position || 0
             gearShiftMode = controllersData.gearShift.mode || "0"
         }
-        
-        if (controllersData.fader) {
+        if (controllersData.fader)
             faderValue = controllersData.fader.value || 0
-        }
-        
         if (controllersData.modPedal) {
             modPedalValue = controllersData.modPedal.value || 0
             modPedalPercent = controllersData.modPedal.percent || 0
         }
-        
-        // Pad 1
-        if (controllersData.pad1) {
-            pad1Velocity = controllersData.pad1.velocity || 0
-            pad1Aftertouch = controllersData.pad1.aftertouch || 0
-            pad1Active = controllersData.pad1.active || false
+        var p1 = controllersData.pad1 || (controllersData.pad && !controllersData.pad1 ? controllersData.pad : null)
+        if (p1) {
+            pad1Velocity = p1.velocity || 0
+            pad1Aftertouch = p1.aftertouch || 0
+            pad1Active = p1.active || false
             if (root.pad1CalibrationActive) {
                 if (root.padCalibrationMode === "min") {
                     root.pad1CalibMinV = Math.min(root.pad1CalibMinV, pad1Velocity)
@@ -1155,8 +240,6 @@ Rectangle {
                 }
             }
         }
-        
-        // Pad 2
         if (controllersData.pad2) {
             pad2Velocity = controllersData.pad2.velocity || 0
             pad2Aftertouch = controllersData.pad2.aftertouch || 0
@@ -1171,34 +254,387 @@ Rectangle {
                 }
             }
         }
-        
-        // Rétrocompatibilité : ancien format "pad" unique -> pad1
-        if (controllersData.pad && !controllersData.pad1) {
-            pad1Velocity = controllersData.pad.velocity || 0
-            pad1Aftertouch = controllersData.pad.aftertouch || 0
-            pad1Active = controllersData.pad.active || false
-            if (root.pad1CalibrationActive) {
-                if (root.padCalibrationMode === "min") {
-                    root.pad1CalibMinV = Math.min(root.pad1CalibMinV, pad1Velocity)
-                    root.pad1CalibMinA = Math.min(root.pad1CalibMinA, pad1Aftertouch)
-                } else {
-                    root.pad1CalibMaxV = Math.max(root.pad1CalibMaxV, pad1Velocity)
-                    root.pad1CalibMaxA = Math.max(root.pad1CalibMaxA, pad1Aftertouch)
-                }
-            }
-        }
-        
-        // Boutons supplémentaires
         if (controllersData.buttons) {
             button1 = controllersData.buttons.button1 || false
             button2 = controllersData.buttons.button2 || false
         }
-        
-        // Encodeur
         if (controllersData.encoder) {
             encoderValue = controllersData.encoder.value || 0
             encoderPressed = controllersData.encoder.pressed || false
         }
-        
+    }
+
+    Connections {
+        target: root.configController
+        ignoreUnknownSignals: true
+        function onSettingsUpdated() { root.refreshJoystickCalibrationStateFromConfig() }
+    }
+
+    Component.onCompleted: root.refreshJoystickCalibrationStateFromConfig()
+
+    // ------------------------------------------------------------------
+    // Briques visuelles
+    // ------------------------------------------------------------------
+
+    // Carte : titre + contenu empilé
+    component Card: Rectangle {
+        id: card
+        property string title: ""
+        property bool lit: false            // allumée quand le contrôleur est actif
+        default property alias content: body.data
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        Layout.minimumWidth: 200
+        implicitHeight: body.implicitHeight + 40
+        color: "#141414"
+        radius: 6
+        border.width: 1
+        border.color: lit ? "#00ff00" : "#2a2a2a"
+        Text {
+            id: cardTitle
+            text: card.title
+            color: card.lit ? "#00ff00" : "#88ff88"
+            font.pixelSize: 13
+            font.bold: true
+            font.letterSpacing: 1.5
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.margins: 10
+        }
+        Column {
+            id: body
+            spacing: 8
+            anchors.top: cardTitle.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 10
+        }
+    }
+
+    // Jauge horizontale 0..max, avec libellé et valeur
+    component Gauge: Item {
+        id: gauge
+        property string label: ""
+        property real value: 0
+        property real maximum: 127
+        property string text: String(Math.round(value))
+        width: parent ? parent.width : 150
+        implicitHeight: 22
+        Text {
+            id: gaugeLabel
+            text: gauge.label
+            color: "#7a7a7a"
+            font.pixelSize: 12
+            width: 44
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        Rectangle {
+            id: track
+            anchors.left: gaugeLabel.right
+            anchors.right: gaugeValue.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            height: 10
+            radius: 3
+            color: "#262626"
+            Rectangle {
+                width: parent.width * Math.max(0, Math.min(1, gauge.value / gauge.maximum))
+                height: parent.height
+                radius: 3
+                color: "#00ff00"
+            }
+        }
+        Text {
+            id: gaugeValue
+            text: gauge.text
+            color: "#ccffcc"
+            font.pixelSize: 13
+            font.family: "monospace"
+            horizontalAlignment: Text.AlignRight
+            width: 48
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+        }
+    }
+
+    // Voyant rond + libellé (boutons)
+    component Lamp: Row {
+        property string label: ""
+        property bool on: false
+        spacing: 6
+        Rectangle {
+            width: 14; height: 14; radius: 7
+            color: parent.on ? "#00ff00" : "#262626"
+            border.color: parent.on ? "#00ff00" : "#444444"
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        Text {
+            text: parent.label
+            color: parent.on ? "#00ff00" : "#7a7a7a"
+            font.pixelSize: 12
+            anchors.verticalCenter: parent.verticalCenter
+        }
+    }
+
+    // Bouton plat : simple ou à état (choisi)
+    component FlatButton: Rectangle {
+        id: fb
+        property string label: ""
+        property bool selected: false
+        signal clicked()
+        implicitWidth: Math.max(44, fbText.implicitWidth + 16)
+        implicitHeight: 26
+        radius: 4
+        color: selected ? "#00aa00" : (fbMouse.containsMouse ? "#3a3a3a" : "#2a2a2a")
+        border.color: "#00ff00"
+        border.width: selected ? 2 : 1
+        Text {
+            id: fbText
+            anchors.centerIn: parent
+            text: fb.label
+            color: fb.selected ? "#000000" : "#00ff00"
+            font.pixelSize: 11
+            font.bold: fb.selected
+        }
+        MouseArea {
+            id: fbMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: fb.clicked()
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Mise en page
+    // ------------------------------------------------------------------
+
+    // Barre d'outils : tests
+    Row {
+        id: toolBar
+        visible: root.showControllerValues()
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.margins: 10
+        spacing: 8
+        FlatButton {
+            label: root.leftSpeakerTestOn ? "HP G ON" : "HP G"
+            selected: root.leftSpeakerTestOn
+            onClicked: { root.leftSpeakerTestOn = !root.leftSpeakerTestOn; root.testSpeaker("left", root.leftSpeakerTestOn) }
+        }
+        FlatButton {
+            label: root.rightSpeakerTestOn ? "HP D ON" : "HP D"
+            selected: root.rightSpeakerTestOn
+            onClicked: { root.rightSpeakerTestOn = !root.rightSpeakerTestOn; root.testSpeaker("right", root.rightSpeakerTestOn) }
+        }
+        FlatButton {
+            visible: root.isShown("fader")
+            label: root.faderTestActive ? "TEST FADER ON" : "TEST FADER"
+            selected: root.faderTestActive
+            onClicked: { root.faderTestActive = !root.faderTestActive; root.testFader(root.faderTestActive) }
+        }
+    }
+
+    GridLayout {
+        id: grid
+        anchors.top: toolBar.visible ? toolBar.bottom : parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 10
+        columns: Math.max(2, Math.floor(width / 260))
+        rowSpacing: 10
+        columnSpacing: 10
+
+        // --- Volant ---
+        Card {
+            title: "VOLANT"
+            visible: root.isShown("wheel")
+            lit: root.wheelSpeed !== 0
+            Item {
+                width: parent.width
+                height: 90
+                Rectangle {
+                    id: dial
+                    width: 80; height: 80; radius: 40
+                    anchors.centerIn: parent
+                    color: "transparent"
+                    border.color: "#444444"
+                    border.width: 2
+                    Rectangle {
+                        width: 3; height: 36
+                        color: root.accent
+                        antialiasing: true
+                        x: dial.width / 2 - width / 2
+                        y: dial.height / 2 - height
+                        transform: Rotation {
+                            origin.x: 1.5; origin.y: 36
+                            angle: root.wheelPosition
+                        }
+                    }
+                }
+            }
+            Gauge { label: "angle"; value: root.wheelPosition; maximum: 360; text: Math.round(root.wheelPosition) + "°" }
+            Gauge { label: "vitesse"; value: Math.abs(root.wheelSpeed); maximum: 127; text: String(Math.round(root.wheelSpeed)) }
+        }
+
+        // --- Levier ---
+        Card {
+            title: "LEVIER"
+            visible: root.isShown("gearShift")
+            Row {
+                spacing: 6
+                anchors.horizontalCenter: parent.horizontalCenter
+                Repeater {
+                    model: [0, 1, 12, 24, 48]
+                    Rectangle {
+                        width: 40; height: 40; radius: 4
+                        color: index === root.gearShiftPosition ? root.accent : "#262626"
+                        border.color: "#444444"
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData
+                            color: index === root.gearShiftPosition ? "#000000" : root.dimText
+                            font.pixelSize: 13
+                            font.bold: index === root.gearShiftPosition
+                        }
+                    }
+                }
+            }
+            Text {
+                text: "position " + root.gearShiftPosition + " · " + root.gearShiftMode + " demi-tons"
+                color: root.valueText
+                font.pixelSize: 12
+            }
+        }
+
+        // --- Joystick ---
+        Card {
+            title: "JOYSTICK"
+            visible: root.isShown("joystick")
+            lit: root.joystickButton || Math.abs(root.joystickX) > 0.05 || Math.abs(root.joystickY) > 0.05
+            Layout.columnSpan: grid.columns >= 4 ? 2 : 1
+            Row {
+                spacing: 14
+                width: parent.width
+                // Position X/Y
+                Rectangle {
+                    id: joyBox
+                    width: 110; height: 110
+                    color: "#1a1a1a"
+                    border.color: "#444444"
+                    Rectangle { width: 1; height: parent.height; x: parent.width / 2; color: "#333333" }
+                    Rectangle { width: parent.width; height: 1; y: parent.height / 2; color: "#333333" }
+                    Rectangle {
+                        width: 12; height: 12; radius: 6
+                        color: root.joystickButton ? "#ffffff" : root.accent
+                        x: joyBox.width / 2 + Math.max(-1, Math.min(1, root.joystickX)) * (joyBox.width / 2 - 6) - 6
+                        y: joyBox.height / 2 - Math.max(-1, Math.min(1, root.joystickY)) * (joyBox.height / 2 - 6) - 6
+                    }
+                }
+                Column {
+                    spacing: 6
+                    width: parent.width - joyBox.width - 14
+                    Gauge { label: "X"; value: Math.abs(root.joystickX) * 127; text: String(Math.round(root.joystickRawX)) }
+                    Gauge { label: "Y"; value: Math.abs(root.joystickY) * 127; text: String(Math.round(root.joystickRawY)) }
+                    Gauge { label: "Z"; value: Math.abs(root.joystickZ) * 127; text: String(Math.round(root.joystickZ * 127)) }
+                    Lamp { label: "bouton"; on: root.joystickButton }
+                    Text {
+                        visible: root.joystickFilteredReceived
+                        text: "filtré  X " + Math.round(root.joystickFilteredX) + "   Y " + Math.round(root.joystickFilteredY)
+                        color: "#ffeeaa"
+                        font.pixelSize: 12
+                        font.family: "monospace"
+                    }
+                }
+            }
+            // Calibrage
+            Row {
+                spacing: 4
+                Repeater {
+                    model: [["min", "min"], ["zero_min", "0.min"], ["zero_max", "0.max"], ["max", "max"]]
+                    FlatButton {
+                        label: modelData[1]
+                        selected: root.joystickCalibrationMode === modelData[0]
+                        onClicked: root.joystickCalibrationMode = modelData[0]
+                    }
+                }
+                Item { width: 8; height: 1 }
+                FlatButton { label: "Calibrer X"; onClicked: root.sendJoystickCalibration("x") }
+                FlatButton { label: "Calibrer Y"; onClicked: root.sendJoystickCalibration("y") }
+            }
+            Text {
+                text: "seuils X  " + [0, 1, 2, 3].map(function (i) { return root.joyCalibSlot("x", i) }).join(" / ")
+                      + "     Y  " + [0, 1, 2, 3].map(function (i) { return root.joyCalibSlot("y", i) }).join(" / ")
+                color: root.valueText
+                font.pixelSize: 11
+                font.family: "monospace"
+            }
+        }
+
+        // --- Pads ---
+        Repeater {
+            model: 2
+            Card {
+                readonly property bool active: index === 0 ? root.pad1Active : root.pad2Active
+                title: "PAD " + (index + 1)
+                visible: root.isShown("pad")
+                lit: active
+                Gauge { label: "frappe"; value: index === 0 ? root.pad1Velocity : root.pad2Velocity }
+                Gauge { label: "pression"; value: index === 0 ? root.pad1Aftertouch : root.pad2Aftertouch }
+                Text {
+                    text: "brut " + root.padCalibDisplayValues[index]
+                    color: root.dimText
+                    font.pixelSize: 12
+                    font.family: "monospace"
+                }
+                Row {
+                    spacing: 4
+                    FlatButton { label: "Min"; selected: root.padCalibrationMode === "min"; onClicked: root.padCalibrationMode = "min" }
+                    FlatButton { label: "Max"; selected: root.padCalibrationMode === "max"; onClicked: root.padCalibrationMode = "max" }
+                    FlatButton { label: "Calibrer"; onClicked: root.sendPadCalibration(index) }
+                }
+            }
+        }
+
+        // --- Slider (fader) ---
+        Card {
+            title: "SLIDER"
+            visible: root.isShown("fader")
+            lit: root.faderTestActive
+            Gauge { label: "valeur"; value: root.faderValue }
+        }
+
+        // --- Pédale ---
+        Card {
+            title: "PÉDALE"
+            visible: root.isShown("modPedal")
+            Gauge { label: "valeur"; value: root.modPedalValue }
+            Text {
+                text: Math.round(root.modPedalPercent) + " %"
+                color: root.valueText
+                font.pixelSize: 12
+            }
+        }
+
+        // --- Encodeur ---
+        Card {
+            title: "ENCODEUR"
+            visible: root.isShown("encoder")
+            lit: root.encoderPressed
+            Gauge { label: "valeur"; value: root.encoderValue }
+            Lamp { label: "appuyé"; on: root.encoderPressed }
+        }
+
+        // --- Boutons ---
+        Card {
+            title: "BOUTONS"
+            lit: root.button1 || root.button2
+            Row {
+                spacing: 18
+                Lamp { label: "bouton 1"; on: root.button1 }
+                Lamp { label: "bouton 2"; on: root.button2 }
+            }
+        }
     }
 }
