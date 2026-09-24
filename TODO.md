@@ -22,6 +22,11 @@ Tâches et améliorations futures pour l'ensemble du système mecaviv-qml-ui.
 - [ ] Cache des clefs 3D pour performance
 - [ ] Mode plein écran optimisé pour Raspberry Pi
 
+#### SirenePupitre — girophones (pad NiDMI, MIDI USB)
+- [ ] Flasher tous les girophones : firmware NiDMI usbmidi-on+usbnet + NVS `gyrophone-pad` (USB seul)
+- [ ] Brancher le MIDI du pad dans `M645.pd` (échelles à mesurer sur le Pi d'abord)
+- [ ] Calibrage des pads et du slider depuis l'interface QML
+
 #### SirenConsole
 - [ ] Implémentation des connexions WebSocket réelles avec pupitres
 - [ ] Messages MIDI binaires temps réel
