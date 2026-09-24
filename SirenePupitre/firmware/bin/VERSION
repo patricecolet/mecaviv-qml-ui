@@ -15,6 +15,7 @@ nvs_image         = gyrophone-pad.nvs.bin (genere par scripts/build-nvs.sh depui
                     modifiee depuis — voir l'en-tete du CSV). USB seul : wifi_enabled=0,
                     rtp_enabled=0, osc_out_all=0 (cles lues a partir de 5184edc).
 
-valide_sur        = Pi (cdc_ncm) : 20 redemarrages + 2 rebranchements, 22/22 (avec une
-                    ligne de debug en plus, retiree ensuite). macOS : lien encore
-                    intermittent, ~1 demarrage sur 2 (sujet ouvert cote NiDMI).
+valide_sur        = Pi (cdc_ncm) : 20 redemarrages + 2 rebranchements, 22/22 (build de debug),
+                    puis CE binaire charge par OTA : 10/10, Wi-Fi et RTP-MIDI coupes,
+                    MIDI USB relie a Pd. macOS : lien encore intermittent, ~1 demarrage
+                    sur 2 (sujet ouvert cote NiDMI).
