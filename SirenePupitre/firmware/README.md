@@ -43,8 +43,13 @@ NiDMI se compile en plusieurs variantes ; celle embarquée ici est **USB-MIDI ac
 - il n'y a **plus de port série** tant que ce firmware tourne : l'USB est pris par le MIDI et le
   réseau. C'est le principal effet de bord à connaître (voir *Pièges*).
 
-L'AP Wi-Fi (`192.168.4.1`) reste disponible en parallèle, mais l'intérêt de cette variante est
-justement de ne plus en dépendre.
+Les girophones tournent en **USB seul** : la NVS coupe le Wi-Fi, RTP-MIDI et l'OSC
+(`wifi_enabled=0`, `rtp_enabled=0`, `osc_out_all=0`, lus par NiDMI à partir de `5184edc`).
+L'interface web, le calibrage et l'OTA passent par le câble. Le même binaire et la même NVS
+servent pour tous les girophones.
+
+Lien réseau USB : fiable sur le Pi (22/22 démarrages), encore intermittent sur macOS (environ
+un démarrage sur deux, l'interface reste `inactive`) — débrancher/rebrancher.
 
 Reconstruire ce binaire depuis le dépôt NiDMI :
 
@@ -104,6 +109,7 @@ que pour *régénérer* l'image — pas pour flasher.
 
 Relevé le 2026-08-25 sur la carte du pupitre. `GET /api/pins/list` renvoie les chaînes NVS telles
 quelles : les fichiers de `nvs/pins/` en sont la copie exacte, vérifiée à l'octet près.
+Modifiés depuis le relevé (2026-09-23) : `A1` `potMin` 400 → 1000, `D2` `btnMode` `pulse` → `press_release`.
 
 | Broche | Nom | Composant | MIDI (canal 1) | Adresse OSC | Sens |
 |---|---|---|---|---|---|
@@ -146,16 +152,15 @@ appuyer/relâcher **RESET**, relâcher **BOOT**. Une carte neuve, elle, est reco
 mais destructeur sur une carte déjà réglée par quelqu'un. Pour une simple mise à jour de firmware :
 `--fw-only`, ou l'OTA (voir ci-dessous).
 
-**L'OTA ne peut pas transporter la configuration.** La mise à jour par Wi-Fi n'écrit que la
+**L'OTA ne peut pas transporter la configuration.** La mise à jour OTA (par le câble) n'écrit que la
 partition applicative — par construction elle ne touche jamais la NVS. Donc : **câble** pour la
 mise en service d'une carte neuve, **OTA** pour les mises à jour ensuite.
 
-**Le nom réseau est dans l'image.** `mdns_name` / `rtp_name` valent `pupitre` dans le CSV : deux
-cartes flashées avec cette image seraient toutes deux `pupitre.local`. Sans conséquence par USB —
-chaque carte est son propre réseau `192.168.7.1` — mais elles se collisionneraient sur le Wi-Fi.
-Pour une flotte, retirer ces clés du CSV et laisser NiDMI dériver un nom par défaut, ou produire
-une image par carte.
+**Le nom réseau est dans l'image.** `mdns_name` / `rtp_name` valent `nidmi` dans le CSV : deux
+cartes flashées avec cette image seraient toutes deux `nidmi.local`. Sans conséquence par USB —
+chaque carte est son propre réseau `192.168.7.1`, et le Wi-Fi est coupé. À revoir seulement si
+on le rallume : retirer ces clés du CSV, ou produire une image par carte.
 
-**Les offsets sont dupliqués.** `scripts/flash.sh` code en dur `0x0 / 0x8000 / 0x9000 / 0x10000`,
+**Les offsets sont dupliqués.** `scripts/flash.sh` code en dur `0x0 / 0x8000 / 0x9000 / 0xe000 (otadata, effacé) / 0x10000`,
 qui viennent de `NiDMI/tools/nidmi_s3_ota_dual_littlefs.csv`. Si cette table change côté NiDMI,
 il faut les reporter ici — rien ne le détecte automatiquement.

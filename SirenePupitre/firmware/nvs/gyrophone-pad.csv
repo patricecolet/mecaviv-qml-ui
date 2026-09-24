@@ -2,6 +2,13 @@
 #
 # CAPTUREE depuis la carte de reference le 2026-08-28 (GET /api/pins/list renvoie
 # les chaines NVS telles quelles, la copie est donc fidele a l octet pres).
+# Modifie depuis (2026-09-23) : A1 potMin 400->1000, D2 btnMode pulse->press_release.
+# TYPES : l API rend les valeurs, pas les types NVS. Ils doivent suivre les
+# get/put du firmware -- osc_port est i32 (getInt) ; en u32 la lecture echoue
+# et l OSC part sur le port par defaut 8001.
+# USB seul (2026-09-24) : ni Wi-Fi, ni RTP-MIDI, ni OSC -- wifi_enabled et
+# rtp_enabled demandent un firmware NiDMI qui les lit au demarrage (feat/usb-net
+# apres e4de224) ; un firmware plus ancien les ignore et garde le Wi-Fi.
 # Regenerer l image : ./scripts/build-nvs.sh
 #
 # ATTENTION mdns_name / rtp_name : toutes les cartes flashees avec cette image
@@ -15,10 +22,12 @@ mdns_name,data,string,nidmi
 rtp_name,data,string,nidmi
 touch_enabled,data,u8,0
 rt_slice,data,u8,8
+wifi_enabled,data,u8,0
+rtp_enabled,data,u8,0
 osc_target,data,string,ap+usb
-osc_port,data,u32,8000
+osc_port,data,i32,8000
 osc_broadcast,data,u8,1
-osc_out_all,data,u8,1
+osc_out_all,data,u8,0
 osc_interface,data,string,ap+usb
 # --- Controles du pupitre (message 0x02 CONTROLLERS) ---
 pin_D2,file,string,pins/D2.json

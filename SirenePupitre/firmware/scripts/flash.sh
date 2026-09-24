@@ -19,6 +19,7 @@ OFF_BOOTLOADER=0x0        # l'ESP32-S3 demarre a 0x0 (et non 0x1000 comme l'ESP3
 OFF_PARTITIONS=0x8000
 OFF_NVS=0x9000            # taille 0x5000 = 20 Ko
 OFF_APP=0x10000           # slot app0
+OFF_OTADATA=0xe000        # taille 0x2000
 
 FW_BOOTLOADER="$BIN/nidmi-s3-usbnet.bootloader.bin"
 FW_PARTITIONS="$BIN/nidmi-s3-usbnet.partitions.bin"
@@ -79,8 +80,10 @@ fi
 # les 4.x n'acceptent que l'ancien nom (write_flash).
 if "$ESPTOOL" --help 2>&1 | grep -q -- 'write-flash'; then
     WRITE_CMD=write-flash
+    ERASE_CMD=erase-region
 else
     WRITE_CMD=write_flash
+    ERASE_CMD=erase_region
 fi
 
 echo "📡 Port      : $PORT"
@@ -103,6 +106,11 @@ if [ "$DO_NVS" = true ]; then
 fi
 [ ${#ARGS[@]} -eq 0 ] && { echo "Rien a faire (--fw-only et --nvs-only sont exclusifs)."; exit 1; }
 
+# otadata efface avec le firmware : une carte deja mise a jour par OTA demarre
+# sur app1, et un flash dans app0 serait ignore sans aucun message.
+if [ "$DO_FW" = true ]; then
+    "$ESPTOOL" --chip esp32s3 --port "$PORT" "$ERASE_CMD" "$OFF_OTADATA" 0x2000
+fi
 "$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 921600 "$WRITE_CMD" "${ARGS[@]}"
 
 cat <<'MSG'
