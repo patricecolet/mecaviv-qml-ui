@@ -1,0 +1,8 @@
+# Version de pdlua compilée dans ~/pd-externals/pdlua (tag de agraef/pd-lua),
+# alignée sur celle du Mac. Changer cette valeur suffit à déclencher un rebuild.
+#
+# Le pd-lua 0.7.3 de Debian ne convient pas : il ne fournit pas `_canvaspath`,
+# dont pdjson se sert pour résoudre un chemin relatif — la lecture du JSON
+# échoue et pedalier.pd démarre sans ses compositions (mesuré le 2026-09-23).
+# Depuis 0.12, pdlua embarque Lua 5.4 : lunajson doit être visible en 5.4.
+0.12.23

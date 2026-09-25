@@ -538,16 +538,76 @@ phase_pd_build() {
 # externals — ~/pd-externals
 # ---------------------------------------------------------------------------
 
-# Le patch sonde ne contient QUE l'objet pdjson : la moindre ligne
-# « couldn't create » dans la sortie signe son échec. Pd affiche le nom de
-# l'objet et le message sur deux lignes séparées, d'où le motif sans le nom.
+# Le patch sonde fait lire à pdjson un fichier RELATIF au patch : que l'objet se
+# crée ne suffit pas. Avec le pdlua 0.7.3 de Debian, pdjson se créait très bien
+# puis échouait à chaque `read` (pas de `_canvaspath`). « JSON loaded from »
+# n'est posté que si le fichier a été lu et décodé.
 pdjson_loads() {
     local tmp; tmp=$(mktemp -d)
-    printf '#N canvas 0 0 200 200;\n#X obj 20 20 pdjson;\n' > "$tmp/probe.pd"
+    printf '{"ok": 1}\n' > "$tmp/probe.json"
+    printf '%s\n' '#N canvas 0 0 200 200;' '#X obj 20 20 loadbang;' \
+        '#X msg 20 50 read probe.json;' '#X obj 20 80 pdjson;' \
+        '#X connect 0 0 1 0;' '#X connect 1 0 2 0;' > "$tmp/probe.pd"
     local out; out=$(timeout 20 "$PEDALIER_PD_BIN" -nogui -stderr -noprefs -path "$EXTERNALS_DIR" \
         -lib pdlua "$tmp/probe.pd" 2>&1 </dev/null)
     rm -rf "$tmp"
-    ! printf '%s' "$out" | grep -q "couldn't create"
+    printf '%s' "$out" | grep -q "JSON loaded from"
+}
+
+# pdlua compilé depuis agraef/pd-lua contre les sources du Pd de /usr/local
+# (il lui faut s_stuff.h, que le paquet dev n'installe pas). On recompile si la
+# version demandée ou celle de Pd a changé.
+build_pdlua() {
+    local target; target=$(read_manifest "$MANIFEST_DIR/pdlua-version.txt" | head -1)
+    local stamp; stamp="$target+pd$(stamp_read pd.version)"
+    local src="$HOME/dev/src/pd-lua"
+    local dest="$EXTERNALS_DIR/pdlua"
+
+    if stamp_matches pdlua.version "$stamp" && [ -f "$dest/pdlua.pd_linux" ]; then
+        skip "pdlua $target"
+        return 0
+    fi
+    [ -f "$PD_SRC/src/s_stuff.h" ] || { warn "sources de Pd absentes ($PD_SRC) — phase pd-build d'abord"; return 0; }
+
+    info "compilation de pdlua $target"
+    if [ ! -d "$src/.git" ]; then
+        run git clone --branch "$target" https://github.com/agraef/pd-lua.git "$src" \
+            || { warn "clonage de pd-lua impossible"; return 0; }
+    else
+        run git -C "$src" fetch --tags origin || true
+        run git -C "$src" checkout --quiet "$target" || { warn "tag pdlua $target introuvable"; return 0; }
+    fi
+    run git -C "$src" submodule update --init --recursive || { warn "sous-module lua de pd-lua absent"; return 0; }
+    run_sh "cd '$src' && make clean >/dev/null 2>&1; make -j$(nproc) PDDIR='$PD_SRC'" \
+        || { warn "compilation de pdlua échouée — l'ancien reste en place"; return 0; }
+
+    # L'ancien n'est écarté qu'une fois le nouveau compilé, et hors du chemin
+    # de recherche de Pd.
+    if [ -d "$dest" ]; then
+        run rm -rf "$src.prev" && run mv "$dest" "$src.prev"
+    fi
+    run_sh "cd '$src' && make install PDDIR='$PD_SRC' objectsdir='$EXTERNALS_DIR' >/dev/null" \
+        || { warn "installation de pdlua échouée — l'ancien est dans $src.prev"; return 0; }
+    stamp_write pdlua.version "$stamp"
+    ok "pdlua $target installé"
+}
+
+# lunajson est du Lua pur, installé à la main dans /usr/local/share/lua/5.2/
+# quand pdlua venait de Debian (Lua 5.2). Le pdlua compilé embarque Lua 5.4 :
+# on rend la même copie visible en 5.4 par des liens.
+ensure_lunajson() {
+    local lua54=/usr/local/share/lua/5.4 lua52=/usr/local/share/lua/5.2
+    if [ -f "$lua54/lunajson.lua" ]; then
+        skip "lunajson (Lua 5.4)"
+    elif [ -f "$lua52/lunajson.lua" ]; then
+        run sudo mkdir -p "$lua54" \
+            && run sudo ln -sfn "$lua52/lunajson.lua" "$lua54/lunajson.lua" \
+            && run sudo ln -sfn "$lua52/lunajson" "$lua54/lunajson" \
+            && ok "lunajson rendu visible en Lua 5.4"
+    else
+        warn "lunajson absent de $lua54/ — pdjson ne pourra pas lire de JSON"
+        warn "  correctif : git clone https://github.com/grafi-tt/lunajson && sudo cp -r lunajson/src/lunajson.lua lunajson/src/lunajson $lua54/"
+    fi
 }
 
 # Compile un external de critapec. Meme logique pour tous : on recompile si le
@@ -644,11 +704,7 @@ phase_externals() {
     build_critapec_external "c-siren~"
     install_siren_resources
 
-    # pdlua vient du paquet Debian, mais son dossier d'installation est invisible
-    # pour le Pd de /usr/local : on en garde une copie dans ~/pd-externals.
-    if [ ! -f "$EXTERNALS_DIR/pdlua/pdlua.pd_linux" ] && [ -d /usr/lib/pd/extra/pdlua ]; then
-        run cp -a /usr/lib/pd/extra/pdlua "$EXTERNALS_DIR/" && ok "pdlua copié depuis le paquet Debian"
-    fi
+    build_pdlua
 
     # Pd < 0.55 ne cherche pas <nom>/<nom>.pd_lua : un lien à plat le rend
     # trouvable quelle que soit la version, pour un coût nul.
@@ -659,18 +715,15 @@ phase_externals() {
 
     # lunajson doit rester hors du dossier de pdjson : le chemin de recherche de
     # pdlua essaie le répertoire `lunajson/` avant `lunajson.lua`.
-    if [ ! -f /usr/local/share/lua/5.2/lunajson.lua ]; then
-        warn "lunajson absent de /usr/local/share/lua/5.2/ — pdjson ne pourra pas lire de JSON"
-        warn "  correctif : git clone https://github.com/grafi-tt/lunajson && sudo cp -r lunajson.lua lunajson /usr/local/share/lua/5.2/"
-    fi
+    ensure_lunajson
 
     if [ "$DRY_RUN" != true ] && [ -x "$PEDALIER_PD_BIN" ]; then
         if pdjson_loads; then
-            ok "pdjson se charge"
+            ok "pdjson lit un JSON"
             stamp_write externals.builtfor "$pd_version"
         else
-            err "pdjson ne se charge PAS — pedalier.pd fonctionnera de façon dégradée"
-            err "  vérifier : $PEDALIER_PD_BIN -version (0.55 attendu) et $EXTERNALS_DIR/pdjson.pd_lua"
+            err "pdjson ne lit PAS de JSON — pedalier.pd démarrera sans ses compositions"
+            err "  vérifier : $EXTERNALS_DIR/pdjson.pd_lua, la version de $EXTERNALS_DIR/pdlua et lunajson en Lua 5.4"
         fi
     fi
 }
@@ -998,7 +1051,7 @@ cmd_doctor() {
         log "  binaire : $PEDALIER_PD_BIN — $("$PEDALIER_PD_BIN" -version 2>&1 | head -1)"
         local want; want=$(read_manifest "$MANIFEST_DIR/pd-version.txt" | head -1)
         [ "$(stamp_read pd.version)" = "$want" ] && ok "version attendue ($want)" || warn "jalon de version : $(stamp_read pd.version) ≠ $want"
-        if pdjson_loads; then ok "pdjson se charge"; else err "pdjson ne se charge pas"; fi
+        if pdjson_loads; then ok "pdjson lit un JSON"; else err "pdjson ne lit pas de JSON"; fi
     else
         err "binaire Pd introuvable : $PEDALIER_PD_BIN"
     fi
@@ -1007,7 +1060,10 @@ cmd_doctor() {
         [ -e "$EXTERNALS_DIR/$ext" ] && ok "external $ext" || err "external $ext absent"
     done
     [ -f "$EXTERNALS_DIR/critapec/midifile/midifile.pd_linux" ] && ok "midifile compilé" || err "midifile non compilé"
-    [ -f /usr/local/share/lua/5.2/lunajson.lua ] && ok "lunajson" || err "lunajson absent"
+    local want_lua; want_lua=$(read_manifest "$MANIFEST_DIR/pdlua-version.txt" | head -1)
+    grep -q "VERSION $want_lua;" "$EXTERNALS_DIR/pdlua/pdlua-meta.pd" 2>/dev/null \
+        && ok "pdlua $want_lua" || err "pdlua ≠ $want_lua (le 0.7.3 de Debian casse pdjson)"
+    [ -f /usr/local/share/lua/5.4/lunajson.lua ] && ok "lunajson (Lua 5.4)" || err "lunajson absent de Lua 5.4"
 
     log ""
     log "${C_BOLD}Dépôts${C_RESET}"
