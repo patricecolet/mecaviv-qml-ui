@@ -1402,8 +1402,8 @@ Python, canal binaire horodaté) ou en headless sur le vrai `pedalier.pd` :
   s'applique pas** ; dès que la pédale bouge (> 0) la hauteur s'applique telle quelle, et gate et
   vélocité glissent vers ceux du pas jusqu'à 127. Pas d'interpolation sur la hauteur — « sinon des
   options compliquées ».
-- **Le motif redémarre à chaque note-on**, legato compris ; un note-off n'arrête que s'il libère la
-  note tenue ; chaque pas emporte vélocité et bend de la note source, sans quoi le note-off de la
+- **Le motif redémarre à l'appui, pas à chaque note-on** (révisé le 2026-09-25, voir la fin du
+  document) ; chaque pas emporte vélocité et bend de la note source, sans quoi le note-off de la
   touche précédente rendait les pas muets. **43 relâché** : le note-on suivant ne relance rien.
   **Changer de voix au pied** arrête le motif de l'ancienne sirène (sa note n'aura jamais de note-off).
 - **Rien à refaire d'une scène à l'autre** : assigner ou régler une vitesse écrit la scène une
@@ -1418,3 +1418,26 @@ Python, canal binaire horodaté) ou en headless sur le vrai `pedalier.pd` :
 Reste noté, non traité : à 20 % je mesure 10–14 ms de son au lieu de 25 — les comptes courts
 semblent tomber dans une rafale de sous-ticks après un top d'horloge (`grain`). Et le mode song
 piloté par l'horloge externe, nommé par Patrice, à voir plus tard.
+
+### Départ à l'appui, sur son propre métro — 2026-09-25
+
+Le pas 0 attendait l'impulsion suivante de `pulse480` : le motif ne partait pas sur le geste.
+Décision de Patrice : **un séquenceur indépendant de l'horloge des boucles, au même tempo.**
+`pd phase` tourne sur un `[metro]` d'un tick (`60000 / bpm / 480`, bpm lu dans `$1-tempo` et
+`$1.midiclock.tempo.echo`) ; le retrig le remet à zéro et joue le pas 0 tout de suite ; `pd gate`
+compte sur ces mêmes ticks (`$0.pulse`). Un changement de tempo s'applique au tick suivant.
+
+**Déclenchement** : le sirénium envoie une enveloppe de volet en notes on continues — **2 volet
+fermé** (mesuré, `aseqdump`), montée 4 … 127 à l'appui, descente au relâchement. Le motif repart
+quand la vélocité **franchit 2 en montant**, et s'arrête (`tenue 0`) quand elle y **repasse en
+descendant** ; le legato ne relance plus rien. Le seuil de note on passe de > 1 à > 2.
+
+Mesuré au banc (tempo 120, séquence 2) : pas 0 à 0 ms, puis 166,7 et 333,3 ms — exact au tick ;
+legato sans relance ; arrêt à la descente, nouvel appui repart au pas 0. Le pas 0 part avec la
+vélocité du début de montée (4). Le point « 10–14 ms au lieu de 25 » plus haut venait des rafales
+de `grain` : à revérifier, le gate ne compte plus sur cette horloge.
+
+Même jour, `pd base` : la base de vélocité est prise à la première note et rendue à la voix quand
+`tenue` retombe — `pd volume` écrit le champ 3 de `voices`, que `pd source` relisait à chaque note,
+et la vélocité fondait de 5 % par note jusqu'à 1.
+
