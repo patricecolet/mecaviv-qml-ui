@@ -31,12 +31,13 @@ Trois pédales d'expression continues et quatre interrupteurs, sur la **pédale 
 canal 9). Les numéros sont du matériel, ils sont figés : boutons **43-46**, pédales **47-50**
 (`PEDALIER_MAPPING.md`). Les interrupteurs ont chacun **leur LED** (43-46 en retour).
 
-**Les interrupteurs 43 et 44 sont momentanés** — mesuré le 2026-09-25 (`aseqdump` sur le port
+**Les quatre interrupteurs 43-46 sont momentanés** — mesuré le 2026-09-25 (`aseqdump` sur le port
 `PEDALE_BOSS`) : `127` à l'appui, `0` au relâchement. Une version antérieure de ce paragraphe les
 disait latchés, et le patch recopiait la valeur brute : le motif ne tenait que pied enfoncé, et
 valait 127 ou 254 au lieu de 1 ou 2. C'est donc Pd qui bascule, dans `pd interrupteurs` (sous
 `pd pedals.modulators`) : un appui inverse l'état, le relâchement est ignoré ; `pedal.buttons` reçoit
-0/1, la LED 0/127, et l'état vit dans `$0-interrupteurs`. 45 et 46 passent encore tels quels.
+0/1, la LED 0/127, et l'état vit dans `$0-interrupteurs`. **Même traitement pour 45 et 46**
+(portée des pédales B et C), demandé par Patrice le même jour : les quatre sont des bascules.
 
 | Pédale | CC | Interrupteurs | Au pied | Dans la scène |
 |---|---|---|---|---|
