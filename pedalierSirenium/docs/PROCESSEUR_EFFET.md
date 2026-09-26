@@ -1427,14 +1427,15 @@ Décision de Patrice : **un séquenceur indépendant de l'horloge des boucles, a
 `$1.midiclock.tempo.echo`) ; le retrig le remet à zéro et joue le pas 0 tout de suite ; `pd gate`
 compte sur ces mêmes ticks (`$0.pulse`). Un changement de tempo s'applique au tick suivant.
 
-**Déclenchement** : le sirénium envoie une enveloppe de volet en notes on continues — **2 volet
-fermé** (mesuré, `aseqdump`), montée 4 … 127 à l'appui, descente au relâchement. Le motif repart
-quand la vélocité **franchit 2 en montant**, et s'arrête (`tenue 0`) quand elle y **repasse en
-descendant** ; le legato ne relance plus rien. Le seuil de note on passe de > 1 à > 2.
+**Déclenchement** (règle de Patrice, 2026-09-26) : **la séquence joue tant que la vélocité est
+> 1** — c'est le note on. Elle repart au pas 0 quand la vélocité dépasse 1, et s'arrête au note off
+(1 : `[max 1]` de `pedalier.pd` remonte le 0 du note off à 1) ; le legato ne relance rien. Une
+première version (2026-09-25) mettait le seuil à 2, sur une capture où le sirénium envoyait 2 volet
+fermé : abandonnée, le seuil est un choix de conception, pas une mesure.
 
-Mesuré au banc (tempo 120, séquence 2) : pas 0 à 0 ms, puis 166,7 et 333,3 ms — exact au tick ;
+Au banc (tempo 120, séquence 2) : pas 0 à 0 ms, puis 166,7 et 333,3 ms — exact au tick ;
 legato sans relance ; arrêt à la descente, nouvel appui repart au pas 0. Le pas 0 part avec la
-vélocité du début de montée (4). Le point « 10–14 ms au lieu de 25 » plus haut venait des rafales
+vélocité du début de montée. Le point « 10–14 ms au lieu de 25 » plus haut venait des rafales
 de `grain` : à revérifier, le gate ne compte plus sur cette horloge.
 
 Même jour, `pd base` : la base de vélocité est prise à la première note et rendue à la voix quand
